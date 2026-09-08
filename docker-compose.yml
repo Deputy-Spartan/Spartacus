@@ -1,0 +1,25 @@
+version: "3.8"
+
+# Local Postgres for real end-to-end dev/testing. Not used in production —
+# swap DATABASE_URL to your free-tier host (Neon/Supabase/Railway) at deploy
+# time. Start with: docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spartacus
+      POSTGRES_PASSWORD: spartacus_dev
+      POSTGRES_DB: spartacus
+    ports:
+      - "5432:5432"
+    volumes:
+      - spartacus_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spartacus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  spartacus_pg_data:

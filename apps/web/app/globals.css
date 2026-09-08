@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-base-950 text-slate-100 font-sans;
+  }
+}
+
+@layer components {
+  .neon-card {
+    @apply bg-base-900 border border-white/5 rounded-xl p-5
+           shadow-glow-blue transition-shadow duration-200
+           hover:shadow-glow-blue-lg;
+  }
+
+  .neon-toggle-on {
+    @apply bg-neon-blue shadow-glow-blue;
+  }
+
+  .neon-button {
+    @apply bg-neon-gradient text-base-950 font-semibold rounded-lg px-4 py-2
+           shadow-glow-blue transition-shadow hover:shadow-glow-blue-lg;
+  }
+}

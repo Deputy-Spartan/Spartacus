@@ -1,0 +1,656 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Guild {
+  id                String               @id // Discord guild ID
+  name              String?
+  modules           ModuleToggle[]
+  welcomeConfig     WelcomeConfig?
+  customCommands    CustomCommand[]
+  events            Event[]
+  streamSubs        StreamSubscription[]
+  members           MemberXp[]
+  loggingConfig     LoggingConfig?
+  antiRaidConfig    AntiRaidConfig?
+  reactionRoles     ReactionRole[]
+  joinRoles         JoinRole[]
+  stickyMessages    StickyMessage[]
+  starboardConfig   StarboardConfig?
+  starredMessages   StarredMessage[]
+  tempChannelLobbies TempChannelLobby[]
+  tempChannelInstances TempChannelInstance[]
+  ticketPanels      TicketPanel[]
+  tickets           Ticket[]
+  giveaways         Giveaway[]
+  moderationCases   ModerationCase[]
+  verificationConfig VerificationConfig?
+  quarantineRecords QuarantineRecord[]
+  antiNukeConfig    AntiNukeConfig?
+  honeypotConfig    HoneypotConfig?
+  roleSnapshots     RoleSnapshot[]
+  scheduledMessages ScheduledMessage[]
+  polls             Poll[]
+  suggestions       Suggestion[]
+  economyConfig     EconomyConfig?
+  economyBalances   EconomyBalance[]
+  levelRoles        LevelRole[]
+  xpBlacklist       XpBlacklistEntry[]
+  countingGameConfig CountingGameConfig?
+  invites           InviteStat[]
+  modmailThreads    ModmailThread[]
+  serverPartnerships ServerPartnership[]
+  playerReports     PlayerReport[]
+  permWatchConfig   PermWatchConfig?
+  createdAt         DateTime             @default(now())
+}
+
+enum ModuleKey {
+  MODERATION
+  WELCOME
+  LEVELING
+  STREAM_ALERTS
+  CUSTOM_COMMANDS
+  EVENTS
+  LOGGING
+  ANTI_RAID
+  REACTION_ROLES
+  JOIN_ROLES
+  STICKY_MESSAGES
+  STARBOARD
+  TEMP_CHANNELS
+  TICKETS
+  GIVEAWAYS
+  VERIFICATION
+  QUARANTINE
+  ANTI_NUKE
+  HONEYPOT
+  ROLE_PERSISTENCE
+  SCHEDULED_MESSAGES
+  POLLS
+  SUGGESTIONS
+  ECONOMY
+  COUNTING_GAME
+  TRIVIA
+  CASINO
+  INVITE_TRACKING
+  MODMAIL
+  PLAYER_REPORTS
+  PERM_WATCH
+}
+
+model ModuleToggle {
+  id      String    @id @default(cuid())
+  guild   Guild     @relation(fields: [guildId], references: [id])
+  guildId String
+  key     ModuleKey
+  enabled Boolean   @default(false)
+  config  Json?
+
+  @@unique([guildId, key])
+  @@index([guildId])
+}
+
+model WelcomeConfig {
+  id          String  @id @default(cuid())
+  guild       Guild   @relation(fields: [guildId], references: [id])
+  guildId     String  @unique
+  channelId   String?
+  welcomeText String?
+  goodbyeText String?
+  embedColor  String? @default("#00E5FF")
+}
+
+model CustomCommand {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  trigger   String
+  response  String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, trigger])
+}
+
+model StreamSubscription {
+  id                String    @id @default(cuid())
+  guild             Guild     @relation(fields: [guildId], references: [id])
+  guildId           String
+  platform          String // "twitch" | "youtube"
+  channelName       String
+  announceChannelId String
+  isLive            Boolean   @default(false)
+  lastNotifiedAt    DateTime?
+
+  @@index([guildId])
+}
+
+model MemberXp {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  userId    String
+  xp        Int      @default(0)
+  level     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId])
+  @@index([guildId, xp])
+}
+
+// ---- Raid Helper / Event Coordination ----
+
+enum EventStatus {
+  SCHEDULED
+  REMINDED
+  COMPLETED
+  CANCELLED
+}
+
+model Event {
+  id                    String        @id @default(cuid())
+  guild                 Guild         @relation(fields: [guildId], references: [id])
+  guildId               String
+  title                 String
+  description           String?
+  channelId             String
+  messageId             String?
+  createdById           String
+  startTime             DateTime
+  status                EventStatus   @default(SCHEDULED)
+  reminderMinutesBefore Int           @default(15)
+  signups               EventSignup[]
+  createdAt             DateTime      @default(now())
+
+  @@index([guildId, startTime])
+}
+
+enum SignupRole {
+  TANK
+  DPS
+  HEALER
+  ATTENDING
+  ABSENT
+  TENTATIVE
+}
+
+model EventSignup {
+  id         String     @id @default(cuid())
+  event      Event      @relation(fields: [eventId], references: [id])
+  eventId    String
+  userId     String
+  role       SignupRole
+  reminded   Boolean    @default(false)
+  signedUpAt DateTime   @default(now())
+
+  @@unique([eventId, userId])
+  @@index([eventId])
+}
+
+// ---- Logging ----
+
+model LoggingConfig {
+  id             String   @id @default(cuid())
+  guild          Guild    @relation(fields: [guildId], references: [id])
+  guildId        String   @unique
+  logChannelId   String?
+  logEdits       Boolean  @default(true)
+  logDeletes     Boolean  @default(true)
+  logJoinsLeaves Boolean  @default(true)
+  logVoice       Boolean  @default(false)
+}
+
+// ---- Anti-Raid ----
+
+model AntiRaidConfig {
+  id                String  @id @default(cuid())
+  guild             Guild   @relation(fields: [guildId], references: [id])
+  guildId           String  @unique
+  alertChannelId    String?
+  joinRateLimit     Int     @default(10) // members
+  joinRateWindowSec Int     @default(30)
+  minAccountAgeDays Int     @default(3)
+  autoLockdown      Boolean @default(false)
+}
+
+// ---- Reaction Roles ----
+
+model ReactionRole {
+  id        String @id @default(cuid())
+  guild     Guild  @relation(fields: [guildId], references: [id])
+  guildId   String
+  channelId String
+  messageId String
+  emoji     String
+  roleId    String
+
+  @@unique([messageId, emoji])
+  @@index([guildId])
+}
+
+// ---- Join Roles ----
+
+model JoinRole {
+  id      String @id @default(cuid())
+  guild   Guild  @relation(fields: [guildId], references: [id])
+  guildId String
+  roleId  String
+
+  @@unique([guildId, roleId])
+}
+
+// ---- Sticky Messages ----
+
+model StickyMessage {
+  id            String  @id @default(cuid())
+  guild         Guild   @relation(fields: [guildId], references: [id])
+  guildId       String
+  channelId     String  @unique
+  content       String
+  lastMessageId String?
+}
+
+// ---- Starboard ----
+
+model StarboardConfig {
+  id          String @id @default(cuid())
+  guild       Guild  @relation(fields: [guildId], references: [id])
+  guildId     String @unique
+  channelId   String?
+  threshold   Int    @default(5)
+}
+
+model StarredMessage {
+  id                String @id @default(cuid())
+  guild             Guild  @relation(fields: [guildId], references: [id])
+  guildId           String
+  originalMessageId String
+  starboardMessageId String?
+  starCount         Int    @default(0)
+
+  @@unique([guildId, originalMessageId])
+}
+
+// ---- Temp Channels ----
+
+model TempChannelLobby {
+  id               String  @id @default(cuid())
+  guild            Guild   @relation(fields: [guildId], references: [id])
+  guildId          String
+  name             String
+  lobbyChannelId   String
+  categoryId       String?
+  nameFormat       String  @default("Channel")
+  userLimit        Int     @default(0)
+  bitrate          Int     @default(64000)
+  deleteAfterEmptySec Int  @default(0)
+  pairTextChannel  Boolean @default(false)
+  hideTextFromNonMembers Boolean @default(true)
+
+  @@index([guildId])
+}
+
+model TempChannelInstance {
+  id         String   @id @default(cuid())
+  guild      Guild    @relation(fields: [guildId], references: [id])
+  guildId    String
+  lobbyId    String
+  channelId  String
+  textChannelId String?
+  ownerId    String
+  createdAt  DateTime @default(now())
+
+  @@index([guildId])
+}
+
+// ---- Tickets ----
+
+model TicketPanel {
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String
+  name           String
+  channelId      String
+  categoryId     String?
+  buttonLabel    String  @default("Open a Ticket")
+  supportRoleId  String?
+  messageId      String?
+
+  @@index([guildId])
+}
+
+enum TicketStatus {
+  OPEN
+  CLAIMED
+  CLOSED
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  guild       Guild        @relation(fields: [guildId], references: [id])
+  guildId     String
+  panelId     String
+  channelId   String
+  userId      String
+  claimedById String?
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  closedAt    DateTime?
+
+  @@index([guildId, status])
+}
+
+// ---- Giveaways ----
+
+model Giveaway {
+  id          String   @id @default(cuid())
+  guild       Guild    @relation(fields: [guildId], references: [id])
+  guildId     String
+  channelId   String
+  messageId   String?
+  prize       String
+  winnerCount Int      @default(1)
+  endsAt      DateTime
+  ended       Boolean  @default(false)
+  entries     GiveawayEntry[]
+
+  @@index([guildId, endsAt])
+}
+
+model GiveawayEntry {
+  id         String   @id @default(cuid())
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id])
+  giveawayId String
+  userId     String
+
+  @@unique([giveawayId, userId])
+}
+
+// ---- Moderation Cases (persistent history behind /kick /ban /mute /warn) ----
+
+enum CaseAction {
+  WARN
+  MUTE
+  KICK
+  BAN
+  UNBAN
+  UNMUTE
+}
+
+model ModerationCase {
+  id          String     @id @default(cuid())
+  guild       Guild      @relation(fields: [guildId], references: [id])
+  guildId     String
+  caseNumber  Int
+  userId      String
+  action      CaseAction
+  reason      String?
+  moderatorId String
+  createdAt   DateTime   @default(now())
+
+  @@unique([guildId, caseNumber])
+  @@index([guildId, userId])
+}
+
+// ---- Verification ----
+
+model VerificationConfig {
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String  @unique
+  verifiedRoleId String?
+  minAccountAgeDays Int  @default(0)
+}
+
+// ---- Quarantine ----
+
+model QuarantineRecord {
+  id            String   @id @default(cuid())
+  guild         Guild    @relation(fields: [guildId], references: [id])
+  guildId       String
+  userId        String
+  reason        String?
+  quarantinedBy String
+  previousRoles String[] // role IDs to restore on release
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  @@index([guildId, active])
+}
+
+// ---- Anti-Nuke ----
+
+model AntiNukeConfig {
+  id                String  @id @default(cuid())
+  guild             Guild   @relation(fields: [guildId], references: [id])
+  guildId           String  @unique
+  alertChannelId    String?
+  maxBansPerMinute  Int     @default(3)
+  maxChannelDeletesPerMinute Int @default(3)
+  stripRolesOnTrigger Boolean @default(true)
+}
+
+// ---- Honeypot ----
+
+model HoneypotConfig {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+}
+
+// ---- Role Persistence ----
+
+model RoleSnapshot {
+  id      String   @id @default(cuid())
+  guild   Guild    @relation(fields: [guildId], references: [id])
+  guildId String
+  userId  String
+  roleIds String[]
+  savedAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+// ---- Scheduled Messages ----
+
+model ScheduledMessage {
+  id            String    @id @default(cuid())
+  guild         Guild     @relation(fields: [guildId], references: [id])
+  guildId       String
+  channelId     String
+  content       String
+  cronExpr      String // e.g. "0 9 * * 1" (every Monday 9am)
+  lastSentAt    DateTime?
+
+  @@index([guildId])
+}
+
+// ---- Polls ----
+
+model Poll {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  channelId String
+  messageId String?
+  question  String
+  options   String[] // display labels, indexed by position
+  closed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  votes     PollVote[]
+
+  @@index([guildId])
+}
+
+model PollVote {
+  id       String @id @default(cuid())
+  poll     Poll   @relation(fields: [pollId], references: [id])
+  pollId   String
+  userId   String
+  option   Int
+
+  @@unique([pollId, userId])
+}
+
+// ---- Suggestions ----
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+model Suggestion {
+  id        String           @id @default(cuid())
+  guild     Guild            @relation(fields: [guildId], references: [id])
+  guildId   String
+  channelId String
+  messageId String?
+  userId    String
+  content   String
+  status    SuggestionStatus @default(PENDING)
+  createdAt DateTime         @default(now())
+
+  @@index([guildId, status])
+}
+
+// ---- Economy ----
+
+model EconomyConfig {
+  id           String  @id @default(cuid())
+  guild        Guild   @relation(fields: [guildId], references: [id])
+  guildId      String  @unique
+  currencyName String  @default("Coins")
+  currencyIcon String  @default("🪙")
+  messageEarnMin Int   @default(2)
+  messageEarnMax Int   @default(6)
+  dailyAmount  Int     @default(200)
+  maxBet       Int     @default(5000)
+}
+
+model EconomyBalance {
+  id             String    @id @default(cuid())
+  guild          Guild     @relation(fields: [guildId], references: [id])
+  guildId        String
+  userId         String
+  balance        Int       @default(0)
+  lastDailyClaim DateTime?
+
+  @@unique([guildId, userId])
+  @@index([guildId, balance])
+}
+
+// ---- Level Roles / XP Blacklist ----
+
+model LevelRole {
+  id      String @id @default(cuid())
+  guild   Guild  @relation(fields: [guildId], references: [id])
+  guildId String
+  level   Int
+  roleId  String
+
+  @@unique([guildId, level])
+}
+
+enum XpBlacklistType {
+  CHANNEL
+  ROLE
+}
+
+model XpBlacklistEntry {
+  id       String          @id @default(cuid())
+  guild    Guild           @relation(fields: [guildId], references: [id])
+  guildId  String
+  targetId String
+  type     XpBlacklistType
+
+  @@unique([guildId, targetId])
+}
+
+// ---- Counting Game ----
+
+model CountingGameConfig {
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String  @unique
+  channelId      String?
+  currentCount   Int     @default(0)
+  lastUserId     String?
+  resetOnMistake Boolean @default(true)
+  highScore      Int     @default(0)
+}
+
+// ---- Invite Tracking ----
+
+model InviteStat {
+  id        String @id @default(cuid())
+  guild     Guild  @relation(fields: [guildId], references: [id])
+  guildId   String
+  inviterId String
+  uses      Int    @default(0)
+
+  @@unique([guildId, inviterId])
+}
+
+// ---- Modmail ----
+
+model ModmailThread {
+  id         String   @id @default(cuid())
+  guild      Guild    @relation(fields: [guildId], references: [id])
+  guildId    String
+  userId     String
+  channelId  String // staff-side thread channel
+  subject    String?
+  open       Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([guildId, open])
+}
+
+// ---- Server Partnerships ----
+
+model ServerPartnership {
+  id            String   @id @default(cuid())
+  guild         Guild    @relation(fields: [guildId], references: [id])
+  guildId       String
+  partnerName   String
+  partnerInvite String?
+  type          String // "Ad Exchange" | "Full Alliance" etc
+  since         DateTime @default(now())
+}
+
+// ---- Player Reports ----
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+}
+
+model PlayerReport {
+  id             String       @id @default(cuid())
+  guild          Guild        @relation(fields: [guildId], references: [id])
+  guildId        String
+  reporterId     String
+  reportedUserId String
+  reason         String
+  status         ReportStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+
+  @@index([guildId, status])
+}
+
+// ---- Perm Watch ----
+
+model PermWatchConfig {
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String  @unique
+  alertChannelId String?
+}

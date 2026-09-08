@@ -1,0 +1,39 @@
+services:
+  # Bot + API merged into one free web service — the practical shape for a
+  # 512MB free-tier host. Render builds this from the root Dockerfile.
+  - type: web
+    name: spartacus-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: RUN_BOT_INLINE
+        value: "true"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # set manually — Neon/Supabase connection string
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: NEXTAUTH_URL
+        sync: false # your deployed web dashboard URL
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+
+  # Dashboard — deploy separately to Vercel (recommended for Next.js) or as
+  # a second Render static/web service pointed at apps/web.

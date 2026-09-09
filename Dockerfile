@@ -4,6 +4,9 @@
 FROM node:20-alpine AS base
 WORKDIR /app
 
+# Prisma's schema engine needs OpenSSL, which alpine doesn't ship by default.
+RUN apk add --no-cache openssl
+
 # Install dependencies for the whole workspace first (better layer caching)
 COPY package.json ./
 COPY apps/api/package.json apps/api/package.json

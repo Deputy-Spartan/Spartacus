@@ -1,3 +1,7 @@
+import * as path from "path";
+import * as dotenv from "dotenv";
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+
 import { Client, Events, GatewayIntentBits, Options, Partials } from "discord.js";
 import { commands } from "./commands";
 import * as interactionCreate from "./events/interactionCreate";

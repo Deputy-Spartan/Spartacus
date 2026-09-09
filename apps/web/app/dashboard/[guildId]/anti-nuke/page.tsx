@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type AntiNukeConfig } from "../../../../lib/api";
 
 export default function AntiNukePage({ params }: { params: { guildId: string } }) {
@@ -25,10 +26,12 @@ export default function AntiNukePage({ params }: { params: { guildId: string } }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Anti-Nuke</h1>
-      <p className="text-slate-400 mb-6">
-        Watches the audit log for mass bans or channel deletions and can strip the offending account's roles automatically.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="ANTI_NUKE"
+        title="Anti-Nuke"
+        description="Watches the audit log for mass bans or channel deletions and can strip the offending account's roles automatically."
+      />
 
       <NeonCard className="max-w-lg">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Alert Channel</label>

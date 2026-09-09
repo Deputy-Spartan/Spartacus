@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api } from "../../../../lib/api";
 
 interface PartnershipRow {
@@ -13,6 +14,7 @@ interface PartnershipRow {
 }
 
 export default function PartnershipsPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<PartnershipRow[]>([]);
   const [partnerName, setPartnerName] = useState("");
   const [partnerInvite, setPartnerInvite] = useState("");
@@ -32,6 +34,7 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
   }
 
   async function remove(id: string) {
+    if (!(await confirm("Remove this server partnership?"))) return;
     await api.deletePartnership(params.guildId, id);
     refresh();
   }

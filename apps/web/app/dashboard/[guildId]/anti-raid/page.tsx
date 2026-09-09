@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type AntiRaidConfig } from "../../../../lib/api";
 
 export default function AntiRaidPage({ params }: { params: { guildId: string } }) {
@@ -25,10 +26,12 @@ export default function AntiRaidPage({ params }: { params: { guildId: string } }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Anti-Raid</h1>
-      <p className="text-slate-400 mb-6">
-        The bot kicks new-account joiners and alerts a channel when the join rate spikes.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="ANTI_RAID"
+        title="Anti-Raid"
+        description="The bot kicks new-account joiners and alerts a channel when the join rate spikes."
+      />
 
       <NeonCard className="max-w-lg">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Alert Channel</label>

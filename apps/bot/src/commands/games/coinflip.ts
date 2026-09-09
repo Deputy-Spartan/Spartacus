@@ -35,7 +35,7 @@ const command: CommandModule = {
     const result = Math.random() < 0.5 ? "heads" : "tails";
     const won = result === side;
     const delta = won ? amount : -amount;
-    await addBalance(interaction.guildId, interaction.user.id, delta);
+    await addBalance(interaction.guildId, interaction.user.id, delta, "casino", config.maxBalance);
 
     await interaction.reply(
       `🪙 The coin landed on **${result}**. ${won ? `You won **${amount.toLocaleString()} ${config.currencyName}**! 🎉` : `You lost **${amount.toLocaleString()} ${config.currencyName}**.`}`

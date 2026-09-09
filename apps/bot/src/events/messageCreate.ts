@@ -1,12 +1,13 @@
 import { Events, Message } from "discord.js";
 import { isModuleEnabled } from "../lib/moduleGate";
-import { checkAutomod, handleViolation } from "../modules/moderation/automod";
+import { checkAutomod, handleViolation, type AutomodConfig } from "../modules/moderation/automod";
 import { awardMessageXp } from "../modules/leveling/xp";
 import { grantLevelRoles } from "../modules/leveling/levelRoles";
 import { prisma } from "../lib/prisma";
 import { customCommandCache } from "../lib/cache";
+import { buildStickyPayload } from "../lib/stickyRender";
 import { isSendableChannel } from "../lib/channels";
-import { addBalance, getConfig as getEconomyConfig } from "../lib/economy";
+import { awardMessageEarnings } from "../lib/economy";
 import { checkCountingMessage } from "../modules/games/countingGame";
 
 export const name = Events.MessageCreate;
@@ -19,9 +20,12 @@ export async function execute(message: Message) {
     const toggle = await prisma.moduleToggle.findUnique({
       where: { guildId_key: { guildId: message.guildId, key: "MODERATION" } },
     });
-    const config = (toggle?.config as { bannedWords?: string[]; antiLink?: boolean; spamCap?: boolean }) ?? {};
+    const config = (toggle?.config as AutomodConfig) ?? {};
 
-    const violation = checkAutomod(message, config);
+    const immuneRoleIds = Array.isArray(config.immuneRoleIds) ? config.immuneRoleIds : [];
+    const isImmune = message.member && immuneRoleIds.some((roleId) => message.member!.roles.cache.has(roleId));
+
+    const violation = !isImmune && checkAutomod(message, config);
     if (violation) {
       await handleViolation(message, violation);
       return; // don't also award XP / process commands for a removed message
@@ -43,10 +47,8 @@ export async function execute(message: Message) {
   }
 
   // --- Economy: passive message earning ---
-  if (await isModuleEnabled(message.guildId, "ECONOMY")) {
-    const config = await getEconomyConfig(message.guildId);
-    const amount = Math.floor(Math.random() * (config.messageEarnMax - config.messageEarnMin + 1)) + config.messageEarnMin;
-    await addBalance(message.guildId, message.author.id, amount);
+  if (message.member && (await isModuleEnabled(message.guildId, "ECONOMY"))) {
+    await awardMessageEarnings(message.guildId, message.member, message.channelId, message.content);
   }
 
   // --- Counting game ---
@@ -62,12 +64,28 @@ export async function execute(message: Message) {
     let guildCommands = customCommandCache.get(message.guildId);
     if (!guildCommands) {
       const rows = await prisma.customCommand.findMany({ where: { guildId: message.guildId } });
-      guildCommands = new Map(rows.map((r) => [r.trigger.toLowerCase(), r.response]));
+      guildCommands = new Map(
+        rows.map((r) => [
+          r.trigger.toLowerCase(),
+          { response: r.response, embedEnabled: r.embedEnabled, embedTitle: r.embedTitle, embedColor: r.embedColor, buttons: r.buttons },
+        ])
+      );
       customCommandCache.set(message.guildId, guildCommands);
     }
 
-    const response = guildCommands.get(trigger);
-    if (response && isSendableChannel(message.channel)) await message.channel.send(response);
+    const command = guildCommands.get(trigger);
+    if (command && isSendableChannel(message.channel)) {
+      await message.channel.send(
+        buildStickyPayload({
+          content: command.response,
+          embedEnabled: command.embedEnabled,
+          embedTitle: command.embedTitle,
+          embedDescription: command.response,
+          embedColor: command.embedColor,
+          buttons: command.buttons,
+        })
+      );
+    }
   }
 }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type HoneypotConfig } from "../../../../lib/api";
 
 export default function HoneypotPage({ params }: { params: { guildId: string } }) {
@@ -24,11 +25,17 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Honeypot</h1>
-      <p className="text-slate-400 mb-6">
-        Create a channel real members are told to avoid — anyone who posts in it is instantly banned. Hide it from
-        @everyone in Discord's channel permissions so only bots and raiders find it.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="HONEYPOT"
+        title="Honeypot"
+        description={
+          <>
+            Create a channel real members are told to avoid — anyone who posts in it is instantly banned. Hide it from
+            @everyone in Discord's channel permissions so only bots and raiders find it.
+          </>
+        }
+      />
 
       <NeonCard className="max-w-lg">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Honeypot Channel</label>

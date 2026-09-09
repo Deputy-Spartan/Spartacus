@@ -39,7 +39,7 @@ const command: CommandModule = {
     const reels = spin();
     const multiplier = payoutMultiplier(reels);
     const delta = multiplier > 0 ? Math.floor(amount * multiplier) - amount : -amount;
-    await addBalance(interaction.guildId, interaction.user.id, delta);
+    await addBalance(interaction.guildId, interaction.user.id, delta, "casino", config.maxBalance);
 
     const outcome = multiplier > 0 ? `You won **${Math.floor(amount * multiplier).toLocaleString()} ${config.currencyName}**! 🎉` : `You lost **${amount.toLocaleString()} ${config.currencyName}**.`;
 

@@ -14,7 +14,15 @@ export const xpCooldownCache = new LRUCache<string, number>({
   ttl: 1000 * 60, // 1 min — matches the XP-per-message cooldown window
 });
 
-export const customCommandCache = new LRUCache<string, Map<string, string>>({
+export interface CustomCommandEntry {
+  response: string;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedColor: string | null;
+  buttons: unknown;
+}
+
+export const customCommandCache = new LRUCache<string, Map<string, CustomCommandEntry>>({
   max: 500, // one entry per guild, capped
   ttl: 1000 * 60 * 5,
 });

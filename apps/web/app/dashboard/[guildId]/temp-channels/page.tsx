@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type TempChannelLobbyRow } from "../../../../lib/api";
+
+const NAME_FORMAT_TOKENS = [
+  { token: "{user}", description: "The joining member's display name" },
+  { token: "{index}", description: "Counts up as new channels are created (1, 2, 3…) — resets as channels empty out" },
+  { token: "{count}", description: "Same as {index}, if you prefer the alias" },
+  { token: "{guild}", description: "This server's name" },
+];
 
 const EMPTY: Partial<TempChannelLobbyRow> = {
   name: "New Lobby",
@@ -17,7 +27,24 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   hideTextFromNonMembers: true,
 };
 
+function NameFormatField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel Name Format</label>
+      <input
+        ref={ref}
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <PlaceholderExamples items={NAME_FORMAT_TOKENS} inputRef={ref} value={value} onChange={onChange} />
+    </div>
+  );
+}
+
 export default function TempChannelsPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
   const [lobbies, setLobbies] = useState<TempChannelLobbyRow[]>([]);
 
   function refresh() {
@@ -36,17 +63,19 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
   }
 
   async function removeLobby(id: string) {
+    if (!(await confirm("Delete this temp channel lobby?"))) return;
     await api.deleteTempChannelLobby(params.guildId, id);
     refresh();
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Temp Channels</h1>
-      <p className="text-slate-400 mb-6">
-        Members joining the lobby voice channel get their own personal voice channel spawned under the chosen category — it deletes
-        itself once empty.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="TEMP_CHANNELS"
+        title="Temp Channels"
+        description="Members joining the lobby voice channel get their own personal voice channel spawned under the chosen category — it deletes itself once empty."
+      />
 
       <div className="space-y-4">
         {lobbies.map((l) => (
@@ -81,14 +110,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
                   onChange={(id) => updateLobby(l.id, { categoryId: id })}
                 />
               </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel Name Format</label>
-                <input
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-                  value={l.nameFormat}
-                  onChange={(e) => updateLobby(l.id, { nameFormat: e.target.value })}
-                />
-              </div>
+              <NameFormatField value={l.nameFormat} onChange={(v) => updateLobby(l.id, { nameFormat: v })} />
               <div>
                 <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">User Limit (0 = unlimited)</label>
                 <input

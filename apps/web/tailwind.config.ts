@@ -13,24 +13,24 @@ const config: Config = {
           700: "#2A3350",
         },
         neon: {
-          blue: "#00E5FF",
-          purple: "#B14BFF",
-          cyan: "#22D3EE",
+          blue: "#4C8DFF",
+          purple: "#94A3B8",
+          cyan: "#4C8DFF",
         },
       },
       fontFamily: {
         sans: ["Inter", "Roboto", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        "glow-blue": "0 0 15px rgba(0, 229, 255, 0.35)",
-        "glow-blue-lg": "0 0 30px rgba(0, 229, 255, 0.45)",
-        "glow-purple": "0 0 15px rgba(177, 75, 255, 0.35)",
+        "glow-blue": "none",
+        "glow-blue-lg": "none",
+        "glow-purple": "none",
       },
       backgroundImage: {
-        "neon-gradient": "linear-gradient(135deg, #00E5FF 0%, #B14BFF 100%)",
+        "neon-gradient": "linear-gradient(135deg, #4C8DFF 0%, #4C8DFF 100%)",
       },
       borderColor: {
-        "neon-blue": "rgba(0, 229, 255, 0.4)",
+        "neon-blue": "rgba(76, 141, 255, 0.35)",
       },
     },
   },

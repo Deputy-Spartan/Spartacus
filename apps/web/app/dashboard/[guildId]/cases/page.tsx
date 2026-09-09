@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api } from "../../../../lib/api";
 
 interface CaseRow {
@@ -22,8 +23,12 @@ export default function CasesPage({ params }: { params: { guildId: string } }) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Cases & Warnings</h1>
-      <p className="text-slate-400 mb-6">Full moderation history — every /kick /ban /mute /warn is logged here automatically.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="MODERATION"
+        title="Cases & Warnings"
+        description="Full moderation history — every /kick /ban /mute /warn is logged here automatically."
+      />
 
       <NeonCard>
         {cases.length === 0 && <p className="text-sm text-slate-500 py-2">No moderation actions logged yet.</p>}

@@ -5,3 +5,6 @@ dist/
 .env.local
 *.log
 *.tsbuildinfo
+
+# Local dev log scratch files
+apps/*/.devlog.txt

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api } from "../../../../lib/api";
 
 export default function PermWatchPage({ params }: { params: { guildId: string } }) {
@@ -22,8 +23,12 @@ export default function PermWatchPage({ params }: { params: { guildId: string } 
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Perm Watch</h1>
-      <p className="text-slate-400 mb-6">Get alerted the moment a role's permissions change — especially a new Administrator grant.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="PERM_WATCH"
+        title="Perm Watch"
+        description="Get alerted the moment a role's permissions change — especially a new Administrator grant."
+      />
 
       <NeonCard className="max-w-lg">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Alert Channel</label>

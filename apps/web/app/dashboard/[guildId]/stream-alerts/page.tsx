@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type StreamSubscription } from "../../../../lib/api";
 
 export default function StreamAlertsPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
   const [subs, setSubs] = useState<StreamSubscription[]>([]);
   const [platform, setPlatform] = useState<"twitch" | "youtube">("twitch");
   const [channelName, setChannelName] = useState("");
@@ -25,14 +28,19 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
   }
 
   async function remove(id: string) {
+    if (!(await confirm("Remove this stream alert subscription?"))) return;
     await api.deleteStreamSubscription(params.guildId, id);
     refresh();
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Stream Alerts</h1>
-      <p className="text-slate-400 mb-6">Ping a channel the moment a subscribed creator goes live.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="STREAM_ALERTS"
+        title="Stream Alerts"
+        description="Ping a channel the moment a subscribed creator goes live."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <NeonCard>

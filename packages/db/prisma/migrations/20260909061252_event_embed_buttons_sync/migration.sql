@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN     "buttons" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "embedColor" TEXT DEFAULT '#00E5FF',
+ADD COLUMN     "embedEnabled" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "needsSync" BOOLEAN NOT NULL DEFAULT true;

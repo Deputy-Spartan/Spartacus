@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type CountingGameConfig } from "../../../../lib/api";
 
 export default function CountingGamePage({ params }: { params: { guildId: string } }) {
@@ -25,8 +26,12 @@ export default function CountingGamePage({ params }: { params: { guildId: string
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Counting Game</h1>
-      <p className="text-slate-400 mb-6">Members count upward together, one number per message — the bot enforces the sequence.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="COUNTING_GAME"
+        title="Counting Game"
+        description="Members count upward together, one number per message — the bot enforces the sequence."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <NeonCard>

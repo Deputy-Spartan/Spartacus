@@ -40,8 +40,8 @@ export async function handleTriviaAnswer(
   const correct = correctIndex === chosenIndex;
 
   if (correct) {
-    await addBalance(interaction.guildId, interaction.user.id, reward);
     const config = await getConfig(interaction.guildId);
+    await addBalance(interaction.guildId, interaction.user.id, reward, "trivia", config.maxBalance);
     await interaction.reply(`✅ Correct! You earned **${reward} ${config.currencyName}**.`);
   } else {
     await interaction.reply({ content: "❌ Not quite — try the next one!", ephemeral: true });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type VerificationConfig } from "../../../../lib/api";
 
 export default function VerificationPage({ params }: { params: { guildId: string } }) {
@@ -24,11 +25,17 @@ export default function VerificationPage({ params }: { params: { guildId: string
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Verification</h1>
-      <p className="text-slate-400 mb-6">
-        New members run <code className="text-neon-blue">/verify</code> to receive this role and gain access to the rest of the
-        server.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="VERIFICATION"
+        title="Verification"
+        description={
+          <>
+            New members run <code className="text-neon-blue">/verify</code> to receive this role and gain access to the rest of
+            the server.
+          </>
+        }
+      />
 
       <NeonCard className="max-w-lg">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Verified Role</label>

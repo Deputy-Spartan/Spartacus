@@ -36,24 +36,49 @@ export interface ModuleState {
   config: Record<string, unknown> | null;
 }
 
+export interface DashboardActivityEntry {
+  id: string;
+  userId: string;
+  username: string;
+  method: string;
+  path: string;
+  createdAt: string;
+}
+
 export interface WelcomeConfig {
   guildId: string;
   channelId: string | null;
   welcomeText: string;
   goodbyeText: string;
   embedColor: string;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  buttons: StickyButton[];
 }
 
 export interface AutomodConfig {
+  bannedWordsEnabled: boolean;
   bannedWords: string[];
-  antiLink: boolean;
-  spamCap: boolean;
+  repeatedTextEnabled: boolean;
+  serverInvitesEnabled: boolean;
+  externalLinksEnabled: boolean;
+  excessiveCapsEnabled: boolean;
+  excessiveEmojisEnabled: boolean;
+  excessiveSpoilersEnabled: boolean;
+  excessiveMentionsEnabled: boolean;
+  immuneRoleIds: string[];
+  zalgoEnabled: boolean;
+  antiSpamEnabled: boolean;
 }
 
 export interface CustomCommand {
   id: string;
   trigger: string;
   response: string;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedColor: string | null;
+  buttons: StickyButton[];
 }
 
 export interface StreamSubscription {
@@ -64,6 +89,8 @@ export interface StreamSubscription {
   isLive: boolean;
 }
 
+export type RsvpRole = "TANK" | "DPS" | "HEALER" | "ATTENDING" | "ABSENT";
+
 export interface EventRow {
   id: string;
   title: string;
@@ -71,7 +98,149 @@ export interface EventRow {
   channelId: string;
   startTime: string;
   status: string;
+  reminderMinutesBefore: number;
+  embedEnabled: boolean;
+  embedColor: string | null;
+  buttons: StickyButton[];
+  enabledRoles: RsvpRole[];
   signups: Array<{ userId: string; role: string }>;
+}
+export interface EventInput {
+  title: string;
+  description: string;
+  channelId: string;
+  startTime: string;
+  reminderMinutesBefore: number;
+  embedEnabled: boolean;
+  embedColor: string;
+  buttons: StickyButton[];
+  enabledRoles: RsvpRole[];
+}
+
+export interface EventTemplateRow {
+  id: string;
+  name: string;
+  title: string;
+  description: string | null;
+  reminderMinutesBefore: number;
+  embedEnabled: boolean;
+  embedColor: string | null;
+  buttons: StickyButton[];
+  enabledRoles: RsvpRole[];
+}
+export interface EventTemplateInput {
+  name: string;
+  title: string;
+  description: string;
+  reminderMinutesBefore: number;
+  embedEnabled: boolean;
+  embedColor: string;
+  buttons: StickyButton[];
+  enabledRoles: RsvpRole[];
+}
+
+export interface EventSettingsRow {
+  guildId: string;
+  defaultChannelId: string | null;
+  defaultReminder: number;
+  mentionRoleId: string | null;
+}
+
+export interface ButtonPresetRow {
+  id: string;
+  name: string;
+  buttons: StickyButton[];
+}
+
+export interface SavedEmbedRow {
+  id: string;
+  name: string;
+  content: string | null;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedDescription: string | null;
+  embedColor: string | null;
+  buttons: StickyButton[];
+}
+export interface SavedEmbedInput {
+  name: string;
+  content: string;
+  embedEnabled: boolean;
+  embedTitle: string;
+  embedDescription: string;
+  embedColor: string;
+  buttons: StickyButton[];
+}
+
+export interface StatChannelRow {
+  id: string;
+  channelId: string;
+  statType: "MEMBER_COUNT" | "BOOST_COUNT" | "CHANNEL_COUNT";
+  format: string;
+}
+
+export interface AiConfigRow {
+  guildId: string;
+  chatChannelId: string | null;
+  chatSystemPrompt: string | null;
+  moderationEnabled: boolean;
+}
+
+export interface ServerBackupRow {
+  id: string;
+  name: string;
+  createdAt: string;
+  roleCount: number;
+  channelCount: number;
+}
+
+export interface CommandToggleRow {
+  name: string;
+  description: string;
+  moduleKey: string | null;
+  enabled: boolean;
+}
+
+export type CustomCommandActionType = "SEND_MESSAGE" | "GIVE_ROLE" | "REMOVE_ROLE" | "ADD_CURRENCY" | "POST_EMBED";
+
+export interface CustomSlashCommandRow {
+  id: string;
+  name: string;
+  description: string;
+  actionType: CustomCommandActionType;
+  ephemeralReply: boolean;
+  messageText: string | null;
+  roleId: string | null;
+  currencyAmount: number | null;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedDescription: string | null;
+  embedColor: string | null;
+  buttons: StickyButton[];
+}
+export interface CustomSlashCommandInput {
+  name: string;
+  description: string;
+  actionType: CustomCommandActionType;
+  ephemeralReply: boolean;
+  messageText?: string;
+  roleId?: string;
+  currencyAmount?: number;
+  embedEnabled?: boolean;
+  embedTitle?: string;
+  embedDescription?: string;
+  embedColor?: string;
+  buttons?: StickyButton[];
+}
+
+export interface SendMessageInput {
+  channelId: string;
+  content: string;
+  embedEnabled: boolean;
+  embedTitle: string;
+  embedDescription: string;
+  embedColor: string;
+  buttons: StickyButton[];
 }
 
 export interface LeaderboardRow {
@@ -95,14 +264,57 @@ export interface DiscordRoleOption {
   name: string;
   color: number;
 }
+export interface DiscordMemberOption {
+  id: string;
+  username: string;
+  nickname: string | null;
+  avatar: string | null;
+}
 
 export interface LoggingConfig {
   guildId: string;
   logChannelId: string | null;
+
+  // Moderation Events
+  logMemberMuted: boolean;
+  logMemberUnmuted: boolean;
+  logModerationBan: boolean;
+  logModerationUnban: boolean;
+
+  // Message Events
   logEdits: boolean;
   logDeletes: boolean;
+  logInvitePosted: boolean;
+
+  // Member Events
+  logNicknameChanged: boolean;
+  logMemberBanned: boolean;
   logJoinsLeaves: boolean;
+  logMemberUnbanned: boolean;
+  logUserUpdated: boolean;
+
+  // Role Events
+  logRoleCreated: boolean;
+  logRoleUpdated: boolean;
+  logRoleDeleted: boolean;
+  logMemberRolesChanged: boolean;
+
+  // Voice Events
   logVoice: boolean;
+
+  // Server Events
+  logServerEdited: boolean;
+  logEmojisUpdated: boolean;
+
+  // Channel Events
+  logChannelCreated: boolean;
+  logChannelUpdated: boolean;
+  logChannelDeleted: boolean;
+
+  // Ignored / Additional settings
+  ignoredChannelIds: string[];
+  ignoreBots: boolean;
+  hideThumbnails: boolean;
 }
 
 export interface AntiRaidConfig {
@@ -127,10 +339,27 @@ export interface JoinRoleRow {
   roleId: string;
 }
 
+export interface StickyButton {
+  label: string;
+  url: string;
+}
 export interface StickyMessageRow {
   id: string;
   channelId: string;
   content: string;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedDescription: string | null;
+  embedColor: string | null;
+  buttons: StickyButton[];
+}
+export interface StickyMessageInput {
+  content: string;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedDescription: string | null;
+  embedColor: string | null;
+  buttons: StickyButton[];
 }
 
 export interface StarboardConfig {
@@ -152,45 +381,309 @@ export interface TempChannelLobbyRow {
   hideTextFromNonMembers: boolean;
 }
 
+export type RolePanelLayout = "BUTTONS" | "DROPDOWN";
+
+export interface RolePanelOption {
+  roleId: string;
+  label: string;
+  emoji?: string;
+}
+
+export interface RolePanelRow {
+  id: string;
+  name: string;
+  channelId: string;
+  description: string | null;
+  layout: RolePanelLayout;
+  options: RolePanelOption[];
+  messageId: string | null;
+}
+
+export interface AnnouncementRow {
+  id: string;
+  channelId: string;
+  content: string | null;
+  embedEnabled: boolean;
+  embedTitle: string | null;
+  embedColor: string | null;
+  buttons: StickyButton[];
+  scheduledFor: string | null;
+  sentAt: string | null;
+  createdAt: string;
+}
+export interface AnnouncementInput {
+  channelId: string;
+  content: string;
+  embedEnabled: boolean;
+  embedTitle: string;
+  embedColor: string;
+  buttons: StickyButton[];
+  scheduledFor: string | null;
+}
+
+export interface AutoPurgeConfigRow {
+  id: string;
+  channelId: string;
+  intervalMinutes: number;
+  ignorePinned: boolean;
+  ignoreImages: boolean;
+  ignoreLinks: boolean;
+  protectedEmojis: string[];
+  lastRunAt: string | null;
+}
+
+export interface SlowModeChannelRow {
+  id: string;
+  name: string;
+  rateLimitPerUser: number;
+}
+
+export interface BirthdayConfigRow {
+  guildId: string;
+  channelId: string | null;
+  embedTitle: string | null;
+  embedMessage: string | null;
+  embedColor: string | null;
+  pingRoleId: string | null;
+  useButton: boolean;
+  buttonChannelId: string | null;
+}
+
+export interface BirthdayRow {
+  id: string;
+  userId: string;
+  month: number;
+  day: number;
+}
+
+export type ApplicationPanelLayout = "BUTTONS" | "DROPDOWN";
+
+export interface ApplicationPanelRow {
+  id: string;
+  name: string;
+  channelId: string;
+  description: string | null;
+  layout: ApplicationPanelLayout;
+  typeIds: string[];
+  messageId: string | null;
+  paused: boolean;
+}
+
+export interface ApplicationQuestion {
+  label: string;
+  style: "SHORT" | "PARAGRAPH";
+  required: boolean;
+}
+
+export interface ApplicationTypeRow {
+  id: string;
+  name: string;
+  emoji: string | null;
+  description: string | null;
+  reviewChannelId: string | null;
+  staffRoleIds: string[];
+  questions: ApplicationQuestion[];
+  acceptMessage: string | null;
+  denyMessage: string | null;
+  enabled: boolean;
+}
+
+export type ApplicationStatus = "PENDING" | "ACCEPTED" | "DENIED";
+
+export interface ApplicationRow {
+  id: string;
+  panelId: string;
+  typeId: string | null;
+  userId: string;
+  answers: Array<{ label: string; answer: string }>;
+  status: ApplicationStatus;
+  reviewedBy: string | null;
+  createdAt: string;
+}
+
+export interface ApplicationCounts {
+  pending: number;
+  accepted: number;
+  denied: number;
+}
+
+export interface ApplicationSettingsRow {
+  guildId: string;
+  logChannelId: string | null;
+  supportRoleIds: string[];
+}
+
+export type TicketPanelLayout = "BUTTONS" | "DROPDOWN";
+
 export interface TicketPanelRow {
   id: string;
   name: string;
   channelId: string;
+  layout: TicketPanelLayout;
+  typeIds: string[];
+  description: string | null;
+  paused: boolean;
+  messageId: string | null;
   categoryId: string | null;
   buttonLabel: string;
   supportRoleId: string | null;
 }
 
+export interface TicketModalField {
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  style?: "SHORT" | "PARAGRAPH";
+}
+
+export interface TicketTypeRow {
+  id: string;
+  name: string;
+  emoji: string | null;
+  description: string | null;
+  categoryId: string | null;
+  staffRoleIds: string[];
+  openMessage: string | null;
+  modalFields: TicketModalField[];
+  autoCloseHours: number | null;
+  slaMinutes: number | null;
+  enabled: boolean;
+}
+
+export type TicketStatus = "OPEN" | "CLAIMED" | "CLOSED";
+
 export interface TicketRow {
   id: string;
+  panelId: string;
+  typeId: string | null;
+  ticketNumber: number;
   channelId: string;
   userId: string;
-  status: string;
+  status: TicketStatus;
   claimedById: string | null;
+  priority: string | null;
+  tags: string[];
+  closeReason: string | null;
+  transcriptUrl: string | null;
+  feedbackRating: number | null;
+  createdAt: string;
+  closedAt: string | null;
+}
+
+export interface TicketCounts {
+  open: number;
+  claimed: number;
+  closed: number;
+  archived: number;
+}
+
+export interface TicketTagRow {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface TicketCannedResponseRow {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface TicketKnowledgeBaseRow {
+  id: string;
+  name: string;
+  content: string;
+}
+
+export interface TicketSettingsRow {
+  guildId: string;
+  logChannelId: string | null;
+  transcriptChannelId: string | null;
+  channelNameFormat: string;
+  ticketCap: number;
+  requireCloseReason: boolean;
+  supportRoleIds: string[];
+  blacklistUserIds: string[];
+  blacklistRoleIds: string[];
+}
+
+export interface TicketAnalytics {
+  opened: number;
+  closed: number;
+  currentlyOpen: number;
+  avgFirstResponseMs: number | null;
+  avgResolutionMs: number | null;
+  byType: Array<{ typeId: string; name: string; count: number }>;
+  staffLeaderboard: Array<{ userId: string; count: number }>;
+  avgFeedback: number | null;
+  feedbackCount: number;
 }
 
 export interface GiveawayRow {
   id: string;
   channelId: string;
   prize: string;
+  description: string | null;
+  embedColor: string | null;
+  imageUrl: string | null;
+  buttons: StickyButton[];
   winnerCount: number;
   endsAt: string;
   ended: boolean;
   entries: Array<{ userId: string }>;
+}
+export interface GiveawayInput {
+  channelId: string;
+  prize: string;
+  description?: string;
+  embedColor?: string;
+  imageUrl?: string;
+  buttons?: StickyButton[];
+  winnerCount: number;
+  endsAt: string;
+}
+
+export interface EconomyMultiplier {
+  channelId?: string;
+  roleId?: string;
+  multiplier: number;
 }
 
 export interface EconomyConfig {
   guildId: string;
   currencyName: string;
   currencyIcon: string;
+  embedColor: string;
+  maxBalance: number;
+  earnOnMessages: boolean;
   messageEarnMin: number;
   messageEarnMax: number;
+  messageCooldownSec: number;
+  minMessageLength: number;
+  dailyEnabled: boolean;
   dailyAmount: number;
+  streakBonusPerDay: number;
+  streakCapDays: number;
+  transfersEnabled: boolean;
+  transferMinAmount: number;
+  transferTaxPercent: number;
+  channelMultipliers: EconomyMultiplier[];
+  roleMultipliers: EconomyMultiplier[];
   maxBet: number;
 }
 export interface EconomyBalanceRow {
   userId: string;
   balance: number;
+  totalEarned: number;
+  totalSpent: number;
+}
+export interface EconomyAnalytics {
+  totalHeld: number;
+  activeMembers: number;
+  earned: number;
+  removed: number;
+  concentration: { top5: number; top10: number; top50: number };
+  topEarners: Array<{ userId: string; totalEarned: number; balance: number }>;
 }
 export interface VerificationConfig {
   guildId: string;
@@ -213,6 +706,69 @@ export interface LevelRoleRow {
   level: number;
   roleId: string;
 }
+export interface ChannelLockRow {
+  id: string;
+  channelId: string;
+  allowImages: boolean;
+  allowLinks: boolean;
+  allowFiles: boolean;
+  allowMessages: boolean;
+  slashCommandsOnly: boolean;
+  requiredPrefixes: string[];
+  bannedWords: string[];
+  notifyEnabled: boolean;
+  notifyContent: string | null;
+  notifyEmbedEnabled: boolean;
+  notifyEmbedTitle: string | null;
+  notifyEmbedColor: string | null;
+  notifyButtons: StickyButton[];
+  notifyDeleteAfterSec: number;
+  dmUser: boolean;
+}
+export interface ChannelLockInput {
+  allowImages: boolean;
+  allowLinks: boolean;
+  allowFiles: boolean;
+  allowMessages: boolean;
+  slashCommandsOnly: boolean;
+  requiredPrefixes: string[];
+  bannedWords: string[];
+  notifyEnabled: boolean;
+  notifyContent: string | null;
+  notifyEmbedEnabled: boolean;
+  notifyEmbedTitle: string | null;
+  notifyEmbedColor: string | null;
+  notifyButtons: StickyButton[];
+  notifyDeleteAfterSec: number;
+  dmUser: boolean;
+}
+
+export interface BotConfigRow {
+  id: string;
+  username: string | null;
+  avatarUrl: string | null;
+  description: string | null;
+  statusType: "online" | "idle" | "dnd" | "invisible";
+  activityType: "PLAYING" | "WATCHING" | "LISTENING" | "COMPETING" | "CUSTOM";
+  activityText: string | null;
+}
+export interface BotConfigInput {
+  username?: string;
+  avatarDataUri?: string;
+  description?: string;
+  statusType?: string;
+  activityType?: string;
+  activityText?: string;
+}
+
+export interface ErrorLogRow {
+  id: string;
+  source: string;
+  message: string;
+  stack: string | null;
+  createdAt: string;
+}
+
 export interface CountingGameConfig {
   guildId: string;
   channelId: string | null;
@@ -221,10 +777,18 @@ export interface CountingGameConfig {
   highScore: number;
 }
 
+export interface CurrentUser {
+  id: string;
+  username: string;
+  avatar: string | null;
+}
+
 export const api = {
+  getMe: () => request<CurrentUser>("/me"),
   getGuilds: () => request<Array<{ id: string; name: string; icon: string | null }>>("/guilds"),
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
+  getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),
   setModule: (guildId: string, key: string, enabled: boolean) =>
     request(`/guilds/${guildId}/modules/${key}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
 
@@ -238,17 +802,75 @@ export const api = {
     request(`/guilds/${guildId}/moderation`, { method: "PUT", body: JSON.stringify(config) }),
 
   getEvents: (guildId: string) => request<EventRow[]>(`/guilds/${guildId}/events`),
-  createEvent: (guildId: string, body: Record<string, unknown>) =>
+  createEvent: (guildId: string, body: EventInput) =>
     request<EventRow>(`/guilds/${guildId}/events`, { method: "POST", body: JSON.stringify(body) }),
+  updateEvent: (guildId: string, id: string, body: Partial<EventInput>) =>
+    request<EventRow>(`/guilds/${guildId}/events/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteEvent: (guildId: string, id: string) => request(`/guilds/${guildId}/events/${id}`, { method: "DELETE" }),
+
+  getEventTemplates: (guildId: string) => request<EventTemplateRow[]>(`/guilds/${guildId}/event-templates`),
+  saveEventTemplate: (guildId: string, input: EventTemplateInput) =>
+    request<EventTemplateRow>(`/guilds/${guildId}/event-templates`, { method: "POST", body: JSON.stringify(input) }),
+  deleteEventTemplate: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/event-templates/${id}`, { method: "DELETE" }),
+
+  getEventSettings: (guildId: string) => request<EventSettingsRow>(`/guilds/${guildId}/event-settings`),
+  setEventSettings: (guildId: string, settings: Partial<EventSettingsRow>) =>
+    request<EventSettingsRow>(`/guilds/${guildId}/event-settings`, { method: "PUT", body: JSON.stringify(settings) }),
+
+  sendMessage: (guildId: string, input: SendMessageInput) =>
+    request<{ ok: boolean }>(`/guilds/${guildId}/send-message`, { method: "POST", body: JSON.stringify(input) }),
+
+  getButtonPresets: (guildId: string) => request<ButtonPresetRow[]>(`/guilds/${guildId}/button-presets`),
+  saveButtonPreset: (guildId: string, name: string, buttons: StickyButton[]) =>
+    request<ButtonPresetRow>(`/guilds/${guildId}/button-presets`, { method: "POST", body: JSON.stringify({ name, buttons }) }),
+  deleteButtonPreset: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/button-presets/${id}`, { method: "DELETE" }),
+
+  getSavedEmbeds: (guildId: string) => request<SavedEmbedRow[]>(`/guilds/${guildId}/saved-embeds`),
+  saveSavedEmbed: (guildId: string, input: SavedEmbedInput) =>
+    request<SavedEmbedRow>(`/guilds/${guildId}/saved-embeds`, { method: "POST", body: JSON.stringify(input) }),
+  deleteSavedEmbed: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/saved-embeds/${id}`, { method: "DELETE" }),
+
+  getStatChannels: (guildId: string) => request<StatChannelRow[]>(`/guilds/${guildId}/stat-channels`),
+  addStatChannel: (guildId: string, channelId: string, statType: string, format: string) =>
+    request<StatChannelRow>(`/guilds/${guildId}/stat-channels`, { method: "POST", body: JSON.stringify({ channelId, statType, format }) }),
+  deleteStatChannel: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/stat-channels/${id}`, { method: "DELETE" }),
+
+  getAiConfig: (guildId: string) => request<AiConfigRow>(`/guilds/${guildId}/ai-config`),
+  setAiConfig: (guildId: string, config: Partial<AiConfigRow>) =>
+    request<AiConfigRow>(`/guilds/${guildId}/ai-config`, { method: "PUT", body: JSON.stringify(config) }),
+
+  getServerBackups: (guildId: string) => request<ServerBackupRow[]>(`/guilds/${guildId}/backups`),
+  createServerBackup: (guildId: string, name: string) =>
+    request<ServerBackupRow>(`/guilds/${guildId}/backups`, { method: "POST", body: JSON.stringify({ name }) }),
+  restoreServerBackup: (guildId: string, id: string) =>
+    request<{ created: { roles: number; channels: number } }>(`/guilds/${guildId}/backups/${id}/restore`, { method: "POST" }),
+  deleteServerBackup: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/backups/${id}`, { method: "DELETE" }),
+
+  getCommandToggles: (guildId: string) => request<CommandToggleRow[]>(`/guilds/${guildId}/command-toggles`),
+  setCommandToggle: (guildId: string, name: string, enabled: boolean) =>
+    request(`/guilds/${guildId}/command-toggles/${name}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+
+  getCustomSlashCommands: (guildId: string) => request<CustomSlashCommandRow[]>(`/guilds/${guildId}/custom-slash-commands`),
+  createCustomSlashCommand: (guildId: string, input: CustomSlashCommandInput) =>
+    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands`, { method: "POST", body: JSON.stringify(input) }),
+  deleteCustomSlashCommand: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "DELETE" }),
 
   getLeaderboard: (guildId: string) => request<LeaderboardRow[]>(`/guilds/${guildId}/leaderboard`),
 
   getCommands: (guildId: string) => request<CustomCommand[]>(`/guilds/${guildId}/commands`),
-  addCommand: (guildId: string, trigger: string, response: string) =>
+  addCommand: (guildId: string, trigger: string, body: Omit<CustomCommand, "id" | "trigger">) =>
     request<CustomCommand>(`/guilds/${guildId}/commands`, {
       method: "POST",
-      body: JSON.stringify({ trigger, response }),
+      body: JSON.stringify({ trigger, ...body }),
     }),
+  updateCommand: (guildId: string, id: string, body: Omit<CustomCommand, "id" | "trigger">) =>
+    request<CustomCommand>(`/guilds/${guildId}/commands/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteCommand: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/commands/${id}`, { method: "DELETE" }),
 
@@ -267,6 +889,8 @@ export const api = {
 
   getDiscordChannels: (guildId: string) => request<DiscordChannels>(`/guilds/${guildId}/discord/channels`),
   getDiscordRoles: (guildId: string) => request<DiscordRoleOption[]>(`/guilds/${guildId}/discord/roles`),
+  getDiscordMembers: (guildId: string, ids: string[]) =>
+    request<DiscordMemberOption[]>(`/guilds/${guildId}/discord/members?ids=${ids.join(",")}`),
 
   getLogging: (guildId: string) => request<LoggingConfig>(`/guilds/${guildId}/logging`),
   setLogging: (guildId: string, config: Partial<LoggingConfig>) =>
@@ -288,10 +912,17 @@ export const api = {
   deleteJoinRole: (guildId: string, id: string) => request(`/guilds/${guildId}/join-roles/${id}`, { method: "DELETE" }),
 
   getStickyMessages: (guildId: string) => request<StickyMessageRow[]>(`/guilds/${guildId}/sticky-messages`),
-  addStickyMessage: (guildId: string, channelId: string, content: string) =>
-    request<StickyMessageRow>(`/guilds/${guildId}/sticky-messages`, { method: "POST", body: JSON.stringify({ channelId, content }) }),
+  addStickyMessage: (guildId: string, channelId: string, input: StickyMessageInput) =>
+    request<StickyMessageRow>(`/guilds/${guildId}/sticky-messages`, {
+      method: "POST",
+      body: JSON.stringify({ channelId, ...input }),
+    }),
+  updateStickyMessage: (guildId: string, id: string, input: StickyMessageInput) =>
+    request<StickyMessageRow>(`/guilds/${guildId}/sticky-messages/${id}`, { method: "PUT", body: JSON.stringify(input) }),
   deleteStickyMessage: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/sticky-messages/${id}`, { method: "DELETE" }),
+  resendStickyMessage: (guildId: string, id: string) =>
+    request<{ ok: true }>(`/guilds/${guildId}/sticky-messages/${id}/resend`, { method: "POST" }),
 
   getStarboard: (guildId: string) => request<StarboardConfig>(`/guilds/${guildId}/starboard`),
   setStarboard: (guildId: string, config: Partial<StarboardConfig>) =>
@@ -305,20 +936,116 @@ export const api = {
   deleteTempChannelLobby: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/temp-channels/lobbies/${id}`, { method: "DELETE" }),
 
+  getAnnouncements: (guildId: string) => request<AnnouncementRow[]>(`/guilds/${guildId}/announcements`),
+  addAnnouncement: (guildId: string, body: AnnouncementInput) =>
+    request<AnnouncementRow>(`/guilds/${guildId}/announcements`, { method: "POST", body: JSON.stringify(body) }),
+  deleteAnnouncement: (guildId: string, id: string) => request(`/guilds/${guildId}/announcements/${id}`, { method: "DELETE" }),
+
+  getAutoPurgeConfigs: (guildId: string) => request<AutoPurgeConfigRow[]>(`/guilds/${guildId}/auto-purge`),
+  addAutoPurgeConfig: (guildId: string, body: Partial<AutoPurgeConfigRow> & { channelId: string }) =>
+    request<AutoPurgeConfigRow>(`/guilds/${guildId}/auto-purge`, { method: "POST", body: JSON.stringify(body) }),
+  updateAutoPurgeConfig: (guildId: string, id: string, body: Partial<AutoPurgeConfigRow>) =>
+    request<AutoPurgeConfigRow>(`/guilds/${guildId}/auto-purge/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteAutoPurgeConfig: (guildId: string, id: string) => request(`/guilds/${guildId}/auto-purge/${id}`, { method: "DELETE" }),
+
+  getSlowModeChannels: (guildId: string) => request<SlowModeChannelRow[]>(`/guilds/${guildId}/slow-mode`),
+  setSlowMode: (guildId: string, channelId: string, seconds: number) =>
+    request<SlowModeChannelRow>(`/guilds/${guildId}/slow-mode/${channelId}`, { method: "PUT", body: JSON.stringify({ seconds }) }),
+
+  getApplicationPanels: (guildId: string) => request<ApplicationPanelRow[]>(`/guilds/${guildId}/application-panels`),
+  addApplicationPanel: (guildId: string, body: Partial<ApplicationPanelRow>) =>
+    request<ApplicationPanelRow>(`/guilds/${guildId}/application-panels`, { method: "POST", body: JSON.stringify(body) }),
+  updateApplicationPanel: (guildId: string, id: string, body: Partial<ApplicationPanelRow>) =>
+    request<ApplicationPanelRow>(`/guilds/${guildId}/application-panels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteApplicationPanel: (guildId: string, id: string) => request(`/guilds/${guildId}/application-panels/${id}`, { method: "DELETE" }),
+
+  getApplicationTypes: (guildId: string) => request<ApplicationTypeRow[]>(`/guilds/${guildId}/application-types`),
+  addApplicationType: (guildId: string, body: Partial<ApplicationTypeRow>) =>
+    request<ApplicationTypeRow>(`/guilds/${guildId}/application-types`, { method: "POST", body: JSON.stringify(body) }),
+  updateApplicationType: (guildId: string, id: string, body: Partial<ApplicationTypeRow>) =>
+    request<ApplicationTypeRow>(`/guilds/${guildId}/application-types/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteApplicationType: (guildId: string, id: string) => request(`/guilds/${guildId}/application-types/${id}`, { method: "DELETE" }),
+
+  getApplications: (guildId: string, status?: ApplicationStatus) =>
+    request<ApplicationRow[]>(`/guilds/${guildId}/applications${status ? `?status=${status}` : ""}`),
+  getApplicationCounts: (guildId: string) => request<ApplicationCounts>(`/guilds/${guildId}/applications/counts`),
+
+  getApplicationSettings: (guildId: string) => request<ApplicationSettingsRow>(`/guilds/${guildId}/application-settings`),
+  setApplicationSettings: (guildId: string, body: Partial<ApplicationSettingsRow>) =>
+    request<ApplicationSettingsRow>(`/guilds/${guildId}/application-settings`, { method: "PUT", body: JSON.stringify(body) }),
+
+  getBirthdayConfig: (guildId: string) => request<BirthdayConfigRow>(`/guilds/${guildId}/birthday-config`),
+  setBirthdayConfig: (guildId: string, body: Partial<BirthdayConfigRow>) =>
+    request<BirthdayConfigRow>(`/guilds/${guildId}/birthday-config`, { method: "PUT", body: JSON.stringify(body) }),
+  getBirthdays: (guildId: string) => request<BirthdayRow[]>(`/guilds/${guildId}/birthdays`),
+  deleteBirthday: (guildId: string, userId: string) => request(`/guilds/${guildId}/birthdays/${userId}`, { method: "DELETE" }),
+
+  getRolePanels: (guildId: string) => request<RolePanelRow[]>(`/guilds/${guildId}/role-panels`),
+  addRolePanel: (guildId: string, body: Partial<RolePanelRow>) =>
+    request<RolePanelRow>(`/guilds/${guildId}/role-panels`, { method: "POST", body: JSON.stringify(body) }),
+  updateRolePanel: (guildId: string, id: string, body: Partial<RolePanelRow>) =>
+    request<RolePanelRow>(`/guilds/${guildId}/role-panels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteRolePanel: (guildId: string, id: string) => request(`/guilds/${guildId}/role-panels/${id}`, { method: "DELETE" }),
+
   getTicketPanels: (guildId: string) => request<TicketPanelRow[]>(`/guilds/${guildId}/ticket-panels`),
   addTicketPanel: (guildId: string, body: Partial<TicketPanelRow>) =>
     request<TicketPanelRow>(`/guilds/${guildId}/ticket-panels`, { method: "POST", body: JSON.stringify(body) }),
+  updateTicketPanel: (guildId: string, id: string, body: Partial<TicketPanelRow>) =>
+    request<TicketPanelRow>(`/guilds/${guildId}/ticket-panels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteTicketPanel: (guildId: string, id: string) => request(`/guilds/${guildId}/ticket-panels/${id}`, { method: "DELETE" }),
-  getTickets: (guildId: string) => request<TicketRow[]>(`/guilds/${guildId}/tickets`),
+  resetTicketNumbers: (guildId: string) => request(`/guilds/${guildId}/ticket-panels/reset-numbers`, { method: "POST" }),
+
+  getTicketTypes: (guildId: string) => request<TicketTypeRow[]>(`/guilds/${guildId}/ticket-types`),
+  addTicketType: (guildId: string, body: Partial<TicketTypeRow>) =>
+    request<TicketTypeRow>(`/guilds/${guildId}/ticket-types`, { method: "POST", body: JSON.stringify(body) }),
+  updateTicketType: (guildId: string, id: string, body: Partial<TicketTypeRow>) =>
+    request<TicketTypeRow>(`/guilds/${guildId}/ticket-types/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteTicketType: (guildId: string, id: string) => request(`/guilds/${guildId}/ticket-types/${id}`, { method: "DELETE" }),
+
+  getTickets: (guildId: string, params?: { view?: string; search?: string; typeId?: string; priority?: string }) => {
+    const qs = new URLSearchParams(Object.entries(params ?? {}).filter(([, v]) => v) as [string, string][]).toString();
+    return request<TicketRow[]>(`/guilds/${guildId}/tickets${qs ? `?${qs}` : ""}`);
+  },
+  getTicketCounts: (guildId: string) => request<TicketCounts>(`/guilds/${guildId}/tickets/counts`),
+  updateTicket: (guildId: string, id: string, body: Partial<TicketRow>) =>
+    request<TicketRow>(`/guilds/${guildId}/tickets/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+
+  getTicketTags: (guildId: string) => request<TicketTagRow[]>(`/guilds/${guildId}/ticket-tags`),
+  addTicketTag: (guildId: string, body: Partial<TicketTagRow>) =>
+    request<TicketTagRow>(`/guilds/${guildId}/ticket-tags`, { method: "POST", body: JSON.stringify(body) }),
+  deleteTicketTag: (guildId: string, id: string) => request(`/guilds/${guildId}/ticket-tags/${id}`, { method: "DELETE" }),
+
+  getTicketCannedResponses: (guildId: string) => request<TicketCannedResponseRow[]>(`/guilds/${guildId}/ticket-canned-responses`),
+  addTicketCannedResponse: (guildId: string, body: Partial<TicketCannedResponseRow>) =>
+    request<TicketCannedResponseRow>(`/guilds/${guildId}/ticket-canned-responses`, { method: "POST", body: JSON.stringify(body) }),
+  updateTicketCannedResponse: (guildId: string, id: string, body: Partial<TicketCannedResponseRow>) =>
+    request<TicketCannedResponseRow>(`/guilds/${guildId}/ticket-canned-responses/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteTicketCannedResponse: (guildId: string, id: string) => request(`/guilds/${guildId}/ticket-canned-responses/${id}`, { method: "DELETE" }),
+
+  getTicketKnowledge: (guildId: string) => request<TicketKnowledgeBaseRow[]>(`/guilds/${guildId}/ticket-knowledge`),
+  addTicketKnowledge: (guildId: string, body: Partial<TicketKnowledgeBaseRow>) =>
+    request<TicketKnowledgeBaseRow>(`/guilds/${guildId}/ticket-knowledge`, { method: "POST", body: JSON.stringify(body) }),
+  updateTicketKnowledge: (guildId: string, id: string, body: Partial<TicketKnowledgeBaseRow>) =>
+    request<TicketKnowledgeBaseRow>(`/guilds/${guildId}/ticket-knowledge/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteTicketKnowledge: (guildId: string, id: string) => request(`/guilds/${guildId}/ticket-knowledge/${id}`, { method: "DELETE" }),
+
+  getTicketSettings: (guildId: string) => request<TicketSettingsRow>(`/guilds/${guildId}/ticket-settings`),
+  setTicketSettings: (guildId: string, body: Partial<TicketSettingsRow>) =>
+    request<TicketSettingsRow>(`/guilds/${guildId}/ticket-settings`, { method: "PUT", body: JSON.stringify(body) }),
+  resetTicketSettings: (guildId: string) => request<TicketSettingsRow>(`/guilds/${guildId}/ticket-settings/reset`, { method: "POST" }),
+
+  getTicketAnalytics: (guildId: string, days: number) =>
+    request<TicketAnalytics>(`/guilds/${guildId}/ticket-analytics?days=${days}`),
 
   getGiveaways: (guildId: string) => request<GiveawayRow[]>(`/guilds/${guildId}/giveaways`),
-  addGiveaway: (guildId: string, body: { channelId: string; prize: string; winnerCount: number; endsAt: string }) =>
+  addGiveaway: (guildId: string, body: GiveawayInput) =>
     request<GiveawayRow>(`/guilds/${guildId}/giveaways`, { method: "POST", body: JSON.stringify(body) }),
 
   getEconomyConfig: (guildId: string) => request<EconomyConfig>(`/guilds/${guildId}/economy/config`),
   setEconomyConfig: (guildId: string, config: Partial<EconomyConfig>) =>
     request<EconomyConfig>(`/guilds/${guildId}/economy/config`, { method: "PUT", body: JSON.stringify(config) }),
   getEconomyLeaderboard: (guildId: string) => request<EconomyBalanceRow[]>(`/guilds/${guildId}/economy/leaderboard`),
+  getEconomyAnalytics: (guildId: string, days: number) => request<EconomyAnalytics>(`/guilds/${guildId}/economy/analytics?days=${days}`),
 
   getVerification: (guildId: string) => request<VerificationConfig>(`/guilds/${guildId}/verification`),
   setVerification: (guildId: string, config: Partial<VerificationConfig>) =>
@@ -364,4 +1091,18 @@ export const api = {
   getPermWatch: (guildId: string) => request<{ guildId: string; alertChannelId: string | null }>(`/guilds/${guildId}/perm-watch`),
   setPermWatch: (guildId: string, alertChannelId: string) =>
     request(`/guilds/${guildId}/perm-watch`, { method: "PUT", body: JSON.stringify({ alertChannelId }) }),
+
+  getChannelLocks: (guildId: string) => request<ChannelLockRow[]>(`/guilds/${guildId}/channel-locks`),
+  addChannelLock: (guildId: string, channelId: string, input: ChannelLockInput) =>
+    request<ChannelLockRow>(`/guilds/${guildId}/channel-locks`, { method: "POST", body: JSON.stringify({ channelId, ...input }) }),
+  updateChannelLock: (guildId: string, id: string, input: ChannelLockInput) =>
+    request<ChannelLockRow>(`/guilds/${guildId}/channel-locks/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+  deleteChannelLock: (guildId: string, id: string) => request(`/guilds/${guildId}/channel-locks/${id}`, { method: "DELETE" }),
+
+  getErrors: (guildId: string) => request<ErrorLogRow[]>(`/guilds/${guildId}/errors`),
+  clearErrors: (guildId: string) => request(`/guilds/${guildId}/errors`, { method: "DELETE" }),
+
+  getBotConfig: () => request<BotConfigRow>("/bot-config"),
+  setBotConfig: (input: BotConfigInput) =>
+    request<{ config: BotConfigRow; errors: string[] }>("/bot-config", { method: "PUT", body: JSON.stringify(input) }),
 };

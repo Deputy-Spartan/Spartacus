@@ -5,9 +5,9 @@ export const MODULE_KEYS = [
   "STREAM_ALERTS",
   "CUSTOM_COMMANDS",
   "EVENTS",
-  "LOGGING",
   "ANTI_RAID",
   "REACTION_ROLES",
+  "ROLE_PANELS",
   "JOIN_ROLES",
   "STICKY_MESSAGES",
   "STARBOARD",
@@ -30,6 +30,15 @@ export const MODULE_KEYS = [
   "MODMAIL",
   "PLAYER_REPORTS",
   "PERM_WATCH",
+  "CHANNEL_LOCKS",
+  "STAT_CHANNELS",
+  "AI_CHAT",
+  "AI_MODERATION",
+  "SERVER_BACKUP",
+  "ANNOUNCEMENTS",
+  "SLOW_MODE",
+  "BIRTHDAYS",
+  "APPLICATIONS",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -41,9 +50,9 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   STREAM_ALERTS: "Stream Alerts",
   CUSTOM_COMMANDS: "Custom Commands",
   EVENTS: "Event Coordination",
-  LOGGING: "Logging",
   ANTI_RAID: "Anti-Raid",
   REACTION_ROLES: "Reaction Roles",
+  ROLE_PANELS: "Role Panels",
   JOIN_ROLES: "Join Roles",
   STICKY_MESSAGES: "Sticky Messages",
   STARBOARD: "Starboard",
@@ -66,6 +75,15 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   MODMAIL: "Modmail",
   PLAYER_REPORTS: "Player Reports",
   PERM_WATCH: "Perm Watch",
+  CHANNEL_LOCKS: "Channel Locks",
+  STAT_CHANNELS: "Server Stat Channels",
+  AI_CHAT: "AI Chat",
+  AI_MODERATION: "AI Moderation",
+  SERVER_BACKUP: "Server Backup",
+  ANNOUNCEMENTS: "Announcements",
+  SLOW_MODE: "Slow Mode",
+  BIRTHDAYS: "Birthdays",
+  APPLICATIONS: "Applications",
 };
 
 export const SIGNUP_ROLES = [

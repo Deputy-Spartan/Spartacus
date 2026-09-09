@@ -1,6 +1,7 @@
-import { ColorResolvable, EmbedBuilder, Events, GuildMember, PartialGuildMember } from "discord.js";
+import { Events, GuildMember, PartialGuildMember } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
+import { buildStickyPayload } from "../lib/stickyRender";
 
 export const name = Events.GuildMemberRemove;
 
@@ -18,9 +19,14 @@ export async function execute(member: GuildMember | PartialGuildMember) {
     .replace("{user}", member.user.username)
     .replace("{server}", member.guild.name);
 
-  const embed = new EmbedBuilder()
-    .setColor((config.embedColor ?? "#00E5FF") as ColorResolvable)
-    .setDescription(text);
+  const payload = buildStickyPayload({
+    content: text,
+    embedEnabled: config.embedEnabled,
+    embedTitle: config.embedTitle,
+    embedDescription: text,
+    embedColor: config.embedColor,
+    buttons: config.buttons,
+  });
 
-  await channel.send({ embeds: [embed] });
+  await channel.send(payload);
 }

@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN     "enabledRoles" JSONB NOT NULL DEFAULT '["TANK","DPS","HEALER","ATTENDING","ABSENT"]';
+
+-- AlterTable
+ALTER TABLE "EventTemplate" ADD COLUMN     "enabledRoles" JSONB NOT NULL DEFAULT '["TANK","DPS","HEALER","ATTENDING","ABSENT"]';

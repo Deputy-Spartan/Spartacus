@@ -1,9 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
-import { prisma } from "../../lib/prisma";
-import { addBalance, getConfig } from "../../lib/economy";
+import { claimDaily, getConfig } from "../../lib/economy";
 import type { CommandModule } from "../types";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const command: CommandModule = {
   moduleKey: "ECONOMY",
@@ -15,19 +12,20 @@ const command: CommandModule = {
     const userId = interaction.user.id;
 
     const config = await getConfig(guildId);
-    const row = await prisma.economyBalance.findUnique({ where: { guildId_userId: { guildId, userId } } });
+    const result = await claimDaily(guildId, userId);
 
-    if (row?.lastDailyClaim && Date.now() - row.lastDailyClaim.getTime() < DAY_MS) {
-      const remainingMs = DAY_MS - (Date.now() - row.lastDailyClaim.getTime());
-      const hours = Math.ceil(remainingMs / (60 * 60 * 1000));
-      await interaction.reply({ content: `You've already claimed today. Try again in ~${hours}h.`, ephemeral: true });
+    if (!result.ok) {
+      if (result.reason === "disabled") {
+        await interaction.reply({ content: "The daily claim is turned off in this server.", ephemeral: true });
+      } else {
+        const hours = Math.ceil(result.hoursRemaining ?? 0);
+        await interaction.reply({ content: `You've already claimed today. Try again in ~${hours}h.`, ephemeral: true });
+      }
       return;
     }
 
-    await addBalance(guildId, userId, config.dailyAmount);
-    await prisma.economyBalance.update({ where: { guildId_userId: { guildId, userId } }, data: { lastDailyClaim: new Date() } });
-
-    await interaction.reply(`${config.currencyIcon} You claimed your daily **${config.dailyAmount} ${config.currencyName}**!`);
+    const streakNote = config.streakBonusPerDay > 0 ? ` (streak: ${result.streak} day${result.streak === 1 ? "" : "s"})` : "";
+    await interaction.reply(`${config.currencyIcon} You claimed your daily **${result.amount} ${config.currencyName}**!${streakNote}`);
   },
 };
 

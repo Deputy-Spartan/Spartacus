@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api } from "../../../../lib/api";
 
 interface ReportRow {
@@ -28,8 +29,12 @@ export default function ReportsPage({ params }: { params: { guildId: string } })
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Player Reports</h1>
-      <p className="text-slate-400 mb-6">Submitted via /report — review and resolve them here.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="PLAYER_REPORTS"
+        title="Player Reports"
+        description="Submitted via /report — review and resolve them here."
+      />
 
       <NeonCard>
         {reports.length === 0 && <p className="text-sm text-slate-500">No reports yet.</p>}

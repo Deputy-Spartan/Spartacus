@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type JoinRoleRow } from "../../../../lib/api";
 
 export default function JoinRolesPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<JoinRoleRow[]>([]);
   const [roleId, setRoleId] = useState<string | null>(null);
 
@@ -22,14 +25,19 @@ export default function JoinRolesPage({ params }: { params: { guildId: string } 
   }
 
   async function remove(id: string) {
+    if (!(await confirm("Remove this join role?"))) return;
     await api.deleteJoinRole(params.guildId, id);
     refresh();
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Join Roles</h1>
-      <p className="text-slate-400 mb-6">Roles the bot grants automatically the moment a member joins.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="JOIN_ROLES"
+        title="Join Roles"
+        description="Roles the bot grants automatically the moment a member joins."
+      />
 
       <NeonCard className="max-w-lg">
         <p className="font-medium mb-3">Auto-Assigned Roles</p>

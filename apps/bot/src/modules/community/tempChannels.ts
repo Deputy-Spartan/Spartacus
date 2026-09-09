@@ -27,7 +27,14 @@ async function handleJoin(state: VoiceState) {
   });
   if (!lobby || !state.member) return;
 
-  const name = lobby.nameFormat.replace("{user}", state.member.displayName);
+  // {index} counts currently-active channels for this lobby, so numbering
+  // stays tight (1, 2, 3…) rather than climbing forever as channels come
+  // and go — matches how most "temp voice" bots number rooms.
+  const activeCount = await prisma.tempChannelInstance.count({ where: { lobbyId: lobby.id } });
+  const name = lobby.nameFormat
+    .replace(/{user}/g, state.member.displayName)
+    .replace(/{index}|{count}/g, String(activeCount + 1))
+    .replace(/{guild}/g, state.guild.name);
 
   const created = await state.guild.channels
     .create({

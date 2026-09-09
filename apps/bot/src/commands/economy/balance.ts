@@ -1,5 +1,6 @@
-import { SlashCommandBuilder } from "discord.js";
-import { getBalance, getConfig } from "../../lib/economy";
+import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { getConfig } from "../../lib/economy";
+import { prisma } from "../../lib/prisma";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -12,9 +13,29 @@ const command: CommandModule = {
   async execute(interaction) {
     if (!interaction.guildId) return;
     const target = interaction.options.getUser("user") ?? interaction.user;
-    const [balance, config] = await Promise.all([getBalance(interaction.guildId, target.id), getConfig(interaction.guildId)]);
+    const guildId = interaction.guildId;
 
-    await interaction.reply(`${config.currencyIcon} **${target.username}** has **${balance.toLocaleString()} ${config.currencyName}**.`);
+    const [row, config, rankAbove] = await Promise.all([
+      prisma.economyBalance.findUnique({ where: { guildId_userId: { guildId, userId: target.id } } }),
+      getConfig(guildId),
+      prisma.economyBalance.count({ where: { guildId } }),
+    ]);
+
+    const balance = row?.balance ?? 0;
+    const higherCount = await prisma.economyBalance.count({ where: { guildId, balance: { gt: balance } } });
+    const rank = rankAbove === 0 ? "—" : `#${higherCount + 1}`;
+
+    const embed = new EmbedBuilder()
+      .setColor((config.embedColor as `#${string}`) || "#E8C547")
+      .setAuthor({ name: target.username, iconURL: target.displayAvatarURL() })
+      .addFields(
+        { name: "Wallet", value: `${balance.toLocaleString()} ${config.currencyIcon} ${config.currencyName}` },
+        { name: "Earned", value: (row?.totalEarned ?? 0).toLocaleString(), inline: true },
+        { name: "Spent", value: (row?.totalSpent ?? 0).toLocaleString(), inline: true },
+        { name: "Rank", value: rank, inline: true }
+      );
+
+    await interaction.reply({ embeds: [embed] });
   },
 };
 

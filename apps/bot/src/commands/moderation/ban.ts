@@ -28,6 +28,7 @@ const command: CommandModule = {
       action: "BAN",
       reason,
       moderatorId: interaction.user.id,
+      client: interaction.client,
     });
     await interaction.reply(`🔨 Banned **${user.tag}** — ${reason}`);
   },

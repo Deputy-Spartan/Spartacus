@@ -32,6 +32,7 @@ const command: CommandModule = {
       action: "MUTE",
       reason: `${reason} (${minutes}m)`,
       moderatorId: interaction.user.id,
+      client: interaction.client,
     });
     await interaction.reply(`🔇 Muted **${user.tag}** for ${minutes} minute(s) — ${reason}`);
   },

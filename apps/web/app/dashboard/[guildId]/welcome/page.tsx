@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { api, type WelcomeConfig } from "../../../../lib/api";
 
 export default function WelcomePage({ params }: { params: { guildId: string } }) {
@@ -23,15 +26,23 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
+  const previewText = config.welcomeText.replace("{server}", "Iron Legion").replace("{user}", "@Draven");
+
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Welcome & Goodbye</h1>
-      <p className="text-slate-400 mb-6">
-        Use <code className="text-neon-blue">{"{user}"}</code> and{" "}
-        <code className="text-neon-blue">{"{server}"}</code> as placeholders.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="WELCOME"
+        title="Welcome & Goodbye"
+        description={
+          <>
+            Use <code className="text-neon-blue">{"{user}"}</code> and{" "}
+            <code className="text-neon-blue">{"{server}"}</code> as placeholders.
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <NeonCard>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Welcome Channel</label>
           <ChannelSelect
@@ -50,23 +61,31 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Goodbye Message</label>
           <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 focus:outline-none focus:ring-1 focus:ring-neon-blue"
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 mb-4 focus:outline-none focus:ring-1 focus:ring-neon-blue"
             value={config.goodbyeText}
             onChange={(e) => setConfig({ ...config, goodbyeText: e.target.value })}
+          />
+
+          <EmbedFields
+            guildId={params.guildId}
+            embedEnabled={config.embedEnabled}
+            embedTitle={config.embedTitle ?? ""}
+            embedColor={config.embedColor}
+            buttons={config.buttons}
+            onChange={(next) => setConfig({ ...config, ...next })}
           />
         </NeonCard>
 
         <NeonCard>
-          <p className="text-xs uppercase tracking-wide text-slate-500 mb-3">Live Preview</p>
-          <div
-            className="rounded-lg p-4 flex gap-3 items-center"
-            style={{ background: "#1E2640", borderLeft: `3px solid ${config.embedColor}` }}
-          >
-            <div className="w-11 h-11 rounded-full bg-neon-gradient shrink-0" />
-            <p className="text-sm">
-              {config.welcomeText.replace("{server}", "Iron Legion").replace("{user}", "@Draven")}
-            </p>
-          </div>
+          <p className="text-xs uppercase tracking-wide text-slate-500 mb-3">Live Preview (Welcome)</p>
+          <StickyPreview
+            content={previewText}
+            embedEnabled={config.embedEnabled}
+            embedTitle={config.embedTitle ?? ""}
+            embedDescription={previewText}
+            embedColor={config.embedColor}
+            buttons={config.buttons}
+          />
         </NeonCard>
       </div>
 

@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type LevelRoleRow } from "../../../../lib/api";
 
 export default function LevelRolesPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<LevelRoleRow[]>([]);
   const [level, setLevel] = useState(10);
   const [roleId, setRoleId] = useState<string | null>(null);
@@ -22,14 +25,19 @@ export default function LevelRolesPage({ params }: { params: { guildId: string }
   }
 
   async function remove(id: string) {
+    if (!(await confirm("Remove this level role?"))) return;
     await api.deleteLevelRole(params.guildId, id);
     refresh();
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Level Roles</h1>
-      <p className="text-slate-400 mb-6">Roles the bot grants automatically the moment a member reaches a milestone level.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="LEVELING"
+        title="Level Roles"
+        description="Roles the bot grants automatically the moment a member reaches a milestone level."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <NeonCard>

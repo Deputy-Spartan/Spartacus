@@ -26,6 +26,13 @@ export async function handleEventSignupInteraction(interaction: ButtonInteractio
     update: { role },
   });
 
+  if (interaction.message.embeds.length === 0) {
+    // Embed disabled for this event — RSVP is still recorded, there's just
+    // no info card to update the role counts on.
+    await interaction.reply({ content: `Marked you as **${ROLE_FIELD_LABELS[role]}**.`, ephemeral: true });
+    return;
+  }
+
   const signups = await prisma.eventSignup.findMany({ where: { eventId } });
   const grouped = signups.reduce<Record<SignupRole, string[]>>(
     (acc, s) => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type LeaderboardRow } from "../../../../lib/api";
 
 export default function LevelingPage({ params }: { params: { guildId: string } }) {
@@ -13,8 +14,12 @@ export default function LevelingPage({ params }: { params: { guildId: string } }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Leveling & XP</h1>
-      <p className="text-slate-400 mb-6">Top members by message-based XP this server has ever awarded.</p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="LEVELING"
+        title="Leveling & XP"
+        description="Top members by message-based XP this server has ever awarded."
+      />
 
       <NeonCard>
         {!rows && <p className="text-slate-500 text-sm">Loading…</p>}

@@ -24,11 +24,13 @@ export function startEventReminderJob(client: Client) {
 
       const channel = await client.channels.fetch(event.channelId).catch(() => null);
       const attendees = event.signups.filter((s) => s.role !== "ABSENT");
+      const settings = await prisma.eventSettings.findUnique({ where: { guildId: event.guildId } });
+      const roleMention = settings?.mentionRoleId ? `<@&${settings.mentionRoleId}> ` : "";
 
-      if (isSendableChannel(channel) && attendees.length > 0) {
+      if (isSendableChannel(channel) && (attendees.length > 0 || roleMention)) {
         const mentions = attendees.map((s) => `<@${s.userId}>`).join(" ");
         await channel
-          .send(`⏰ **${event.title}** starts <t:${Math.floor(event.startTime.getTime() / 1000)}:R> — ${mentions}`)
+          .send(`⏰ ${roleMention}**${event.title}** starts <t:${Math.floor(event.startTime.getTime() / 1000)}:R> — ${mentions}`)
           .catch(() => null);
       }
 

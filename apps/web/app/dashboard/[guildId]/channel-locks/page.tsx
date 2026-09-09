@@ -1,0 +1,371 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { NeonCard } from "../../../../components/ui/NeonCard";
+import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
+import { api, type ChannelLockInput, type ChannelLockRow } from "../../../../lib/api";
+
+const NOTIFY_TOKENS = [
+  { token: "{user}", description: "Mentions the member whose message was removed" },
+  { token: "{channel}", description: "Mentions the channel the message was removed from" },
+];
+
+const EMPTY_FORM: ChannelLockInput = {
+  allowImages: true,
+  allowLinks: true,
+  allowFiles: true,
+  allowMessages: true,
+  slashCommandsOnly: false,
+  requiredPrefixes: [],
+  bannedWords: [],
+  notifyEnabled: false,
+  notifyContent: "{user}, that message isn't allowed in {channel}.",
+  notifyEmbedEnabled: false,
+  notifyEmbedTitle: "",
+  notifyEmbedColor: "#00E5FF",
+  notifyButtons: [],
+  notifyDeleteAfterSec: 6,
+  dmUser: false,
+};
+
+function Row({ label, hint, enabled, onChange }: { label: string; hint: string; enabled: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-b-0">
+      <div>
+        <p className="text-sm text-slate-200">{label}</p>
+        <p className="text-xs text-slate-500">{hint}</p>
+      </div>
+      <ToggleSwitch enabled={enabled} onChange={onChange} label={label} />
+    </div>
+  );
+}
+
+function TagList({
+  values,
+  onChange,
+  placeholder,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState("");
+
+  function add() {
+    const v = draft.trim();
+    if (!v || values.includes(v)) return;
+    onChange([...values, v]);
+    setDraft("");
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2 mb-2">
+        <input
+          className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2 text-sm"
+          value={draft}
+          placeholder={placeholder}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+        />
+        <button onClick={add} className="neon-button-sm">
+          Add
+        </button>
+      </div>
+      {values.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {values.map((v) => (
+            <span key={v} className="flex items-center gap-1 bg-base-800 border border-white/10 rounded-full px-2.5 py-1 text-xs">
+              {v}
+              <button onClick={() => onChange(values.filter((x) => x !== v))} className="text-slate-500 hover:text-rose-400">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ChannelLocksPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
+  const notifyContentRef = useRef<HTMLTextAreaElement>(null);
+  const [rows, setRows] = useState<ChannelLockRow[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [channelId, setChannelId] = useState<string | null>(null);
+  const [form, setForm] = useState<ChannelLockInput>(EMPTY_FORM);
+  const [showEditor, setShowEditor] = useState(false);
+
+  function refresh() {
+    api.getChannelLocks(params.guildId).then(setRows);
+  }
+  useEffect(refresh, [params.guildId]);
+
+  function startCreate() {
+    setEditingId(null);
+    setChannelId(null);
+    setForm(EMPTY_FORM);
+    setShowEditor(true);
+  }
+
+  function startEdit(row: ChannelLockRow) {
+    setEditingId(row.id);
+    setChannelId(row.channelId);
+    setForm({
+      allowImages: row.allowImages,
+      allowLinks: row.allowLinks,
+      allowFiles: row.allowFiles,
+      allowMessages: row.allowMessages,
+      slashCommandsOnly: row.slashCommandsOnly,
+      requiredPrefixes: row.requiredPrefixes,
+      bannedWords: row.bannedWords,
+      notifyEnabled: row.notifyEnabled,
+      notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
+      notifyEmbedEnabled: row.notifyEmbedEnabled,
+      notifyEmbedTitle: row.notifyEmbedTitle ?? "",
+      notifyEmbedColor: row.notifyEmbedColor ?? "#00E5FF",
+      notifyButtons: row.notifyButtons,
+      notifyDeleteAfterSec: row.notifyDeleteAfterSec,
+      dmUser: row.dmUser,
+    });
+    setShowEditor(true);
+  }
+
+  async function save() {
+    if (!channelId) return;
+    if (editingId) {
+      await api.updateChannelLock(params.guildId, editingId, form);
+    } else {
+      await api.addChannelLock(params.guildId, channelId, form);
+    }
+    setShowEditor(false);
+    refresh();
+  }
+
+  async function remove(id: string) {
+    if (!(await confirm("Delete this channel lock schedule?"))) return;
+    await api.deleteChannelLock(params.guildId, id);
+    if (editingId === id) setShowEditor(false);
+    refresh();
+  }
+
+  return (
+    <div>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="CHANNEL_LOCKS"
+        title="Channel Locks"
+        description="Restrict a channel to only certain kinds of content — images, links, files, or messages starting with a required word."
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <NeonCard>
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-medium">Locked Channels</p>
+            <button onClick={startCreate} className="neon-button-sm">
+              + New Lock
+            </button>
+          </div>
+          {rows.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
+          <div className="divide-y divide-white/5">
+            {rows.map((r) => (
+              <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                <div className="min-w-0">
+                  <span className="text-slate-300 truncate block">#{r.channelId}</span>
+                  <span className="text-slate-600 text-xs">
+                    {r.slashCommandsOnly
+                      ? "Slash commands only"
+                      : [
+                          !r.allowImages && "no images",
+                          !r.allowLinks && "no links",
+                          !r.allowFiles && "no files",
+                          !r.allowMessages && r.requiredPrefixes.length === 0 && "no plain text",
+                          r.requiredPrefixes.length > 0 && `prefix required`,
+                          r.bannedWords.length > 0 && `${r.bannedWords.length} banned word(s)`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || "no restrictions"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button onClick={() => startEdit(r)} className="text-slate-500 hover:text-neon-blue text-xs">
+                    Edit
+                  </button>
+                  <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </NeonCard>
+
+        {showEditor && (
+          <NeonCard>
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-medium">{editingId ? "Edit Lock" : "New Lock"}</p>
+              <button onClick={() => setShowEditor(false)} className="text-slate-500 hover:text-slate-300 text-xs">
+                Close
+              </button>
+            </div>
+
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+            <ChannelSelect
+              guildId={params.guildId}
+              value={channelId}
+              onChange={setChannelId}
+              kind="text"
+              placeholder={editingId ? undefined : "Select a channel…"}
+            />
+            {editingId && <p className="text-xs text-slate-600 -mt-3 mb-4">Channel can't be changed once created.</p>}
+
+            <div className="mb-4">
+              <Row
+                label="Slash commands only"
+                hint="Deletes every regular message — only interactions (slash commands, buttons) go untouched."
+                enabled={form.slashCommandsOnly}
+                onChange={(v) => setForm({ ...form, slashCommandsOnly: v })}
+              />
+              {!form.slashCommandsOnly && (
+                <>
+                  <Row
+                    label="Allow images"
+                    hint="Image attachments"
+                    enabled={form.allowImages}
+                    onChange={(v) => setForm({ ...form, allowImages: v })}
+                  />
+                  <Row
+                    label="Allow links"
+                    hint="Messages containing a URL"
+                    enabled={form.allowLinks}
+                    onChange={(v) => setForm({ ...form, allowLinks: v })}
+                  />
+                  <Row
+                    label="Allow files"
+                    hint="Non-image attachments"
+                    enabled={form.allowFiles}
+                    onChange={(v) => setForm({ ...form, allowFiles: v })}
+                  />
+                  <Row
+                    label="Allow plain messages"
+                    hint="Text with no link/attachment — ignored if a required prefix is set below"
+                    enabled={form.allowMessages}
+                    onChange={(v) => setForm({ ...form, allowMessages: v })}
+                  />
+                </>
+              )}
+            </div>
+
+            {!form.slashCommandsOnly && (
+              <>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                  Required Prefixes (message must start with one)
+                </label>
+                <div className="mb-4">
+                  <TagList
+                    values={form.requiredPrefixes}
+                    onChange={(v) => setForm({ ...form, requiredPrefixes: v })}
+                    placeholder="e.g. !suggest"
+                  />
+                </div>
+
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Banned Words</label>
+                <div className="mb-4">
+                  <TagList
+                    values={form.bannedWords}
+                    onChange={(v) => setForm({ ...form, bannedWords: v })}
+                    placeholder="Word to always delete"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="mb-4 pt-4 border-t border-white/5">
+              <Row
+                label="Notify on delete"
+                hint="Post a message (and/or DM the author) when their message is removed for breaking this lock."
+                enabled={form.notifyEnabled}
+                onChange={(v) => setForm({ ...form, notifyEnabled: v })}
+              />
+            </div>
+
+            {form.notifyEnabled && (
+              <>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Notice Message</label>
+                <textarea
+                  ref={notifyContentRef}
+                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                  rows={2}
+                  value={form.notifyContent ?? ""}
+                  onChange={(e) => setForm({ ...form, notifyContent: e.target.value })}
+                />
+                <PlaceholderExamples
+                  items={NOTIFY_TOKENS}
+                  inputRef={notifyContentRef}
+                  value={form.notifyContent ?? ""}
+                  onChange={(v) => setForm({ ...form, notifyContent: v })}
+                />
+
+                <div className="mb-4">
+                  <EmbedFields
+                    guildId={params.guildId}
+                    embedEnabled={form.notifyEmbedEnabled}
+                    embedTitle={form.notifyEmbedTitle ?? ""}
+                    embedColor={form.notifyEmbedColor ?? "#00E5FF"}
+                    buttons={form.notifyButtons}
+                    onChange={(next) =>
+                      setForm({
+                        ...form,
+                        notifyEmbedEnabled: next.embedEnabled,
+                        notifyEmbedTitle: next.embedTitle,
+                        notifyEmbedColor: next.embedColor,
+                        notifyButtons: next.buttons,
+                      })
+                    }
+                    titleLabel="Notice Embed Title"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Auto-delete notice after (seconds)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-32 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    value={form.notifyDeleteAfterSec}
+                    onChange={(e) => setForm({ ...form, notifyDeleteAfterSec: Number(e.target.value) })}
+                  />
+                  <p className="text-xs text-slate-600 mt-1">0 leaves the in-channel notice up permanently.</p>
+                </div>
+
+                <div className="mb-4">
+                  <Row
+                    label="Also DM the member"
+                    hint="Sends the same notice as a direct message, in addition to the in-channel one."
+                    enabled={form.dmUser}
+                    onChange={(v) => setForm({ ...form, dmUser: v })}
+                  />
+                </div>
+              </>
+            )}
+
+            <button onClick={save} className="neon-button">
+              {editingId ? "Save Changes" : "Create Lock"}
+            </button>
+          </NeonCard>
+        )}
+      </div>
+    </div>
+  );
+}

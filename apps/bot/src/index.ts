@@ -2,18 +2,27 @@ import * as path from "path";
 import * as dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
-import { Client, Events, GatewayIntentBits, Options, Partials } from "discord.js";
+import { ActivityType, Client, Events, GatewayIntentBits, Options, Partials, type PresenceStatusData } from "discord.js";
+import { logError, prisma } from "@spartacus/db";
 import { commands } from "./commands";
 import * as interactionCreate from "./events/interactionCreate";
 import * as messageCreate from "./events/messageCreate";
 import * as guildMemberAdd from "./events/guildMemberAdd";
 import * as guildMemberRemove from "./events/guildMemberRemove";
 import { startEventReminderJob } from "./jobs/eventReminder";
+import { startEventSyncJob } from "./jobs/eventSync";
 import { startStreamPollerJob } from "./jobs/streamPoller";
 import { startGiveawayEnderJob } from "./jobs/giveawayEnder";
 import { startGiveawayPosterJob } from "./jobs/giveawayPoster";
 import { startTicketPanelPosterJob } from "./jobs/ticketPanelPoster";
+import { startRolePanelPosterJob } from "./jobs/rolePanelPoster";
 import { startScheduledMessagesJob } from "./jobs/scheduledMessages";
+import { startStatChannelsJob } from "./jobs/statChannels";
+import { startAnnouncementPosterJob } from "./jobs/announcementPoster";
+import { startAutoPurgeJob } from "./jobs/autoPurge";
+import { startBirthdayAnnouncerJob } from "./jobs/birthdayAnnouncer";
+import { startBirthdayPanelPosterJob } from "./jobs/birthdayPanelPoster";
+import { startApplicationPanelPosterJob } from "./jobs/applicationPanelPoster";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -28,6 +37,54 @@ import * as tempChannels from "./modules/community/tempChannels";
 import * as rolePersistence from "./modules/community/rolePersistence";
 import * as inviteTracking from "./modules/community/inviteTracking";
 import * as modmail from "./modules/modmail/modmail";
+import * as channelLocks from "./modules/utility/channelLocks";
+import * as aiChat from "./modules/community/aiChat";
+import * as aiModeration from "./modules/moderation/aiModeration";
+
+// Discord.js event listeners aren't wrapped by Express's error handling —
+// an exception thrown inside one (or a rejected promise nobody awaited)
+// used to crash the whole process. This is the bot-side equivalent of
+// apps/api's global Express error handler.
+process.on("unhandledRejection", (reason) => {
+  console.error("[bot] Unhandled rejection:", reason);
+  logError("bot", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[bot] Uncaught exception:", err);
+  logError("bot", err);
+});
+
+const ACTIVITY_TYPE_MAP: Record<string, ActivityType> = {
+  PLAYING: ActivityType.Playing,
+  WATCHING: ActivityType.Watching,
+  LISTENING: ActivityType.Listening,
+  COMPETING: ActivityType.Competing,
+  CUSTOM: ActivityType.Custom,
+};
+
+// Username/avatar/description changes take effect immediately via the API
+// (direct Discord REST calls), but status/activity live on the gateway
+// connection itself — only the running bot process can apply those. Polled
+// rather than pushed so this works the same whether the API and bot run in
+// one process (the default free-tier setup) or as separate services.
+async function applyBotPresence(client: Client) {
+  const config = await prisma.botConfig.findUnique({ where: { id: "singleton" } });
+  if (!config || !client.user) return;
+
+  const activities = config.activityText
+    ? [
+        {
+          name: config.activityType === "CUSTOM" ? "Custom Status" : config.activityText,
+          type: ACTIVITY_TYPE_MAP[config.activityType] ?? ActivityType.Playing,
+          state: config.activityType === "CUSTOM" ? config.activityText : undefined,
+        },
+      ]
+    : [];
+
+  client.user.setPresence({ status: (config.statusType as PresenceStatusData) ?? "online", activities });
+}
+
+export { commands } from "./commands";
 
 export function startBot() {
   const client = new Client({
@@ -41,6 +98,7 @@ export function startBot() {
       GatewayIntentBits.GuildModeration, // audit-log-driven anti-nuke detection
       GatewayIntentBits.DirectMessages, // modmail DM bridge
       GatewayIntentBits.GuildInvites, // invite-use tracking
+      GatewayIntentBits.GuildEmojisAndStickers, // audit log: emoji create/update/delete
     ],
     partials: [Partials.GuildMember, Partials.Message, Partials.Reaction, Partials.Channel],
     // Cap every default cache — without this, discord.js caches every
@@ -64,20 +122,34 @@ export function startBot() {
   client.once("ready", async (c) => {
     console.log(`[bot] Logged in as ${c.user.tag}`);
     startEventReminderJob(c);
+    startEventSyncJob(c);
+    startStatChannelsJob(c);
     startStreamPollerJob(c);
     startGiveawayEnderJob(c);
     startGiveawayPosterJob(c);
     startTicketPanelPosterJob(c);
+    startRolePanelPosterJob(c);
+    startAnnouncementPosterJob(c);
+    startAutoPurgeJob(c);
+    startBirthdayAnnouncerJob(c);
+    startBirthdayPanelPosterJob(c);
+    startApplicationPanelPosterJob(c);
     startScheduledMessagesJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);
+
+    await applyBotPresence(c);
+    setInterval(() => applyBotPresence(c), 30_000);
   });
 
   client.on(interactionCreate.name, interactionCreate.execute);
+  client.on(channelLocks.name, channelLocks.execute);
   client.on(messageCreate.name, messageCreate.execute);
   client.on(Events.MessageCreate, modmail.execute); // DM-only, filters guild messages internally
   client.on(Events.MessageCreate, modmail.handleStaffReply); // guild-only, filters DMs internally
+  client.on(aiChat.name, aiChat.execute);
+  client.on(aiModeration.name, aiModeration.execute);
 
   // guildMemberAdd has several independent listeners — welcome message,
   // join-role assignment, anti-raid detection, role-persistence restore,
@@ -97,7 +169,22 @@ export function startBot() {
   client.on(Events.MessageUpdate, logger.onMessageUpdate);
   client.on(Events.GuildMemberAdd, logger.onMemberAdd);
   client.on(Events.GuildMemberRemove, logger.onMemberRemove);
+  client.on(Events.GuildMemberUpdate, logger.onMemberUpdate);
   client.on(Events.VoiceStateUpdate, logger.onVoiceStateUpdate);
+  client.on(Events.GuildBanAdd, logger.onGuildBanAdd);
+  client.on(Events.GuildBanRemove, logger.onGuildBanRemove);
+  client.on(Events.UserUpdate, logger.onUserUpdate);
+  client.on(Events.GuildRoleCreate, logger.onRoleCreate);
+  client.on(Events.GuildRoleUpdate, logger.onRoleUpdate);
+  client.on(Events.GuildRoleDelete, logger.onRoleDelete);
+  client.on(Events.GuildUpdate, logger.onGuildUpdate);
+  client.on(Events.GuildEmojiCreate, logger.onEmojiCreate);
+  client.on(Events.GuildEmojiDelete, logger.onEmojiDelete);
+  client.on(Events.GuildEmojiUpdate, logger.onEmojiUpdate);
+  client.on(Events.ChannelCreate, logger.onChannelCreate);
+  client.on(Events.ChannelDelete, logger.onChannelDelete);
+  client.on(Events.ChannelUpdate, logger.onChannelUpdate);
+  client.on(Events.InviteCreate, logger.onInviteCreate);
   client.on(Events.VoiceStateUpdate, tempChannels.execute);
 
   client.on(Events.MessageReactionAdd, reactionRoles.onReactionAdd);

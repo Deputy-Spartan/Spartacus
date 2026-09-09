@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type ReactionRoleRow } from "../../../../lib/api";
 
 export default function ReactionRolesPage({ params }: { params: { guildId: string } }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<ReactionRoleRow[]>([]);
   const [channelId, setChannelId] = useState<string | null>(null);
   const [messageId, setMessageId] = useState("");
@@ -27,16 +30,19 @@ export default function ReactionRolesPage({ params }: { params: { guildId: strin
   }
 
   async function remove(id: string) {
+    if (!(await confirm("Remove this reaction role?"))) return;
     await api.deleteReactionRole(params.guildId, id);
     refresh();
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Reaction Roles</h1>
-      <p className="text-slate-400 mb-6">
-        The bot reacts to the target message with your emoji — members click it to get the role, and it's removed if they un-react.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="REACTION_ROLES"
+        title="Reaction Roles"
+        description="The bot reacts to the target message with your emoji — members click it to get the role, and it's removed if they un-react."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <NeonCard>

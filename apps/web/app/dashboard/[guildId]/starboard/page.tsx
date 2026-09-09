@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type StarboardConfig } from "../../../../lib/api";
 
 export default function StarboardPage({ params }: { params: { guildId: string } }) {
@@ -24,10 +25,12 @@ export default function StarboardPage({ params }: { params: { guildId: string } 
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Starboard</h1>
-      <p className="text-slate-400 mb-6">
-        Any message that hits the ⭐ threshold gets reposted here automatically, and stays updated as more people star it.
-      </p>
+      <ModuleHeader
+        guildId={params.guildId}
+        moduleKey="STARBOARD"
+        title="Starboard"
+        description="Any message that hits the ⭐ threshold gets reposted here automatically, and stays updated as more people star it."
+      />
 
       <NeonCard className="max-w-lg">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Starboard Channel</label>

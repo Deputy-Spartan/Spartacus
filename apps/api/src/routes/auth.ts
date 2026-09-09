@@ -63,21 +63,18 @@ router.get("/auth/discord/callback", async (req, res) => {
     { expiresIn: "7d" }
   );
 
-  // Dashboard and API live on different origins (Vercel + Render), so this
-  // cookie is inherently cross-site — "lax" would be silently dropped by
-  // the browser on the fetch() calls lib/api.ts makes with credentials.
-  res.cookie("spartacus_session", session, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-
-  res.redirect(`${process.env.NEXTAUTH_URL ?? ""}/dashboard`);
+  // Dashboard (Vercel) and API (Render) live on different origins. A cookie
+  // set here is cross-site from the dashboard's perspective, and browsers
+  // increasingly drop cross-site cookies outright regardless of SameSite
+  // settings (Safari ITP, Chrome's third-party cookie phase-out, private
+  // browsing, etc). So the session is handed to the frontend as a token in
+  // the URL fragment instead — fragments never reach the server, so it
+  // never appears in logs or Referer headers — and the frontend stores it
+  // itself (localStorage) and sends it back as a Bearer header.
+  res.redirect(`${process.env.NEXTAUTH_URL ?? ""}/auth/callback#token=${session}`);
 });
 
 router.post("/auth/logout", (_req, res) => {
-  res.clearCookie("spartacus_session");
   res.status(204).send();
 });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "../../lib/api";
+import { api, clearToken } from "../../lib/api";
 
 export default function GuildPickerPage() {
   const router = useRouter();
@@ -12,7 +12,10 @@ export default function GuildPickerPage() {
     api
       .getGuilds()
       .then(setGuilds)
-      .catch(() => router.push("/"));
+      .catch(() => {
+        clearToken();
+        router.push("/");
+      });
   }, [router]);
 
   if (!guilds) {

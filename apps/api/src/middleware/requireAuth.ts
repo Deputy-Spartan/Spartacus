@@ -14,7 +14,8 @@ export interface AuthedRequest extends Request {
 }
 
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
-  const token = req.cookies?.spartacus_session;
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : req.cookies?.spartacus_session;
   if (!token) {
     return res.status(401).json({ error: "Not authenticated" });
   }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "../../../components/nav/Sidebar";
 import { TopHeader } from "../../../components/nav/TopHeader";
-import { api } from "../../../lib/api";
+import { api, clearToken } from "../../../lib/api";
 
 export default function DashboardLayout({
   children,
@@ -17,7 +17,13 @@ export default function DashboardLayout({
   const [guilds, setGuilds] = useState<Array<{ id: string; name: string; icon: string | null }>>([]);
 
   useEffect(() => {
-    api.getGuilds().then(setGuilds).catch(() => router.push("/"));
+    api
+      .getGuilds()
+      .then(setGuilds)
+      .catch(() => {
+        clearToken();
+        router.push("/");
+      });
   }, [router]);
 
   return (

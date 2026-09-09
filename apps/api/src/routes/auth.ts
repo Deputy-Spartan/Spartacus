@@ -63,14 +63,17 @@ router.get("/auth/discord/callback", async (req, res) => {
     { expiresIn: "7d" }
   );
 
+  // Dashboard and API live on different origins (Vercel + Render), so this
+  // cookie is inherently cross-site — "lax" would be silently dropped by
+  // the browser on the fetch() calls lib/api.ts makes with credentials.
   res.cookie("spartacus_session", session, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
-  res.redirect(process.env.NEXTAUTH_URL ?? "/");
+  res.redirect(`${process.env.NEXTAUTH_URL ?? ""}/dashboard`);
 });
 
 router.post("/auth/logout", (_req, res) => {

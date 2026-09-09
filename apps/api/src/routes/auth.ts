@@ -47,16 +47,25 @@ router.get("/auth/discord/callback", async (req, res) => {
   ]);
 
   const user = (await userRes.json()) as { id: string; username: string; avatar: string | null };
-  const guilds = (await guildsRes.json()) as Array<{
+  const allGuilds = (await guildsRes.json()) as Array<{
     id: string;
     name: string;
     icon: string | null;
     permissions: string;
   }>;
 
-  // Session payload stays small and short-lived — guild/permission list is
-  // refreshed on next login rather than cached indefinitely, keeping token
-  // size (and thus cookie overhead) low.
+  // Only servers the user can actually manage go into the session — a
+  // Discord power user can belong to hundreds of servers, and embedding
+  // all of them in the JWT (now sent as a Bearer header, previously a
+  // cookie) blows past proxy/CDN header-size limits (431 errors on every
+  // authenticated request).
+  const MANAGE_GUILD = 0x20;
+  const ADMINISTRATOR = 0x8;
+  const guilds = allGuilds.filter((g) => {
+    const perms = BigInt(g.permissions);
+    return (perms & BigInt(MANAGE_GUILD)) !== 0n || (perms & BigInt(ADMINISTRATOR)) !== 0n;
+  });
+
   const session = jwt.sign(
     { id: user.id, username: user.username, avatar: user.avatar, guilds },
     process.env.NEXTAUTH_SECRET as string,

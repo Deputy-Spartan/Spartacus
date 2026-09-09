@@ -3,8 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  /* Tells the browser to use its dark native widget rendering everywhere —
+     select dropdown popups, checkboxes, radios, date/time pickers — instead
+     of defaulting to a jarring white/light system theme regardless of the
+     page's own colors. */
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-base-950 text-slate-100 font-sans;
+  }
+
+  select,
+  input,
+  textarea {
+    accent-color: #4c8dff;
   }
 
   * {
@@ -30,17 +44,6 @@
     background-color: rgba(76, 141, 255, 0.45);
   }
 
-  /* Native date/time/color picker popups (Chromium) follow color-scheme —
-     without this they render as a jarring white calendar regardless of the
-     rest of the page's theme. */
-  input[type="date"],
-  input[type="time"],
-  input[type="datetime-local"],
-  input[type="month"],
-  input[type="week"] {
-    color-scheme: dark;
-    accent-color: #4c8dff;
-  }
 }
 
 @layer components {

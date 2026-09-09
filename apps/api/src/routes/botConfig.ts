@@ -16,6 +16,7 @@ router.get("/bot-config", requireAuth, async (_req, res) => {
 
   res.json({
     id: SINGLETON_ID,
+    clientId: discordUser?.id ?? null, // a bot's Discord user id doubles as its OAuth2 application/client id
     username: discordUser?.username ?? row?.username ?? null,
     avatarUrl: discordUser?.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
     description: row?.description ?? null,

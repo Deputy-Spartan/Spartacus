@@ -16,20 +16,38 @@ export default function DashboardLayout({
   params: { guildId: string };
 }) {
   const router = useRouter();
-  const [guilds, setGuilds] = useState<Array<{ id: string; name: string; icon: string | null }>>([]);
+  const [guilds, setGuilds] = useState<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>([]);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
 
   useEffect(() => {
     api
       .getGuilds()
-      .then(setGuilds)
+      .then((rows) => {
+        setGuilds(rows);
+        const guild = rows.find((g) => g.id === params.guildId);
+        if (!guild || !guild.botInstalled) {
+          setAccess("denied");
+          router.push("/dashboard");
+        } else {
+          setAccess("allowed");
+        }
+      })
       .catch(() => {
         clearToken();
         router.push("/");
       });
     api.getMe().then(setUser).catch(() => null);
-  }, [router]);
+  }, [router, params.guildId]);
+
+  if (access !== "allowed") {
+    return (
+      <div className="min-h-screen bg-base-950 flex items-center justify-center text-slate-400">
+        {access === "checking" ? "Checking access…" : "Redirecting…"}
+      </div>
+    );
+  }
 
   return (
     <ConfirmProvider>

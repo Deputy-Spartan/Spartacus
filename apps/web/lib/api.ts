@@ -743,8 +743,19 @@ export interface ChannelLockInput {
   dmUser: boolean;
 }
 
+export function buildBotInviteUrl(clientId: string, guildId?: string) {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    scope: "bot applications.commands",
+    permissions: "8", // Administrator — simplest option given how many modules touch roles/channels/messages
+  });
+  if (guildId) params.set("guild_id", guildId);
+  return `https://discord.com/oauth2/authorize?${params.toString()}`;
+}
+
 export interface BotConfigRow {
   id: string;
+  clientId: string | null;
   username: string | null;
   avatarUrl: string | null;
   description: string | null;
@@ -785,7 +796,7 @@ export interface CurrentUser {
 
 export const api = {
   getMe: () => request<CurrentUser>("/me"),
-  getGuilds: () => request<Array<{ id: string; name: string; icon: string | null }>>("/guilds"),
+  getGuilds: () => request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>("/guilds"),
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
   getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),

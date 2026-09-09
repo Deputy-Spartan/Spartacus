@@ -4,6 +4,7 @@ interface Guild {
   id: string;
   name: string;
   icon: string | null;
+  botInstalled: boolean;
 }
 
 interface TopHeaderProps {
@@ -15,6 +16,8 @@ interface TopHeaderProps {
 }
 
 export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick }: TopHeaderProps) {
+  const installedGuilds = guilds.filter((g) => g.botInstalled);
+
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-base-950/80 backdrop-blur border-b border-white/5">
       <div className="flex items-center gap-2 min-w-0">
@@ -26,7 +29,7 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
           onChange={(e) => onSelectGuild(e.target.value)}
           className="min-w-0 max-w-[45vw] sm:max-w-none bg-base-900 border border-white/10 rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-neon-blue truncate"
         >
-          {guilds.map((g) => (
+          {installedGuilds.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name}
             </option>

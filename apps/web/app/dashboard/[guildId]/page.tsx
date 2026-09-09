@@ -90,12 +90,12 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
           )}
         </NeonCard>
 
-        <NeonCard>
-          <p className="font-medium mb-3">Recent Activity</p>
+        <NeonCard className="flex flex-col max-h-96">
+          <p className="font-medium mb-3 shrink-0">Recent Activity</p>
           {activity.length === 0 ? (
             <p className="text-sm text-slate-500">No dashboard changes yet.</p>
           ) : (
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-white/5 overflow-y-auto">
               {activity.map((entry) => (
                 <div key={entry.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
                   <div className="min-w-0">

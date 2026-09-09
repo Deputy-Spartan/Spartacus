@@ -32,6 +32,31 @@ const channelCache = new Map<string, { data: DiscordChannel[]; expires: number }
 const roleCache = new Map<string, { data: DiscordRole[]; expires: number }>();
 const CACHE_TTL_MS = 10_000;
 
+let botGuildIdsCache: { data: Set<string>; expires: number } | null = null;
+
+// Which guilds the bot itself is currently a member of — used to show
+// "installed" vs "not installed" on the dashboard's server picker, which is
+// otherwise just the user's manageable guild list regardless of bot presence.
+export async function getBotGuildIds(): Promise<Set<string>> {
+  if (botGuildIdsCache && botGuildIdsCache.expires > Date.now()) return botGuildIdsCache.data;
+
+  const ids = new Set<string>();
+  let after: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const res = await fetch(`${DISCORD_API}/users/@me/guilds?limit=200${after ? `&after=${after}` : ""}`, {
+      headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+    });
+    if (!res.ok) break;
+    const batch = (await res.json()) as Array<{ id: string }>;
+    for (const g of batch) ids.add(g.id);
+    if (batch.length < 200) break;
+    after = batch[batch.length - 1]?.id;
+  }
+
+  botGuildIdsCache = { data: ids, expires: Date.now() + CACHE_TTL_MS };
+  return ids;
+}
+
 export async function getGuildChannels(guildId: string): Promise<DiscordChannel[]> {
   const cached = channelCache.get(guildId);
   if (cached && cached.expires > Date.now()) return cached.data;

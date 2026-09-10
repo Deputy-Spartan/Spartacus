@@ -165,6 +165,16 @@ export async function postChannelMessage(channelId: string, payload: unknown): P
   return { id: message.id };
 }
 
+export async function editChannelMessage(channelId: string, messageId: string, payload: unknown): Promise<{ error?: string }> {
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages/${messageId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return { error: await res.text() };
+  return {};
+}
+
 export async function deleteChannelMessage(channelId: string, messageId: string): Promise<void> {
   await fetch(`${DISCORD_API}/channels/${channelId}/messages/${messageId}`, {
     method: "DELETE",

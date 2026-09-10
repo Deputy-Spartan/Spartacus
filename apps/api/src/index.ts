@@ -58,6 +58,7 @@ import savedEmbedsRouter from "./routes/savedEmbeds";
 import statChannelsRouter from "./routes/statChannels";
 import statusChannelsRouter from "./routes/statusChannels";
 import botStatusRouter from "./routes/botStatus";
+import { startStatusChannelWatchdog } from "./jobs/statusChannelWatchdog";
 import aiConfigRouter from "./routes/aiConfig";
 import serverBackupsRouter from "./routes/serverBackups";
 import commandTogglesRouter from "./routes/commandToggles";
@@ -153,3 +154,12 @@ app.listen(port, () => {
 if (process.env.RUN_BOT_INLINE !== "false") {
   import("@spartacus/bot").then(({ startBot }) => startBot());
 }
+
+// Deliberately started here, not inside the bot process — this needs to
+// keep working (and be the one to say so) precisely when the bot itself is
+// down. Survives both deploy shapes: in the merged single-service default
+// above, the bot's own unhandledRejection/uncaughtException guards keep
+// this process (and this watchdog) alive even if the gateway connection
+// dies; when split into its own service (RUN_BOT_INLINE=false), this
+// process was never coupled to the bot's lifecycle in the first place.
+startStatusChannelWatchdog();

@@ -2,7 +2,21 @@ import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
-import { deleteChannelMessage } from "../lib/discordRest";
+import {
+  deleteChannelMessage,
+  getGuildChannels,
+  createGuildScheduledEvent,
+  updateGuildScheduledEvent,
+  deleteGuildScheduledEvent,
+} from "../lib/discordRest";
+
+const NATIVE_EVENT_DURATION_MS = 2 * 60 * 60 * 1000; // Discord requires an end time for EXTERNAL events; the dashboard has no end-time field, so default to a 2h block
+
+async function channelLocation(guildId: string, channelId: string): Promise<string> {
+  const channels = await getGuildChannels(guildId).catch(() => []);
+  const channel = channels.find((c) => c.id === channelId);
+  return channel ? `#${channel.name}` : "Discord";
+}
 
 const router = Router();
 
@@ -55,6 +69,17 @@ router.post("/guilds/:guildId/events", requireAuth, requireGuildPermission, asyn
     },
   });
 
+  const nativeEvent = await createGuildScheduledEvent(guildId, {
+    name: event.title,
+    description: event.description ?? undefined,
+    scheduledStartTime: event.startTime.toISOString(),
+    scheduledEndTime: new Date(event.startTime.getTime() + NATIVE_EVENT_DURATION_MS).toISOString(),
+    location: await channelLocation(guildId, event.channelId),
+  });
+  if (nativeEvent.id) {
+    await prisma.event.update({ where: { id: event.id }, data: { discordEventId: nativeEvent.id } });
+  }
+
   res.status(201).json(event);
 });
 
@@ -81,6 +106,15 @@ router.put("/guilds/:guildId/events/:id", requireAuth, requireGuildPermission, a
     },
   });
 
+  if (existing.discordEventId) {
+    await updateGuildScheduledEvent(req.params.guildId, existing.discordEventId, {
+      name: event.title,
+      description: event.description ?? undefined,
+      scheduledStartTime: event.startTime.toISOString(),
+      scheduledEndTime: new Date(event.startTime.getTime() + NATIVE_EVENT_DURATION_MS).toISOString(),
+    });
+  }
+
   res.json(event);
 });
 
@@ -92,6 +126,9 @@ router.delete("/guilds/:guildId/events/:id", requireAuth, requireGuildPermission
 
   if (existing.messageId) {
     await deleteChannelMessage(existing.channelId, existing.messageId);
+  }
+  if (existing.discordEventId) {
+    await deleteGuildScheduledEvent(req.params.guildId, existing.discordEventId);
   }
 
   await prisma.event.delete({ where: { id: req.params.id } });

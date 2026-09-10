@@ -217,6 +217,7 @@ model Event {
   // Attending/Absent, not the raid roles.
   enabledRoles          Json          @default("[\"TANK\",\"DPS\",\"HEALER\",\"ATTENDING\",\"ABSENT\"]")
   needsSync             Boolean       @default(true) // true = bot must (re)post/edit the Discord message
+  discordEventId        String? // native Discord "Scheduled Event" (Events tab) mirroring this — separate from messageId's RSVP embed
   signups               EventSignup[]
   createdAt             DateTime      @default(now())
 

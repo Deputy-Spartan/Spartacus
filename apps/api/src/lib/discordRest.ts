@@ -281,6 +281,67 @@ export async function deleteGuildApplicationCommand(guildId: string, commandId: 
   }).catch(() => null);
 }
 
+// Discord's native "Scheduled Events" (the calendar-integrated tab with
+// mobile push reminders and an "Interested" button) — kept in sync
+// alongside the dashboard's own RSVP-embed event system, not replacing it.
+// EXTERNAL is used unconditionally (rather than picking VOICE/STAGE_INSTANCE
+// based on the event's channel) since dashboard events point at a text
+// channel for the RSVP embed, which native scheduled events can't target
+// directly — EXTERNAL just needs a free-text location and an end time.
+interface ScheduledEventFields {
+  name: string;
+  description?: string;
+  scheduledStartTime: string; // ISO 8601
+  scheduledEndTime: string; // ISO 8601 — required for EXTERNAL events
+  location: string;
+}
+
+export async function createGuildScheduledEvent(guildId: string, fields: ScheduledEventFields): Promise<{ id?: string; error?: string }> {
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}/scheduled-events`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: fields.name.slice(0, 100),
+      description: fields.description?.slice(0, 1000),
+      scheduled_start_time: fields.scheduledStartTime,
+      scheduled_end_time: fields.scheduledEndTime,
+      privacy_level: 2, // GUILD_ONLY — the only level Discord currently supports
+      entity_type: 3, // EXTERNAL
+      entity_metadata: { location: fields.location.slice(0, 100) },
+    }),
+  });
+  if (!res.ok) return { error: await res.text() };
+  const data = (await res.json()) as { id: string };
+  return { id: data.id };
+}
+
+export async function updateGuildScheduledEvent(
+  guildId: string,
+  eventId: string,
+  fields: Partial<ScheduledEventFields>
+): Promise<{ error?: string }> {
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}/scheduled-events/${eventId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...(fields.name !== undefined ? { name: fields.name.slice(0, 100) } : {}),
+      ...(fields.description !== undefined ? { description: fields.description.slice(0, 1000) } : {}),
+      ...(fields.scheduledStartTime !== undefined ? { scheduled_start_time: fields.scheduledStartTime } : {}),
+      ...(fields.scheduledEndTime !== undefined ? { scheduled_end_time: fields.scheduledEndTime } : {}),
+      ...(fields.location !== undefined ? { entity_metadata: { location: fields.location.slice(0, 100) } } : {}),
+    }),
+  });
+  if (!res.ok) return { error: await res.text() };
+  return {};
+}
+
+export async function deleteGuildScheduledEvent(guildId: string, eventId: string): Promise<void> {
+  await fetch(`${DISCORD_API}/guilds/${guildId}/scheduled-events/${eventId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+  }).catch(() => null);
+}
+
 export async function getGuildRoles(guildId: string): Promise<DiscordRole[]> {
   const cached = roleCache.get(guildId);
   if (cached && cached.expires > Date.now()) return cached.data;

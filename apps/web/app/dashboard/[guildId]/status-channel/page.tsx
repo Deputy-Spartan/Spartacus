@@ -14,6 +14,7 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
   const confirm = useConfirm();
   const status = useBotStatus();
   const [rows, setRows] = useState<StatusChannelRow[]>([]);
+  const [channelNames, setChannelNames] = useState<Record<string, string>>({});
   const [channelId, setChannelId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,6 +22,13 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
     api.getStatusChannels(params.guildId).then(setRows);
   }
   useEffect(refresh, [params.guildId]);
+  useEffect(() => {
+    api.getDiscordChannels(params.guildId).then((c) => {
+      const map: Record<string, string> = {};
+      for (const ch of [...c.textChannels, ...c.voiceChannels]) map[ch.id] = ch.name;
+      setChannelNames(map);
+    });
+  }, [params.guildId]);
 
   async function add() {
     if (!channelId) {
@@ -55,7 +63,7 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
           <div className="divide-y divide-white/5">
             {rows.map((r) => (
               <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-                <span className="text-slate-300 truncate">#{r.channelId}</span>
+                <span className="text-slate-300 truncate">#{channelNames[r.channelId] ?? r.channelId}</span>
                 <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
                   Remove
                 </button>

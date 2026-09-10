@@ -35,14 +35,26 @@ router.post("/access-requests", requireAuthOnly, async (req: AuthedRequest, res)
   });
 
   if (process.env.OWNER_DISCORD_ID) {
+    // Buttons resolved by the bot's own gateway connection — see
+    // apps/bot/src/modules/owner/accessRequests.ts — so approving/denying
+    // works right from the DM without opening the dashboard at all.
     sendDirectMessage(process.env.OWNER_DISCORD_ID, {
       embeds: [
         {
           color: 0xf5a524,
           title: "🔑 New dashboard access request",
           description: `**${username}** (\`${id}\`) wants access to the Spartacus dashboard.`,
-          footer: { text: "Approve or deny it on the Access Control page" },
+          footer: { text: "Approve or deny below, or on the Access Control page" },
           timestamp: new Date().toISOString(),
+        },
+      ],
+      components: [
+        {
+          type: 1,
+          components: [
+            { type: 2, style: 3, custom_id: `access:approve:${row.id}`, label: "Approve" },
+            { type: 2, style: 4, custom_id: `access:deny:${row.id}`, label: "Deny" },
+          ],
         },
       ],
     }).catch(() => null); // best-effort — a missed DM shouldn't fail the request itself

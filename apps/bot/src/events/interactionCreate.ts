@@ -22,6 +22,20 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && interaction.customId.startsWith("access:approve:")) {
+    const requestId = interaction.customId.split(":")[2];
+    const { handleAccessApprove } = await import("../modules/owner/accessRequests");
+    await handleAccessApprove(interaction, requestId);
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith("access:deny:")) {
+    const requestId = interaction.customId.split(":")[2];
+    const { handleAccessDeny } = await import("../modules/owner/accessRequests");
+    await handleAccessDeny(interaction, requestId);
+    return;
+  }
+
   if (!interaction.guildId) return;
 
   if (interaction.isChatInputCommand()) {

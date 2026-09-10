@@ -7,6 +7,7 @@ import { TopHeader } from "../../../components/nav/TopHeader";
 import { CommandPalette } from "../../../components/nav/CommandPalette";
 import { ConfirmProvider } from "../../../components/ui/ConfirmDialog";
 import { api, clearToken, type CurrentUser } from "../../../lib/api";
+import { useIdleLogout } from "../../../lib/useIdleLogout";
 
 export default function DashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default function DashboardLayout({
   params: { guildId: string };
 }) {
   const router = useRouter();
+  useIdleLogout();
   const [guilds, setGuilds] = useState<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>([]);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isOwner, setIsOwner] = useState(false);

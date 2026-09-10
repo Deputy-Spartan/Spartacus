@@ -26,6 +26,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
+  // A single choke point for "your session is no longer valid" — expired
+  // (24h token lifetime) or revoked (owner pulled your dashboard access) —
+  // so every page gets a clean redirect to a real login screen instead of
+  // each one needing its own 401 handling (previously inconsistent: some
+  // pages caught it, most didn't).
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      window.location.href = "/?expired=1";
+    }
+    throw new Error("Session expired");
+  }
+
   if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

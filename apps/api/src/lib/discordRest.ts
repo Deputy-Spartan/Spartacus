@@ -154,6 +154,21 @@ export function buildRestMessagePayload(input: SendPayloadInput) {
   return { content: "", embeds: [embed], components };
 }
 
+// Opens (or reuses) a DM channel with a user and sends them a message —
+// bots can only DM someone they share a server with, which is guaranteed
+// here since this is only ever used to message the dashboard owner, who
+// by definition is in the server(s) running this bot.
+export async function sendDirectMessage(userId: string, payload: unknown): Promise<{ error?: string; id?: string }> {
+  const dmRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ recipient_id: userId }),
+  });
+  if (!dmRes.ok) return { error: await dmRes.text() };
+  const dmChannel = (await dmRes.json()) as { id: string };
+  return postChannelMessage(dmChannel.id, payload);
+}
+
 export async function postChannelMessage(channelId: string, payload: unknown): Promise<{ error?: string; id?: string }> {
   const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
     method: "POST",

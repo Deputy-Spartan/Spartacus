@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { BotStatusBadge } from "./BotStatusBadge";
+import { clearToken } from "../../lib/api";
 
 interface Guild {
   id: string;
@@ -19,7 +21,13 @@ interface TopHeaderProps {
 }
 
 export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick, sidebarOpen }: TopHeaderProps) {
+  const router = useRouter();
   const installedGuilds = guilds.filter((g) => g.botInstalled);
+
+  function logout() {
+    clearToken();
+    router.push("/");
+  }
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-base-950/80 backdrop-blur border-b border-white/5">
@@ -61,6 +69,14 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
           alt={user.username}
           className="h-8 w-8 rounded-full border border-neon-blue shadow-glow-blue"
         />
+        <button
+          onClick={logout}
+          title="Log out"
+          aria-label="Log out"
+          className="shrink-0 text-slate-500 hover:text-rose-400 text-lg leading-none p-1"
+        >
+          🚪
+        </button>
       </div>
     </header>
   );

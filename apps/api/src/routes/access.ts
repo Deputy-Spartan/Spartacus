@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuthOnly, isOwner, type AuthedRequest } from "../middleware/requireAuth";
 import { requireOwner } from "../middleware/requireOwner";
+import { sendDirectMessage } from "../lib/discordRest";
 
 const router = Router();
 
@@ -32,6 +33,21 @@ router.post("/access-requests", requireAuthOnly, async (req: AuthedRequest, res)
     create: { discordUserId: id, username },
     update: { username }, // refresh in case they changed their Discord username since first requesting
   });
+
+  if (process.env.OWNER_DISCORD_ID) {
+    sendDirectMessage(process.env.OWNER_DISCORD_ID, {
+      embeds: [
+        {
+          color: 0xf5a524,
+          title: "🔑 New dashboard access request",
+          description: `**${username}** (\`${id}\`) wants access to the Spartacus dashboard.`,
+          footer: { text: "Approve or deny it on the Access Control page" },
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    }).catch(() => null); // best-effort — a missed DM shouldn't fail the request itself
+  }
+
   res.status(201).json(row);
 });
 

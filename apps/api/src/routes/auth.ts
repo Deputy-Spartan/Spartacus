@@ -66,10 +66,12 @@ router.get("/auth/discord/callback", async (req, res) => {
     return (perms & BigInt(MANAGE_GUILD)) !== 0n || (perms & BigInt(ADMINISTRATOR)) !== 0n;
   });
 
+  // Short-lived now that the dashboard is invite-only — a stolen/forgotten
+  // token on a shared machine is only good for a day, not a week.
   const session = jwt.sign(
     { id: user.id, username: user.username, avatar: user.avatar, guilds },
     process.env.NEXTAUTH_SECRET as string,
-    { expiresIn: "7d" }
+    { expiresIn: "24h" }
   );
 
   // Dashboard (Vercel) and API (Render) live on different origins. A cookie

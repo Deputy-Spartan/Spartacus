@@ -1,5 +1,6 @@
 import { prisma } from "@spartacus/db";
 import { editChannelMessage, postChannelMessage } from "../lib/discordRest";
+import { getEffectiveBotStatus, type BotPhase } from "../lib/botStatus";
 
 // Runs inside the API process, not the bot's gateway connection — the whole
 // point is to still work when the bot itself is dead or mid-crash-loop.
@@ -11,16 +12,13 @@ import { editChannelMessage, postChannelMessage } from "../lib/discordRest";
 // It also owns the uptime-history log: a separate, append-only channel
 // (distinct from the live status embed) that gets one message per
 // went-offline / back-online event, backed by UptimeIncident rows so
-// duration can be reported. A deploy's brief "Updating" window (see
-// scripts/mark-deploying.js) is deliberately NOT treated as an incident —
-// that's an expected restart, not an outage.
-const STALE_AFTER_MS = 60_000;
-const UPDATING_TIMEOUT_MS = 5 * 60_000;
+// duration can be reported. A deploy's brief "Updating" window and any
+// owner-set manual override are deliberately NOT treated as incidents —
+// those are expected/intentional states, not outages.
 const CHECK_INTERVAL_MS = 30_000;
 
-type Phase = "online" | "updating" | "offline";
-
-let lastPhase: Phase | null = null;
+let lastPhase: BotPhase | null = null;
+let lastWasManual = false;
 let openIncidentId: string | null = null;
 
 async function postToUptimeChannels(payload: unknown) {
@@ -48,6 +46,23 @@ function formatDuration(ms: number): string {
   const minutes = totalMinutes % 60;
   if (hours === 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
+}
+
+async function announceManual(phase: BotPhase, message: string | null) {
+  const byPhase: Record<BotPhase, { color: number; title: string }> = {
+    online: { color: 0x22c55e, title: "🟢 Spartacus is Online" },
+    updating: { color: 0xf59e0b, title: "🟡 Spartacus is Under Maintenance" },
+    offline: { color: 0x64748b, title: "🔴 Spartacus is Offline" },
+  };
+  const { color, title } = byPhase[phase];
+
+  await editPrimaryStatusChannels({
+    color,
+    title,
+    description: message ?? undefined,
+    footer: { text: "Set manually" },
+    timestamp: new Date().toISOString(),
+  });
 }
 
 async function announceUpdating() {
@@ -104,21 +119,25 @@ async function announceRecovery() {
 }
 
 async function checkAndAnnounce() {
-  const config = await prisma.botConfig.findUnique({ where: { id: "singleton" } });
-  const lastHeartbeatAt = config?.lastHeartbeatAt ?? null;
-  const online = !!lastHeartbeatAt && Date.now() - lastHeartbeatAt.getTime() < STALE_AFTER_MS;
-  const deployingSince = config?.deployingSince ?? null;
-  const updating = !online && !!deployingSince && Date.now() - deployingSince.getTime() < UPDATING_TIMEOUT_MS;
-
-  const phase: Phase = online ? "online" : updating ? "updating" : "offline";
+  const status = await getEffectiveBotStatus();
   const previousPhase = lastPhase;
-  lastPhase = phase;
+  const wasManual = lastWasManual;
+  lastPhase = status.phase;
+  lastWasManual = status.manual;
 
-  if (previousPhase === null || previousPhase === phase) return; // first check, or no change
+  // An owner-set override fully bypasses the auto incident/recovery
+  // machinery below — it's an intentional state, not something to log as
+  // an outage. Only re-edit the embed on an actual change, not every tick.
+  if (status.manual) {
+    if (previousPhase !== status.phase || !wasManual) await announceManual(status.phase, status.message);
+    return;
+  }
 
-  if (phase === "updating") await announceUpdating();
-  else if (phase === "offline" && previousPhase !== "offline") await announceOffline();
-  else if (phase === "online" && previousPhase !== "online") await announceRecovery();
+  if (previousPhase === null || previousPhase === status.phase) return; // first check, or no change
+
+  if (status.phase === "updating") await announceUpdating();
+  else if (status.phase === "offline" && previousPhase !== "offline") await announceOffline();
+  else if (status.phase === "online" && previousPhase !== "online") await announceRecovery();
 }
 
 export async function startStatusChannelWatchdog() {

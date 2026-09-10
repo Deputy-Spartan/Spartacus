@@ -24,6 +24,8 @@ import { startAutoPurgeJob } from "./jobs/autoPurge";
 import { startBirthdayAnnouncerJob } from "./jobs/birthdayAnnouncer";
 import { startBirthdayPanelPosterJob } from "./jobs/birthdayPanelPoster";
 import { startApplicationPanelPosterJob } from "./jobs/applicationPanelPoster";
+import { startModDigestJob } from "./jobs/modDigest";
+import { startWeeklyRecapJob } from "./jobs/weeklyRecap";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -35,6 +37,7 @@ import * as joinRoles from "./modules/community/joinRoles";
 import * as stickyMessages from "./modules/community/stickyMessages";
 import * as starboard from "./modules/community/starboard";
 import * as tempChannels from "./modules/community/tempChannels";
+import * as voiceActivity from "./modules/community/voiceActivity";
 import * as rolePersistence from "./modules/community/rolePersistence";
 import * as inviteTracking from "./modules/community/inviteTracking";
 import * as modmail from "./modules/modmail/modmail";
@@ -162,6 +165,8 @@ export function startBot() {
     startBirthdayPanelPosterJob(c);
     startApplicationPanelPosterJob(c);
     startScheduledMessagesJob(c);
+    startModDigestJob(c);
+    startWeeklyRecapJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);
@@ -216,6 +221,7 @@ export function startBot() {
   client.on(Events.ChannelUpdate, logger.onChannelUpdate);
   client.on(Events.InviteCreate, logger.onInviteCreate);
   client.on(Events.VoiceStateUpdate, tempChannels.execute);
+  client.on(Events.VoiceStateUpdate, voiceActivity.execute);
 
   client.on(Events.MessageReactionAdd, reactionRoles.onReactionAdd);
   client.on(Events.MessageReactionRemove, reactionRoles.onReactionRemove);

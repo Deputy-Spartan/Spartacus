@@ -6,6 +6,22 @@ import { commands } from "../commands";
 export const name = Events.InteractionCreate;
 
 export async function execute(interaction: Interaction) {
+  // These two happen in a DM (the appeal button/modal live on a DM the bot
+  // sent), so they must be handled before the guild-only gate below.
+  if (interaction.isButton() && interaction.customId.startsWith("appeal:start:")) {
+    const caseId = interaction.customId.split(":")[2];
+    const { handleAppealStart } = await import("../modules/moderation/appeals");
+    await handleAppealStart(interaction, caseId);
+    return;
+  }
+
+  if (interaction.isModalSubmit() && interaction.customId.startsWith("appealmodal:")) {
+    const caseId = interaction.customId.split(":")[1];
+    const { handleAppealModalSubmit } = await import("../modules/moderation/appeals");
+    await handleAppealModalSubmit(interaction, caseId);
+    return;
+  }
+
   if (!interaction.guildId) return;
 
   if (interaction.isChatInputCommand()) {
@@ -143,6 +159,18 @@ export async function execute(interaction: Interaction) {
   }
 
   if (!interaction.isButton()) return;
+
+  if (interaction.customId.startsWith("appeal:approve:") || interaction.customId.startsWith("appeal:deny:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "BAN_APPEALS");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Ban/Mute Appeals is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const appealParts = interaction.customId.split(":");
+    const { handleAppealResolve } = await import("../modules/moderation/appeals");
+    await handleAppealResolve(interaction, appealParts[2], appealParts[1] as "approve" | "deny");
+    return;
+  }
 
   if (interaction.customId.startsWith("event:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "EVENTS");

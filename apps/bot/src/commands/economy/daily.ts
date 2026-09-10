@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import { claimDaily, getConfig } from "../../lib/economy";
+import { awardAchievement } from "../../lib/achievements";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -26,6 +27,13 @@ const command: CommandModule = {
 
     const streakNote = config.streakBonusPerDay > 0 ? ` (streak: ${result.streak} day${result.streak === 1 ? "" : "s"})` : "";
     await interaction.reply(`${config.currencyIcon} You claimed your daily **${result.amount} ${config.currencyName}**!${streakNote}`);
+
+    if (result.streak >= 7) {
+      await awardAchievement(interaction.client, guildId, userId, "STREAK_7", "7-Day Streak", interaction.channelId ?? undefined);
+    }
+    if (result.streak >= 30) {
+      await awardAchievement(interaction.client, guildId, userId, "STREAK_30", "30-Day Streak", interaction.channelId ?? undefined);
+    }
   },
 };
 

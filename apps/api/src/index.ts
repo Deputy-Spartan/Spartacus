@@ -66,6 +66,12 @@ import aiConfigRouter from "./routes/aiConfig";
 import serverBackupsRouter from "./routes/serverBackups";
 import commandTogglesRouter from "./routes/commandToggles";
 import customSlashCommandsRouter from "./routes/customSlashCommands";
+import modDigestSettingsRouter from "./routes/modDigestSettings";
+import weeklyRecapSettingsRouter from "./routes/weeklyRecapSettings";
+import voiceActivityRouter from "./routes/voiceActivity";
+import achievementsRouter from "./routes/achievements";
+import warnEscalationRouter from "./routes/warnEscalation";
+import appealsRouter from "./routes/appeals";
 
 const app = express();
 
@@ -134,6 +140,12 @@ app.use(aiConfigRouter);
 app.use(serverBackupsRouter);
 app.use(commandTogglesRouter);
 app.use(customSlashCommandsRouter);
+app.use(modDigestSettingsRouter);
+app.use(warnEscalationRouter);
+app.use(appealsRouter);
+app.use(weeklyRecapSettingsRouter);
+app.use(voiceActivityRouter);
+app.use(achievementsRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

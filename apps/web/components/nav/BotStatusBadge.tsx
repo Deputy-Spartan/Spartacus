@@ -20,8 +20,9 @@ export function BotStatusBadge() {
   }[phase];
   const textClass = { checking: "text-slate-500", updating: "text-amber-400", online: "text-slate-300", offline: "text-slate-500" }[phase];
 
-  const title =
-    phase === "offline" && status?.lastError
+  const title = status?.manual
+    ? `Manually set${status.message ? `: ${status.message}` : ""}`
+    : phase === "offline" && status?.lastError
       ? `Last error: ${status.lastError.message} — see the Errors page for details`
       : status?.lastHeartbeatAt
         ? `Last heartbeat: ${new Date(status.lastHeartbeatAt).toLocaleTimeString()}`

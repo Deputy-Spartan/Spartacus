@@ -59,6 +59,14 @@ model Guild {
   statChannels      StatChannel[]
   statusChannels    StatusChannel[]
   alertSettings     AlertSettings?
+  warnEscalationSettings WarnEscalationSettings?
+  appealSettings    AppealSettings?
+  appeals           Appeal[]
+  modDigestSettings ModDigestSettings?
+  voiceSessions     VoiceSession[]
+  voiceActivity     VoiceActivity[]
+  weeklyRecapSettings WeeklyRecapSettings?
+  achievements      Achievement[]
   aiConfig          AiConfig?
   serverBackups     ServerBackup[]
   buttonPresets     ButtonPreset[]
@@ -121,6 +129,12 @@ enum ModuleKey {
   BIRTHDAYS
   APPLICATIONS
   STATUS_CHANNEL
+  WARN_ESCALATION
+  BAN_APPEALS
+  MOD_DIGEST
+  VOICE_ACTIVITY
+  WEEKLY_RECAP
+  ACHIEVEMENTS
 }
 
 model ModuleToggle {
@@ -990,6 +1004,8 @@ model BotConfig {
   lastDeployCommit String?  // RENDER_GIT_COMMIT at last boot — comparing this on startup is how a "new deploy" is detected
   lastDeployAt     DateTime?
   deployingSince   DateTime? // set right before `prisma migrate deploy` runs, cleared by the next heartbeat — see apps/api/src/routes/botStatus.ts
+  manualStatusOverride String? // "ONLINE" | "OFFLINE" | "MAINTENANCE" | null — null means fully automatic (heartbeat-based). Owner-set, takes precedence over everything else.
+  manualStatusMessage  String? // shown alongside the override everywhere the status appears
   updatedAt       DateTime  @updatedAt
 }
 
@@ -1288,4 +1304,112 @@ model DashboardAuditEntry {
   createdAt DateTime @default(now())
 
   @@index([guildId, createdAt])
+}
+
+// ---- Warn Escalation ----
+// Auto-acts once a member racks up enough WARN cases within a rolling
+// window — logCase() in apps/bot/src/lib/cases.ts is the one place every
+// /warn (and dashboard-issued warning) already funnels through, so that's
+// the trigger point rather than duplicating warn logic elsewhere.
+
+model WarnEscalationSettings {
+  id             String @id @default(cuid())
+  guild          Guild  @relation(fields: [guildId], references: [id])
+  guildId        String @unique
+  warnThreshold  Int    @default(3)
+  warnWindowDays Int    @default(30)
+  action         String @default("TIMEOUT") // TIMEOUT | KICK | BAN
+  timeoutMinutes Int    @default(60)
+}
+
+// ---- Ban/Mute Appeals ----
+// A punished member gets DMed an "Appeal" prompt; their response becomes
+// one of these, reviewed by staff in appealChannelId.
+
+model AppealSettings {
+  id              String  @id @default(cuid())
+  guild           Guild   @relation(fields: [guildId], references: [id])
+  guildId         String  @unique
+  appealChannelId String?
+}
+
+model Appeal {
+  id         String    @id @default(cuid())
+  guild      Guild     @relation(fields: [guildId], references: [id])
+  guildId    String
+  userId     String
+  caseId     String? // the ModerationCase being appealed, if one is linkable
+  reason     String
+  status     String    @default("PENDING") // PENDING | APPROVED | DENIED
+  messageId  String? // the staff review message, for editing after a decision
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([guildId, status])
+}
+
+// ---- Mod Accountability Digest ----
+// A periodic per-moderator tally of ModerationCase rows, posted to a
+// staff channel — surfaces activity that otherwise only lives in the log.
+
+model ModDigestSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+}
+
+// ---- Voice Activity ----
+// Message-based XP/earning already exists (MemberXp, EconomyBalance) —
+// this is the voice-channel equivalent. VoiceSession rows track an
+// in-progress connection (closed out and folded into VoiceActivity's
+// running total when the member leaves); VoiceActivity is the durable
+// per-user total voice minutes, independent of leveling/economy so it can
+// feed either without coupling them.
+
+model VoiceSession {
+  id       String   @id @default(cuid())
+  guild    Guild    @relation(fields: [guildId], references: [id])
+  guildId  String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  @@unique([guildId, userId])
+}
+
+model VoiceActivity {
+  id           String @id @default(cuid())
+  guild        Guild  @relation(fields: [guildId], references: [id])
+  guildId      String
+  userId       String
+  totalMinutes Int    @default(0)
+
+  @@unique([guildId, userId])
+  @@index([guildId, totalMinutes])
+}
+
+// ---- Weekly Recap ----
+
+model WeeklyRecapSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+}
+
+// ---- Achievements ----
+// One row per member per milestone ever awarded — the unique constraint
+// is what prevents re-awarding the same badge on a later trigger.
+
+model Achievement {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  userId    String
+  type      String // FIRST_MESSAGE | LEVEL_10 | LEVEL_25 | LEVEL_50 | STREAK_7 | STREAK_30 | VOICE_10H | VOICE_50H
+  awardedAt DateTime @default(now())
+
+  @@unique([guildId, userId, type])
+  @@index([guildId, userId])
 }

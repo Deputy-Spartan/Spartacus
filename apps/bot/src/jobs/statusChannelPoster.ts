@@ -22,6 +22,15 @@ function formatUptime(seconds: number): string {
 // best-effort mirror of it for members who only see Discord.
 export function startStatusChannelPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    // An owner-set OFFLINE/MAINTENANCE override means someone deliberately
+    // wants the channel to say that, even though the bot is clearly alive
+    // (it's the one running this very job) — skip so this doesn't fight the
+    // API-side watchdog that owns painting the override onto the embed.
+    // A null override or an explicit ONLINE override both fall through to
+    // normal behavior below.
+    const config = await prisma.botConfig.findUnique({ where: { id: "singleton" } });
+    if (config?.manualStatusOverride === "OFFLINE" || config?.manualStatusOverride === "MAINTENANCE") return;
+
     let loggedThisTick = 0;
     const rows = await prisma.statusChannel.findMany({ take: 200 });
 

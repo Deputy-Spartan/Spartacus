@@ -81,7 +81,12 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
                   <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
                   <span className={`text-lg font-semibold ${textClass}`}>{label}</span>
                 </p>
-                {phase === "offline" && botStatus?.lastError && (
+                {botStatus?.manual && botStatus.message && (
+                  <p className="text-xs text-slate-500 mt-1 truncate" title={botStatus.message}>
+                    {botStatus.message}
+                  </p>
+                )}
+                {!botStatus?.manual && phase === "offline" && botStatus?.lastError && (
                   <p className="text-xs text-slate-500 mt-1 truncate" title={botStatus.lastError.message}>
                     {botStatus.lastError.message} —{" "}
                     <Link href={`/dashboard/${params.guildId}/errors`} className="text-neon-blue hover:underline">

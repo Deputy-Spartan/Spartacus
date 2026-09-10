@@ -23,18 +23,27 @@ router.get("/bot-config", requireAuth, async (_req, res) => {
     statusType: row?.statusType ?? "online",
     activityType: row?.activityType ?? "PLAYING",
     activityText: row?.activityText ?? null,
+    manualStatusOverride: row?.manualStatusOverride ?? null,
+    manualStatusMessage: row?.manualStatusMessage ?? null,
   });
 });
 
 router.put("/bot-config", requireAuth, async (req, res) => {
-  const { username, avatarDataUri, description, statusType, activityType, activityText } = req.body as {
+  const { username, avatarDataUri, description, statusType, activityType, activityText, manualStatusOverride, manualStatusMessage } = req.body as {
     username?: string;
     avatarDataUri?: string;
     description?: string;
     statusType?: string;
     activityType?: string;
     activityText?: string;
+    manualStatusOverride?: string | null;
+    manualStatusMessage?: string | null;
   };
+
+  const VALID_OVERRIDES = new Set(["ONLINE", "OFFLINE", "MAINTENANCE"]);
+  if (manualStatusOverride !== undefined && manualStatusOverride !== null && !VALID_OVERRIDES.has(manualStatusOverride)) {
+    return res.status(400).json({ error: "Invalid manualStatusOverride" });
+  }
 
   const errors: string[] = [];
 
@@ -60,6 +69,8 @@ router.put("/bot-config", requireAuth, async (req, res) => {
       statusType: statusType ?? "online",
       activityType: activityType ?? "PLAYING",
       activityText: activityText ?? null,
+      manualStatusOverride: manualStatusOverride ?? null,
+      manualStatusMessage: manualStatusMessage ?? null,
     },
     update: {
       ...(username !== undefined ? { username } : {}),
@@ -67,6 +78,8 @@ router.put("/bot-config", requireAuth, async (req, res) => {
       ...(statusType !== undefined ? { statusType } : {}),
       ...(activityType !== undefined ? { activityType } : {}),
       ...(activityText !== undefined ? { activityText } : {}),
+      ...(manualStatusOverride !== undefined ? { manualStatusOverride } : {}),
+      ...(manualStatusMessage !== undefined ? { manualStatusMessage } : {}),
     },
   });
 

@@ -21,6 +21,9 @@ export const NAV_SECTIONS = [
       { href: "/moderation", label: "Moderator", icon: "🛡️" },
       { href: "/cases", label: "Cases & Warnings", icon: "📁" },
       { href: "/reports", label: "Player Reports", icon: "🚩" },
+      { href: "/mod-digest", label: "Mod Digest", icon: "📋" },
+      { href: "/warn-escalation", label: "Warn Escalation", icon: "📈" },
+      { href: "/appeals", label: "Appeals", icon: "🙏" },
     ],
   },
   {
@@ -54,6 +57,8 @@ export const NAV_SECTIONS = [
     items: [
       { href: "/leveling", label: "Leaderboard", icon: "📈" },
       { href: "/level-roles", label: "Level Roles", icon: "🏅" },
+      { href: "/voice-activity", label: "Voice Activity", icon: "🎙️" },
+      { href: "/achievements", label: "Achievements", icon: "🏆" },
     ],
   },
   {
@@ -63,6 +68,7 @@ export const NAV_SECTIONS = [
       { href: "/giveaways", label: "Giveaways", icon: "🎁" },
       { href: "/stream-alerts", label: "Stream Alerts", icon: "🔴" },
       { href: "/commands", label: "Custom Commands", icon: "💬" },
+      { href: "/weekly-recap", label: "Weekly Recap", icon: "📊" },
     ],
   },
   {

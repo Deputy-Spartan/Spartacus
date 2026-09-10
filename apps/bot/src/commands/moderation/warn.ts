@@ -21,6 +21,7 @@ const command: CommandModule = {
       action: "WARN",
       reason,
       moderatorId: interaction.user.id,
+      client: interaction.client,
     });
 
     await user.send(`You were warned in **${interaction.guild?.name}**: ${reason}`).catch(() => null);

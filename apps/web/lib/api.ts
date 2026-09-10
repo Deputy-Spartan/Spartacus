@@ -767,6 +767,8 @@ export interface BotConfigRow {
   statusType: "online" | "idle" | "dnd" | "invisible";
   activityType: "PLAYING" | "WATCHING" | "LISTENING" | "COMPETING" | "CUSTOM";
   activityText: string | null;
+  manualStatusOverride: "ONLINE" | "OFFLINE" | "MAINTENANCE" | null;
+  manualStatusMessage: string | null;
 }
 export interface BotConfigInput {
   username?: string;
@@ -775,11 +777,15 @@ export interface BotConfigInput {
   statusType?: string;
   activityType?: string;
   activityText?: string;
+  manualStatusOverride?: "ONLINE" | "OFFLINE" | "MAINTENANCE" | null;
+  manualStatusMessage?: string | null;
 }
 
 export interface BotStatusRow {
   online: boolean;
   updating: boolean;
+  manual: boolean;
+  message: string | null;
   lastHeartbeatAt: string | null;
   lastError: { message: string; source: string; createdAt: string } | null;
 }
@@ -788,6 +794,38 @@ export interface AlertSettingsRow {
   errorChannelId: string | null;
   deployChannelId: string | null;
   uptimeChannelId: string | null;
+}
+
+export interface WarnEscalationSettingsRow {
+  warnThreshold: number;
+  warnWindowDays: number;
+  action: "TIMEOUT" | "KICK" | "BAN";
+  timeoutMinutes: number;
+}
+
+export interface AppealSettingsRow {
+  appealChannelId: string | null;
+}
+
+export interface AppealRow {
+  id: string;
+  guildId: string;
+  userId: string;
+  caseId: string | null;
+  reason: string;
+  status: "PENDING" | "APPROVED" | "DENIED";
+  messageId: string | null;
+  resolvedBy: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface ModDigestSettingsRow {
+  channelId: string | null;
+}
+
+export interface WeeklyRecapSettingsRow {
+  channelId: string | null;
 }
 
 export interface ErrorLogRow {
@@ -804,6 +842,19 @@ export interface CountingGameConfig {
   currentCount: number;
   resetOnMistake: boolean;
   highScore: number;
+}
+
+export interface VoiceActivityRow {
+  id: string;
+  userId: string;
+  totalMinutes: number;
+}
+
+export interface AchievementRow {
+  id: string;
+  userId: string;
+  type: string;
+  awardedAt: string;
 }
 
 export interface CurrentUser {
@@ -1142,6 +1193,26 @@ export const api = {
   getAlertSettings: (guildId: string) => request<AlertSettingsRow>(`/guilds/${guildId}/alert-settings`),
   updateAlertSettings: (guildId: string, input: Partial<AlertSettingsRow>) =>
     request<AlertSettingsRow>(`/guilds/${guildId}/alert-settings`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getWarnEscalationSettings: (guildId: string) => request<WarnEscalationSettingsRow>(`/guilds/${guildId}/warn-escalation`),
+  updateWarnEscalationSettings: (guildId: string, input: Partial<WarnEscalationSettingsRow>) =>
+    request<WarnEscalationSettingsRow>(`/guilds/${guildId}/warn-escalation`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getAppealSettings: (guildId: string) => request<AppealSettingsRow>(`/guilds/${guildId}/appeal-settings`),
+  updateAppealSettings: (guildId: string, input: Partial<AppealSettingsRow>) =>
+    request<AppealSettingsRow>(`/guilds/${guildId}/appeal-settings`, { method: "PUT", body: JSON.stringify(input) }),
+  getAppeals: (guildId: string) => request<AppealRow[]>(`/guilds/${guildId}/appeals`),
+
+  getModDigestSettings: (guildId: string) => request<ModDigestSettingsRow>(`/guilds/${guildId}/mod-digest-settings`),
+  updateModDigestSettings: (guildId: string, input: Partial<ModDigestSettingsRow>) =>
+    request<ModDigestSettingsRow>(`/guilds/${guildId}/mod-digest-settings`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getWeeklyRecapSettings: (guildId: string) => request<WeeklyRecapSettingsRow>(`/guilds/${guildId}/weekly-recap-settings`),
+  updateWeeklyRecapSettings: (guildId: string, input: Partial<WeeklyRecapSettingsRow>) =>
+    request<WeeklyRecapSettingsRow>(`/guilds/${guildId}/weekly-recap-settings`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getVoiceActivity: (guildId: string) => request<VoiceActivityRow[]>(`/guilds/${guildId}/voice-activity`),
+  getAchievements: (guildId: string) => request<AchievementRow[]>(`/guilds/${guildId}/achievements`),
 
   getBotConfig: () => request<BotConfigRow>("/bot-config"),
   setBotConfig: (input: BotConfigInput) =>

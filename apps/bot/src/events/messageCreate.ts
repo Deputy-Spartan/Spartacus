@@ -9,6 +9,7 @@ import { buildStickyPayload } from "../lib/stickyRender";
 import { isSendableChannel } from "../lib/channels";
 import { awardMessageEarnings } from "../lib/economy";
 import { checkCountingMessage } from "../modules/games/countingGame";
+import { awardAchievement } from "../lib/achievements";
 
 export const name = Events.MessageCreate;
 
@@ -32,6 +33,19 @@ export async function execute(message: Message) {
     }
   }
 
+  // --- Achievements: first-ever tracked message ---
+  // Checked independently of leveling (via a findUnique on the Achievement
+  // row itself, relying on awardAchievement's create+P2002 idempotency) so
+  // this achievement works even in servers that never turn LEVELING on.
+  if (await isModuleEnabled(message.guildId, "ACHIEVEMENTS")) {
+    const already = await prisma.achievement.findUnique({
+      where: { guildId_userId_type: { guildId: message.guildId, userId: message.author.id, type: "FIRST_MESSAGE" } },
+    });
+    if (!already) {
+      await awardAchievement(message.client, message.guildId, message.author.id, "FIRST_MESSAGE", "First Message", message.channelId);
+    }
+  }
+
   // --- Leveling ---
   if (await isModuleEnabled(message.guildId, "LEVELING")) {
     const blacklisted = await isXpBlacklisted(message);
@@ -42,6 +56,16 @@ export async function execute(message: Message) {
           await message.channel.send(`🎉 ${message.author} just reached **Level ${result.level}**!`).catch(() => null);
         }
         await grantLevelRoles(message.guild, message.author.id, result.level);
+
+        if (result.level >= 10) {
+          await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_10", "Level 10", message.channelId);
+        }
+        if (result.level >= 25) {
+          await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_25", "Level 25", message.channelId);
+        }
+        if (result.level >= 50) {
+          await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_50", "Level 50", message.channelId);
+        }
       }
     }
   }

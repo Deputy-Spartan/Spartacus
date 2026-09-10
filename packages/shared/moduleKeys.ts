@@ -40,6 +40,12 @@ export const MODULE_KEYS = [
   "BIRTHDAYS",
   "APPLICATIONS",
   "STATUS_CHANNEL",
+  "WARN_ESCALATION",
+  "BAN_APPEALS",
+  "MOD_DIGEST",
+  "VOICE_ACTIVITY",
+  "WEEKLY_RECAP",
+  "ACHIEVEMENTS",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -86,6 +92,12 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   BIRTHDAYS: "Birthdays",
   APPLICATIONS: "Applications",
   STATUS_CHANNEL: "Status Channel",
+  WARN_ESCALATION: "Warn Escalation",
+  BAN_APPEALS: "Ban/Mute Appeals",
+  MOD_DIGEST: "Mod Accountability Digest",
+  VOICE_ACTIVITY: "Voice Activity",
+  WEEKLY_RECAP: "Weekly Recap",
+  ACHIEVEMENTS: "Achievements",
 };
 
 export const SIGNUP_ROLES = [

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { AvatarCropper } from "../../../../components/ui/AvatarCropper";
 import { api, type BotConfigRow } from "../../../../lib/api";
 
 const STATUS_OPTIONS = [
@@ -33,6 +34,7 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cropSource, setCropSource] = useState<string | null>(null); // set while the crop modal is open
 
   useEffect(() => {
     api.getBotConfig().then((c) => {
@@ -48,12 +50,14 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
 
   function onAvatarFile(file: File) {
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUri = reader.result as string;
-      setAvatarPreview(dataUri);
-      setAvatarDataUri(dataUri);
-    };
+    reader.onload = () => setCropSource(reader.result as string);
     reader.readAsDataURL(file);
+  }
+
+  function onCropSaved(dataUri: string) {
+    setAvatarPreview(dataUri);
+    setAvatarDataUri(dataUri);
+    setCropSource(null);
   }
 
   async function save() {
@@ -124,9 +128,16 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
                 if (file) onAvatarFile(file);
               }}
             />
-            <button onClick={() => fileInputRef.current?.click()} className="neon-button-sm">
-              Choose Image
-            </button>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => fileInputRef.current?.click()} className="neon-button-sm">
+                Choose Image
+              </button>
+              {avatarDataUri && (
+                <button onClick={() => setCropSource(avatarDataUri)} className="text-xs text-slate-500 hover:text-neon-blue text-left">
+                  Adjust position &amp; zoom
+                </button>
+              )}
+            </div>
           </div>
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Bot Username</label>
@@ -191,6 +202,8 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
       <button onClick={save} disabled={saving} className="neon-button mt-4 disabled:opacity-50">
         {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
       </button>
+
+      {cropSource && <AvatarCropper imageSrc={cropSource} onCancel={() => setCropSource(null)} onSave={onCropSaved} />}
     </div>
   );
 }

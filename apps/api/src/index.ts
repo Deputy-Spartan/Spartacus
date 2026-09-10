@@ -59,6 +59,9 @@ import statChannelsRouter from "./routes/statChannels";
 import statusChannelsRouter from "./routes/statusChannels";
 import botStatusRouter from "./routes/botStatus";
 import { startStatusChannelWatchdog } from "./jobs/statusChannelWatchdog";
+import { announceDeployIfNew } from "./jobs/deployAnnouncer";
+import { startErrorAlertPoller } from "./jobs/errorAlertPoller";
+import alertSettingsRouter from "./routes/alertSettings";
 import aiConfigRouter from "./routes/aiConfig";
 import serverBackupsRouter from "./routes/serverBackups";
 import commandTogglesRouter from "./routes/commandToggles";
@@ -126,6 +129,7 @@ app.use(savedEmbedsRouter);
 app.use(statChannelsRouter);
 app.use(statusChannelsRouter);
 app.use(botStatusRouter);
+app.use(alertSettingsRouter);
 app.use(aiConfigRouter);
 app.use(serverBackupsRouter);
 app.use(commandTogglesRouter);
@@ -163,3 +167,5 @@ if (process.env.RUN_BOT_INLINE !== "false") {
 // dies; when split into its own service (RUN_BOT_INLINE=false), this
 // process was never coupled to the bot's lifecycle in the first place.
 startStatusChannelWatchdog();
+startErrorAlertPoller();
+announceDeployIfNew();

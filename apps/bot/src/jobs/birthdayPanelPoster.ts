@@ -1,12 +1,14 @@
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 // Posts (or reposts, after a channel change clears buttonMessageId) the
 // "Set My Birthday" button panel for any guild that has turned it on.
 export function startBirthdayPanelPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const pending = await prisma.birthdayConfig.findMany({
       where: { useButton: true, buttonMessageId: null, buttonChannelId: { not: null } },
       take: 20,
@@ -25,7 +27,10 @@ export function startBirthdayPanelPosterJob(client: Client) {
         new ButtonBuilder().setCustomId("birthdaypanel").setLabel("Set My Birthday").setEmoji("🎂").setStyle(ButtonStyle.Primary)
       );
 
-      const message = await channel.send({ embeds: [embed], components: [row] }).catch(() => null);
+      const message = await channel.send({ embeds: [embed], components: [row] }).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, config.guildId); loggedThisTick++; }
+        return null;
+      });
       if (message) await prisma.birthdayConfig.update({ where: { id: config.id }, data: { buttonMessageId: message.id } });
     }
   });

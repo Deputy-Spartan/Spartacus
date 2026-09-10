@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 // Posts the button/dropdown panel for any TicketPanel created or edited via
@@ -8,6 +9,7 @@ import { isSendableChannel } from "../lib/channels";
 // messageId so this redraws it).
 export function startTicketPanelPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const pending = await prisma.ticketPanel.findMany({ where: { messageId: null, paused: false }, take: 20 });
 
     for (const panel of pending) {
@@ -54,7 +56,10 @@ export function startTicketPanelPosterJob(client: Client) {
         );
       }
 
-      const message = await channel.send({ embeds: [embed], components: [component] }).catch(() => null);
+      const message = await channel.send({ embeds: [embed], components: [component] }).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, panel.guildId); loggedThisTick++; }
+        return null;
+      });
       if (message) await prisma.ticketPanel.update({ where: { id: panel.id }, data: { messageId: message.id } });
     }
   });

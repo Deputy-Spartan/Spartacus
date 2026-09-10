@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { EmbedBuilder, Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 
@@ -15,6 +16,7 @@ export function startBirthdayAnnouncerJob(client: Client) {
     const birthdaysToday = await prisma.birthday.findMany({ where: { month, day } });
     if (birthdaysToday.length === 0) return;
 
+    let loggedThisTick = 0;
     const byGuild = new Map<string, string[]>();
     for (const b of birthdaysToday) {
       const list = byGuild.get(b.guildId) ?? [];
@@ -43,7 +45,10 @@ export function startBirthdayAnnouncerJob(client: Client) {
 
       await channel
         .send({ content: config.pingRoleId ? `<@&${config.pingRoleId}>` : undefined, embeds: [embed] })
-        .catch(() => null);
+        .catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, guildId); loggedThisTick++; }
+          return null;
+        });
     }
   });
 }

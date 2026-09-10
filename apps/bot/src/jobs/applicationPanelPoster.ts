@@ -1,12 +1,14 @@
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 // Posts (or reposts, after edits clear messageId) the button/dropdown panel
 // for any ApplicationPanel that doesn't have a live message yet.
 export function startApplicationPanelPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const pending = await prisma.applicationPanel.findMany({ where: { messageId: null, paused: false }, take: 20 });
 
     for (const panel of pending) {
@@ -47,7 +49,10 @@ export function startApplicationPanelPosterJob(client: Client) {
               })
             );
 
-      const message = await channel.send({ embeds: [embed], components: [component] }).catch(() => null);
+      const message = await channel.send({ embeds: [embed], components: [component] }).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, panel.guildId); loggedThisTick++; }
+        return null;
+      });
       if (message) await prisma.applicationPanel.update({ where: { id: panel.id }, data: { messageId: message.id } });
     }
   });

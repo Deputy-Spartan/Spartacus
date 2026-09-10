@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 // Runs every minute and checks for events starting within their configured
@@ -9,6 +10,7 @@ import { isSendableChannel } from "../lib/channels";
 export function startEventReminderJob(client: Client) {
   cron.schedule("* * * * *", async () => {
     const now = new Date();
+    let loggedThisTick = 0;
 
     const upcoming = await prisma.event.findMany({
       where: { status: "SCHEDULED" },
@@ -22,7 +24,10 @@ export function startEventReminderJob(client: Client) {
 
       if (msUntilStart > reminderWindowMs || msUntilStart < 0) continue;
 
-      const channel = await client.channels.fetch(event.channelId).catch(() => null);
+      const channel = await client.channels.fetch(event.channelId).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, event.guildId); loggedThisTick++; }
+        return null;
+      });
       const attendees = event.signups.filter((s) => s.role !== "ABSENT");
       const settings = await prisma.eventSettings.findUnique({ where: { guildId: event.guildId } });
       const roleMention = settings?.mentionRoleId ? `<@&${settings.mentionRoleId}> ` : "";
@@ -31,7 +36,10 @@ export function startEventReminderJob(client: Client) {
         const mentions = attendees.map((s) => `<@${s.userId}>`).join(" ");
         await channel
           .send(`⏰ ${roleMention}**${event.title}** starts <t:${Math.floor(event.startTime.getTime() / 1000)}:R> — ${mentions}`)
-          .catch(() => null);
+          .catch((err) => {
+            if (loggedThisTick < 5) { logError("bot", err, event.guildId); loggedThisTick++; }
+            return null;
+          });
       }
 
       await prisma.eventSignup.updateMany({

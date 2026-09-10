@@ -1,12 +1,14 @@
 import cron from "node-cron";
 import { Client, EmbedBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 // Every minute, close out any giveaway whose end time has passed and hasn't
 // been resolved yet. One tick covers every guild.
 export function startGiveawayEnderJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const ended = await prisma.giveaway.findMany({
       where: { ended: false, endsAt: { lte: new Date() } },
       include: { entries: true },
@@ -33,7 +35,10 @@ export function startGiveawayEnderJob(client: Client) {
               ? `Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!`
               : "No valid entries — no winner could be selected."
           );
-        await channel.send({ embeds: [embed] }).catch(() => null);
+        await channel.send({ embeds: [embed] }).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, giveaway.guildId); loggedThisTick++; }
+          return null;
+        });
       }
 
       await prisma.giveaway.update({ where: { id: giveaway.id }, data: { ended: true } });

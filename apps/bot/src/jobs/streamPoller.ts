@@ -2,6 +2,7 @@ import cron from "node-cron";
 import fetch from "node-fetch";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 let twitchAppToken: { token: string; expiresAt: number } | null = null;
@@ -46,6 +47,7 @@ export function startStreamPollerJob(client: Client) {
     const subs = await prisma.streamSubscription.findMany({ where: { platform: "twitch" }, take: 100 });
     if (subs.length === 0) return;
 
+    let loggedThisTick = 0;
     const uniqueChannels = [...new Set(subs.map((s) => s.channelName.toLowerCase()))];
     const liveNow = await checkTwitchLive(uniqueChannels).catch(() => new Set<string>());
 
@@ -57,7 +59,10 @@ export function startStreamPollerJob(client: Client) {
         if (isSendableChannel(channel)) {
           await channel
             .send(`🔴 **${sub.channelName}** just went live on Twitch! https://twitch.tv/${sub.channelName}`)
-            .catch(() => null);
+            .catch((err) => {
+              if (loggedThisTick < 5) { logError("bot", err, sub.guildId); loggedThisTick++; }
+              return null;
+            });
         }
       }
 

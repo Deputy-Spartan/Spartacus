@@ -782,6 +782,12 @@ export interface BotStatusRow {
   lastHeartbeatAt: string | null;
 }
 
+export interface AlertSettingsRow {
+  errorChannelId: string | null;
+  deployChannelId: string | null;
+  uptimeChannelId: string | null;
+}
+
 export interface ErrorLogRow {
   id: string;
   source: string;
@@ -1130,6 +1136,10 @@ export const api = {
 
   getErrors: (guildId: string) => request<ErrorLogRow[]>(`/guilds/${guildId}/errors`),
   clearErrors: (guildId: string) => request(`/guilds/${guildId}/errors`, { method: "DELETE" }),
+
+  getAlertSettings: (guildId: string) => request<AlertSettingsRow>(`/guilds/${guildId}/alert-settings`),
+  updateAlertSettings: (guildId: string, input: Partial<AlertSettingsRow>) =>
+    request<AlertSettingsRow>(`/guilds/${guildId}/alert-settings`, { method: "PUT", body: JSON.stringify(input) }),
 
   getBotConfig: () => request<BotConfigRow>("/bot-config"),
   setBotConfig: (input: BotConfigInput) =>

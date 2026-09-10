@@ -2,20 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
-import { api, type ErrorLogRow } from "../../../../lib/api";
+import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { api, type AlertSettingsRow, type ErrorLogRow } from "../../../../lib/api";
 
 export default function ErrorsPage({ params }: { params: { guildId: string } }) {
   const [rows, setRows] = useState<ErrorLogRow[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [alertSettings, setAlertSettings] = useState<AlertSettingsRow | null>(null);
 
   function refresh() {
     api.getErrors(params.guildId).then(setRows);
   }
   useEffect(refresh, [params.guildId]);
+  useEffect(() => {
+    api.getAlertSettings(params.guildId).then(setAlertSettings);
+  }, [params.guildId]);
 
   async function clearAll() {
     await api.clearErrors(params.guildId);
     refresh();
+  }
+
+  async function updateChannel(field: "errorChannelId" | "deployChannelId", channelId: string) {
+    const value = channelId || null;
+    setAlertSettings((prev) => (prev ? { ...prev, [field]: value } : prev));
+    await api.updateAlertSettings(params.guildId, { [field]: value });
   }
 
   return (
@@ -30,6 +41,31 @@ export default function ErrorsPage({ params }: { params: { guildId: string } }) 
             Clear all
           </button>
         )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <NeonCard>
+          <p className="font-medium mb-1">Error Alert Channel</p>
+          <p className="text-xs text-slate-500 mb-3">Posts a new embed here every time an error is logged for this server.</p>
+          <ChannelSelect
+            guildId={params.guildId}
+            value={alertSettings?.errorChannelId ?? null}
+            onChange={(id) => updateChannel("errorChannelId", id)}
+            kind="text"
+            placeholder="Off — not posting anywhere"
+          />
+        </NeonCard>
+        <NeonCard>
+          <p className="font-medium mb-1">Deploy Announcement Channel</p>
+          <p className="text-xs text-slate-500 mb-3">Posts here whenever a new version of Spartacus goes live.</p>
+          <ChannelSelect
+            guildId={params.guildId}
+            value={alertSettings?.deployChannelId ?? null}
+            onChange={(id) => updateChannel("deployChannelId", id)}
+            kind="text"
+            placeholder="Off — not posting anywhere"
+          />
+        </NeonCard>
       </div>
 
       <NeonCard>

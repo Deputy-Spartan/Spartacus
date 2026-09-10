@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client, EmbedBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { isSendableChannel } from "../lib/channels";
 
@@ -21,6 +22,7 @@ function formatUptime(seconds: number): string {
 // best-effort mirror of it for members who only see Discord.
 export function startStatusChannelPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const rows = await prisma.statusChannel.findMany({ take: 200 });
 
     for (const row of rows) {
@@ -40,9 +42,15 @@ export function startStatusChannelPosterJob(client: Client) {
       const existing = row.messageId ? await channel.messages.fetch(row.messageId).catch(() => null) : null;
 
       if (existing) {
-        await existing.edit({ embeds: [embed] }).catch(() => null);
+        await existing.edit({ embeds: [embed] }).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, row.guildId); loggedThisTick++; }
+          return null;
+        });
       } else {
-        const message = await channel.send({ embeds: [embed] }).catch(() => null);
+        const message = await channel.send({ embeds: [embed] }).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, row.guildId); loggedThisTick++; }
+          return null;
+        });
         if (message) await prisma.statusChannel.update({ where: { id: row.id }, data: { messageId: message.id } });
       }
     }

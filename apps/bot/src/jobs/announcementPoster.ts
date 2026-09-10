@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildStickyPayload } from "../lib/stickyRender";
@@ -10,6 +11,7 @@ import { buildStickyPayload } from "../lib/stickyRender";
 // immediately, within the next minute).
 export function startAnnouncementPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const due = await prisma.announcement.findMany({
       where: { sentAt: null, OR: [{ scheduledFor: null }, { scheduledFor: { lte: new Date() } }] },
       take: 20,
@@ -34,7 +36,10 @@ export function startAnnouncementPosterJob(client: Client) {
         buttons: announcement.buttons,
       });
 
-      await channel.send(payload).catch(() => null);
+      await channel.send(payload).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, announcement.guildId); loggedThisTick++; }
+        return null;
+      });
       await prisma.announcement.update({ where: { id: announcement.id }, data: { sentAt: new Date() } });
     }
   });

@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 interface RolePanelOption {
@@ -14,6 +15,7 @@ interface RolePanelOption {
 // messageId so this redraws it).
 export function startRolePanelPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const pending = await prisma.rolePanel.findMany({ where: { messageId: null }, take: 20 });
 
     for (const panel of pending) {
@@ -52,7 +54,10 @@ export function startRolePanelPosterJob(client: Client) {
               })
             );
 
-      const message = await channel.send({ embeds: [embed], components: [component] }).catch(() => null);
+      const message = await channel.send({ embeds: [embed], components: [component] }).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, panel.guildId); loggedThisTick++; }
+        return null;
+      });
       if (message) await prisma.rolePanel.update({ where: { id: panel.id }, data: { messageId: message.id } });
     }
   });

@@ -58,6 +58,7 @@ model Guild {
   customSlashCommands CustomSlashCommand[]
   statChannels      StatChannel[]
   statusChannels    StatusChannel[]
+  alertSettings     AlertSettings?
   aiConfig          AiConfig?
   serverBackups     ServerBackup[]
   buttonPresets     ButtonPreset[]
@@ -986,6 +987,8 @@ model BotConfig {
   activityType    String    @default("PLAYING") // PLAYING | WATCHING | LISTENING | COMPETING | CUSTOM
   activityText    String?
   lastHeartbeatAt DateTime? // written every ~20s by the running bot process; the dashboard/status channel treat this as stale (offline) after ~60s
+  lastDeployCommit String?  // RENDER_GIT_COMMIT at last boot — comparing this on startup is how a "new deploy" is detected
+  lastDeployAt     DateTime?
   updatedAt       DateTime  @updatedAt
 }
 
@@ -1016,6 +1019,32 @@ model StatusChannel {
   channelId String   @unique
   messageId String?
   createdAt DateTime @default(now())
+}
+
+// ---- Alert Settings ----
+// Per-guild channel picks for operational notices — configured from two
+// places in the dashboard (Errors page: error/deploy; Status Channel page:
+// uptime history) but stored together since they're all "where should
+// Spartacus post about itself" settings for that server.
+
+model AlertSettings {
+  id              String  @id @default(cuid())
+  guild           Guild   @relation(fields: [guildId], references: [id])
+  guildId         String  @unique
+  errorChannelId  String? // new ErrorLog rows for this guild get posted here as an embed
+  deployChannelId String? // posted once per new production deploy (detected via RENDER_GIT_COMMIT change)
+  uptimeChannelId String? // a running log of bot went-offline / back-online events, distinct from the live status embed
+}
+
+// ---- Uptime Incidents ----
+// One row per bot outage, opened when the heartbeat goes stale and closed
+// when it recovers — global, not per guild, since the bot is a single
+// process shared by every server. Backs the uptime-history channel posts.
+
+model UptimeIncident {
+  id        String    @id @default(cuid())
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
 }
 
 // ---- AI Chat + Moderation ----

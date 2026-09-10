@@ -8,7 +8,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useBotStatus } from "../../../../lib/useBotStatus";
-import { api, type StatusChannelRow } from "../../../../lib/api";
+import { api, type AlertSettingsRow, type StatusChannelRow } from "../../../../lib/api";
 
 export default function StatusChannelPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
@@ -17,6 +17,7 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
   const [channelNames, setChannelNames] = useState<Record<string, string>>({});
   const [channelId, setChannelId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [alertSettings, setAlertSettings] = useState<AlertSettingsRow | null>(null);
 
   function refresh() {
     api.getStatusChannels(params.guildId).then(setRows);
@@ -29,6 +30,15 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
       setChannelNames(map);
     });
   }, [params.guildId]);
+  useEffect(() => {
+    api.getAlertSettings(params.guildId).then(setAlertSettings);
+  }, [params.guildId]);
+
+  async function updateUptimeChannel(newChannelId: string) {
+    const value = newChannelId || null;
+    setAlertSettings((prev) => (prev ? { ...prev, uptimeChannelId: value } : prev));
+    await api.updateAlertSettings(params.guildId, { uptimeChannelId: value });
+  }
 
   async function add() {
     if (!channelId) {
@@ -95,6 +105,20 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
             Add Status Channel
           </button>
           <FormError message={error} />
+        </NeonCard>
+
+        <NeonCard className="lg:col-span-2">
+          <p className="font-medium mb-1">Uptime History Channel</p>
+          <p className="text-xs text-slate-500 mb-3">
+            A running log — separate from the live status embed above — with one message every time Spartacus goes offline or comes back, including how long it was down.
+          </p>
+          <ChannelSelect
+            guildId={params.guildId}
+            value={alertSettings?.uptimeChannelId ?? null}
+            onChange={updateUptimeChannel}
+            kind="text"
+            placeholder="Off — not posting anywhere"
+          />
         </NeonCard>
       </div>
     </div>

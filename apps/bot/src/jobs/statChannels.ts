@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client, ChannelType } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isModuleEnabled } from "../lib/moduleGate";
 
 // Discord rate-limits channel renames to ~2 per 10 minutes per channel, so
@@ -8,6 +9,7 @@ import { isModuleEnabled } from "../lib/moduleGate";
 // possible on Discord's own platform limits, this is as fast as it gets.
 export function startStatChannelsJob(client: Client) {
   cron.schedule("*/10 * * * *", async () => {
+    let loggedThisTick = 0;
     const statChannels = await prisma.statChannel.findMany({ take: 200 });
 
     for (const sc of statChannels) {
@@ -29,7 +31,9 @@ export function startStatChannelsJob(client: Client) {
       const name = sc.format.replace("{stat}", label).replace("{count}", String(count));
 
       if (channel.name !== name) {
-        await channel.setName(name).catch(() => null);
+        await channel.setName(name).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, sc.guildId); loggedThisTick++; }
+        });
       }
     }
   });

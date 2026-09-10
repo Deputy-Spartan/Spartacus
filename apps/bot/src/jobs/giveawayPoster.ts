@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 
 interface GiveawayButton {
@@ -12,6 +13,7 @@ interface GiveawayButton {
 // posts the live entry embed. Runs alongside giveawayEnder on its own tick.
 export function startGiveawayPosterJob(client: Client) {
   cron.schedule("* * * * *", async () => {
+    let loggedThisTick = 0;
     const pending = await prisma.giveaway.findMany({ where: { messageId: null, ended: false }, take: 20 });
 
     for (const giveaway of pending) {
@@ -33,7 +35,10 @@ export function startGiveawayPosterJob(client: Client) {
         ...linkButtons.map((b) => new ButtonBuilder().setLabel(b.label).setURL(b.url).setStyle(ButtonStyle.Link))
       );
 
-      const message = await channel.send({ embeds: [embed], components: [row] }).catch(() => null);
+      const message = await channel.send({ embeds: [embed], components: [row] }).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, giveaway.guildId); loggedThisTick++; }
+        return null;
+      });
       if (message) await prisma.giveaway.update({ where: { id: giveaway.id }, data: { messageId: message.id } });
     }
   });

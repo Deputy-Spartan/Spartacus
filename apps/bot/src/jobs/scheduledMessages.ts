@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 
@@ -11,6 +12,7 @@ export function startScheduledMessagesJob(client: Client) {
   cron.schedule("* * * * *", async () => {
     const messages = await prisma.scheduledMessage.findMany({ take: 200 });
     const now = new Date();
+    let loggedThisTick = 0;
 
     for (const msg of messages) {
       if (!(await isModuleEnabled(msg.guildId, "SCHEDULED_MESSAGES"))) continue;
@@ -26,7 +28,10 @@ export function startScheduledMessagesJob(client: Client) {
 
       const channel = await client.channels.fetch(msg.channelId).catch(() => null);
       if (isSendableChannel(channel)) {
-        await channel.send(msg.content).catch(() => null);
+        await channel.send(msg.content).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, msg.guildId); loggedThisTick++; }
+          return null;
+        });
       }
       await prisma.scheduledMessage.update({ where: { id: msg.id }, data: { lastSentAt: now } });
     }

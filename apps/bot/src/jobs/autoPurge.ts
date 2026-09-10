@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client, Message } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isModuleEnabled } from "../lib/moduleGate";
 
 const URL_PATTERN = /https?:\/\//i;
@@ -31,6 +32,7 @@ function shouldSkip(
 // bulk-delete boundary, skipping whatever the config says to protect.
 export function startAutoPurgeJob(client: Client) {
   cron.schedule("*/10 * * * *", async () => {
+    let loggedThisTick = 0;
     const configs = await prisma.autoPurgeConfig.findMany();
 
     for (const config of configs) {
@@ -47,16 +49,23 @@ export function startAutoPurgeJob(client: Client) {
       let keepGoing = true;
 
       while (keepGoing) {
-        const messages = await channel.messages.fetch({ limit: 100, before: lastId }).catch(() => null);
+        const messages = await channel.messages.fetch({ limit: 100, before: lastId }).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, config.guildId); loggedThisTick++; }
+          return null;
+        });
         if (!messages || messages.size === 0) break;
         lastId = messages.last()?.id;
 
         const batch = [...messages.filter((m) => !shouldSkip(m, config)).values()];
 
         if (batch.length === 1) {
-          await batch[0].delete().catch(() => null);
+          await batch[0].delete().catch((err) => {
+            if (loggedThisTick < 5) { logError("bot", err, config.guildId); loggedThisTick++; }
+          });
         } else if (batch.length > 1) {
-          await channel.bulkDelete(batch, true).catch(() => null);
+          await channel.bulkDelete(batch, true).catch((err) => {
+            if (loggedThisTick < 5) { logError("bot", err, config.guildId); loggedThisTick++; }
+          });
         }
 
         if (messages.size < 100) keepGoing = false; // reached the start of history

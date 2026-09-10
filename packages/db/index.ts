@@ -13,6 +13,29 @@ if (process.env.NODE_ENV !== "production") {
   global.__spartacusPrisma = prisma;
 }
 
+// Neon's free tier suspends the database after a period of no traffic, and
+// the first query after that has to wait for it to wake back up — if that
+// wake-up takes longer than Prisma's connect timeout, the query fails
+// outright with no retry anywhere in the app (P1001 unreachable, P1002
+// timed out, P1017 connection closed). A couple of short, cheap retries
+// absorbs exactly that one-time cold-start delay; anything else (a bad
+// query, a constraint violation) isn't one of these codes and fails
+// immediately as before — this only ever retries connectivity failures.
+const RETRYABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
+const RETRY_DELAYS_MS = [300, 800];
+
+prisma.$use(async (params, next) => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await next(params);
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (!code || !RETRYABLE_CODES.has(code) || attempt >= RETRY_DELAYS_MS.length) throw error;
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+});
+
 export * from "@prisma/client";
 
 // Best-effort error logging — never lets a logging failure become a

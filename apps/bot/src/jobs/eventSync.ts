@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { logError } from "@spartacus/db";
 import { buildEventPayload } from "../lib/eventRender";
 import { isSendableChannel } from "../lib/channels";
 
@@ -10,6 +11,7 @@ import { isSendableChannel } from "../lib/channels";
 // and API to share a process or talk to each other directly.
 export function startEventSyncJob(client: Client) {
   cron.schedule("*/15 * * * * *", async () => {
+    let loggedThisTick = 0;
     const pending = await prisma.event.findMany({ where: { needsSync: true }, take: 50 });
 
     for (const event of pending) {
@@ -24,13 +26,19 @@ export function startEventSyncJob(client: Client) {
       if (event.messageId) {
         const existing = await channel.messages.fetch(event.messageId).catch(() => null);
         if (existing) {
-          await existing.edit(payload).catch(() => null);
+          await existing.edit(payload).catch((err) => {
+            if (loggedThisTick < 5) { logError("bot", err, event.guildId); loggedThisTick++; }
+            return null;
+          });
           await prisma.event.update({ where: { id: event.id }, data: { needsSync: false } }).catch(() => null);
           continue;
         }
       }
 
-      const posted = await channel.send(payload).catch(() => null);
+      const posted = await channel.send(payload).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, event.guildId); loggedThisTick++; }
+        return null;
+      });
       if (posted) {
         await prisma.event.update({ where: { id: event.id }, data: { messageId: posted.id, needsSync: false } }).catch(() => null);
       }

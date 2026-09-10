@@ -252,6 +252,8 @@ export interface LeaderboardRow {
   userId: string;
   xp: number;
   level: number;
+  username: string | null;
+  nickname: string | null;
 }
 
 export interface DiscordChannelOption {

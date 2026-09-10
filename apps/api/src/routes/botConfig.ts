@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { getBotUser, updateBotApplication, updateBotUser } from "../lib/discordRest";
+import { refreshStatusNow } from "../jobs/statusChannelWatchdog";
 
 const router = Router();
 
@@ -82,6 +83,10 @@ router.put("/bot-config", requireAuth, async (req, res) => {
       ...(manualStatusMessage !== undefined ? { manualStatusMessage } : {}),
     },
   });
+
+  if (manualStatusOverride !== undefined || manualStatusMessage !== undefined) {
+    refreshStatusNow().catch(() => null); // don't block the response on a Discord edit
+  }
 
   res.json({ config: row, errors });
 });

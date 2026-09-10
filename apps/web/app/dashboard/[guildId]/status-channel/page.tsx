@@ -81,15 +81,20 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
             ))}
           </div>
 
-          <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/5">
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                status === null ? "bg-slate-600 animate-pulse" : status.online ? "bg-emerald-400" : "bg-slate-500"
-              }`}
-            />
-            <span className="text-xs text-slate-500">
-              Current preview: Spartacus is {status === null ? "checking…" : status.online ? "online" : "offline"}
-            </span>
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  status === null ? "bg-slate-600 animate-pulse" : status.updating ? "bg-amber-400" : status.online ? "bg-emerald-400" : "bg-slate-500"
+                }`}
+              />
+              <span className="text-xs text-slate-500">
+                Current preview: Spartacus is{" "}
+                {status === null ? "checking…" : status.updating ? "updating" : status.online ? "online" : "offline"}
+                {status?.manual ? " (set manually)" : ""}
+              </span>
+            </div>
+            {status?.manual && status.message && <p className="text-xs text-slate-600 mt-1 pl-4">"{status.message}"</p>}
           </div>
         </NeonCard>
 

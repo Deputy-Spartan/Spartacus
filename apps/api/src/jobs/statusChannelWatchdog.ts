@@ -19,6 +19,7 @@ const CHECK_INTERVAL_MS = 30_000;
 
 let lastPhase: BotPhase | null = null;
 let lastWasManual = false;
+let lastAnnouncedMessage: string | null = null;
 let openIncidentId: string | null = null;
 
 async function postToUptimeChannels(payload: unknown) {
@@ -52,7 +53,7 @@ async function announceManual(phase: BotPhase, message: string | null) {
   const byPhase: Record<BotPhase, { color: number; title: string }> = {
     online: { color: 0x22c55e, title: "🟢 Spartacus is Online" },
     updating: { color: 0xf59e0b, title: "🟡 Spartacus is Under Maintenance" },
-    offline: { color: 0x64748b, title: "🔴 Spartacus is Offline" },
+    offline: { color: 0xef4444, title: "🔴 Spartacus is Offline" },
   };
   const { color, title } = byPhase[phase];
 
@@ -96,7 +97,7 @@ async function announceOffline() {
   });
 
   await editPrimaryStatusChannels({
-    color: 0x64748b, // slate — matches the dashboard's offline grey
+    color: 0xef4444,
     title: "🔴 Spartacus is Offline",
     description: "The bot lost its connection. This will update automatically once it's back.",
     footer: { text: "Last updated" },
@@ -129,15 +130,25 @@ async function checkAndAnnounce() {
   // machinery below — it's an intentional state, not something to log as
   // an outage. Only re-edit the embed on an actual change, not every tick.
   if (status.manual) {
-    if (previousPhase !== status.phase || !wasManual) await announceManual(status.phase, status.message);
+    const messageChanged = status.message !== lastAnnouncedMessage;
+    lastAnnouncedMessage = status.message;
+    if (previousPhase !== status.phase || !wasManual || messageChanged) await announceManual(status.phase, status.message);
     return;
   }
+  lastAnnouncedMessage = null;
 
   if (previousPhase === null || previousPhase === status.phase) return; // first check, or no change
 
   if (status.phase === "updating") await announceUpdating();
   else if (status.phase === "offline" && previousPhase !== "offline") await announceOffline();
   else if (status.phase === "online" && previousPhase !== "online") await announceRecovery();
+}
+
+// Called right after the manual-override setting is saved (see
+// apps/api/src/routes/botConfig.ts) so the Discord embed updates within
+// the same request instead of waiting up to CHECK_INTERVAL_MS.
+export async function refreshStatusNow() {
+  await checkAndAnnounce();
 }
 
 export async function startStatusChannelWatchdog() {

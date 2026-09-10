@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { api, type BotConfigRow } from "../../../../lib/api";
+import { notifyBotStatusChanged } from "../../../../lib/useBotStatus";
 
 const STATUS_OPTIONS = [
   { value: "online", label: "Online" },
@@ -61,6 +62,7 @@ export default function BotCustomizationPage() {
     setSavingOverride(false);
     if (result.errors.length === 0) {
       setOverrideSaved(true);
+      notifyBotStatusChanged();
       setTimeout(() => setOverrideSaved(false), 2500);
     }
   }

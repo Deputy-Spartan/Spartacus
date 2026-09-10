@@ -1,6 +1,7 @@
 {
   "name": "spartacus",
   "private": true,
+  "license": "UNLICENSED",
   "workspaces": [
     "apps/*",
     "packages/*"

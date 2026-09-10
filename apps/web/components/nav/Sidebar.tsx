@@ -11,7 +11,6 @@ export const NAV_SECTIONS = [
     items: [
       { href: "", label: "Overview", icon: "📊" },
       { href: "/modules", label: "Modules", icon: "🧩" },
-      { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
       { href: "/errors", label: "Errors", icon: "⚠️" },
     ],
   },
@@ -111,25 +110,57 @@ export const NAV_SECTIONS = [
   },
 ];
 
-export function Sidebar({ guildId, open, onClose }: { guildId: string; open: boolean; onClose: () => void }) {
+const OWNER_NAV_SECTION = {
+  section: "Owner Only",
+  items: [
+    { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
+    { href: "/owner-panel", label: "Access Control", icon: "🔑" },
+  ],
+};
+
+export function Sidebar({
+  guildId,
+  open,
+  onClose,
+  isOwner,
+}: {
+  guildId: string;
+  open: boolean;
+  onClose: () => void;
+  isOwner?: boolean;
+}) {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
 
+  const allSections = useMemo(
+    () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
+    [isOwner]
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return NAV_SECTIONS;
-    return NAV_SECTIONS.map((section) => ({
-      ...section,
-      items: section.items.filter((item) => item.label.toLowerCase().includes(q)),
-    })).filter((section) => section.items.length > 0);
-  }, [query]);
+    if (!q) return allSections;
+    return allSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.label.toLowerCase().includes(q)),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [query, allSections]);
 
   const searching = query.trim().length > 0;
 
   function toggleSection(key: string) {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  // Picking a page closes the drawer on mobile (it's covering the content
+  // you just asked for) but leaves it open on desktop, where it's pushed
+  // beside the content rather than over it — only mobile should auto-close.
+  function onNavigate() {
+    if (window.innerWidth < 768) onClose();
   }
 
   return (
@@ -138,7 +169,7 @@ export function Sidebar({ guildId, open, onClose }: { guildId: string; open: boo
       <aside
         className={[
           "fixed left-0 top-0 h-screen w-64 sm:w-60 bg-base-900 border-r border-white/5 flex flex-col overflow-y-auto z-40",
-          "transition-transform duration-200 md:translate-x-0",
+          "transition-transform duration-200",
           open ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
       >
@@ -149,7 +180,7 @@ export function Sidebar({ guildId, open, onClose }: { guildId: string; open: boo
           <span className="text-3xl">⚡</span>
         )}
         <span className="spartacus-wave inline-block text-2xl font-bold">Spartacus</span>
-        <button onClick={onClose} className="ml-auto text-slate-500 hover:text-slate-200 text-xl md:hidden" aria-label="Close menu">
+        <button onClick={onClose} className="ml-auto text-slate-500 hover:text-slate-200 text-xl" aria-label="Hide sidebar" title="Hide sidebar">
           ✕
         </button>
       </div>
@@ -177,7 +208,11 @@ export function Sidebar({ guildId, open, onClose }: { guildId: string; open: boo
                   onClick={() => toggleSection(key)}
                   className="w-full flex items-center justify-between px-3 mb-1 group"
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-600 group-hover:text-slate-400">
+                  <span
+                    className={`text-[10px] font-semibold uppercase tracking-widest group-hover:text-slate-400 ${
+                      section.section === "Owner Only" ? "text-purple-400" : "text-slate-600"
+                    }`}
+                  >
                     {section.section}
                   </span>
                   <span className={`text-slate-600 text-[10px] transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>▼</span>
@@ -192,12 +227,14 @@ export function Sidebar({ guildId, open, onClose }: { guildId: string; open: boo
                       <Link
                         key={item.href}
                         href={href}
-                        onClick={onClose}
+                        onClick={onNavigate}
                         className={[
                           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                           active
                             ? "bg-base-800 text-neon-blue shadow-glow-blue"
-                            : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
+                            : section.section === "Owner Only"
+                              ? "text-purple-300 hover:text-purple-100 hover:bg-base-800/60"
+                              : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
                         ].join(" ")}
                       >
                         <span>{item.icon}</span>

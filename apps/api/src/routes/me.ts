@@ -1,9 +1,11 @@
 import { Router } from "express";
-import { requireAuth, type AuthedRequest } from "../middleware/requireAuth";
+import { requireAuthOnly, type AuthedRequest } from "../middleware/requireAuth";
 
 const router = Router();
 
-router.get("/me", requireAuth, (req: AuthedRequest, res) => {
+// requireAuthOnly, not requireAuth — a logged-in-but-unapproved visitor
+// still needs to know who they are to render the "access needed" screen.
+router.get("/me", requireAuthOnly, (req: AuthedRequest, res) => {
   res.json(req.user);
 });
 

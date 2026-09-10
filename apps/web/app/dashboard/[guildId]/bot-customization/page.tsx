@@ -5,6 +5,7 @@ import Link from "next/link";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { AvatarCropper } from "../../../../components/ui/AvatarCropper";
 import { api, type BotConfigRow } from "../../../../lib/api";
+import { useOwnerGuard } from "../../../../lib/useOwnerGuard";
 
 const STATUS_OPTIONS = [
   { value: "online", label: "Online" },
@@ -22,6 +23,7 @@ const ACTIVITY_OPTIONS = [
 ];
 
 export default function BotCustomizationPage({ params }: { params: { guildId: string } }) {
+  const ownerAccess = useOwnerGuard(params.guildId);
   const [config, setConfig] = useState<BotConfigRow | null>(null);
   const [username, setUsername] = useState("");
   const [description, setDescription] = useState("");
@@ -81,8 +83,8 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
     }
   }
 
-  if (!config) {
-    return <p className="text-sm text-slate-500">Loading…</p>;
+  if (ownerAccess !== "allowed" || !config) {
+    return <p className="text-sm text-slate-500">{ownerAccess === "checking" ? "Checking access…" : "Loading…"}</p>;
   }
 
   return (

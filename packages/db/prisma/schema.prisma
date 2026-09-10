@@ -1042,6 +1042,29 @@ model ErrorLog {
   @@index([guildId, createdAt])
 }
 
+// ---- Dashboard Access Control ----
+// Account-wide (not per-guild) — the whole dashboard is invite-only.
+// req.user.id matching OWNER_DISCORD_ID always passes regardless of this
+// table (see apps/api/src/middleware/requireAuth.ts); everyone else needs
+// a row here. `plan` has no billing logic behind it yet — it exists so a
+// future paid tier can gate a module with one field check instead of a
+// schema change.
+
+model DashboardAccess {
+  id             String   @id @default(cuid())
+  discordUserId  String   @unique
+  username       String // captured at grant time, for the owner's own reference in the UI
+  plan           String   @default("FREE") // FREE | PAID
+  grantedAt      DateTime @default(now())
+}
+
+model AccessRequest {
+  id            String   @id @default(cuid())
+  discordUserId String   @unique
+  username      String
+  requestedAt   DateTime @default(now())
+}
+
 // ---- Bot Customization ----
 // Account-wide, not per-guild — a bot's username/avatar/presence/
 // description are Discord application-level settings, the same across

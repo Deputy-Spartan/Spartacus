@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
+import { requireOwner } from "../middleware/requireOwner";
 import { getBotUser, updateBotApplication, updateBotUser } from "../lib/discordRest";
 import { refreshStatusNow } from "../jobs/statusChannelWatchdog";
 
@@ -29,7 +30,9 @@ router.get("/bot-config", requireAuth, async (_req, res) => {
   });
 });
 
-router.put("/bot-config", requireAuth, async (req, res) => {
+// Owner only — this is account-wide (every server the bot is in), not
+// something any approved server admin should be able to change.
+router.put("/bot-config", requireAuth, requireOwner, async (req, res) => {
   const { username, avatarDataUri, description, statusType, activityType, activityText, manualStatusOverride, manualStatusMessage } = req.body as {
     username?: string;
     avatarDataUri?: string;

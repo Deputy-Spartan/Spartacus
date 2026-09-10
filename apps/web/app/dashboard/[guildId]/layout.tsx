@@ -18,21 +18,44 @@ export default function DashboardLayout({
   const router = useRouter();
   const [guilds, setGuilds] = useState<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>([]);
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  // Starts open (matches desktop's long-standing always-visible default);
+  // corrected to closed on mount if the viewport is actually mobile-sized,
+  // so this one state drives both the mobile overlay drawer AND the
+  // desktop collapse toggle instead of two separate mechanisms.
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
 
   useEffect(() => {
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  }, []);
+
+  useEffect(() => {
     api
-      .getGuilds()
-      .then((rows) => {
-        setGuilds(rows);
-        const guild = rows.find((g) => g.id === params.guildId);
-        if (!guild || !guild.botInstalled) {
-          setAccess("denied");
-          router.push("/dashboard");
-        } else {
-          setAccess("allowed");
+      .getAccessStatus()
+      .then((status) => {
+        if (status.status !== "owner" && status.status !== "approved") {
+          router.push("/access-required");
+          return;
         }
+        setIsOwner(status.status === "owner");
+
+        api
+          .getGuilds()
+          .then((rows) => {
+            setGuilds(rows);
+            const guild = rows.find((g) => g.id === params.guildId);
+            if (!guild || !guild.botInstalled) {
+              setAccess("denied");
+              router.push("/dashboard");
+            } else {
+              setAccess("allowed");
+            }
+          })
+          .catch(() => {
+            clearToken();
+            router.push("/");
+          });
       })
       .catch(() => {
         clearToken();
@@ -53,8 +76,8 @@ export default function DashboardLayout({
     <ConfirmProvider>
       <div className="min-h-screen bg-base-950">
         <CommandPalette guildId={params.guildId} />
-        <Sidebar guildId={params.guildId} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <div className="md:ml-60">
+        <Sidebar guildId={params.guildId} open={sidebarOpen} onClose={() => setSidebarOpen(false)} isOwner={isOwner} />
+        <div className={`transition-[margin] duration-200 ${sidebarOpen ? "md:ml-60" : "md:ml-0"}`}>
           <TopHeader
             user={{
               username: user?.username ?? "…",
@@ -63,7 +86,8 @@ export default function DashboardLayout({
             guilds={guilds}
             activeGuildId={params.guildId}
             onSelectGuild={(id) => router.push(`/dashboard/${id}`)}
-            onMenuClick={() => setSidebarOpen(true)}
+            onMenuClick={() => setSidebarOpen((v) => !v)}
+            sidebarOpen={sidebarOpen}
           />
           <main className="p-3 sm:p-6 overflow-x-hidden">{children}</main>
         </div>

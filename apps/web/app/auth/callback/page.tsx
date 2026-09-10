@@ -2,19 +2,25 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { setToken } from "../../../lib/api";
+import { setToken, api } from "../../../lib/api";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
     const match = window.location.hash.match(/token=([^&]+)/);
-    if (match) {
-      setToken(match[1]);
-      router.replace("/dashboard");
-    } else {
+    if (!match) {
       router.replace("/");
+      return;
     }
+    setToken(match[1]);
+
+    api
+      .getAccessStatus()
+      .then((s) => {
+        router.replace(s.status === "owner" || s.status === "approved" ? "/dashboard" : "/access-required");
+      })
+      .catch(() => router.replace("/"));
   }, [router]);
 
   return (

@@ -15,16 +15,22 @@ interface TopHeaderProps {
   activeGuildId: string;
   onSelectGuild: (guildId: string) => void;
   onMenuClick: () => void;
+  sidebarOpen?: boolean;
 }
 
-export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick }: TopHeaderProps) {
+export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick, sidebarOpen }: TopHeaderProps) {
   const installedGuilds = guilds.filter((g) => g.botInstalled);
 
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-base-950/80 backdrop-blur border-b border-white/5">
       <div className="flex items-center gap-2 min-w-0">
-        <button onClick={onMenuClick} className="shrink-0 md:hidden text-slate-300 hover:text-neon-blue text-xl leading-none p-1" aria-label="Open menu">
-          ☰
+        <button
+          onClick={onMenuClick}
+          className="shrink-0 text-slate-300 hover:text-neon-blue text-xl leading-none p-1"
+          aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+        >
+          {sidebarOpen ? "⟨⟨" : "☰"}
         </button>
         <select
           value={activeGuildId}

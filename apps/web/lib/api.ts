@@ -883,9 +883,41 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
+export interface AccessStatus {
+  status: "owner" | "approved" | "pending" | "none";
+  plan: "FREE" | "PAID" | null;
+}
+
+export interface AccessRequestRow {
+  id: string;
+  discordUserId: string;
+  username: string;
+  requestedAt: string;
+}
+
+export interface DashboardAccessRow {
+  id: string;
+  discordUserId: string;
+  username: string;
+  plan: "FREE" | "PAID";
+  grantedAt: string;
+}
+
 export const api = {
   getMe: () => request<CurrentUser>("/me"),
   getGuilds: () => request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>("/guilds"),
+
+  getAccessStatus: () => request<AccessStatus>("/access-status"),
+  requestAccess: () => request<AccessRequestRow>("/access-requests", { method: "POST" }),
+  getAccessRequests: () => request<AccessRequestRow[]>("/access-requests"),
+  approveAccessRequest: (id: string) => request<DashboardAccessRow>(`/access-requests/${id}/approve`, { method: "POST" }),
+  denyAccessRequest: (id: string) => request(`/access-requests/${id}/deny`, { method: "POST" }),
+  getDashboardAccess: () => request<DashboardAccessRow[]>("/dashboard-access"),
+  grantDashboardAccess: (discordUserId: string, username: string) =>
+    request<DashboardAccessRow>("/dashboard-access", { method: "POST", body: JSON.stringify({ discordUserId, username }) }),
+  setDashboardAccessPlan: (id: string, plan: "FREE" | "PAID") =>
+    request<DashboardAccessRow>(`/dashboard-access/${id}`, { method: "PATCH", body: JSON.stringify({ plan }) }),
+  revokeDashboardAccess: (id: string) => request(`/dashboard-access/${id}`, { method: "DELETE" }),
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
   getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),

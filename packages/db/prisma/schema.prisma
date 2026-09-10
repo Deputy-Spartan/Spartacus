@@ -989,6 +989,7 @@ model BotConfig {
   lastHeartbeatAt DateTime? // written every ~20s by the running bot process; the dashboard/status channel treat this as stale (offline) after ~60s
   lastDeployCommit String?  // RENDER_GIT_COMMIT at last boot — comparing this on startup is how a "new deploy" is detected
   lastDeployAt     DateTime?
+  deployingSince   DateTime? // set right before `prisma migrate deploy` runs, cleared by the next heartbeat — see apps/api/src/routes/botStatus.ts
   updatedAt       DateTime  @updatedAt
 }
 

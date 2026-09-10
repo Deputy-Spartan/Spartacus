@@ -8,16 +8,27 @@ import { useBotStatus } from "../../lib/useBotStatus";
 export function BotStatusBadge() {
   const status = useBotStatus();
 
-  const shortLabel = status === null ? "…" : status.online ? "Online" : "Offline";
-  const label = status === null ? "Checking…" : status.online ? "Bot Online" : "Bot Offline";
-  const dotClass = status === null ? "bg-slate-600 animate-pulse" : status.online ? "bg-emerald-400" : "bg-slate-500";
-  const textClass = status === null ? "text-slate-500" : status.online ? "text-slate-300" : "text-slate-500";
+  const phase = status === null ? "checking" : status.updating ? "updating" : status.online ? "online" : "offline";
+
+  const shortLabel = { checking: "…", updating: "Updating", online: "Online", offline: "Offline" }[phase];
+  const label = { checking: "Checking…", updating: "Bot Updating", online: "Bot Online", offline: "Bot Offline" }[phase];
+  const dotClass = {
+    checking: "bg-slate-600 animate-pulse",
+    updating: "bg-amber-400 animate-pulse",
+    online: "bg-emerald-400",
+    offline: "bg-slate-500",
+  }[phase];
+  const textClass = { checking: "text-slate-500", updating: "text-amber-400", online: "text-slate-300", offline: "text-slate-500" }[phase];
+
+  const title =
+    phase === "offline" && status?.lastError
+      ? `Last error: ${status.lastError.message} — see the Errors page for details`
+      : status?.lastHeartbeatAt
+        ? `Last heartbeat: ${new Date(status.lastHeartbeatAt).toLocaleTimeString()}`
+        : undefined;
 
   return (
-    <div
-      className="flex items-center gap-2 bg-base-900 border border-white/10 rounded-lg px-2.5 py-1.5"
-      title={status?.lastHeartbeatAt ? `Last heartbeat: ${new Date(status.lastHeartbeatAt).toLocaleTimeString()}` : undefined}
-    >
+    <div className="flex items-center gap-2 bg-base-900 border border-white/10 rounded-lg px-2.5 py-1.5" title={title}>
       <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
       <span className={`text-xs ${textClass} sm:hidden`}>{shortLabel}</span>
       <span className={`text-xs ${textClass} hidden sm:inline`}>{label}</span>

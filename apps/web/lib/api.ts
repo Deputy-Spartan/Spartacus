@@ -779,7 +779,9 @@ export interface BotConfigInput {
 
 export interface BotStatusRow {
   online: boolean;
+  updating: boolean;
   lastHeartbeatAt: string | null;
+  lastError: { message: string; source: string; createdAt: string } | null;
 }
 
 export interface AlertSettingsRow {

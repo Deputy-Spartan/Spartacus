@@ -17,7 +17,7 @@ export function useBotStatus(): BotStatusRow | null {
       api
         .getBotStatus()
         .then((s) => !cancelled && setStatus(s))
-        .catch(() => !cancelled && setStatus({ online: false, lastHeartbeatAt: null }));
+        .catch(() => !cancelled && setStatus({ online: false, updating: false, lastHeartbeatAt: null, lastError: null }));
     }
     poll();
     const interval = setInterval(poll, POLL_MS);

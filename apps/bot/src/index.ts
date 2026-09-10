@@ -89,13 +89,23 @@ async function applyBotPresence(client: Client) {
 // read this instead of pinging the gateway directly — same polled-not-pushed
 // reasoning as applyBotPresence above, works whether the bot and API share
 // a process or not. The API treats anything older than 60s as offline.
+//
+// Also clears deployingSince (see scripts/mark-deploying.js) on every tick,
+// not just the first one after a restart — during a real deploy the OLD
+// instance is usually still running and heartbeating right up until Render
+// swaps traffic to the new one, so its very next heartbeat (within ~20s)
+// clears the "Updating" flag almost immediately, which is correct: nothing
+// was actually down. If there's no old instance still alive (first-ever
+// deploy, or it already crashed), the flag simply stays set until this new
+// instance's own first heartbeat clears it — which is exactly when
+// "Updating" should turn back into "Online".
 async function sendHeartbeat(client: Client) {
   if (!client.user) return;
   await prisma.botConfig
     .upsert({
       where: { id: "singleton" },
-      create: { id: "singleton", lastHeartbeatAt: new Date() },
-      update: { lastHeartbeatAt: new Date() },
+      create: { id: "singleton", lastHeartbeatAt: new Date(), deployingSince: null },
+      update: { lastHeartbeatAt: new Date(), deployingSince: null },
     })
     .catch((err) => logError("bot", err));
 }

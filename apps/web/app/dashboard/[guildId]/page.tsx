@@ -65,16 +65,33 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
         </NeonCard>
         <NeonCard>
           <p className="text-slate-400 text-sm">Bot Status</p>
-          <p className="flex items-center gap-2 mt-1">
-            <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                botStatus === null ? "bg-slate-600 animate-pulse" : botStatus.online ? "bg-emerald-400" : "bg-slate-500"
-              }`}
-            />
-            <span className={`text-lg font-semibold ${botStatus?.online ? "text-neon-blue" : "text-slate-400"}`}>
-              {botStatus === null ? "Checking…" : botStatus.online ? "Online" : "Offline"}
-            </span>
-          </p>
+          {(() => {
+            const phase = botStatus === null ? "checking" : botStatus.updating ? "updating" : botStatus.online ? "online" : "offline";
+            const dotClass = {
+              checking: "bg-slate-600 animate-pulse",
+              updating: "bg-amber-400 animate-pulse",
+              online: "bg-emerald-400",
+              offline: "bg-slate-500",
+            }[phase];
+            const textClass = { checking: "text-slate-400", updating: "text-amber-400", online: "text-neon-blue", offline: "text-slate-400" }[phase];
+            const label = { checking: "Checking…", updating: "Updating", online: "Online", offline: "Offline" }[phase];
+            return (
+              <>
+                <p className="flex items-center gap-2 mt-1">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+                  <span className={`text-lg font-semibold ${textClass}`}>{label}</span>
+                </p>
+                {phase === "offline" && botStatus?.lastError && (
+                  <p className="text-xs text-slate-500 mt-1 truncate" title={botStatus.lastError.message}>
+                    {botStatus.lastError.message} —{" "}
+                    <Link href={`/dashboard/${params.guildId}/errors`} className="text-neon-blue hover:underline">
+                      see Errors
+                    </Link>
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </NeonCard>
       </div>
 

@@ -83,6 +83,9 @@ model Guild {
   applicationTypes  ApplicationType[]
   applications      Application[]
   applicationSettings ApplicationSettings?
+  growthSnapshots   GrowthSnapshot[]
+  bumpReminderSettings BumpReminderSettings?
+  suggestionAnalyticsSettings SuggestionAnalyticsSettings?
   createdAt         DateTime             @default(now())
 }
 
@@ -135,6 +138,57 @@ enum ModuleKey {
   VOICE_ACTIVITY
   WEEKLY_RECAP
   ACHIEVEMENTS
+  GROWTH_ANALYTICS
+  SERVER_TEMPLATES
+  BUMP_REMINDER
+  SUGGESTION_ANALYTICS
+}
+
+model GrowthSnapshot {
+  id           String   @id @default(cuid())
+  guild        Guild    @relation(fields: [guildId], references: [id])
+  guildId      String
+  memberCount  Int
+  messageCount Int
+  createdAt    DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// ---- Bump Reminder ----
+// Detects Disboard's "Bump done!" confirmation embed in chat, then pings
+// the configured channel again once the 2-hour cooldown expires — checked
+// by a cron job (not setTimeout) specifically so it survives a bot restart.
+
+model BumpReminderSettings {
+  id             String    @id @default(cuid())
+  guild          Guild     @relation(fields: [guildId], references: [id])
+  guildId        String    @unique
+  channelId      String?
+  mentionRoleId  String?
+  nextReminderAt DateTime?
+  reminded       Boolean   @default(true) // true = nothing pending; set false the moment a bump is detected
+}
+
+// ---- Suggestion Analytics ----
+// A periodic digest of the most-reacted suggestions — reaction counts
+// aren't persisted anywhere (Suggestion has no vote columns), so the job
+// that uses this reads them live off the Discord message each time.
+
+model SuggestionAnalyticsSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+}
+
+model DailyMessageCount {
+  id      String   @id @default(cuid())
+  guildId String
+  date    DateTime @db.Date
+  count   Int      @default(0)
+
+  @@unique([guildId, date])
 }
 
 model ModuleToggle {

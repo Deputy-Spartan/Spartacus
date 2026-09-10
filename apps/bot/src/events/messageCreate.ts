@@ -75,6 +75,17 @@ export async function execute(message: Message) {
     await awardMessageEarnings(message.guildId, message.member, message.channelId, message.content);
   }
 
+  // --- Growth analytics: running daily message counter ---
+  if (await isModuleEnabled(message.guildId, "GROWTH_ANALYTICS")) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    await prisma.dailyMessageCount.upsert({
+      where: { guildId_date: { guildId: message.guildId, date: today } },
+      create: { guildId: message.guildId, date: today, count: 1 },
+      update: { count: { increment: 1 } },
+    });
+  }
+
   // --- Counting game ---
   if (await isModuleEnabled(message.guildId, "COUNTING_GAME")) {
     await checkCountingMessage(message);

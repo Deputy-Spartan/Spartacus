@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonInteraction,
   ButtonStyle,
@@ -13,6 +14,7 @@ import {
 } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import type { TicketPanel, TicketSettings, TicketType } from "@spartacus/db";
+import { isSendableChannel } from "../../lib/channels";
 
 // Discord channel names are lowercase-and-dashes only, so tokens get
 // substituted before that normalization runs.
@@ -191,8 +193,9 @@ async function closeTicket(interaction: ButtonInteraction | ModalSubmitInteracti
 
   await interaction.reply("🔒 Closing this ticket in 5 seconds…");
 
+  let settings: TicketSettings | null = null;
   if (interaction.guild) {
-    const settings = await getSettings(interaction.guild.id);
+    settings = await getSettings(interaction.guild.id);
     if (settings?.transcriptChannelId) {
       const transcriptChannel = await interaction.guild.channels.fetch(settings.transcriptChannelId).catch(() => null);
       if (transcriptChannel?.isTextBased()) {
@@ -208,7 +211,83 @@ async function closeTicket(interaction: ButtonInteraction | ModalSubmitInteracti
     }
   }
 
+  await postTranscript(interaction, ticket, settings).catch(() => null);
+
   setTimeout(() => interaction.channel?.delete().catch(() => null), 5000);
+}
+
+// Formats a batch of fetched messages (oldest-first) as plain-text transcript
+// lines: "[HH:MM:SS] Username: content". Extracted as a pure function so it's
+// testable without touching Discord.
+export function formatTranscriptLines(
+  messages: Array<{ author: { tag: string }; content: string; createdAt: Date }>
+): string {
+  return messages
+    .map((m) => {
+      const time = m.createdAt.toISOString().slice(11, 19);
+      const content = m.content || "[no text content]";
+      return `[${time}] ${m.author.tag}: ${content}`;
+    })
+    .join("\n");
+}
+
+// Fetches up to the most recent 100 messages in the channel (a single
+// discord.js fetch page) and builds a transcript attachment + posts/DMs it.
+// Capped at ~100 messages for this first version — pagination via `before`
+// (see apps/bot/src/jobs/autoPurge.ts for the pattern) would be needed for
+// full-history transcripts on long-lived tickets.
+async function postTranscript(
+  interaction: ButtonInteraction | ModalSubmitInteraction,
+  ticket: { id: string; ticketNumber: number; userId: string },
+  settings: TicketSettings | null
+) {
+  const channel = interaction.channel;
+  if (!channel || !channel.isTextBased()) return;
+
+  const fetched = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+  if (!fetched) return;
+
+  const ordered = [...fetched.values()].reverse();
+  const text = formatTranscriptLines(ordered) || "(No messages in this ticket.)";
+  const buffer = Buffer.from(text, "utf-8");
+  const fileName = `transcript-ticket-${ticket.ticketNumber}.txt`;
+
+  const buildAttachment = () => new AttachmentBuilder(buffer, { name: fileName });
+
+  let transcriptUrl: string | null = null;
+
+  if (settings?.transcriptChannelId && interaction.guild) {
+    const transcriptChannel = await interaction.guild.channels.fetch(settings.transcriptChannelId).catch(() => null);
+    if (transcriptChannel?.isTextBased()) {
+      const sent = await transcriptChannel
+        .send({ content: `📄 Transcript for ticket #${ticket.ticketNumber}`, files: [buildAttachment()] })
+        .catch(() => null);
+      transcriptUrl = sent?.attachments.first()?.url ?? null;
+    }
+  } else if (isSendableChannel(channel)) {
+    // No dedicated log channel configured — post it to the ticket channel
+    // itself, right before it gets archived/deleted, so it's preserved one
+    // last time in the channel's own history.
+    const sent = await channel
+      .send({ content: `📄 Transcript for ticket #${ticket.ticketNumber}`, files: [buildAttachment()] })
+      .catch(() => null);
+    transcriptUrl = sent?.attachments.first()?.url ?? null;
+  }
+
+  // Best-effort DM copy to the ticket opener — many users have DMs closed.
+  const opener = await interaction.client.users.fetch(ticket.userId).catch(() => null);
+  if (opener) {
+    await opener
+      .send({ content: `📄 Here's the transcript for your ticket #${ticket.ticketNumber}.`, files: [buildAttachment()] })
+      .catch(() => null);
+  }
+
+  // Discord attachment CDN URLs can expire/rotate over long timescales —
+  // this is a best-effort convenience link, not a permanent archive, since
+  // there's no file storage service configured in this project.
+  if (transcriptUrl) {
+    await prisma.ticket.update({ where: { id: ticket.id }, data: { transcriptUrl } }).catch(() => null);
+  }
 }
 
 export function findPanelType(panel: TicketPanel, types: TicketType[]) {

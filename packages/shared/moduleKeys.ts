@@ -46,6 +46,10 @@ export const MODULE_KEYS = [
   "VOICE_ACTIVITY",
   "WEEKLY_RECAP",
   "ACHIEVEMENTS",
+  "GROWTH_ANALYTICS",
+  "SERVER_TEMPLATES",
+  "BUMP_REMINDER",
+  "SUGGESTION_ANALYTICS",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -98,6 +102,10 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   VOICE_ACTIVITY: "Voice Activity",
   WEEKLY_RECAP: "Weekly Recap",
   ACHIEVEMENTS: "Achievements",
+  GROWTH_ANALYTICS: "Growth Analytics",
+  SERVER_TEMPLATES: "Server Config Templates",
+  BUMP_REMINDER: "Bump Reminder",
+  SUGGESTION_ANALYTICS: "Suggestion Analytics",
 };
 
 export const SIGNUP_ROLES = [

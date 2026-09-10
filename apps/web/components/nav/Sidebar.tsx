@@ -59,6 +59,7 @@ export const NAV_SECTIONS = [
       { href: "/level-roles", label: "Level Roles", icon: "🏅" },
       { href: "/voice-activity", label: "Voice Activity", icon: "🎙️" },
       { href: "/achievements", label: "Achievements", icon: "🏆" },
+      { href: "/growth-analytics", label: "Growth Analytics", icon: "📉" },
     ],
   },
   {
@@ -69,6 +70,8 @@ export const NAV_SECTIONS = [
       { href: "/stream-alerts", label: "Stream Alerts", icon: "🔴" },
       { href: "/commands", label: "Custom Commands", icon: "💬" },
       { href: "/weekly-recap", label: "Weekly Recap", icon: "📊" },
+      { href: "/bump-reminder", label: "Bump Reminder", icon: "⏰" },
+      { href: "/suggestion-analytics", label: "Suggestion Analytics", icon: "💡" },
     ],
   },
   {
@@ -103,6 +106,7 @@ export const NAV_SECTIONS = [
       { href: "/slow-mode", label: "Slow Mode", icon: "🐢" },
       { href: "/stat-channels", label: "Server Stat Channels", icon: "📈" },
       { href: "/status-channel", label: "Status Channel", icon: "🟢" },
+      { href: "/server-templates", label: "Server Config Templates", icon: "📋" },
     ],
   },
 ];

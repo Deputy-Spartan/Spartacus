@@ -184,6 +184,14 @@ export interface StatusChannelRow {
   channelId: string;
 }
 
+export interface GrowthSnapshotRow {
+  id: string;
+  guildId: string;
+  memberCount: number;
+  messageCount: number;
+  createdAt: string;
+}
+
 export interface AiConfigRow {
   guildId: string;
   chatChannelId: string | null;
@@ -805,6 +813,16 @@ export interface WarnEscalationSettingsRow {
   timeoutMinutes: number;
 }
 
+export interface BumpReminderSettingsRow {
+  channelId: string | null;
+  mentionRoleId: string | null;
+  nextReminderAt: string | null;
+}
+
+export interface SuggestionAnalyticsSettingsRow {
+  channelId: string | null;
+}
+
 export interface AppealSettingsRow {
   appealChannelId: string | null;
 }
@@ -926,6 +944,11 @@ export const api = {
     request<StatusChannelRow>(`/guilds/${guildId}/status-channels`, { method: "POST", body: JSON.stringify({ channelId }) }),
   deleteStatusChannel: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/status-channels/${id}`, { method: "DELETE" }),
+
+  getGrowthSnapshots: (guildId: string) => request<GrowthSnapshotRow[]>(`/guilds/${guildId}/growth-snapshots`),
+
+  cloneModules: (guildId: string, sourceGuildId: string) =>
+    request<{ copied: number }>(`/guilds/${guildId}/clone-modules`, { method: "POST", body: JSON.stringify({ sourceGuildId }) }),
 
   getBotStatus: () => request<BotStatusRow>("/bot-status"),
 
@@ -1199,6 +1222,14 @@ export const api = {
   getWarnEscalationSettings: (guildId: string) => request<WarnEscalationSettingsRow>(`/guilds/${guildId}/warn-escalation`),
   updateWarnEscalationSettings: (guildId: string, input: Partial<WarnEscalationSettingsRow>) =>
     request<WarnEscalationSettingsRow>(`/guilds/${guildId}/warn-escalation`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getBumpReminderSettings: (guildId: string) => request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`),
+  updateBumpReminderSettings: (guildId: string, input: Partial<BumpReminderSettingsRow>) =>
+    request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getSuggestionAnalyticsSettings: (guildId: string) => request<SuggestionAnalyticsSettingsRow>(`/guilds/${guildId}/suggestion-analytics`),
+  updateSuggestionAnalyticsSettings: (guildId: string, input: Partial<SuggestionAnalyticsSettingsRow>) =>
+    request<SuggestionAnalyticsSettingsRow>(`/guilds/${guildId}/suggestion-analytics`, { method: "PUT", body: JSON.stringify(input) }),
 
   getAppealSettings: (guildId: string) => request<AppealSettingsRow>(`/guilds/${guildId}/appeal-settings`),
   updateAppealSettings: (guildId: string, input: Partial<AppealSettingsRow>) =>

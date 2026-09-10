@@ -24,6 +24,7 @@ import trivia from "./games/trivia";
 import report from "./moderation/report";
 import sticky from "./community/sticky";
 import birthday from "./community/birthday";
+import giveawayReroll from "./engagement/giveawayReroll";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -52,6 +53,7 @@ for (const command of [
   report,
   sticky,
   birthday,
+  giveawayReroll,
 ]) {
   commands.set(command.data.name, command);
 }

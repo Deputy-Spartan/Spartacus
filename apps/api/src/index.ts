@@ -73,6 +73,10 @@ import voiceActivityRouter from "./routes/voiceActivity";
 import achievementsRouter from "./routes/achievements";
 import warnEscalationRouter from "./routes/warnEscalation";
 import appealsRouter from "./routes/appeals";
+import growthAnalyticsRouter from "./routes/growthAnalytics";
+import serverTemplatesRouter from "./routes/serverTemplates";
+import bumpReminderRouter from "./routes/bumpReminder";
+import suggestionAnalyticsRouter from "./routes/suggestionAnalytics";
 
 const app = express();
 
@@ -148,6 +152,10 @@ app.use(appealsRouter);
 app.use(weeklyRecapSettingsRouter);
 app.use(voiceActivityRouter);
 app.use(achievementsRouter);
+app.use(growthAnalyticsRouter);
+app.use(serverTemplatesRouter);
+app.use(bumpReminderRouter);
+app.use(suggestionAnalyticsRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

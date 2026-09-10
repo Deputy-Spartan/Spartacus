@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { api, type EconomyBalanceRow, type EconomyConfig } from "../../../../../lib/api";
 import { useMemberNames } from "../../../../../lib/useMemberNames";
+import { downloadCsv } from "../../../../../lib/csv";
 
 export default function EconomyLeaderboardPage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<EconomyConfig | null>(null);
@@ -19,6 +20,26 @@ export default function EconomyLeaderboardPage({ params }: { params: { guildId: 
     <div>
       <h1 className="text-2xl font-bold mb-1">Economy Leaderboard</h1>
       <p className="text-slate-400 mb-6">Top wallets in this server, ranked by current balance.</p>
+
+      {rows.length > 0 && (
+        <div className="flex justify-end mb-3 max-w-2xl">
+          <button
+            onClick={() =>
+              downloadCsv(
+                `economy-leaderboard-${params.guildId}.csv`,
+                rows.map((row) => ({
+                  userId: row.userId,
+                  username: displayName(row.userId),
+                  balance: row.balance,
+                }))
+              )
+            }
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-base-900 border border-white/10 hover:border-neon-blue transition-colors"
+          >
+            Export CSV
+          </button>
+        </div>
+      )}
 
       <NeonCard className="max-w-2xl">
         <div className="flex items-center justify-between mb-3">

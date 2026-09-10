@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type LeaderboardRow } from "../../../../lib/api";
+import { downloadCsv } from "../../../../lib/csv";
 
 export default function LevelingPage({ params }: { params: { guildId: string } }) {
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
@@ -20,6 +21,28 @@ export default function LevelingPage({ params }: { params: { guildId: string } }
         title="Leveling & XP"
         description="Top members by message-based XP this server has ever awarded."
       />
+
+      {rows && rows.length > 0 && (
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={() =>
+              downloadCsv(
+                `leveling-leaderboard-${params.guildId}.csv`,
+                rows.map((row) => ({
+                  userId: row.userId,
+                  username: row.username ?? "",
+                  nickname: row.nickname ?? "",
+                  xp: row.xp,
+                  level: row.level,
+                }))
+              )
+            }
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-base-900 border border-white/10 hover:border-neon-blue transition-colors"
+          >
+            Export CSV
+          </button>
+        </div>
+      )}
 
       <NeonCard>
         {!rows && <p className="text-slate-500 text-sm">Loading…</p>}

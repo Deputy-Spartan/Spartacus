@@ -641,6 +641,11 @@ function TicketsTab({ guildId }: { guildId: string }) {
                     <a href={`discord://discord.com/channels/${guildId}/${t.channelId}`} className="text-xs text-neon-blue hover:underline">
                       Jump in
                     </a>
+                    {t.transcriptUrl ? (
+                      <a href={t.transcriptUrl} target="_blank" rel="noreferrer" className="text-xs text-neon-blue hover:underline">
+                        Transcript
+                      </a>
+                    ) : null}
                     {t.status === "CLOSED" ? (
                       <button onClick={() => reopen(t)} className="text-xs text-slate-500 hover:text-neon-blue">
                         Reopen

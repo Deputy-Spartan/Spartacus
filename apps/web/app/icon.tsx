@@ -3,6 +3,14 @@ import path from "node:path";
 
 export const size = { width: 256, height: 256 };
 export const contentType = "image/png";
+// Without this, Next treats icon.tsx like a static asset and generates it
+// once at build time — if that build-time fetch to the API fails (e.g. the
+// Vercel build sandbox can't reach a free-tier Render service, or the env
+// var isn't set the same way at build time), the wrong fallback gets baked
+// in permanently until the next deploy. Forcing this dynamic makes it a
+// real per-request fetch instead, matching what "always mirrors the bot's
+// current avatar" actually requires.
+export const dynamic = "force-dynamic";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 

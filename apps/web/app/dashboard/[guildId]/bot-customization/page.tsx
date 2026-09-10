@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { api, type BotConfigRow } from "../../../../lib/api";
-import { notifyBotStatusChanged } from "../../../../lib/useBotStatus";
 
 const STATUS_OPTIONS = [
   { value: "online", label: "Online" },
@@ -20,7 +20,7 @@ const ACTIVITY_OPTIONS = [
   { value: "CUSTOM", label: "Custom status" },
 ];
 
-export default function BotCustomizationPage() {
+export default function BotCustomizationPage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<BotConfigRow | null>(null);
   const [username, setUsername] = useState("");
   const [description, setDescription] = useState("");
@@ -34,11 +34,6 @@ export default function BotCustomizationPage() {
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [manualStatusOverride, setManualStatusOverride] = useState<"" | "ONLINE" | "OFFLINE" | "MAINTENANCE">("");
-  const [manualStatusMessage, setManualStatusMessage] = useState("");
-  const [savingOverride, setSavingOverride] = useState(false);
-  const [overrideSaved, setOverrideSaved] = useState(false);
-
   useEffect(() => {
     api.getBotConfig().then((c) => {
       setConfig(c);
@@ -48,24 +43,8 @@ export default function BotCustomizationPage() {
       setActivityType(c.activityType);
       setActivityText(c.activityText ?? "");
       setAvatarPreview(c.avatarUrl);
-      setManualStatusOverride(c.manualStatusOverride ?? "");
-      setManualStatusMessage(c.manualStatusMessage ?? "");
     });
   }, []);
-
-  async function saveOverride() {
-    setSavingOverride(true);
-    const result = await api.setBotConfig({
-      manualStatusOverride: manualStatusOverride || null,
-      manualStatusMessage: manualStatusMessage || null,
-    });
-    setSavingOverride(false);
-    if (result.errors.length === 0) {
-      setOverrideSaved(true);
-      notifyBotStatusChanged();
-      setTimeout(() => setOverrideSaved(false), 2500);
-    }
-  }
 
   function onAvatarFile(file: File) {
     const reader = new FileReader();
@@ -106,7 +85,12 @@ export default function BotCustomizationPage() {
     <div>
       <h1 className="text-2xl font-bold mb-1">Bot Customization</h1>
       <p className="text-slate-400 mb-6">
-        These are account-wide — the bot's username, avatar, status, and description are the same across every server it's in.
+        These are account-wide — the bot's username, avatar, status, and description are the same across every server it's in. Looking to force
+        the bot online/offline or post a maintenance message?{" "}
+        <Link href={`/dashboard/${params.guildId}/status-channel`} className="text-neon-blue hover:underline">
+          That's on the Status Channel page
+        </Link>
+        .
       </p>
 
       {errors.length > 0 && (
@@ -116,38 +100,6 @@ export default function BotCustomizationPage() {
           ))}
         </div>
       )}
-
-      <NeonCard className="mb-4">
-        <p className="font-medium mb-1">Manual Status Override</p>
-        <p className="text-xs text-slate-500 mb-4">
-          Overrides the automatic online/offline detection everywhere — the dashboard badge, Overview, and the Discord status channel. Set back to
-          "Auto" to return to normal heartbeat-based detection.
-        </p>
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Status</label>
-        <select
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-          value={manualStatusOverride}
-          onChange={(e) => setManualStatusOverride(e.target.value as typeof manualStatusOverride)}
-        >
-          <option value="">Auto (heartbeat-based)</option>
-          <option value="ONLINE">Force Online</option>
-          <option value="MAINTENANCE">Under Maintenance</option>
-          <option value="OFFLINE">Force Offline</option>
-        </select>
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message (optional)</label>
-        <input
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-          value={manualStatusMessage}
-          onChange={(e) => setManualStatusMessage(e.target.value)}
-          placeholder="e.g. Doing scheduled maintenance, back by 6pm EST"
-        />
-
-        <button onClick={saveOverride} disabled={savingOverride} className="neon-button-sm disabled:opacity-50">
-          {savingOverride ? "Saving…" : overrideSaved ? "Saved ✓" : "Save Override"}
-        </button>
-      </NeonCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <NeonCard>

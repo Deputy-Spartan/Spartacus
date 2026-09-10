@@ -7,38 +7,149 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { useBotStatus } from "../../../../lib/useBotStatus";
-import { api, type AlertSettingsRow, type StatusChannelRow } from "../../../../lib/api";
+import { useBotStatus, notifyBotStatusChanged } from "../../../../lib/useBotStatus";
+import { api, type AlertSettingsRow, type BotConfigRow, type StatusChannelRow } from "../../../../lib/api";
 
-export default function StatusChannelPage({ params }: { params: { guildId: string } }) {
-  const confirm = useConfirm();
+type OverrideValue = "" | "ONLINE" | "OFFLINE" | "MAINTENANCE";
+
+function LiveIndicator() {
   const status = useBotStatus();
+  const phase = status === null ? "checking" : status.updating ? "updating" : status.online ? "online" : "offline";
+  const dotClass = {
+    checking: "bg-slate-600 animate-pulse",
+    updating: "bg-amber-400",
+    online: "bg-emerald-400",
+    offline: "bg-slate-500",
+  }[phase];
+  const label = { checking: "checking…", updating: "updating", online: "online", offline: "offline" }[phase];
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+      <span className="text-xs text-slate-500">
+        Live preview: Spartacus is {label}
+        {status?.manual ? " (set manually)" : ""}
+      </span>
+      {status?.manual && status.message && <span className="text-xs text-slate-600 italic">— "{status.message}"</span>}
+    </div>
+  );
+}
+
+function ManualOverrideCard() {
+  const [override, setOverride] = useState<OverrideValue>("");
+  const [message, setMessage] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.getBotConfig().then((c: BotConfigRow) => {
+      setOverride(c.manualStatusOverride ?? "");
+      setMessage(c.manualStatusMessage ?? "");
+      setLoaded(true);
+    });
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    const result = await api.setBotConfig({ manualStatusOverride: override || null, manualStatusMessage: message || null });
+    setSaving(false);
+    if (result.errors.length === 0) {
+      setSaved(true);
+      notifyBotStatusChanged();
+      setTimeout(() => setSaved(false), 2500);
+    }
+  }
+
+  return (
+    <NeonCard>
+      <div className="flex items-start justify-between gap-4 mb-1">
+        <p className="font-medium">Manual Override</p>
+        <LiveIndicator />
+      </div>
+      <p className="text-xs text-slate-500 mb-4">
+        Forces the status shown everywhere — this page, the dashboard header, Overview, and the live embed below — instead of the automatic
+        heartbeat detection. Set back to "Auto" to return to normal.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Status</label>
+          <select
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+            value={override}
+            onChange={(e) => setOverride(e.target.value as OverrideValue)}
+            disabled={!loaded}
+          >
+            <option value="">Auto (heartbeat-based)</option>
+            <option value="ONLINE">Force Online</option>
+            <option value="MAINTENANCE">Under Maintenance</option>
+            <option value="OFFLINE">Force Offline</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message (optional)</label>
+          <input
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="e.g. Doing scheduled maintenance, back by 6pm EST"
+            disabled={!loaded}
+          />
+        </div>
+      </div>
+
+      <button onClick={save} disabled={saving || !loaded} className="neon-button-sm mt-4 disabled:opacity-50">
+        {saving ? "Saving…" : saved ? "Saved ✓" : "Save Override"}
+      </button>
+    </NeonCard>
+  );
+}
+
+function ActiveChannelsCard({ guildId }: { guildId: string }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<StatusChannelRow[]>([]);
   const [channelNames, setChannelNames] = useState<Record<string, string>>({});
-  const [channelId, setChannelId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [alertSettings, setAlertSettings] = useState<AlertSettingsRow | null>(null);
 
   function refresh() {
-    api.getStatusChannels(params.guildId).then(setRows);
+    api.getStatusChannels(guildId).then(setRows);
   }
-  useEffect(refresh, [params.guildId]);
+  useEffect(refresh, [guildId]);
   useEffect(() => {
-    api.getDiscordChannels(params.guildId).then((c) => {
+    api.getDiscordChannels(guildId).then((c) => {
       const map: Record<string, string> = {};
       for (const ch of [...c.textChannels, ...c.voiceChannels]) map[ch.id] = ch.name;
       setChannelNames(map);
     });
-  }, [params.guildId]);
-  useEffect(() => {
-    api.getAlertSettings(params.guildId).then(setAlertSettings);
-  }, [params.guildId]);
+  }, [guildId]);
 
-  async function updateUptimeChannel(newChannelId: string) {
-    const value = newChannelId || null;
-    setAlertSettings((prev) => (prev ? { ...prev, uptimeChannelId: value } : prev));
-    await api.updateAlertSettings(params.guildId, { uptimeChannelId: value });
+  async function remove(id: string) {
+    if (!(await confirm("Remove this status channel? The posted status message in Discord won't be deleted."))) return;
+    await api.deleteStatusChannel(guildId, id);
+    refresh();
   }
+
+  return (
+    <NeonCard>
+      <p className="font-medium mb-3">Active Status Channels</p>
+      {rows.length === 0 && <p className="text-sm text-slate-500">None yet — add one on the right.</p>}
+      <div className="divide-y divide-white/5">
+        {rows.map((r) => (
+          <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+            <span className="text-slate-300 truncate">#{channelNames[r.channelId] ?? r.channelId}</span>
+            <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+    </NeonCard>
+  );
+}
+
+function AddChannelCard({ guildId, onAdded }: { guildId: string; onAdded: () => void }) {
+  const [channelId, setChannelId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function add() {
     if (!channelId) {
@@ -46,16 +157,60 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
       return;
     }
     setError(null);
-    await api.addStatusChannel(params.guildId, channelId);
+    await api.addStatusChannel(guildId, channelId);
     setChannelId(null);
-    refresh();
+    onAdded();
   }
 
-  async function remove(id: string) {
-    if (!(await confirm("Remove this status channel? The posted status message in Discord won't be deleted."))) return;
-    await api.deleteStatusChannel(params.guildId, id);
-    refresh();
+  return (
+    <NeonCard>
+      <p className="font-medium mb-3">Add Status Channel</p>
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+        Channel
+        <Required />
+      </label>
+      <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} kind="text" placeholder="Select a text channel…" />
+
+      <button onClick={add} disabled={!channelId} className="neon-button mt-4 disabled:opacity-50">
+        Add Status Channel
+      </button>
+      <FormError message={error} />
+    </NeonCard>
+  );
+}
+
+function UptimeHistoryCard({ guildId }: { guildId: string }) {
+  const [alertSettings, setAlertSettings] = useState<AlertSettingsRow | null>(null);
+
+  useEffect(() => {
+    api.getAlertSettings(guildId).then(setAlertSettings);
+  }, [guildId]);
+
+  async function update(newChannelId: string) {
+    const value = newChannelId || null;
+    setAlertSettings((prev) => (prev ? { ...prev, uptimeChannelId: value } : prev));
+    await api.updateAlertSettings(guildId, { uptimeChannelId: value });
   }
+
+  return (
+    <NeonCard>
+      <p className="font-medium mb-1">Uptime History Channel</p>
+      <p className="text-xs text-slate-500 mb-3">
+        A separate, running log — one message every time Spartacus goes offline or comes back, including how long it was down.
+      </p>
+      <ChannelSelect
+        guildId={guildId}
+        value={alertSettings?.uptimeChannelId ?? null}
+        onChange={update}
+        kind="text"
+        placeholder="Off — not posting anywhere"
+      />
+    </NeonCard>
+  );
+}
+
+export default function StatusChannelPage({ params }: { params: { guildId: string } }) {
+  const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div>
@@ -66,65 +221,15 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
         description="Posts a live embed to a channel of your choosing showing whether Spartacus is online, refreshed every minute."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <NeonCard>
-          <p className="font-medium mb-3">Active Status Channels</p>
-          {rows.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
-          <div className="divide-y divide-white/5">
-            {rows.map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-                <span className="text-slate-300 truncate">#{channelNames[r.channelId] ?? r.channelId}</span>
-                <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <ManualOverrideCard />
 
-          <div className="mt-4 pt-4 border-t border-white/5">
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  status === null ? "bg-slate-600 animate-pulse" : status.updating ? "bg-amber-400" : status.online ? "bg-emerald-400" : "bg-slate-500"
-                }`}
-              />
-              <span className="text-xs text-slate-500">
-                Current preview: Spartacus is{" "}
-                {status === null ? "checking…" : status.updating ? "updating" : status.online ? "online" : "offline"}
-                {status?.manual ? " (set manually)" : ""}
-              </span>
-            </div>
-            {status?.manual && status.message && <p className="text-xs text-slate-600 mt-1 pl-4">"{status.message}"</p>}
-          </div>
-        </NeonCard>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ActiveChannelsCard key={refreshKey} guildId={params.guildId} />
+          <AddChannelCard guildId={params.guildId} onAdded={() => setRefreshKey((k) => k + 1)} />
+        </div>
 
-        <NeonCard>
-          <p className="font-medium mb-3">New Status Channel</p>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-            Channel
-            <Required />
-          </label>
-          <ChannelSelect guildId={params.guildId} value={channelId} onChange={setChannelId} kind="text" placeholder="Select a text channel…" />
-
-          <button onClick={add} disabled={!channelId} className="neon-button mt-4 disabled:opacity-50">
-            Add Status Channel
-          </button>
-          <FormError message={error} />
-        </NeonCard>
-
-        <NeonCard className="lg:col-span-2">
-          <p className="font-medium mb-1">Uptime History Channel</p>
-          <p className="text-xs text-slate-500 mb-3">
-            A running log — separate from the live status embed above — with one message every time Spartacus goes offline or comes back, including how long it was down.
-          </p>
-          <ChannelSelect
-            guildId={params.guildId}
-            value={alertSettings?.uptimeChannelId ?? null}
-            onChange={updateUptimeChannel}
-            kind="text"
-            placeholder="Off — not posting anywhere"
-          />
-        </NeonCard>
+        <UptimeHistoryCard guildId={params.guildId} />
       </div>
     </div>
   );

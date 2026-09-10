@@ -112,6 +112,12 @@ export function AvatarCropper({ imageSrc, onCancel, onSave }: AvatarCropperProps
               style={{
                 width: displayedW,
                 height: displayedH,
+                // Tailwind's preflight sets `img { max-width: 100%; height: auto }`
+                // globally — without overriding both here, the browser caps the
+                // image's rendered width at the 240px viewport while height stays
+                // at the full computed value once zoomed past 1x, squishing it.
+                maxWidth: "none",
+                maxHeight: "none",
                 transform: `translate(${(VIEWPORT - displayedW) / 2 + offset.x}px, ${(VIEWPORT - displayedH) / 2 + offset.y}px)`,
               }}
             />

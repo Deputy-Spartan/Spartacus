@@ -5,6 +5,7 @@ import Link from "next/link";
 import { NeonCard } from "../../../components/ui/NeonCard";
 import { MODULE_KEYS, MODULE_LABELS, type ModuleKey } from "@spartacus/shared";
 import { api, type DashboardActivityEntry, type ModuleState } from "../../../lib/api";
+import { useBotStatus } from "../../../lib/useBotStatus";
 
 const METHOD_VERB: Record<string, string> = {
   POST: "Created",
@@ -38,6 +39,7 @@ function timeAgo(iso: string) {
 export default function OverviewPage({ params }: { params: { guildId: string } }) {
   const [modules, setModules] = useState<Record<ModuleKey, ModuleState> | null>(null);
   const [activity, setActivity] = useState<DashboardActivityEntry[]>([]);
+  const botStatus = useBotStatus();
 
   useEffect(() => {
     api.getModules(params.guildId).then((data) => setModules(data as Record<ModuleKey, ModuleState>));
@@ -63,7 +65,16 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
         </NeonCard>
         <NeonCard>
           <p className="text-slate-400 text-sm">Bot Status</p>
-          <p className="text-lg font-semibold mt-1 text-neon-blue">Online</p>
+          <p className="flex items-center gap-2 mt-1">
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                botStatus === null ? "bg-slate-600 animate-pulse" : botStatus.online ? "bg-emerald-400" : "bg-slate-500"
+              }`}
+            />
+            <span className={`text-lg font-semibold ${botStatus?.online ? "text-neon-blue" : "text-slate-400"}`}>
+              {botStatus === null ? "Checking…" : botStatus.online ? "Online" : "Offline"}
+            </span>
+          </p>
         </NeonCard>
       </div>
 

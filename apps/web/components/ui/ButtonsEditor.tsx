@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type ButtonPresetRow, type StickyButton } from "../../lib/api";
+import { usePrompt } from "./ConfirmDialog";
 
 interface ButtonsEditorProps {
   guildId: string;
@@ -15,6 +16,7 @@ interface ButtonsEditorProps {
 export function ButtonsEditor({ guildId, buttons, onChange }: ButtonsEditorProps) {
   const [presets, setPresets] = useState<ButtonPresetRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const prompt = usePrompt();
 
   useEffect(() => {
     api.getButtonPresets(guildId).then(setPresets);
@@ -28,7 +30,7 @@ export function ButtonsEditor({ guildId, buttons, onChange }: ButtonsEditorProps
 
   async function savePreset() {
     if (buttons.length === 0) return;
-    const name = window.prompt("Name this button preset:");
+    const name = await prompt("Name this button preset:");
     if (!name) return;
     setSaving(true);
     const preset = await api.saveButtonPreset(guildId, name, buttons);

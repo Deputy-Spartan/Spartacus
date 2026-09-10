@@ -9,6 +9,8 @@ import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type StickyMessageInput, type StickyMessageRow } from "../../../../lib/api";
 
 const EMPTY_FORM: StickyMessageInput = {
@@ -27,6 +29,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
   const [channelId, setChannelId] = useState<string | null>(null);
   const [form, setForm] = useState<StickyMessageInput>(EMPTY_FORM);
   const [showEditor, setShowEditor] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const embedDescRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,6 +42,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
     setEditingId(null);
     setChannelId(null);
     setForm(EMPTY_FORM);
+    setError(null);
     setShowEditor(true);
   }
 
@@ -53,11 +57,16 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
       embedColor: row.embedColor ?? "#5865F2",
       buttons: row.buttons,
     });
+    setError(null);
     setShowEditor(true);
   }
 
   async function save() {
-    if (!channelId || !form.content) return;
+    if (!channelId || !form.content) {
+      setError("Select a channel and enter a message before saving.");
+      return;
+    }
+    setError(null);
     if (editingId) {
       await api.updateStickyMessage(params.guildId, editingId, form);
     } else {
@@ -135,7 +144,10 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
               </button>
             </div>
 
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+              Channel
+              <Required />
+            </label>
             <ChannelSelect
               guildId={params.guildId}
               value={channelId}
@@ -147,6 +159,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
               {form.embedEnabled ? "Fallback / Embed Description" : "Message"}
+              <Required />
             </label>
             <MarkdownToolbar guildId={params.guildId} textareaRef={contentRef} value={form.content} onChange={(v) => setForm({ ...form, content: v })} />
             <textarea
@@ -226,6 +239,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
             <button onClick={save} className="neon-button">
               {editingId ? "Save Changes" : "Set Sticky"}
             </button>
+            <FormError message={error} />
           </NeonCard>
         )}
       </div>

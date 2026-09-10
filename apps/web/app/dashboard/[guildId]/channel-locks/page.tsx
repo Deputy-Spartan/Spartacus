@@ -8,6 +8,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type ChannelLockInput, type ChannelLockRow } from "../../../../lib/api";
 
 const NOTIFY_TOKENS = [
@@ -106,6 +108,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
   const [channelId, setChannelId] = useState<string | null>(null);
   const [form, setForm] = useState<ChannelLockInput>(EMPTY_FORM);
   const [showEditor, setShowEditor] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getChannelLocks(params.guildId).then(setRows);
@@ -116,6 +119,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
     setEditingId(null);
     setChannelId(null);
     setForm(EMPTY_FORM);
+    setError(null);
     setShowEditor(true);
   }
 
@@ -139,11 +143,16 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       notifyDeleteAfterSec: row.notifyDeleteAfterSec,
       dmUser: row.dmUser,
     });
+    setError(null);
     setShowEditor(true);
   }
 
   async function save() {
-    if (!channelId) return;
+    if (!channelId) {
+      setError("Select a channel before saving.");
+      return;
+    }
+    setError(null);
     if (editingId) {
       await api.updateChannelLock(params.guildId, editingId, form);
     } else {
@@ -220,7 +229,10 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
               </button>
             </div>
 
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+              Channel
+              <Required />
+            </label>
             <ChannelSelect
               guildId={params.guildId}
               value={channelId}
@@ -363,6 +375,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
             <button onClick={save} className="neon-button">
               {editingId ? "Save Changes" : "Create Lock"}
             </button>
+            <FormError message={error} />
           </NeonCard>
         )}
       </div>

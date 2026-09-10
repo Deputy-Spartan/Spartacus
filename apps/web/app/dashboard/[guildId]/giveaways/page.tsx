@@ -5,6 +5,8 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import { api, type GiveawayInput, type GiveawayRow, type StickyButton } from "../../../../lib/api";
 
@@ -22,6 +24,7 @@ const EMPTY: GiveawayInput = {
 export default function GiveawaysPage({ params }: { params: { guildId: string } }) {
   const [rows, setRows] = useState<GiveawayRow[]>([]);
   const [form, setForm] = useState<GiveawayInput>(EMPTY);
+  const [error, setError] = useState<string | null>(null);
   const avatarUrl = useBotAvatar();
 
   function refresh() {
@@ -30,7 +33,11 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
   useEffect(refresh, [params.guildId]);
 
   async function create() {
-    if (!form.channelId || !form.prize || !form.endsAt) return;
+    if (!form.channelId || !form.prize || !form.endsAt) {
+      setError("Select a channel, enter a prize, and set an end time before starting.");
+      return;
+    }
+    setError(null);
     await api.addGiveaway(params.guildId, form);
     setForm(EMPTY);
     refresh();
@@ -49,10 +56,16 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
         <NeonCard>
           <p className="font-medium mb-3">Create Giveaway</p>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={params.guildId} value={form.channelId || null} onChange={(id) => setForm({ ...form, channelId: id })} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Prize</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Prize
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             value={form.prize}
@@ -107,7 +120,10 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Ends At</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Ends At
+                <Required />
+              </label>
               <input
                 type="datetime-local"
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
@@ -120,6 +136,7 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
           <button onClick={create} disabled={!form.channelId || !form.prize || !form.endsAt} className="neon-button disabled:opacity-50">
             Start Giveaway
           </button>
+          <FormError message={error} />
         </NeonCard>
 
         <div className="space-y-4">

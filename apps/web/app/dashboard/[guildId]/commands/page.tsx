@@ -6,6 +6,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type CustomCommand } from "../../../../lib/api";
 
 type CommandForm = Omit<CustomCommand, "id">;
@@ -25,6 +27,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CommandForm>(EMPTY_FORM);
   const [showEditor, setShowEditor] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getCommands(params.guildId).then(setCommands);
@@ -34,17 +37,23 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
   function startCreate() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setError(null);
     setShowEditor(true);
   }
 
   function startEdit(c: CustomCommand) {
     setEditingId(c.id);
     setForm({ trigger: c.trigger, response: c.response, embedEnabled: c.embedEnabled, embedTitle: c.embedTitle, embedColor: c.embedColor ?? "#5865F2", buttons: c.buttons });
+    setError(null);
     setShowEditor(true);
   }
 
   async function save() {
-    if (!form.trigger || !form.response) return;
+    if (!form.trigger || !form.response) {
+      setError("Enter a trigger and a response before saving.");
+      return;
+    }
+    setError(null);
     const body = {
       response: form.response,
       embedEnabled: form.embedEnabled,
@@ -115,7 +124,10 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
               </button>
             </div>
 
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Trigger</label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+              Trigger
+              <Required />
+            </label>
             <input
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 disabled:opacity-50"
               placeholder="!trigger"
@@ -127,6 +139,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
               {form.embedEnabled ? "Embed Description" : "Response"}
+              <Required />
             </label>
             <textarea
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 min-h-20"
@@ -159,6 +172,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
             <button onClick={save} className="neon-button">
               {editingId ? "Save Changes" : "Create Command"}
             </button>
+            <FormError message={error} />
           </NeonCard>
         )}
       </div>

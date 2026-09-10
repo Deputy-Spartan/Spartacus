@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api } from "../../../../lib/api";
 
 interface PartnershipRow {
@@ -19,6 +21,7 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
   const [partnerName, setPartnerName] = useState("");
   const [partnerInvite, setPartnerInvite] = useState("");
   const [type, setType] = useState("Ad Exchange");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getPartnerships(params.guildId).then(setRows);
@@ -26,7 +29,11 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
   useEffect(refresh, [params.guildId]);
 
   async function add() {
-    if (!partnerName) return;
+    if (!partnerName) {
+      setError("Enter the partner server's name before adding.");
+      return;
+    }
+    setError(null);
     await api.addPartnership(params.guildId, { partnerName, partnerInvite, type });
     setPartnerName("");
     setPartnerInvite("");
@@ -67,7 +74,10 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
 
         <NeonCard>
           <p className="font-medium mb-3">Add Partner</p>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Partner Server Name</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Partner Server Name
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             value={partnerName}
@@ -92,6 +102,7 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
           <button onClick={add} className="neon-button">
             Add Partner
           </button>
+          <FormError message={error} />
         </NeonCard>
       </div>
     </div>

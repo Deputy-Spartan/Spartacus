@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type SlowModeChannelRow } from "../../../../lib/api";
 
 const PRESETS = [
@@ -31,6 +33,7 @@ export default function SlowModePage({ params }: { params: { guildId: string } }
   const [showCustom, setShowCustom] = useState(false);
   const [customValue, setCustomValue] = useState("");
   const [customUnit, setCustomUnit] = useState<"s" | "m" | "h">("s");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getSlowModeChannels(params.guildId).then(setChannels);
@@ -54,7 +57,11 @@ export default function SlowModePage({ params }: { params: { guildId: string } }
 
   async function applyCustom() {
     const amount = Number(customValue);
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter a positive number for the custom delay.");
+      return;
+    }
+    setError(null);
     const multiplier = customUnit === "s" ? 1 : customUnit === "m" ? 60 : 3600;
     await apply(Math.min(21600, Math.round(amount * multiplier)));
     setShowCustom(false);
@@ -99,7 +106,7 @@ export default function SlowModePage({ params }: { params: { guildId: string } }
                   </button>
                 ))}
                 <button
-                  onClick={() => setShowCustom((v) => !v)}
+                  onClick={() => { setError(null); setShowCustom((v) => !v); }}
                   disabled={saving}
                   className={`px-3 py-1.5 rounded-lg text-xs border transition-colors disabled:opacity-50 ${
                     showCustom ? "bg-base-800 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400 hover:text-slate-200"
@@ -132,6 +139,7 @@ export default function SlowModePage({ params }: { params: { guildId: string } }
                   <button onClick={applyCustom} disabled={!customValue} className="neon-button-sm disabled:opacity-50">
                     Set
                   </button>
+                  <FormError message={error} />
                 </div>
               )}
             </>

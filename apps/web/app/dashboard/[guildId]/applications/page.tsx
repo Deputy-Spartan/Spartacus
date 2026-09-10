@@ -7,6 +7,8 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import {
   api,
@@ -129,6 +131,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [description, setDescription] = useState("");
   const [layout, setLayout] = useState<ApplicationPanelLayout>("BUTTONS");
   const [typeIds, setTypeIds] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getApplicationPanels(guildId).then(setPanels);
@@ -137,13 +140,18 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   useEffect(refresh, [guildId]);
 
   async function createPanel() {
-    if (!channelId || typeIds.length === 0) return;
+    if (!channelId || typeIds.length === 0) {
+      setError("Select a channel and at least one application type before posting.");
+      return;
+    }
+    setError(null);
     await api.addApplicationPanel(guildId, { name, channelId, description, layout, typeIds });
     setShowForm(false);
     setName("Staff Applications");
     setChannelId(null);
     setDescription("");
     setTypeIds([]);
+    setError(null);
     refresh();
   }
 
@@ -171,7 +179,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             ⚠ Create an application type first
           </span>
         ) : (
-          <button onClick={() => setShowForm(true)} className="neon-button-sm shrink-0">
+          <button onClick={() => { setError(null); setShowForm(true); }} className="neon-button-sm shrink-0">
             + New panel
           </button>
         )}
@@ -198,7 +206,10 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             placeholder="Shown in the panel embed."
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Post In Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Post In Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Layout</label>
@@ -211,7 +222,10 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             <option value="DROPDOWN">Dropdown</option>
           </select>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Application Types Offered</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Application Types Offered
+            <Required />
+          </label>
           <div className="flex flex-wrap gap-2 mb-4">
             {types.map((t) => {
               const on = typeIds.includes(t.id);
@@ -235,10 +249,11 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             <button onClick={createPanel} disabled={!channelId || typeIds.length === 0} className="neon-button disabled:opacity-50">
               Post Panel
             </button>
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            <button onClick={() => { setError(null); setShowForm(false); }} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -311,6 +326,7 @@ function TypesTab({ guildId }: { guildId: string }) {
   const [panels, setPanels] = useState<ApplicationPanelRow[]>([]);
   const [editing, setEditing] = useState<Partial<ApplicationTypeRow> | null>(null);
   const [questionDraft, setQuestionDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getApplicationTypes(guildId).then(setTypes);
@@ -333,7 +349,11 @@ function TypesTab({ guildId }: { guildId: string }) {
   }
 
   async function save() {
-    if (!editing?.name || (editing.questions?.length ?? 0) === 0) return;
+    if (!editing?.name || (editing.questions?.length ?? 0) === 0) {
+      setError("Enter a name and add at least one question before saving.");
+      return;
+    }
+    setError(null);
     if (editing.id) await api.updateApplicationType(guildId, editing.id, editing);
     else await api.addApplicationType(guildId, editing);
     setEditing(null);
@@ -357,7 +377,7 @@ function TypesTab({ guildId }: { guildId: string }) {
         <p className="text-sm text-slate-400 max-w-2xl">
           Application types define the questions asked, who reviews it, and the accept/deny messages sent back to the applicant.
         </p>
-        <button onClick={() => setEditing({ ...EMPTY_TYPE })} className="neon-button-sm shrink-0">
+        <button onClick={() => { setError(null); setEditing({ ...EMPTY_TYPE }); }} className="neon-button-sm shrink-0">
           + New type
         </button>
       </div>
@@ -374,7 +394,10 @@ function TypesTab({ guildId }: { guildId: string }) {
           <p className="font-medium mb-3">{editing.id ? "Edit Type" : "New Type"}</p>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-4">
             <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Name</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Name
+                <Required />
+              </label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
                 value={editing.name ?? ""}
@@ -405,7 +428,10 @@ function TypesTab({ guildId }: { guildId: string }) {
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Staff Roles Pinged</label>
           <RoleChipPicker guildId={guildId} value={editing.staffRoleIds ?? []} onChange={(ids) => setEditing({ ...editing, staffRoleIds: ids })} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Questions (unlimited)</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Questions (unlimited)
+            <Required />
+          </label>
           <p className="text-xs text-slate-600 mb-2">
             Discord only allows 5 questions per popup, so applicants get one popup per 5 — answer the first 5, then the next popup opens
             automatically until they're done.
@@ -457,10 +483,11 @@ function TypesTab({ guildId }: { guildId: string }) {
             <button onClick={save} disabled={!editing.name || (editing.questions?.length ?? 0) === 0} className="neon-button disabled:opacity-50">
               Save Type
             </button>
-            <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            <button onClick={() => { setError(null); setEditing(null); }} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -471,7 +498,7 @@ function TypesTab({ guildId }: { guildId: string }) {
             title="No application types yet"
             desc="Create a type for each kind of application (Staff, Partner, Builder, etc.). Each type becomes a selectable option on every panel that references it."
             action={
-              <button onClick={() => setEditing({ ...EMPTY_TYPE })} className="neon-button">
+              <button onClick={() => { setError(null); setEditing({ ...EMPTY_TYPE }); }} className="neon-button">
                 Create your first application type
               </button>
             }

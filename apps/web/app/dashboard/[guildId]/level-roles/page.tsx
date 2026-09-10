@@ -5,6 +5,8 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type LevelRoleRow } from "../../../../lib/api";
 
 export default function LevelRolesPage({ params }: { params: { guildId: string } }) {
@@ -12,6 +14,7 @@ export default function LevelRolesPage({ params }: { params: { guildId: string }
   const [rows, setRows] = useState<LevelRoleRow[]>([]);
   const [level, setLevel] = useState(10);
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getLevelRoles(params.guildId).then(setRows);
@@ -19,7 +22,11 @@ export default function LevelRolesPage({ params }: { params: { guildId: string }
   useEffect(refresh, [params.guildId]);
 
   async function add() {
-    if (!roleId) return;
+    if (!roleId) {
+      setError("Select a role to grant before adding.");
+      return;
+    }
+    setError(null);
     await api.addLevelRole(params.guildId, level, roleId);
     refresh();
   }
@@ -66,11 +73,15 @@ export default function LevelRolesPage({ params }: { params: { guildId: string }
             value={level}
             onChange={(e) => setLevel(Number(e.target.value))}
           />
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Role to Grant</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Role to Grant
+            <Required />
+          </label>
           <RoleSelect guildId={params.guildId} value={roleId} onChange={setRoleId} />
           <button onClick={add} className="neon-button">
             Add
           </button>
+          <FormError message={error} />
         </NeonCard>
       </div>
     </div>

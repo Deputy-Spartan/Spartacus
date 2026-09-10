@@ -5,12 +5,15 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type JoinRoleRow } from "../../../../lib/api";
 
 export default function JoinRolesPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState<JoinRoleRow[]>([]);
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getJoinRoles(params.guildId).then(setRows);
@@ -18,7 +21,11 @@ export default function JoinRolesPage({ params }: { params: { guildId: string } 
   useEffect(refresh, [params.guildId]);
 
   async function add() {
-    if (!roleId) return;
+    if (!roleId) {
+      setError("Select a role before adding.");
+      return;
+    }
+    setError(null);
     await api.addJoinRole(params.guildId, roleId);
     setRoleId(null);
     refresh();
@@ -53,10 +60,15 @@ export default function JoinRolesPage({ params }: { params: { guildId: string } 
           ))}
         </div>
 
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+          Role
+          <Required />
+        </label>
         <RoleSelect guildId={params.guildId} value={roleId} onChange={setRoleId} />
         <button onClick={add} className="neon-button">
           Add Role
         </button>
+        <FormError message={error} />
       </NeonCard>
     </div>
   );

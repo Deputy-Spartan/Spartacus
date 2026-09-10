@@ -6,6 +6,8 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type RolePanelLayout, type RolePanelOption, type RolePanelRow } from "../../../../lib/api";
 
 const EMPTY_PANEL: Partial<RolePanelRow> = {
@@ -23,6 +25,7 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
   const [pickRoleId, setPickRoleId] = useState<string | null>(null);
   const [pickLabel, setPickLabel] = useState("");
   const [pickEmoji, setPickEmoji] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getRolePanels(params.guildId).then(setPanels);
@@ -44,7 +47,11 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
   }
 
   async function save() {
-    if (!editing?.name || !editing.channelId || !editing.options?.length) return;
+    if (!editing?.name || !editing.channelId || !editing.options?.length) {
+      setError("Enter a panel name, pick a channel, and add at least one role before posting.");
+      return;
+    }
+    setError(null);
     if (editing.id) await api.updateRolePanel(params.guildId, editing.id, editing);
     else await api.addRolePanel(params.guildId, editing);
     setEditing(null);
@@ -67,7 +74,7 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
       />
 
       <div className="flex justify-end mb-4">
-        <button onClick={() => setEditing({ ...EMPTY_PANEL })} className="neon-button-sm">
+        <button onClick={() => { setError(null); setEditing({ ...EMPTY_PANEL }); }} className="neon-button-sm">
           + New panel
         </button>
       </div>
@@ -76,7 +83,10 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
         <NeonCard className="max-w-lg mb-6">
           <p className="font-medium mb-3">{editing.id ? "Edit Panel" : "New Panel"}</p>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Panel Name</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Panel Name
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             value={editing.name ?? ""}
@@ -91,7 +101,10 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
             onChange={(e) => setEditing({ ...editing, description: e.target.value })}
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Post In Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Post In Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={params.guildId} value={editing.channelId ?? null} onChange={(id) => setEditing({ ...editing, channelId: id })} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Layout</label>
@@ -104,7 +117,10 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
             <option value="DROPDOWN">Dropdown (up to 25 roles, multi-select)</option>
           </select>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Roles</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Roles
+            <Required />
+          </label>
           <div className="flex flex-wrap gap-2 mb-3">
             {(editing.options ?? []).map((o) => (
               <span key={o.roleId} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10">
@@ -147,6 +163,7 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -164,7 +181,7 @@ export default function RolePanelsPage({ params }: { params: { guildId: string }
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setEditing(p)} className="text-xs text-slate-500 hover:text-neon-blue">
+                  <button onClick={() => { setError(null); setEditing(p); }} className="text-xs text-slate-500 hover:text-neon-blue">
                     Edit
                   </button>
                   <button onClick={() => remove(p.id, p.name)} className="text-slate-500 hover:text-rose-400 text-xs">

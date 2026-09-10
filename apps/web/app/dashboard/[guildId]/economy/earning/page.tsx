@@ -5,6 +5,8 @@ import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../../components/ui/RoleSelect";
+import { Required } from "../../../../../components/ui/Required";
+import { FormError } from "../../../../../components/ui/FormError";
 import { api, type EconomyConfig, type EconomyMultiplier } from "../../../../../lib/api";
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
@@ -25,6 +27,8 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
   const [config, setConfig] = useState<EconomyConfig | null>(null);
   const [newChannelId, setNewChannelId] = useState<string | null>(null);
   const [newRoleId, setNewRoleId] = useState<string | null>(null);
+  const [channelMultiplierError, setChannelMultiplierError] = useState<string | null>(null);
+  const [roleMultiplierError, setRoleMultiplierError] = useState<string | null>(null);
 
   useEffect(() => {
     api.getEconomyConfig(params.guildId).then(setConfig);
@@ -38,14 +42,22 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
   function addChannelMultiplier() {
-    if (!config || !newChannelId) return;
+    if (!config || !newChannelId) {
+      setChannelMultiplierError("Select a channel before adding a multiplier.");
+      return;
+    }
+    setChannelMultiplierError(null);
     const next: EconomyMultiplier[] = [...config.channelMultipliers.filter((m) => m.channelId !== newChannelId), { channelId: newChannelId, multiplier: 2 }];
     persist({ ...config, channelMultipliers: next });
     setNewChannelId(null);
   }
 
   function addRoleMultiplier() {
-    if (!config || !newRoleId) return;
+    if (!config || !newRoleId) {
+      setRoleMultiplierError("Select a role before adding a multiplier.");
+      return;
+    }
+    setRoleMultiplierError(null);
     const next: EconomyMultiplier[] = [...config.roleMultipliers.filter((m) => m.roleId !== newRoleId), { roleId: newRoleId, multiplier: 2 }];
     persist({ ...config, roleMultipliers: next });
     setNewRoleId(null);
@@ -171,6 +183,7 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
               + Add channel
             </button>
           </div>
+          <FormError message={channelMultiplierError} />
         </div>
 
         <div>
@@ -214,6 +227,7 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
               + Add role
             </button>
           </div>
+          <FormError message={roleMultiplierError} />
         </div>
       </NeonCard>
     </div>

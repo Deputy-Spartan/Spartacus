@@ -6,6 +6,8 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type ReactionRoleRow } from "../../../../lib/api";
 
 export default function ReactionRolesPage({ params }: { params: { guildId: string } }) {
@@ -15,6 +17,7 @@ export default function ReactionRolesPage({ params }: { params: { guildId: strin
   const [messageId, setMessageId] = useState("");
   const [emoji, setEmoji] = useState("");
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getReactionRoles(params.guildId).then(setRows);
@@ -22,7 +25,11 @@ export default function ReactionRolesPage({ params }: { params: { guildId: strin
   useEffect(refresh, [params.guildId]);
 
   async function add() {
-    if (!channelId || !messageId || !emoji || !roleId) return;
+    if (!channelId || !messageId || !emoji || !roleId) {
+      setError("Select a channel, message ID, emoji, and role before adding.");
+      return;
+    }
+    setError(null);
     await api.addReactionRole(params.guildId, { channelId, messageId, emoji, roleId });
     setMessageId("");
     setEmoji("");
@@ -64,10 +71,16 @@ export default function ReactionRolesPage({ params }: { params: { guildId: strin
 
         <NeonCard>
           <p className="font-medium mb-3">Add Mapping</p>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Message Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={params.guildId} value={channelId} onChange={setChannelId} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message ID</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Message ID
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             placeholder="Right-click the message → Copy Message ID"
@@ -75,7 +88,10 @@ export default function ReactionRolesPage({ params }: { params: { guildId: strin
             onChange={(e) => setMessageId(e.target.value)}
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Emoji</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Emoji
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             placeholder="🛡️"
@@ -83,12 +99,16 @@ export default function ReactionRolesPage({ params }: { params: { guildId: strin
             onChange={(e) => setEmoji(e.target.value)}
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Role to Grant</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Role to Grant
+            <Required />
+          </label>
           <RoleSelect guildId={params.guildId} value={roleId} onChange={setRoleId} />
 
           <button onClick={add} className="neon-button">
             Add Mapping
           </button>
+          <FormError message={error} />
         </NeonCard>
       </div>
     </div>

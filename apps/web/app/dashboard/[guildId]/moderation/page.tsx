@@ -7,6 +7,8 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import {
   api,
   type AutomodConfig,
@@ -481,6 +483,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
   const [form, setForm] = useState(EMPTY_AUTOPURGE);
   const [emojiDraft, setEmojiDraft] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getAutoPurgeConfigs(guildId).then(setConfigs);
@@ -488,7 +491,11 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
   useEffect(refresh, [guildId]);
 
   async function create() {
-    if (!channelId) return;
+    if (!channelId) {
+      setError("Select a channel before saving.");
+      return;
+    }
+    setError(null);
     await api.addAutoPurgeConfig(guildId, { channelId, ...form });
     setChannelId(null);
     setForm(EMPTY_AUTOPURGE);
@@ -514,7 +521,13 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
           Automatically deletes messages in the channels below on a schedule — everything eligible up to Discord's 14-day bulk-delete
           limit, minus whatever you choose to protect.
         </p>
-        <button onClick={() => setShowForm(true)} className="neon-button-sm shrink-0">
+        <button
+          onClick={() => {
+            setError(null);
+            setShowForm(true);
+          }}
+          className="neon-button-sm shrink-0"
+        >
           + Add channel
         </button>
       </div>
@@ -522,7 +535,10 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
       {showForm && (
         <NeonCard className="max-w-lg">
           <p className="font-medium mb-3">Auto-Purge a Channel</p>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Run every (minutes)</label>
@@ -586,6 +602,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -666,7 +683,10 @@ function CommandsTab({ guildId }: { guildId: string }) {
   }
 
   async function createCommand() {
-    if (!form.name || !form.description) return;
+    if (!form.name || !form.description) {
+      setError("Enter a command name and description before creating.");
+      return;
+    }
     setCreating(true);
     setError(null);
     try {
@@ -695,7 +715,13 @@ function CommandsTab({ guildId }: { guildId: string }) {
       <NeonCard>
         <div className="flex items-center justify-between mb-3">
           <p className="font-medium">Your Custom Commands</p>
-          <button onClick={() => setShowBuilder(true)} className="neon-button-sm">
+          <button
+            onClick={() => {
+              setError(null);
+              setShowBuilder(true);
+            }}
+            className="neon-button-sm"
+          >
             + New Command
           </button>
         </div>
@@ -732,7 +758,10 @@ function CommandsTab({ guildId }: { guildId: string }) {
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Command Name</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Command Name
+                <Required />
+              </label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
                 placeholder="my-command"
@@ -741,7 +770,10 @@ function CommandsTab({ guildId }: { guildId: string }) {
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Description</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Description
+                <Required />
+              </label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
                 placeholder="Shown in Discord's command picker"
@@ -824,10 +856,10 @@ function CommandsTab({ guildId }: { guildId: string }) {
             <ToggleSwitch enabled={form.ephemeralReply} onChange={(v) => setForm({ ...form, ephemeralReply: v })} />
           </div>
 
-          {error && <p className="text-xs text-rose-400 mb-3">{error}</p>}
           <button onClick={createCommand} disabled={creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Command"}
           </button>
+          <FormError message={error} />
         </NeonCard>
       )}
 

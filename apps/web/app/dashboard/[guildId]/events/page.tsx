@@ -11,6 +11,8 @@ import { EventPreview } from "../../../../components/ui/EventPreview";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { useConfirm, usePrompt } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import {
   api,
   type EventInput,
@@ -67,6 +69,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<EventInput>(EMPTY_EVENT);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<EventTemplateRow[]>([]);
   const [embedToLoad, setEmbedToLoad] = useState<SavedEmbedRow | undefined>(undefined);
 
@@ -81,6 +84,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
   function goCreate() {
     setEditingId(null);
     setForm(EMPTY_EVENT);
+    setError(null);
     setView("create");
   }
 
@@ -97,11 +101,16 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
       buttons: event.buttons,
       enabledRoles: event.enabledRoles,
     });
+    setError(null);
     setView("create");
   }
 
   async function saveEvent() {
-    if (!form.title || !form.channelId || !form.startTime) return;
+    if (!form.title || !form.channelId || !form.startTime) {
+      setError("Enter a title, select a channel, and set a start time before saving.");
+      return;
+    }
+    setError(null);
     setSaving(true);
     if (editingId) {
       await api.updateEvent(params.guildId, editingId, form);
@@ -191,7 +200,10 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
                 </div>
               )}
 
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Title</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Title
+                <Required />
+              </label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
                 value={form.title}
@@ -205,7 +217,10 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
 
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Channel
+                <Required />
+              </label>
               <ChannelSelect
                 guildId={params.guildId}
                 value={form.channelId || null}
@@ -215,7 +230,10 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
 
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Start Time</label>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                    Start Time
+                    <Required />
+                  </label>
                   <input
                     type="datetime-local"
                     className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
@@ -300,6 +318,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
               <button onClick={saveEvent} disabled={saving} className="neon-button">
                 {saving ? "Saving…" : editingId ? "Save Changes" : "Create Event"}
               </button>
+              <FormError message={error} />
             </NeonCard>
 
             <NeonCard>
@@ -607,6 +626,7 @@ function TemplatesView({
   const confirm = useConfirm();
   const [form, setForm] = useState<EventTemplateInput>(EMPTY_TEMPLATE);
   const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [savedEmbeds, setSavedEmbeds] = useState<SavedEmbedRow[]>([]);
 
   useEffect(() => {
@@ -614,7 +634,11 @@ function TemplatesView({
   }, [guildId]);
 
   async function save() {
-    if (!form.name || !form.title) return;
+    if (!form.name || !form.title) {
+      setError("Enter a template name and an event title before saving.");
+      return;
+    }
+    setError(null);
     await api.saveEventTemplate(guildId, form);
     setForm(EMPTY_TEMPLATE);
     setEditing(false);
@@ -641,7 +665,13 @@ function TemplatesView({
           <NeonCard>
             <div className="flex items-center justify-between mb-3">
               <p className="font-medium">Event Templates</p>
-              <button onClick={() => setEditing(true)} className="neon-button-sm">
+              <button
+                onClick={() => {
+                  setError(null);
+                  setEditing(true);
+                }}
+                className="neon-button-sm"
+              >
                 + New Template
               </button>
             </div>
@@ -685,13 +715,19 @@ function TemplatesView({
         {editing && (
           <NeonCard>
             <p className="font-medium mb-3">New Template</p>
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Template Name</label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+              Template Name
+              <Required />
+            </label>
             <input
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Event Title</label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+              Event Title
+              <Required />
+            </label>
             <input
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
               value={form.title}
@@ -706,6 +742,7 @@ function TemplatesView({
             <button onClick={save} className="neon-button">
               Save Template
             </button>
+            <FormError message={error} />
           </NeonCard>
         )}
       </div>
@@ -811,7 +848,10 @@ function CreateEmbedView({
   }
 
   async function send() {
-    if (!channelId) return;
+    if (!channelId) {
+      setError("Select a channel before sending.");
+      return;
+    }
     setSending(true);
     setError(null);
     try {
@@ -850,7 +890,10 @@ function CreateEmbedView({
             </div>
           )}
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} placeholder="Select a channel…" />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -910,7 +953,6 @@ function CreateEmbedView({
             <ButtonsEditor guildId={guildId} buttons={buttons} onChange={setButtons} />
           </div>
 
-          {error && <p className="text-xs text-rose-400 mb-3">{error}</p>}
           <div className="flex items-center gap-3">
             <button onClick={send} disabled={sending || !channelId} className="neon-button disabled:opacity-50">
               {sending ? "Sending…" : sent ? "Sent ✓" : "Post Now"}
@@ -919,6 +961,7 @@ function CreateEmbedView({
               Save as preset
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
 
         <NeonCard>

@@ -8,6 +8,8 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import {
   api,
   type DiscordRoleOption,
@@ -144,6 +146,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [types, setTypes] = useState<TicketTypeRow[]>([]);
   const [counts, setCounts] = useState<TicketCounts | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("Support");
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -161,7 +164,11 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   useEffect(refresh, [guildId]);
 
   async function createPanel() {
-    if (!channelId) return;
+    if (!channelId) {
+      setError("Select a channel to post this panel in.");
+      return;
+    }
+    setError(null);
     await api.addTicketPanel(guildId, { name, channelId, description, layout, typeIds, buttonLabel, supportRoleId });
     setShowForm(false);
     setName("Support");
@@ -196,7 +203,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             ⚠ Create a ticket type first
           </span>
         ) : (
-          <button onClick={() => setShowForm(true)} className="neon-button-sm shrink-0">
+          <button onClick={() => { setError(null); setShowForm(true); }} className="neon-button-sm shrink-0">
             + New panel
           </button>
         )}
@@ -224,7 +231,10 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             placeholder="Shown in the panel embed."
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Post In Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Post In Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Layout</label>
@@ -275,6 +285,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -290,7 +301,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
                   Create your first ticket type
                 </button>
               ) : (
-                <button onClick={() => setShowForm(true)} className="neon-button">
+                <button onClick={() => { setError(null); setShowForm(true); }} className="neon-button">
                   Create your first panel
                 </button>
               )
@@ -346,6 +357,7 @@ function TypesTab({ guildId }: { guildId: string }) {
   const [types, setTypes] = useState<TicketTypeRow[]>([]);
   const [panels, setPanels] = useState<TicketPanelRow[]>([]);
   const [editing, setEditing] = useState<Partial<TicketTypeRow> | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getTicketTypes(guildId).then(setTypes);
@@ -356,7 +368,11 @@ function TypesTab({ guildId }: { guildId: string }) {
   const inUse = useMemo(() => new Set(panels.flatMap((p) => p.typeIds)), [panels]);
 
   async function save() {
-    if (!editing?.name) return;
+    if (!editing?.name) {
+      setError("Enter a name for this ticket type.");
+      return;
+    }
+    setError(null);
     if (editing.id) {
       await api.updateTicketType(guildId, editing.id, editing);
     } else {
@@ -384,7 +400,7 @@ function TypesTab({ guildId }: { guildId: string }) {
           Ticket types define what happens when a panel button is clicked — which staff role gets pinged, which category it opens in, the message members
           see, auto-close, SLA, and more.
         </p>
-        <button onClick={() => setEditing({ ...EMPTY_TYPE })} className="neon-button-sm shrink-0">
+        <button onClick={() => { setError(null); setEditing({ ...EMPTY_TYPE }); }} className="neon-button-sm shrink-0">
           + New type
         </button>
       </div>
@@ -401,7 +417,10 @@ function TypesTab({ guildId }: { guildId: string }) {
           <p className="font-medium mb-3">{editing.id ? "Edit Type" : "New Type"}</p>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-4">
             <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Name</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                Name
+                <Required />
+              </label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
                 value={editing.name ?? ""}
@@ -472,6 +491,7 @@ function TypesTab({ guildId }: { guildId: string }) {
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -482,7 +502,7 @@ function TypesTab({ guildId }: { guildId: string }) {
             title="No ticket types yet"
             desc="Create a type for each kind of support request (Bug report, Billing, Appeal, etc.). Each type becomes a selectable option on every panel that references it."
             action={
-              <button onClick={() => setEditing({ ...EMPTY_TYPE })} className="neon-button">
+              <button onClick={() => { setError(null); setEditing({ ...EMPTY_TYPE }); }} className="neon-button">
                 Create your first ticket type
               </button>
             }
@@ -505,7 +525,7 @@ function TypesTab({ guildId }: { guildId: string }) {
                 </div>
                 <div className="flex items-center gap-3">
                   <ToggleSwitch enabled={t.enabled} onChange={() => toggleEnabled(t)} label="Enabled" />
-                  <button onClick={() => setEditing(t)} className="text-xs text-slate-500 hover:text-neon-blue">
+                  <button onClick={() => { setError(null); setEditing(t); }} className="text-xs text-slate-500 hover:text-neon-blue">
                     Edit
                   </button>
                   <button onClick={() => remove(t.id, t.name)} className="text-slate-500 hover:text-rose-400 text-xs">
@@ -649,6 +669,7 @@ function AssistTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
   const [entries, setEntries] = useState<TicketKnowledgeBaseRow[]>([]);
   const [editing, setEditing] = useState<Partial<TicketKnowledgeBaseRow> | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getTicketKnowledge(guildId).then(setEntries);
@@ -656,7 +677,11 @@ function AssistTab({ guildId }: { guildId: string }) {
   useEffect(refresh, [guildId]);
 
   async function save() {
-    if (!editing?.name || !editing.content) return;
+    if (!editing?.name || !editing.content) {
+      setError("Enter both a name and content for this knowledge base entry.");
+      return;
+    }
+    setError(null);
     if (editing.id) await api.updateTicketKnowledge(guildId, editing.id, editing);
     else await api.addTicketKnowledge(guildId, editing);
     setEditing(null);
@@ -692,20 +717,26 @@ function AssistTab({ guildId }: { guildId: string }) {
 
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-300">Knowledge bases</h3>
-        <button onClick={() => setEditing({ name: "", content: "" })} className="neon-button-sm">
+        <button onClick={() => { setError(null); setEditing({ name: "", content: "" }); }} className="neon-button-sm">
           + Add knowledge base
         </button>
       </div>
 
       {editing && (
         <NeonCard>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Name</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Name
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             value={editing.name ?? ""}
             onChange={(e) => setEditing({ ...editing, name: e.target.value })}
           />
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Content</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Content
+            <Required />
+          </label>
           <textarea
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             rows={6}
@@ -720,6 +751,7 @@ function AssistTab({ guildId }: { guildId: string }) {
               Cancel
             </button>
           </div>
+          <FormError message={error} />
         </NeonCard>
       )}
 
@@ -735,7 +767,7 @@ function AssistTab({ guildId }: { guildId: string }) {
                   <p className="text-xs text-slate-500 truncate max-w-md">{e.content}</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => setEditing(e)} className="text-xs text-slate-500 hover:text-neon-blue">
+                  <button onClick={() => { setError(null); setEditing(e); }} className="text-xs text-slate-500 hover:text-neon-blue">
                     Edit
                   </button>
                   <button onClick={() => remove(e.id, e.name)} className="text-slate-500 hover:text-rose-400 text-xs">
@@ -760,6 +792,8 @@ function ResourcesTab({ guildId }: { guildId: string }) {
   const [responses, setResponses] = useState<TicketCannedResponseRow[]>([]);
   const [newTag, setNewTag] = useState("");
   const [newResponse, setNewResponse] = useState<{ title: string; content: string } | null>(null);
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [responseError, setResponseError] = useState<string | null>(null);
 
   function refresh() {
     api.getTicketTags(guildId).then(setTags);
@@ -768,7 +802,11 @@ function ResourcesTab({ guildId }: { guildId: string }) {
   useEffect(refresh, [guildId]);
 
   async function addTag() {
-    if (!newTag.trim()) return;
+    if (!newTag.trim()) {
+      setTagError("Enter a tag name.");
+      return;
+    }
+    setTagError(null);
     await api.addTicketTag(guildId, { name: newTag.trim() });
     setNewTag("");
     refresh();
@@ -778,7 +816,11 @@ function ResourcesTab({ guildId }: { guildId: string }) {
     refresh();
   }
   async function addResponse() {
-    if (!newResponse?.title || !newResponse.content) return;
+    if (!newResponse?.title || !newResponse.content) {
+      setResponseError("Enter both a title and content for this canned response.");
+      return;
+    }
+    setResponseError(null);
     await api.addTicketCannedResponse(guildId, newResponse);
     setNewResponse(null);
     refresh();
@@ -812,6 +854,7 @@ function ResourcesTab({ guildId }: { guildId: string }) {
               + New tag
             </button>
           </div>
+          <FormError message={tagError} />
           {tags.length === 0 ? (
             <p className="text-sm text-slate-500">No tags yet. Create one to start labelling tickets.</p>
           ) : (
@@ -834,7 +877,7 @@ function ResourcesTab({ guildId }: { guildId: string }) {
               <p className="font-medium flex items-center gap-1.5">💬 Canned responses</p>
               <p className="text-xs text-slate-500">{responses.length} / 100</p>
             </div>
-            <button onClick={() => setNewResponse({ title: "", content: "" })} className="neon-button-sm">
+            <button onClick={() => { setResponseError(null); setNewResponse({ title: "", content: "" }); }} className="neon-button-sm">
               + New response
             </button>
           </div>
@@ -857,10 +900,11 @@ function ResourcesTab({ guildId }: { guildId: string }) {
                 <button onClick={addResponse} className="neon-button-sm">
                   Save
                 </button>
-                <button onClick={() => setNewResponse(null)} className="text-xs text-slate-400 hover:text-slate-200">
+                <button onClick={() => { setResponseError(null); setNewResponse(null); }} className="text-xs text-slate-400 hover:text-slate-200">
                   Cancel
                 </button>
               </div>
+              <FormError message={responseError} />
             </div>
           )}
           {responses.length === 0 ? (
@@ -1034,6 +1078,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<TicketSettingsRow | null>(null);
   const [blacklistInput, setBlacklistInput] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const channelNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -1131,7 +1176,11 @@ function SettingsTab({ guildId }: { guildId: string }) {
           />
           <button
             onClick={() => {
-              if (!blacklistInput.trim()) return;
+              if (!blacklistInput.trim()) {
+                setError("Enter a Discord user ID to blacklist.");
+                return;
+              }
+              setError(null);
               persist({ ...settings, blacklistUserIds: [...settings.blacklistUserIds, blacklistInput.trim()] });
               setBlacklistInput("");
             }}
@@ -1140,6 +1189,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
             Add
           </button>
         </div>
+        <FormError message={error} />
         {settings.blacklistUserIds.length === 0 ? (
           <p className="text-xs text-slate-500 mb-3">No users blacklisted.</p>
         ) : (

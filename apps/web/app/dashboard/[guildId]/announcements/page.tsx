@@ -7,6 +7,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type AnnouncementInput, type AnnouncementRow } from "../../../../lib/api";
 
 const EMPTY: AnnouncementInput = {
@@ -24,6 +26,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
   const [form, setForm] = useState<AnnouncementInput>(EMPTY);
   const [scheduleLocal, setScheduleLocal] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getAnnouncements(params.guildId).then(setRows);
@@ -31,13 +34,18 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   useEffect(refresh, [params.guildId]);
 
   async function send() {
-    if (!form.channelId || (!form.content && !form.embedTitle)) return;
+    if (!form.channelId || (!form.content && !form.embedTitle)) {
+      setError("Select a channel and enter a message or embed title before sending.");
+      return;
+    }
+    setError(null);
     await api.addAnnouncement(params.guildId, {
       ...form,
       scheduledFor: scheduleLocal ? new Date(scheduleLocal).toISOString() : null,
     });
     setForm(EMPTY);
     setScheduleLocal("");
+    setError(null);
     refresh();
   }
 
@@ -60,10 +68,16 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
         <NeonCard>
           <p className="font-medium mb-3">New Announcement</p>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={params.guildId} value={form.channelId || null} onChange={(id) => setForm({ ...form, channelId: id })} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Message
+            <Required />
+          </label>
           <textarea
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             rows={3}
@@ -92,6 +106,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
           <button onClick={send} disabled={!form.channelId} className="neon-button disabled:opacity-50">
             {scheduleLocal ? "Schedule" : "Send Now"}
           </button>
+          <FormError message={error} />
         </NeonCard>
 
         <div className="space-y-4">

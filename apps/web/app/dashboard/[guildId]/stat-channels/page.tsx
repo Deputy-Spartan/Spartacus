@@ -5,6 +5,8 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type StatChannelRow } from "../../../../lib/api";
 
 const STAT_TYPES = [
@@ -19,6 +21,7 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
   const [channelId, setChannelId] = useState<string | null>(null);
   const [statType, setStatType] = useState("MEMBER_COUNT");
   const [format, setFormat] = useState("{stat}: {count}");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getStatChannels(params.guildId).then(setRows);
@@ -26,7 +29,11 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
   useEffect(refresh, [params.guildId]);
 
   async function add() {
-    if (!channelId) return;
+    if (!channelId) {
+      setError("Select a voice channel before adding.");
+      return;
+    }
+    setError(null);
     await api.addStatChannel(params.guildId, channelId, statType, format);
     setChannelId(null);
     refresh();
@@ -70,7 +77,10 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
 
         <NeonCard>
           <p className="font-medium mb-3">New Stat Channel</p>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Channel
+            <Required />
+          </label>
           <ChannelSelect guildId={params.guildId} value={channelId} onChange={setChannelId} kind="voice" placeholder="Select a voice channel…" />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Stat Type</label>
@@ -99,6 +109,7 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
           <button onClick={add} disabled={!channelId} className="neon-button disabled:opacity-50">
             Add Stat Channel
           </button>
+          <FormError message={error} />
         </NeonCard>
       </div>
     </div>

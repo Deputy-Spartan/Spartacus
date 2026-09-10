@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { Required } from "../../../../components/ui/Required";
+import { FormError } from "../../../../components/ui/FormError";
 import { api, type StreamSubscription } from "../../../../lib/api";
 
 export default function StreamAlertsPage({ params }: { params: { guildId: string } }) {
@@ -12,6 +14,7 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
   const [platform, setPlatform] = useState<"twitch" | "youtube">("twitch");
   const [channelName, setChannelName] = useState("");
   const [announceChannelId, setAnnounceChannelId] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getStreamSubscriptions(params.guildId).then(setSubs);
@@ -20,7 +23,11 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
   useEffect(refresh, [params.guildId]);
 
   async function add() {
-    if (!channelName || !announceChannelId) return;
+    if (!channelName || !announceChannelId) {
+      setError("Enter a channel name and an announce channel ID before adding.");
+      return;
+    }
+    setError(null);
     await api.addStreamSubscription(params.guildId, { platform, channelName, announceChannelId });
     setChannelName("");
     setAnnounceChannelId("");
@@ -82,7 +89,10 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
             <option value="youtube">YouTube</option>
           </select>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel Name</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Channel Name
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             placeholder="e.g. ironlegion_gg"
@@ -90,7 +100,10 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
             onChange={(e) => setChannelName(e.target.value)}
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Announce Channel ID</label>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+            Announce Channel ID
+            <Required />
+          </label>
           <input
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
             placeholder="123456789012345678"
@@ -101,6 +114,7 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
           <button onClick={add} className="neon-button">
             Add Subscription
           </button>
+          <FormError message={error} />
         </NeonCard>
       </div>
     </div>

@@ -57,6 +57,7 @@ model Guild {
   commandToggles    CommandToggle[]
   customSlashCommands CustomSlashCommand[]
   statChannels      StatChannel[]
+  statusChannels    StatusChannel[]
   aiConfig          AiConfig?
   serverBackups     ServerBackup[]
   buttonPresets     ButtonPreset[]
@@ -118,6 +119,7 @@ enum ModuleKey {
   SLOW_MODE
   BIRTHDAYS
   APPLICATIONS
+  STATUS_CHANNEL
 }
 
 model ModuleToggle {
@@ -976,13 +978,14 @@ model ErrorLog {
 // every server it's in. Always exactly one row (id "singleton").
 
 model BotConfig {
-  id            String   @id @default("singleton")
-  username      String?
-  description   String?
-  statusType    String   @default("online") // online | idle | dnd | invisible
-  activityType  String   @default("PLAYING") // PLAYING | WATCHING | LISTENING | COMPETING | CUSTOM
-  activityText  String?
-  updatedAt     DateTime @updatedAt
+  id              String    @id @default("singleton")
+  username        String?
+  description     String?
+  statusType      String    @default("online") // online | idle | dnd | invisible
+  activityType    String    @default("PLAYING") // PLAYING | WATCHING | LISTENING | COMPETING | CUSTOM
+  activityText    String?
+  lastHeartbeatAt DateTime? // written every ~20s by the running bot process; the dashboard/status channel treat this as stale (offline) after ~60s
+  updatedAt       DateTime  @updatedAt
 }
 
 // ---- Server Stat Channels ----
@@ -997,6 +1000,20 @@ model StatChannel {
   channelId String   @unique
   statType  String // MEMBER_COUNT | BOOST_COUNT | CHANNEL_COUNT
   format    String   @default("{stat}: {count}")
+  createdAt DateTime @default(now())
+}
+
+// ---- Status Channel (Utility) ----
+// A live embed posted to a chosen text channel showing whether the bot is
+// currently online, edited in place on a short interval (reuses
+// BotConfig.lastHeartbeatAt as the source of truth).
+
+model StatusChannel {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  channelId String   @unique
+  messageId String?
   createdAt DateTime @default(now())
 }
 

@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ModuleKey" ADD VALUE 'STATUS_CHANNEL';

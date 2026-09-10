@@ -179,6 +179,11 @@ export interface StatChannelRow {
   format: string;
 }
 
+export interface StatusChannelRow {
+  id: string;
+  channelId: string;
+}
+
 export interface AiConfigRow {
   guildId: string;
   chatChannelId: string | null;
@@ -772,6 +777,11 @@ export interface BotConfigInput {
   activityText?: string;
 }
 
+export interface BotStatusRow {
+  online: boolean;
+  lastHeartbeatAt: string | null;
+}
+
 export interface ErrorLogRow {
   id: string;
   source: string;
@@ -849,6 +859,14 @@ export const api = {
     request<StatChannelRow>(`/guilds/${guildId}/stat-channels`, { method: "POST", body: JSON.stringify({ channelId, statType, format }) }),
   deleteStatChannel: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/stat-channels/${id}`, { method: "DELETE" }),
+
+  getStatusChannels: (guildId: string) => request<StatusChannelRow[]>(`/guilds/${guildId}/status-channels`),
+  addStatusChannel: (guildId: string, channelId: string) =>
+    request<StatusChannelRow>(`/guilds/${guildId}/status-channels`, { method: "POST", body: JSON.stringify({ channelId }) }),
+  deleteStatusChannel: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/status-channels/${id}`, { method: "DELETE" }),
+
+  getBotStatus: () => request<BotStatusRow>("/bot-status"),
 
   getAiConfig: (guildId: string) => request<AiConfigRow>(`/guilds/${guildId}/ai-config`),
   setAiConfig: (guildId: string, config: Partial<AiConfigRow>) =>

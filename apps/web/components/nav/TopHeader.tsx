@@ -1,5 +1,7 @@
 "use client";
 
+import { BotStatusBadge } from "./BotStatusBadge";
+
 interface Guild {
   id: string;
   name: string;
@@ -38,6 +40,7 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <BotStatusBadge />
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("spartacus:open-command-palette"))}
           className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 hover:text-neon-blue border border-white/10 rounded-lg px-2.5 py-1.5 transition-colors"

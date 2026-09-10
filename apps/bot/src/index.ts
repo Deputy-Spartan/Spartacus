@@ -18,6 +18,7 @@ import { startTicketPanelPosterJob } from "./jobs/ticketPanelPoster";
 import { startRolePanelPosterJob } from "./jobs/rolePanelPoster";
 import { startScheduledMessagesJob } from "./jobs/scheduledMessages";
 import { startStatChannelsJob } from "./jobs/statChannels";
+import { startStatusChannelPosterJob } from "./jobs/statusChannelPoster";
 import { startAnnouncementPosterJob } from "./jobs/announcementPoster";
 import { startAutoPurgeJob } from "./jobs/autoPurge";
 import { startBirthdayAnnouncerJob } from "./jobs/birthdayAnnouncer";
@@ -84,6 +85,21 @@ async function applyBotPresence(client: Client) {
   client.user.setPresence({ status: (config.statusType as PresenceStatusData) ?? "online", activities });
 }
 
+// Dashboard "online/offline" indicator and the status-channel embed both
+// read this instead of pinging the gateway directly — same polled-not-pushed
+// reasoning as applyBotPresence above, works whether the bot and API share
+// a process or not. The API treats anything older than 60s as offline.
+async function sendHeartbeat(client: Client) {
+  if (!client.user) return;
+  await prisma.botConfig
+    .upsert({
+      where: { id: "singleton" },
+      create: { id: "singleton", lastHeartbeatAt: new Date() },
+      update: { lastHeartbeatAt: new Date() },
+    })
+    .catch((err) => logError("bot", err));
+}
+
 export { commands } from "./commands";
 
 export function startBot() {
@@ -124,6 +140,7 @@ export function startBot() {
     startEventReminderJob(c);
     startEventSyncJob(c);
     startStatChannelsJob(c);
+    startStatusChannelPosterJob(c);
     startStreamPollerJob(c);
     startGiveawayEnderJob(c);
     startGiveawayPosterJob(c);
@@ -141,6 +158,9 @@ export function startBot() {
 
     await applyBotPresence(c);
     setInterval(() => applyBotPresence(c), 30_000);
+
+    await sendHeartbeat(c);
+    setInterval(() => sendHeartbeat(c), 20_000);
   });
 
   client.on(interactionCreate.name, interactionCreate.execute);

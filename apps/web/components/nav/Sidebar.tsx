@@ -96,6 +96,7 @@ export const NAV_SECTIONS = [
       { href: "/channel-locks", label: "Channel Locks", icon: "🔒" },
       { href: "/slow-mode", label: "Slow Mode", icon: "🐢" },
       { href: "/stat-channels", label: "Server Stat Channels", icon: "📈" },
+      { href: "/status-channel", label: "Status Channel", icon: "🟢" },
     ],
   },
 ];

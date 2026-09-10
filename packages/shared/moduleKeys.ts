@@ -39,6 +39,7 @@ export const MODULE_KEYS = [
   "SLOW_MODE",
   "BIRTHDAYS",
   "APPLICATIONS",
+  "STATUS_CHANNEL",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -84,6 +85,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   SLOW_MODE: "Slow Mode",
   BIRTHDAYS: "Birthdays",
   APPLICATIONS: "Applications",
+  STATUS_CHANNEL: "Status Channel",
 };
 
 export const SIGNUP_ROLES = [

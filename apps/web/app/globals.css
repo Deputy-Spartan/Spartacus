@@ -21,6 +21,23 @@
     accent-color: #4c8dff;
   }
 
+  /* Belt-and-suspenders for the <select> popup list specifically — the
+     `color-scheme: dark` above (plus the equivalent <meta> tag in
+     app/layout.tsx) is what actually themes the native dropdown in most
+     browsers, but explicitly coloring the closed control and its <option>s
+     too means the dropdown never has a chance to fall back to a bare white
+     browser default even in a browser that only partially honors
+     color-scheme. */
+  select {
+    background-color: #0b0f19;
+    color: #f1f5f9;
+  }
+
+  select option {
+    background-color: #0b0f19;
+    color: #f1f5f9;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: rgba(76, 141, 255, 0.25) transparent;

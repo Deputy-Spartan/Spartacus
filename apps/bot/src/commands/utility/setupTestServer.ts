@@ -4,13 +4,10 @@ import {
   ButtonInteraction,
   ButtonStyle,
   ChannelType,
-  ChatInputCommandInteraction,
   Guild,
-  PermissionFlagsBits,
-  SlashCommandBuilder,
+  Message,
 } from "discord.js";
 import { MODULE_KEYS, MODULE_LABELS, getModuleCategory, slugifyModuleLabel, VOICE_MODULE_KEYS } from "@spartacus/shared";
-import type { CommandModule } from "../types";
 import { isOwner } from "../../lib/owner";
 
 // Scaffolds one category + one channel per dashboard module, derived live
@@ -20,6 +17,15 @@ import { isOwner } from "../../lib/owner";
 // the way a hand-maintained channel list could. Every run computes a full
 // plan (what's missing, what's misplaced, what's stale) and asks for
 // confirmation before touching anything.
+//
+// Deliberately NOT a registered slash command — a slash command shows up in
+// Discord's autocomplete for anyone with Administrator in any server this
+// bot is in (setDefaultMemberPermissions only restricts who can run it, not
+// who can see it exists). This is instead a plain "!setup-test-server" text
+// trigger, checked directly against OWNER_DISCORD_ID in messageCreate.ts —
+// nothing about it is ever registered with Discord, so it's invisible to
+// literally everyone except whoever types the exact phrase, and it only
+// does anything at all for the owner's own account.
 interface ChannelSpec {
   name: string;
   type: "text" | "voice";
@@ -277,49 +283,35 @@ function summarize(plan: Plan): string {
   return parts.join("\n\n");
 }
 
-const command: CommandModule = {
-  data: new SlashCommandBuilder()
-    .setName("setup-test-server")
-    .setDescription("Preview and sync a test channel for every dashboard feature.")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) as SlashCommandBuilder,
+// Called from messageCreate.ts once it's already verified the message is
+// exactly "!setup-test-server" from the owner's own account in a guild.
+export async function runSetupTestServer(message: Message) {
+  const guild = message.guild;
+  if (!guild) return;
 
-  async execute(interaction: ChatInputCommandInteraction) {
-    if (!interaction.guild) return;
+  const layout = buildLayout();
+  const plan = computePlan(guild, layout);
 
-    // Restricted to the bot owner's own Discord account specifically — not
-    // "any admin of any server this bot is in". setDefaultMemberPermissions
-    // above only controls whether Discord's UI shows the command at all;
-    // this is the actual gate.
-    if (!isOwner(interaction.user.id)) {
-      await interaction.reply({ content: "This command is restricted to the bot owner.", ephemeral: true });
-      return;
-    }
+  if (plan.channelsToCreate.length === 0 && plan.channelsToReparent.length === 0 && plan.staleChannelIds.length === 0) {
+    await message.reply("✅ Already up to date — every dashboard feature has a correctly-placed channel, nothing stale.");
+    return;
+  }
 
-    const layout = buildLayout();
-    const plan = computePlan(interaction.guild, layout);
+  pruneExpired();
+  const token = Math.random().toString(36).slice(2, 10);
+  pendingPlans.set(token, { guildId: guild.id, plan, createdAt: Date.now() });
 
-    if (plan.channelsToCreate.length === 0 && plan.channelsToReparent.length === 0 && plan.staleChannelIds.length === 0) {
-      await interaction.reply({ content: "✅ Already up to date — every dashboard feature has a correctly-placed channel, nothing stale.", ephemeral: true });
-      return;
-    }
+  const buttons = [new ButtonBuilder().setCustomId(`setuptestserver:confirm:${token}`).setLabel("Confirm").setStyle(ButtonStyle.Success)];
+  if ((plan.channelsToCreate.length > 0 || plan.channelsToReparent.length > 0) && plan.staleChannelIds.length > 0) {
+    buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:deleteonly:${token}`).setLabel("Delete stale only").setStyle(ButtonStyle.Danger));
+  }
+  buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:skip:${token}`).setLabel("Skip").setStyle(ButtonStyle.Secondary));
 
-    pruneExpired();
-    const token = Math.random().toString(36).slice(2, 10);
-    pendingPlans.set(token, { guildId: interaction.guild.id, plan, createdAt: Date.now() });
-
-    const buttons = [new ButtonBuilder().setCustomId(`setuptestserver:confirm:${token}`).setLabel("Confirm").setStyle(ButtonStyle.Success)];
-    if ((plan.channelsToCreate.length > 0 || plan.channelsToReparent.length > 0) && plan.staleChannelIds.length > 0) {
-      buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:deleteonly:${token}`).setLabel("Delete stale only").setStyle(ButtonStyle.Danger));
-    }
-    buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:skip:${token}`).setLabel("Skip").setStyle(ButtonStyle.Secondary));
-
-    await interaction.reply({
-      content: summarize(plan) + "\n\nWhat would you like to do?",
-      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)],
-      ephemeral: true,
-    });
-  },
-};
+  await message.reply({
+    content: summarize(plan) + "\n\nWhat would you like to do?",
+    components: [new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)],
+  });
+}
 
 async function loadPending(interaction: ButtonInteraction, token: string) {
   if (!isOwner(interaction.user.id)) {
@@ -368,5 +360,3 @@ export async function handleSetupTestServerSkip(interaction: ButtonInteraction, 
   pendingPlans.delete(token);
   await interaction.update({ content: "Skipped — nothing was created, moved, or deleted.", components: [] });
 }
-
-export default command;

@@ -29,7 +29,6 @@ import confess from "./community/confess";
 import giveawayReroll from "./engagement/giveawayReroll";
 import prestige from "./leveling/prestige";
 import remindme from "./utility/remindme";
-import setupTestServer from "./utility/setupTestServer";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -63,7 +62,6 @@ for (const command of [
   giveawayReroll,
   prestige,
   remindme,
-  setupTestServer,
 ]) {
   commands.set(command.data.name, command);
 }

@@ -10,11 +10,21 @@ import { isSendableChannel } from "../lib/channels";
 import { awardMessageEarnings } from "../lib/economy";
 import { checkCountingMessage } from "../modules/games/countingGame";
 import { awardAchievement } from "../lib/achievements";
+import { isOwner } from "../lib/owner";
 
 export const name = Events.MessageCreate;
 
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId) return;
+
+  // Never registered with Discord (see setupTestServer.ts for why) — the
+  // only way this is ever reachable at all is typing the exact phrase, and
+  // it only does anything for the owner's own account.
+  if (message.content.trim() === "!setup-test-server" && isOwner(message.author.id)) {
+    const { runSetupTestServer } = await import("../commands/utility/setupTestServer");
+    await runSetupTestServer(message);
+    return;
+  }
 
   // --- Moderation / automod ---
   if (await isModuleEnabled(message.guildId, "MODERATION")) {

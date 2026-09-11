@@ -35,6 +35,82 @@ function uid() {
   return "i" + Math.random().toString(36).slice(2, 9);
 }
 
+const OPTION_ACTION_TYPES: Record<"role" | "channel" | "user", EmbedActionType[]> = {
+  role: BUTTON_ACTION_TYPES,
+  channel: CHANNEL_ACTION_TYPES,
+  user: USER_ACTION_TYPES,
+};
+
+// The curated list behind Role/Channel/User Select — Discord's own picker
+// always shows everything in the server (can't be filtered), so this is
+// "of everything shown, here's what specific ones actually do something".
+function RoleOptionsList({
+  guildId,
+  row,
+  onChange,
+  pickerKind,
+}: {
+  guildId: string;
+  row: EmbedCreatorComponentRow;
+  onChange: (next: EmbedCreatorComponentRow) => void;
+  pickerKind: "role" | "channel" | "user";
+}) {
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
+  const options = row.options ?? [];
+
+  function addOption() {
+    if (options.length >= 25) return;
+    onChange({ ...row, options: [...options, { id: uid(), label: "", value: "" }] });
+  }
+  function updateOption(id: string, patch: Partial<EmbedSelectOption>) {
+    onChange({ ...row, options: options.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
+  }
+  function removeOption(id: string) {
+    onChange({ ...row, options: options.filter((o) => o.id !== id) });
+  }
+
+  return (
+    <div className="mb-2">
+      <div className="flex flex-col gap-2">
+        {options.map((opt) => (
+          <div key={opt.id} className="bg-base-900 border border-white/10 rounded-lg p-2">
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 min-w-0">
+                {pickerKind === "role" && <RoleSelect guildId={guildId} value={opt.value || null} onChange={(id) => updateOption(opt.id, { value: id })} placeholder="Pick a role…" />}
+                {pickerKind === "channel" && (
+                  <ChannelSelect guildId={guildId} value={opt.value || null} onChange={(id) => updateOption(opt.id, { value: id })} kind="text" placeholder="Pick a channel…" />
+                )}
+                {pickerKind === "user" && (
+                  <input
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2 text-xs"
+                    placeholder="Discord user ID"
+                    value={opt.value}
+                    onChange={(e) => updateOption(opt.id, { value: e.target.value.trim() })}
+                  />
+                )}
+              </div>
+              <button type="button" onClick={() => setOpenActionId(openActionId === opt.id ? null : opt.id)} className="text-[11px] text-neon-blue hover:underline shrink-0">
+                {opt.action && opt.action.type !== "none" ? "Edit action" : "+ Action"}
+              </button>
+              <button type="button" onClick={() => removeOption(opt.id)} className="text-slate-500 hover:text-rose-400 text-xs px-1 shrink-0">
+                ✕
+              </button>
+            </div>
+            {openActionId === opt.id && (
+              <ActionConfigEditor guildId={guildId} action={opt.action} onChange={(next) => updateOption(opt.id, { action: next })} allowedTypes={OPTION_ACTION_TYPES[pickerKind]} />
+            )}
+          </div>
+        ))}
+      </div>
+      {options.length < 25 && (
+        <button type="button" onClick={addOption} className="neon-button-sm mt-2">
+          + Add Option
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ComponentRowEditor({ guildId, row, index, onChange, onRemove }: Props) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [openActionId, setOpenActionId] = useState<string | null>(null);
@@ -205,7 +281,12 @@ export function ComponentRowEditor({ guildId, row, index, onChange, onRemove }: 
             <>
               <label className="text-[11px] text-slate-500 block mb-1.5">Default role (optional — pre-selects it in the picker)</label>
               <RoleSelect guildId={guildId} value={row.defaultValueId ?? null} onChange={(id) => onChange({ ...row, defaultValueId: id })} placeholder="No default" />
-              <p className="text-[11px] text-slate-600 mt-1.5">Clicking a role here always assigns it to whoever picks it — that's the whole point of a role menu, so there's no separate action to configure.</p>
+              <p className="text-[11px] text-slate-600 mt-2 mb-2">
+                The dropdown itself always shows every role in the server (Discord's own picker, can't be filtered) — add specific roles below to give each
+                one its own action. Anything picked that isn't in this list just gets self-assigned/unassigned with no other action, unless you add at least
+                one role here, in which case only listed roles do anything.
+              </p>
+              <RoleOptionsList guildId={guildId} row={row} onChange={onChange} pickerKind="role" />
             </>
           )}
 
@@ -213,12 +294,28 @@ export function ComponentRowEditor({ guildId, row, index, onChange, onRemove }: 
             <>
               <label className="text-[11px] text-slate-500 block mb-1.5">Default channel (optional — pre-selects it in the picker)</label>
               <ChannelSelect guildId={guildId} value={row.defaultValueId ?? null} onChange={(id) => onChange({ ...row, defaultValueId: id })} kind="text" placeholder="No default" />
-              <ActionConfigEditor guildId={guildId} action={row.action} onChange={(next) => onChange({ ...row, action: next })} allowedTypes={CHANNEL_ACTION_TYPES} />
+              <p className="text-[11px] text-slate-600 mt-2 mb-2">
+                Add specific channels below to give each one its own action. With none added, the general action underneath applies to whichever channel
+                gets picked.
+              </p>
+              <RoleOptionsList guildId={guildId} row={row} onChange={onChange} pickerKind="channel" />
+              {(row.options?.length ?? 0) === 0 && (
+                <ActionConfigEditor guildId={guildId} action={row.action} onChange={(next) => onChange({ ...row, action: next })} allowedTypes={CHANNEL_ACTION_TYPES} />
+              )}
             </>
           )}
 
           {row.type === "user" && (
-            <ActionConfigEditor guildId={guildId} action={row.action} onChange={(next) => onChange({ ...row, action: next })} allowedTypes={USER_ACTION_TYPES} />
+            <>
+              <p className="text-[11px] text-slate-600 mb-2">
+                Add specific members below (paste their Discord user ID) to give each one its own action. With none added, the general action underneath
+                applies to whichever member gets picked.
+              </p>
+              <RoleOptionsList guildId={guildId} row={row} onChange={onChange} pickerKind="user" />
+              {(row.options?.length ?? 0) === 0 && (
+                <ActionConfigEditor guildId={guildId} action={row.action} onChange={(next) => onChange({ ...row, action: next })} allowedTypes={USER_ACTION_TYPES} />
+              )}
+            </>
           )}
 
           {row.type === "user_role" && (

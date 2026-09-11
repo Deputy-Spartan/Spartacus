@@ -118,10 +118,25 @@ export async function handleEmbedSelectAction(interaction: AnySelectMenuInteract
   }
 
   if (interaction.isRoleSelectMenu()) {
-    // The picked role IS the target — self-assign/unassign it, regardless
-    // of what a fixed roleId elsewhere might say, since a role picker's
-    // whole point is letting the member choose which one applies to them.
     const roleId = interaction.values[0];
+    const options = config.options ?? [];
+    const matched = options.find((o) => o.value === roleId);
+    if (matched) {
+      if (!matched.action || matched.action.type === "none") {
+        const ephemeral = matched.action?.ephemeral !== false;
+        const message = await toggleRole(invoker, roleId);
+        await interaction.reply({ content: `✅ ${message}`, ephemeral });
+      } else {
+        await runAction(interaction, matched.action, invoker);
+      }
+      return;
+    }
+    if (options.length > 0) {
+      await interaction.reply({ content: "That role isn't set up for this menu.", ephemeral: true });
+      return;
+    }
+    // No curated list configured at all — every role picker's baseline
+    // behavior is self-assign/unassign whatever gets picked.
     const ephemeral = config.defaultAction?.ephemeral !== false;
     const message = await toggleRole(invoker, roleId);
     await interaction.reply({ content: `✅ ${message}`, ephemeral });
@@ -129,13 +144,20 @@ export async function handleEmbedSelectAction(interaction: AnySelectMenuInteract
   }
 
   if (interaction.isChannelSelectMenu()) {
-    const action = config.defaultAction;
+    const channelId = interaction.values[0];
+    const options = config.options ?? [];
+    const matched = options.find((o) => o.value === channelId);
+    const action = matched ? matched.action : options.length === 0 ? config.defaultAction : undefined;
+
+    if (options.length > 0 && !matched) {
+      await interaction.reply({ content: "That channel isn't set up for this menu.", ephemeral: true });
+      return;
+    }
     if (!action?.embedPresetId) {
       await interaction.reply({ content: "This menu isn't fully configured (no saved embed set).", ephemeral: true });
       return;
     }
     const saved = await resolveSavedEmbed(action.embedPresetId);
-    const channelId = interaction.values[0];
     const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
     if (!saved || !channel || !isSendableChannel(channel)) {
       await interaction.reply({ content: "Couldn't send to that channel — check my permissions there.", ephemeral: true });
@@ -148,12 +170,19 @@ export async function handleEmbedSelectAction(interaction: AnySelectMenuInteract
   }
 
   if (interaction.isUserSelectMenu()) {
-    const targetMember = await interaction.guild.members.fetch(interaction.values[0]).catch(() => null);
+    const userId = interaction.values[0];
+    const options = config.options ?? [];
+    const matched = options.find((o) => o.value === userId);
+    if (options.length > 0 && !matched) {
+      await interaction.reply({ content: "That member isn't set up for this menu.", ephemeral: true });
+      return;
+    }
+    const targetMember = await interaction.guild.members.fetch(userId).catch(() => null);
     if (!targetMember) {
       await interaction.reply({ content: "Couldn't find that member.", ephemeral: true });
       return;
     }
-    await runAction(interaction, config.defaultAction, targetMember);
+    await runAction(interaction, matched ? matched.action : config.defaultAction, targetMember);
     return;
   }
 

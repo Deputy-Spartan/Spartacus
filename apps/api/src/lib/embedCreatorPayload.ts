@@ -107,7 +107,11 @@ export async function buildComponentsJson(guildId: string, rows: BuilderComponen
     }
 
     const selectType = SELECT_TYPES[row.type as string] ?? 3;
-    const hasAnyAction = hasAction(row.action) || (row.options || []).some((o) => hasAction(o.action));
+    // A curated options list restricts the picker even if none of the
+    // listed roles/channels/users have a custom action set — those still
+    // fall back to a sensible default (e.g. self-toggle a role) rather than
+    // silently allowing anything Discord's own unfiltered picker shows.
+    const hasAnyAction = hasAction(row.action) || (row.options || []).length > 0;
     const customId = hasAnyAction
       ? await createActionCustomId(prisma, guildId, "select", {
           selectType: row.type,

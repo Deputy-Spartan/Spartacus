@@ -6,6 +6,12 @@ import { sendDirectMessage } from "../lib/discordRest";
 
 const router = Router();
 
+const REQUEST_COOLDOWN_MS = 60 * 60 * 1000; // 1 request per account per hour
+
+function logAccessEvent(discordUserId: string, username: string, action: string, detail?: string) {
+  prisma.accessAuditEntry.create({ data: { discordUserId, username, action, detail } }).catch(() => null);
+}
+
 // ---- Self-service (any logged-in user, approved or not) ----
 
 router.get("/access-status", requireAuthOnly, async (req: AuthedRequest, res) => {
@@ -29,12 +35,20 @@ router.post("/access-requests", requireAuthOnly, async (req: AuthedRequest, res)
   const existingAccess = await prisma.dashboardAccess.findUnique({ where: { discordUserId: id } });
   if (existingAccess) return res.status(400).json({ error: "You already have access" });
 
+  // Rate-limited off the existing request's own timestamp — no separate
+  // table needed, since re-requesting just updates this same row anyway.
+  const existingRequest = await prisma.accessRequest.findUnique({ where: { discordUserId: id } });
+  if (existingRequest && Date.now() - existingRequest.requestedAt.getTime() < REQUEST_COOLDOWN_MS) {
+    const minutesLeft = Math.ceil((REQUEST_COOLDOWN_MS - (Date.now() - existingRequest.requestedAt.getTime())) / 60_000);
+    return res.status(429).json({ error: `You already requested access recently — try again in about ${minutesLeft} minute(s).` });
+  }
+
   const trimmedMessage = message?.trim().slice(0, 500) || null;
 
   const row = await prisma.accessRequest.upsert({
     where: { discordUserId: id },
     create: { discordUserId: id, username, message: trimmedMessage },
-    update: { username, message: trimmedMessage }, // refresh in case they changed their username or re-requested with a new message
+    update: { username, message: trimmedMessage, requestedAt: new Date() },
   });
 
   if (process.env.OWNER_DISCORD_ID) {
@@ -75,6 +89,11 @@ router.get("/access-requests", requireAuthOnly, requireOwner, async (_req, res) 
   res.json(rows);
 });
 
+router.get("/access-audit-log", requireAuthOnly, requireOwner, async (_req, res) => {
+  const rows = await prisma.accessAuditEntry.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  res.json(rows);
+});
+
 router.post("/access-requests/:id/approve", requireAuthOnly, requireOwner, async (req, res) => {
   const request = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
   if (!request) return res.status(404).json({ error: "Request not found" });
@@ -87,6 +106,12 @@ router.post("/access-requests/:id/approve", requireAuthOnly, requireOwner, async
     }),
     prisma.accessRequest.delete({ where: { id: request.id } }),
   ]);
+
+  logAccessEvent(request.discordUserId, request.username, "APPROVED", "via dashboard");
+  sendDirectMessage(request.discordUserId, {
+    embeds: [{ color: 0x22c55e, title: "✅ You've been approved!", description: "Your Spartacus dashboard access request was approved — head back to the dashboard to get started." }],
+  }).catch(() => null);
+
   res.json(access[0]);
 });
 
@@ -94,6 +119,12 @@ router.post("/access-requests/:id/deny", requireAuthOnly, requireOwner, async (r
   const request = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
   if (!request) return res.status(404).json({ error: "Request not found" });
   await prisma.accessRequest.delete({ where: { id: request.id } });
+
+  logAccessEvent(request.discordUserId, request.username, "DENIED", "via dashboard");
+  sendDirectMessage(request.discordUserId, {
+    embeds: [{ color: 0xef4444, title: "Access request denied", description: "Your Spartacus dashboard access request was not approved." }],
+  }).catch(() => null);
+
   res.status(204).send();
 });
 
@@ -115,6 +146,9 @@ router.post("/dashboard-access", requireAuthOnly, requireOwner, async (req, res)
 
   const row = await prisma.dashboardAccess.create({ data: { discordUserId, username: username.trim() } });
   await prisma.accessRequest.deleteMany({ where: { discordUserId } }); // clears a pending request, if any
+
+  logAccessEvent(discordUserId, username.trim(), "GRANTED", "direct grant");
+
   res.status(201).json(row);
 });
 
@@ -124,12 +158,29 @@ router.patch("/dashboard-access/:id", requireAuthOnly, requireOwner, async (req,
 
   const row = await prisma.dashboardAccess.update({ where: { id: req.params.id }, data: { plan } }).catch(() => null);
   if (!row) return res.status(404).json({ error: "Not found" });
+
+  logAccessEvent(row.discordUserId, row.username, "PLAN_CHANGED", plan);
+
   res.json(row);
 });
 
 router.delete("/dashboard-access/:id", requireAuthOnly, requireOwner, async (req, res) => {
-  await prisma.dashboardAccess.delete({ where: { id: req.params.id } }).catch(() => null);
+  const row = await prisma.dashboardAccess.delete({ where: { id: req.params.id } }).catch(() => null);
+  if (row) logAccessEvent(row.discordUserId, row.username, "REVOKED", "via dashboard");
   res.status(204).send();
+});
+
+// Panic button — instantly clears the entire allowlist (the owner is
+// unaffected, since isOwner() never depends on this table). Cheap
+// insurance if a granted account or the dashboard itself is ever
+// suspected compromised.
+router.post("/dashboard-access/revoke-all", requireAuthOnly, requireOwner, async (_req, res) => {
+  const existing = await prisma.dashboardAccess.findMany();
+  await prisma.dashboardAccess.deleteMany();
+
+  logAccessEvent("*", "everyone", "REVOKED_ALL", `${existing.length} user(s)`);
+
+  res.json({ revokedCount: existing.length });
 });
 
 export default router;

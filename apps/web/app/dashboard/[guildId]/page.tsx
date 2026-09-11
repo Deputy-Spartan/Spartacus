@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { NeonCard } from "../../../components/ui/NeonCard";
+import { ChangelogCard } from "../../../components/ui/ChangelogCard";
 import { MODULE_KEYS, MODULE_LABELS, type ModuleKey } from "@spartacus/shared";
 import { api, type DashboardActivityEntry, type ModuleState } from "../../../lib/api";
 import { useBotStatus } from "../../../lib/useBotStatus";
@@ -51,6 +52,8 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Overview</h1>
+
+      <ChangelogCard />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <NeonCard>

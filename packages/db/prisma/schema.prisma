@@ -1066,6 +1066,23 @@ model AccessRequest {
   requestedAt   DateTime @default(now())
 }
 
+// ---- Access Audit Log ----
+// One row per access-control decision — who was approved/denied/granted/
+// revoked/re-planned, and when. Both the HTTP routes (apps/api/src/routes/
+// access.ts) and the DM button handlers (apps/bot/src/modules/owner/
+// accessRequests.ts) write here, since either path can make these changes.
+
+model AccessAuditEntry {
+  id            String   @id @default(cuid())
+  discordUserId String
+  username      String
+  action        String // APPROVED | DENIED | GRANTED | REVOKED | PLAN_CHANGED | REVOKED_ALL
+  detail        String? // e.g. the new plan value, or "via Discord DM"
+  createdAt     DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 // ---- Bot Customization ----
 // Account-wide, not per-guild — a bot's username/avatar/presence/
 // description are Discord application-level settings, the same across

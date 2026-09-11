@@ -9,6 +9,10 @@ function isOwner(userId: string): boolean {
   return !!process.env.OWNER_DISCORD_ID && userId === process.env.OWNER_DISCORD_ID;
 }
 
+function logAccessEvent(discordUserId: string, username: string, action: string, detail?: string) {
+  prisma.accessAuditEntry.create({ data: { discordUserId, username, action, detail } }).catch(() => null);
+}
+
 export async function handleAccessApprove(interaction: ButtonInteraction, requestId: string) {
   if (!isOwner(interaction.user.id)) {
     await interaction.reply({ content: "Only the dashboard owner can approve access requests.", ephemeral: true });
@@ -28,6 +32,19 @@ export async function handleAccessApprove(interaction: ButtonInteraction, reques
     update: { username: request.username },
   });
   await prisma.accessRequest.delete({ where: { id: request.id } });
+  logAccessEvent(request.discordUserId, request.username, "APPROVED", "via Discord DM");
+
+  await interaction.client.users
+    .send(request.discordUserId, {
+      embeds: [
+        {
+          color: 0x22c55e,
+          title: "✅ You've been approved!",
+          description: "Your Spartacus dashboard access request was approved — head back to the dashboard to get started.",
+        },
+      ],
+    })
+    .catch(() => null);
 
   const original = interaction.message.embeds[0];
   await interaction
@@ -53,7 +70,16 @@ export async function handleAccessDeny(interaction: ButtonInteraction, requestId
   }
 
   const request = await prisma.accessRequest.findUnique({ where: { id: requestId } });
-  if (request) await prisma.accessRequest.delete({ where: { id: request.id } });
+  if (request) {
+    await prisma.accessRequest.delete({ where: { id: request.id } });
+    logAccessEvent(request.discordUserId, request.username, "DENIED", "via Discord DM");
+
+    await interaction.client.users
+      .send(request.discordUserId, {
+        embeds: [{ color: 0xef4444, title: "Access request denied", description: "Your Spartacus dashboard access request was not approved." }],
+      })
+      .catch(() => null);
+  }
 
   const original = interaction.message.embeds[0];
   await interaction

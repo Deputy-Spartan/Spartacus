@@ -39,7 +39,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error("Session expired");
   }
 
-  if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error((body && typeof body.error === "string" && body.error) || `API ${path} failed: ${res.status}`);
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -918,6 +921,15 @@ export interface DashboardAccessRow {
   grantedAt: string;
 }
 
+export interface AccessAuditEntryRow {
+  id: string;
+  discordUserId: string;
+  username: string;
+  action: "APPROVED" | "DENIED" | "GRANTED" | "REVOKED" | "PLAN_CHANGED" | "REVOKED_ALL";
+  detail: string | null;
+  createdAt: string;
+}
+
 export const api = {
   getMe: () => request<CurrentUser>("/me"),
   getGuilds: () => request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>("/guilds"),
@@ -934,6 +946,8 @@ export const api = {
   setDashboardAccessPlan: (id: string, plan: "FREE" | "PAID") =>
     request<DashboardAccessRow>(`/dashboard-access/${id}`, { method: "PATCH", body: JSON.stringify({ plan }) }),
   revokeDashboardAccess: (id: string) => request(`/dashboard-access/${id}`, { method: "DELETE" }),
+  revokeAllDashboardAccess: () => request<{ revokedCount: number }>("/dashboard-access/revoke-all", { method: "POST" }),
+  getAccessAuditLog: () => request<AccessAuditEntryRow[]>("/access-audit-log"),
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
   getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),

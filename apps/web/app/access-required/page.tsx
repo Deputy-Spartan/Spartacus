@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NeonCard } from "../../components/ui/NeonCard";
+import { FormError } from "../../components/ui/FormError";
 import { api, clearToken, type CurrentUser, type AccessStatus } from "../../lib/api";
 
 export default function AccessRequiredPage() {
@@ -12,6 +13,7 @@ export default function AccessRequiredPage() {
   const [requesting, setRequesting] = useState(false);
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     Promise.all([api.getMe(), api.getAccessStatus()])
@@ -29,9 +31,15 @@ export default function AccessRequiredPage() {
 
   async function requestAccess() {
     setRequesting(true);
-    await api.requestAccess(message.trim() || undefined).catch(() => null);
-    setRequesting(false);
-    refresh();
+    setError(null);
+    try {
+      await api.requestAccess(message.trim() || undefined);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong — try again.");
+    } finally {
+      setRequesting(false);
+    }
   }
 
   async function checkStatus() {
@@ -105,6 +113,7 @@ export default function AccessRequiredPage() {
             <button onClick={requestAccess} disabled={requesting} className="neon-button w-full mt-3 disabled:opacity-50">
               {requesting ? "Sending…" : "Request Access"}
             </button>
+            <FormError message={error} />
           </>
         )}
         <button

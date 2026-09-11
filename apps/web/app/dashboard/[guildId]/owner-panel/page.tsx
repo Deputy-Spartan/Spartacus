@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type AccessRequestRow, type DashboardAccessRow } from "../../../../lib/api";
+import { api, type AccessAuditEntryRow, type AccessRequestRow, type DashboardAccessRow } from "../../../../lib/api";
 import { useOwnerGuard } from "../../../../lib/useOwnerGuard";
 
 export default function OwnerPanelPage({ params }: { params: { guildId: string } }) {
@@ -12,13 +12,17 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
   const confirm = useConfirm();
   const [requests, setRequests] = useState<AccessRequestRow[] | null>(null);
   const [access, setAccess] = useState<DashboardAccessRow[] | null>(null);
+  const [auditLog, setAuditLog] = useState<AccessAuditEntryRow[] | null>(null);
   const [id, setId] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [revokingAll, setRevokingAll] = useState(false);
 
   function refresh() {
     api.getAccessRequests().then(setRequests);
     api.getDashboardAccess().then(setAccess);
+    api.getAccessAuditLog().then(setAuditLog);
   }
   useEffect(() => {
     if (ownerAccess === "allowed") refresh();
@@ -60,6 +64,32 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
     await api.revokeDashboardAccess(row.id);
     refresh();
   }
+  async function revokeAll() {
+    if (
+      !(await confirm(
+        `Revoke ALL ${access?.length ?? 0} approved user(s)? Everyone except you will need to be re-approved to get back in.`
+      ))
+    )
+      return;
+    setRevokingAll(true);
+    await api.revokeAllDashboardAccess().finally(() => setRevokingAll(false));
+    refresh();
+  }
+
+  const filteredAccess = access?.filter((a) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return a.username.toLowerCase().includes(q) || a.discordUserId.includes(q);
+  });
+
+  const AUDIT_LABELS: Record<string, string> = {
+    APPROVED: "✅ Approved",
+    DENIED: "❌ Denied",
+    GRANTED: "➕ Granted",
+    REVOKED: "🚫 Revoked",
+    PLAN_CHANGED: "🔄 Plan changed",
+    REVOKED_ALL: "🔒 Revoked everyone",
+  };
 
   if (ownerAccess !== "allowed") {
     return <p className="text-sm text-slate-500">Checking access…</p>;
@@ -144,12 +174,27 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
         <FormError message={error} />
       </NeonCard>
 
-      <NeonCard>
-        <p className="font-medium mb-3">Approved users</p>
-        <p className="text-xs text-slate-500 mb-3">Click a plan badge to flip it between Free and Paid.</p>
+      <NeonCard className="mb-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <p className="font-medium">Approved users</p>
+            <p className="text-xs text-slate-500 mt-0.5">Click a plan badge to flip it between Free and Paid.</p>
+          </div>
+          {access && access.length > 0 && (
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or ID…"
+              className="bg-base-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs w-44 shrink-0"
+            />
+          )}
+        </div>
         {access?.length === 0 && <p className="text-sm text-slate-500">No one has access yet — grant it above.</p>}
+        {access && access.length > 0 && filteredAccess?.length === 0 && (
+          <p className="text-sm text-slate-500">No matches for "{search}".</p>
+        )}
         <div className="divide-y divide-white/5">
-          {access?.map((a) => (
+          {filteredAccess?.map((a) => (
             <div key={a.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
               <div className="min-w-0">
                 <p className="truncate">{a.username}</p>
@@ -172,6 +217,41 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
             </div>
           ))}
         </div>
+      </NeonCard>
+
+      {auditLog && auditLog.length > 0 && (
+        <NeonCard className="mb-4">
+          <p className="font-medium mb-1">Recent activity</p>
+          <p className="text-xs text-slate-500 mb-3">Last 50 access-control decisions.</p>
+          <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
+            {auditLog.map((e) => (
+              <div key={e.id} className="flex items-center justify-between py-2 text-xs gap-3">
+                <div className="min-w-0">
+                  <span className="text-slate-300">{AUDIT_LABELS[e.action] ?? e.action}</span>{" "}
+                  <span className="text-slate-500">
+                    — {e.username} {e.detail ? `(${e.detail})` : ""}
+                  </span>
+                </div>
+                <span className="text-slate-600 shrink-0">{new Date(e.createdAt).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </NeonCard>
+      )}
+
+      <NeonCard className="border-rose-500/20">
+        <p className="font-medium text-rose-400 mb-1">Danger zone</p>
+        <p className="text-xs text-slate-500 mb-3">
+          Instantly revokes every approved user's access. You keep yours regardless — use this if you suspect the dashboard or a granted
+          account has been compromised.
+        </p>
+        <button
+          onClick={revokeAll}
+          disabled={revokingAll || !access?.length}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/30 hover:bg-rose-500/20 disabled:opacity-40"
+        >
+          {revokingAll ? "Revoking…" : "Revoke everyone's access"}
+        </button>
       </NeonCard>
     </div>
   );

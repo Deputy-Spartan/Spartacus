@@ -62,6 +62,7 @@ import statusChannelsRouter from "./routes/statusChannels";
 import botStatusRouter from "./routes/botStatus";
 import { startStatusChannelWatchdog } from "./jobs/statusChannelWatchdog";
 import { announceDeployIfNew } from "./jobs/deployAnnouncer";
+import { migrateLegacyEmbeds } from "./jobs/migrateLegacyEmbeds";
 import { startErrorAlertPoller } from "./jobs/errorAlertPoller";
 import alertSettingsRouter from "./routes/alertSettings";
 import aiConfigRouter from "./routes/aiConfig";
@@ -205,3 +206,4 @@ if (process.env.RUN_BOT_INLINE !== "false") {
 startStatusChannelWatchdog();
 startErrorAlertPoller();
 announceDeployIfNew();
+migrateLegacyEmbeds().catch((err) => console.error("[migrateLegacyEmbeds] failed:", err));

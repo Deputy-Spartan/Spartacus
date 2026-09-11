@@ -407,7 +407,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                 )}
               </div>
             </div>
-            <EmbedCreatorPreview state={state} />
+            <EmbedCreatorPreview guildId={guildId} state={state} />
           </NeonCard>
 
           <div className="flex gap-2">

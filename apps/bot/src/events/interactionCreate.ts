@@ -236,10 +236,17 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if (interaction.customId.startsWith("setuptestserver:cancel:")) {
+  if (interaction.customId.startsWith("setuptestserver:deleteonly:")) {
     const token = interaction.customId.split(":")[2];
-    const { handleSetupTestServerCancel } = await import("../commands/utility/setupTestServer");
-    await handleSetupTestServerCancel(interaction, token);
+    const { handleSetupTestServerDeleteOnly } = await import("../commands/utility/setupTestServer");
+    await handleSetupTestServerDeleteOnly(interaction, token);
+    return;
+  }
+
+  if (interaction.customId.startsWith("setuptestserver:skip:")) {
+    const token = interaction.customId.split(":")[2];
+    const { handleSetupTestServerSkip } = await import("../commands/utility/setupTestServer");
+    await handleSetupTestServerSkip(interaction, token);
     return;
   }
 

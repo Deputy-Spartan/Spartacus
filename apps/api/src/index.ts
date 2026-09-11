@@ -83,6 +83,7 @@ import confessionSettingsRouter from "./routes/confessionSettings";
 import milestoneSettingsRouter from "./routes/milestoneSettings";
 import rulesGateSettingsRouter from "./routes/rulesGateSettings";
 import lfgCommandsRouter from "./routes/lfgCommands";
+import embedCreatorRouter from "./routes/embedCreator";
 
 const app = express();
 
@@ -168,6 +169,7 @@ app.use(confessionSettingsRouter);
 app.use(milestoneSettingsRouter);
 app.use(rulesGateSettingsRouter);
 app.use(lfgCommandsRouter);
+app.use(embedCreatorRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

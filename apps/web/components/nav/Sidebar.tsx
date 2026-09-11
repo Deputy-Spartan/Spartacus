@@ -57,6 +57,7 @@ export const NAV_SECTIONS = [
   {
     section: "Engagement",
     items: [
+      { href: "/embed-creator", label: "Embed Creator", icon: "🧩" },
       { href: "/announcements", label: "Announcements", icon: "📢" },
       { href: "/giveaways", label: "Giveaways", icon: "🎁" },
       { href: "/stream-alerts", label: "Stream Alerts", icon: "🔴" },

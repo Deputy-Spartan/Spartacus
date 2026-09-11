@@ -200,6 +200,84 @@ export async function deleteChannelMessage(channelId: string, messageId: string)
   }).catch(() => null);
 }
 
+export interface RawDiscordMessage {
+  id: string;
+  channel_id: string;
+  content: string;
+  embeds: Array<Record<string, unknown>>;
+  components?: Array<Record<string, unknown>>;
+  webhook_id?: string;
+}
+
+export async function getChannelMessage(channelId: string, messageId: string): Promise<RawDiscordMessage | { error: string }> {
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages/${messageId}`, {
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+  });
+  if (!res.ok) return { error: await res.text() };
+  return (await res.json()) as RawDiscordMessage;
+}
+
+// Every Embed Creator "message link" the dashboard accepts is Discord's own
+// standard https://discord.com/channels/<guild>/<channel>/<message> format —
+// this is the one place that parses it, so both the fetch and update routes
+// agree on what counts as valid.
+export function parseMessageLink(link: string): { guildId: string; channelId: string; messageId: string } | null {
+  const m = link.trim().match(/discord(?:app)?\.com\/channels\/(\d+)\/(\d+)\/(\d+)/);
+  if (!m) return null;
+  return { guildId: m[1], channelId: m[2], messageId: m[3] };
+}
+
+// Webhooks carry their own destination (id + token) baked into the URL —
+// unlike everything else in this file, a webhook can point at a channel in
+// any server the pasting admin manages, not just the one they're on in the
+// dashboard right now. That's intentional and matches how Discord webhooks
+// (and tools like Discohook) already work.
+export function parseWebhookUrl(url: string): { id: string; token: string } | null {
+  const m = url.trim().match(/\/webhooks\/(\d+)\/([\w-]+)/);
+  if (!m) return null;
+  return { id: m[1], token: m[2] };
+}
+
+export async function executeWebhook(
+  webhookUrl: string,
+  payload: { content?: string; username?: string; avatar_url?: string; embeds?: unknown[]; components?: unknown[] }
+): Promise<{ error?: string; id?: string }> {
+  const parsed = parseWebhookUrl(webhookUrl);
+  if (!parsed) return { error: "That doesn't look like a valid Discord webhook URL." };
+  const res = await fetch(`${DISCORD_API}/webhooks/${parsed.id}/${parsed.token}?wait=true`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return { error: await res.text() };
+  const message = (await res.json()) as { id: string };
+  return { id: message.id };
+}
+
+export async function editWebhookMessage(
+  webhookUrl: string,
+  messageId: string,
+  payload: { content?: string; embeds?: unknown[]; components?: unknown[] }
+): Promise<{ error?: string }> {
+  const parsed = parseWebhookUrl(webhookUrl);
+  if (!parsed) return { error: "That doesn't look like a valid Discord webhook URL." };
+  const res = await fetch(`${DISCORD_API}/webhooks/${parsed.id}/${parsed.token}/messages/${messageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return { error: await res.text() };
+  return {};
+}
+
+export async function getWebhookMessage(webhookUrl: string, messageId: string): Promise<RawDiscordMessage | { error: string }> {
+  const parsed = parseWebhookUrl(webhookUrl);
+  if (!parsed) return { error: "That doesn't look like a valid Discord webhook URL." };
+  const res = await fetch(`${DISCORD_API}/webhooks/${parsed.id}/${parsed.token}/messages/${messageId}`);
+  if (!res.ok) return { error: await res.text() };
+  return (await res.json()) as RawDiscordMessage;
+}
+
 export async function createGuildRole(guildId: string, role: Partial<DiscordRole>): Promise<DiscordRole | null> {
   const res = await fetch(`${DISCORD_API}/guilds/${guildId}/roles`, {
     method: "POST",

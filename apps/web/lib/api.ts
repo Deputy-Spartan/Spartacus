@@ -276,6 +276,70 @@ export interface LfgCommandInput {
   wrongChannelMessage?: string;
 }
 
+// ---- Embed Creator ----
+export interface EmbedCreatorField {
+  name: string;
+  value: string;
+  inline?: boolean;
+}
+export interface EmbedCreatorEmbed {
+  id: string;
+  authorName?: string;
+  authorIconUrl?: string;
+  authorUrl?: string;
+  title?: string;
+  titleUrl?: string;
+  description?: string;
+  color?: string;
+  thumbnailUrl?: string;
+  imageUrl?: string;
+  fields: EmbedCreatorField[];
+  footerText?: string;
+  footerIconUrl?: string;
+  timestamp?: boolean;
+}
+export type EmbedCreatorButtonItem =
+  | { id: string; kind: "button"; label: string; style: "primary" | "secondary" | "success" | "danger" }
+  | { id: string; kind: "link"; label: string; url: string };
+export interface EmbedCreatorComponentRow {
+  id: string;
+  type: "buttons" | "string" | "user" | "role" | "user_role" | "channel" | null;
+  placeholder?: string;
+  items: EmbedCreatorButtonItem[];
+}
+export interface EmbedCreatorState {
+  content: string;
+  deliveryMode: "bot" | "webhook";
+  channelId: string;
+  webhookUrl: string;
+  profileName: string;
+  profileAvatar: string;
+  embeds: EmbedCreatorEmbed[];
+  components: EmbedCreatorComponentRow[];
+}
+export interface EmbedCreatorPresetRow {
+  id: string;
+  name: string;
+  data: EmbedCreatorState;
+  createdAt: string;
+}
+export interface EmbedCreatorSendInput {
+  mode: "bot" | "webhook";
+  channelId?: string;
+  webhookUrl?: string;
+  profileName?: string;
+  profileAvatar?: string;
+  content?: string;
+  embeds: EmbedCreatorEmbed[];
+  components: EmbedCreatorComponentRow[];
+}
+export interface EmbedCreatorFetchResult {
+  channelId: string;
+  messageId: string;
+  content: string;
+  embeds: EmbedCreatorEmbed[];
+}
+
 export type CustomCommandActionType = "SEND_MESSAGE" | "GIVE_ROLE" | "REMOVE_ROLE" | "ADD_CURRENCY" | "POST_EMBED";
 
 export interface CustomSlashCommandRow {
@@ -1137,6 +1201,18 @@ export const api = {
     request<LfgCommandRow>(`/guilds/${guildId}/lfg-commands/${id}`, { method: "PUT", body: JSON.stringify(input) }),
   deleteLfgCommand: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/lfg-commands/${id}`, { method: "DELETE" }),
+
+  getEmbedCreatorPresets: (guildId: string) => request<EmbedCreatorPresetRow[]>(`/guilds/${guildId}/embed-creator/presets`),
+  saveEmbedCreatorPreset: (guildId: string, name: string, data: EmbedCreatorState) =>
+    request<EmbedCreatorPresetRow>(`/guilds/${guildId}/embed-creator/presets`, { method: "POST", body: JSON.stringify({ name, data }) }),
+  deleteEmbedCreatorPreset: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/embed-creator/presets/${id}`, { method: "DELETE" }),
+  sendEmbedCreatorMessage: (guildId: string, input: EmbedCreatorSendInput) =>
+    request<{ id: string }>(`/guilds/${guildId}/embed-creator/send`, { method: "POST", body: JSON.stringify(input) }),
+  fetchEmbedCreatorMessage: (guildId: string, messageLink: string, webhookUrl?: string) =>
+    request<EmbedCreatorFetchResult>(`/guilds/${guildId}/embed-creator/fetch`, { method: "POST", body: JSON.stringify({ messageLink, webhookUrl }) }),
+  updateEmbedCreatorMessage: (guildId: string, input: EmbedCreatorSendInput & { channelId?: string; messageId: string }) =>
+    request<{ ok: boolean }>(`/guilds/${guildId}/embed-creator/update`, { method: "PATCH", body: JSON.stringify(input) }),
 
   getLeaderboard: (guildId: string) => request<LeaderboardRow[]>(`/guilds/${guildId}/leaderboard`),
 

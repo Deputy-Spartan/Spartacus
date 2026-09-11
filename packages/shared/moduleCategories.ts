@@ -76,6 +76,8 @@ export const MODULE_CATEGORIES: Partial<Record<ModuleKey, ModuleCategory>> = {
   TICKETS: "🎫 support",
   APPLICATIONS: "🎫 support",
 
+  EMBED_CREATOR: "📢 engagement",
+
   CHANNEL_LOCKS: "🧰 utility",
   SLOW_MODE: "🧰 utility",
   STAT_CHANNELS: "🧰 utility",

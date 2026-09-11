@@ -55,6 +55,7 @@ export const MODULE_KEYS = [
   "PRESTIGE",
   "REMINDERS",
   "LFG",
+  "EMBED_CREATOR",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -116,6 +117,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   PRESTIGE: "Prestige",
   REMINDERS: "Reminders",
   LFG: "Looking For Group",
+  EMBED_CREATOR: "Embed Creator",
 };
 
 export const SIGNUP_ROLES = [

@@ -36,6 +36,15 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // Embed Creator's plain buttons and every select-menu type ship with no
+  // action behind them yet (same real limitation Discohook itself has) —
+  // this answers with a clear message instead of Discord's own bare
+  // "This interaction failed".
+  if ((interaction.isButton() || interaction.isAnySelectMenu()) && interaction.customId.startsWith("ecnoop:")) {
+    await interaction.reply({ content: "This component isn't connected to an action yet — only link buttons work right now.", ephemeral: true });
+    return;
+  }
+
   if (!interaction.guildId) return;
 
   if (interaction.isChatInputCommand()) {

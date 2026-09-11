@@ -92,6 +92,7 @@ model Guild {
   prestigeSettings  PrestigeSettings?
   suggestionAnalyticsSettings SuggestionAnalyticsSettings?
   lfgCommands       LfgCommand[]
+  embedCreatorPresets EmbedCreatorPreset[]
   createdAt         DateTime             @default(now())
 }
 
@@ -153,6 +154,7 @@ enum ModuleKey {
   PRESTIGE
   REMINDERS
   LFG
+  EMBED_CREATOR
 }
 
 model GrowthSnapshot {
@@ -1379,6 +1381,25 @@ model LfgCommand {
 
   @@unique([guildId, trigger])
   @@unique([guildId, channelId])
+}
+
+// ---- Embed Creator ----
+// A Discohook-style multi-embed message composer. Deliberately stored as
+// one JSON blob rather than typed columns — the builder's shape (content,
+// up to 10 embeds, up to 5 component rows) is still evolving and this way
+// adding a field to what a preset remembers never needs a migration.
+// Sending itself has no persistent row: bot-mode and webhook-mode messages
+// are read back for editing straight from Discord's own API via the pasted
+// message link, not from anything we store.
+model EmbedCreatorPreset {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  name      String
+  data      Json // { content, embeds: [...], components: [...] }
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, name])
 }
 
 // ---- Role Panels ----

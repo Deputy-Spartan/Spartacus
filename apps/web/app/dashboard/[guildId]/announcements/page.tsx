@@ -126,6 +126,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
               embedDescription={form.content}
               embedColor={form.embedColor}
               buttons={form.buttons}
+              embedExtra={form.embedExtra}
             />
           </NeonCard>
 

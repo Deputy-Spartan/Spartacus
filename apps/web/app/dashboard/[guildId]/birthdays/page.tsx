@@ -7,6 +7,7 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
+import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 
@@ -126,10 +127,15 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
               <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
             </div>
             <div className="rounded bg-[#2b2d31] border-l-4 p-3" style={{ borderColor: config.embedColor || "#FF69B4" }}>
+              <EmbedExtraThumbnail embedExtra={config.embedExtra} />
+              <EmbedExtraAuthor embedExtra={config.embedExtra} />
               <p className="text-[#f2f3f5] font-semibold text-sm mb-1">{config.embedTitle || "🎂 Happy Birthday!"}</p>
               <p className="text-[#dbdee1] text-sm whitespace-pre-wrap">
                 {(config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, "@member")}
               </p>
+              <EmbedExtraFieldsPreview embedExtra={config.embedExtra} />
+              <EmbedExtraImage embedExtra={config.embedExtra} />
+              <EmbedExtraFooter embedExtra={config.embedExtra} />
             </div>
           </div>
 

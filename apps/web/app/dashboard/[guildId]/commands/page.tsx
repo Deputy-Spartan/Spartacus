@@ -174,6 +174,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
                 embedDescription={form.response}
                 embedColor={form.embedColor ?? "#5865F2"}
                 buttons={form.buttons}
+                embedExtra={form.embedExtra}
               />
             </div>
 

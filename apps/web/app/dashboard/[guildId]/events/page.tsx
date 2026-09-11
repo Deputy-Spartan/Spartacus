@@ -994,6 +994,7 @@ function CreateEmbedView({
             embedDescription={embedDescription}
             embedColor={embedColor}
             buttons={buttons}
+            embedExtra={embedExtra}
           />
         </NeonCard>
       </div>

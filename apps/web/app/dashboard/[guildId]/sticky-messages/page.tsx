@@ -241,6 +241,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
                 embedDescription={form.embedDescription ?? ""}
                 embedColor={form.embedColor ?? "#5865F2"}
                 buttons={form.buttons}
+                embedExtra={form.embedExtra}
               />
             </div>
 

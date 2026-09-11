@@ -91,6 +91,7 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
             embedDescription={previewText}
             embedColor={config.embedColor}
             buttons={config.buttons}
+            embedExtra={config.embedExtra}
           />
         </NeonCard>
       </div>

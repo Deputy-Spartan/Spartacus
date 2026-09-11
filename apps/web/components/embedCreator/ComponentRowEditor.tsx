@@ -9,13 +9,15 @@ import type { EmbedActionConfig, EmbedActionType, EmbedCreatorButtonItem, EmbedC
 const COMPONENT_TYPES: Array<{ key: string; label: string }> = [
   { key: "button", label: "Button" },
   { key: "link", label: "Link Button" },
-  { key: "string", label: "Select Menu" },
+  { key: "select", label: "Select Menu" },
+];
+const SELECT_TYPE_OPTIONS: Array<{ key: NonNullable<EmbedCreatorComponentRow["type"]>; label: string }> = [
+  { key: "string", label: "Select Menu (your own options)" },
   { key: "user", label: "User Select Menu" },
   { key: "role", label: "Role Select Menu" },
   { key: "user_role", label: "User & Role Select Menu" },
   { key: "channel", label: "Channel Select Menu" },
 ];
-const SELECT_LABELS: Record<string, string> = { string: "Select Menu", user: "User Select", role: "Role Select", user_role: "User & Role Select", channel: "Channel Select" };
 type ButtonStyle = "primary" | "secondary" | "success" | "danger";
 const BUTTON_STYLES: ButtonStyle[] = ["primary", "secondary", "success", "danger"];
 
@@ -120,12 +122,26 @@ export function ComponentRowEditor({ guildId, row, index, onChange, onRemove }: 
       const item: EmbedCreatorButtonItem =
         type === "link" ? { id: uid(), kind: "link", label: "Link", url: "" } : { id: uid(), kind: "button", label: "Button", style: "primary" };
       onChange({ ...row, type: "buttons", items: [...row.items, item] });
-    } else if (type === "string") {
-      onChange({ ...row, type: "string", placeholder: row.placeholder || "Choose an option…", options: row.options?.length ? row.options : [{ id: uid(), label: "Option 1", value: "option_1" }] });
     } else {
-      onChange({ ...row, type: type as EmbedCreatorComponentRow["type"], placeholder: row.placeholder || "Choose an option…" });
+      // "select" collapses all 5 select-menu variants into one entry — which
+      // specific kind it is (String/User/Role/Channel/User & Role) is picked
+      // inside the row itself, right below, instead of upfront here.
+      onChange({ ...row, type: "string", placeholder: row.placeholder || "Choose an option…", options: [{ id: uid(), label: "Option 1", value: "option_1" }] });
     }
     setDropdownOpen(false);
+  }
+
+  function changeSelectType(nextType: NonNullable<EmbedCreatorComponentRow["type"]>) {
+    // Option/default-value semantics differ per type (a role id isn't a
+    // valid channel id), so switching type clears whatever was configured
+    // rather than carrying over now-meaningless values.
+    onChange({
+      ...row,
+      type: nextType,
+      options: nextType === "string" ? [{ id: uid(), label: "Option 1", value: "option_1" }] : undefined,
+      action: undefined,
+      defaultValueId: undefined,
+    });
   }
 
   function updateItem(id: string, patch: Partial<{ label: string; url: string; style: ButtonStyle; action: EmbedActionConfig | undefined }>) {
@@ -218,6 +234,23 @@ export function ComponentRowEditor({ guildId, row, index, onChange, onRemove }: 
         </div>
       )}
 
+      {row.type && row.type !== "buttons" && (
+        <div className="mb-2">
+          <label className="text-[11px] text-slate-500 block mb-1.5">Menu type</label>
+          <select
+            className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-xs"
+            value={row.type}
+            onChange={(e) => changeSelectType(e.target.value as NonNullable<EmbedCreatorComponentRow["type"]>)}
+          >
+            {SELECT_TYPE_OPTIONS.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {row.type === "string" && (
         <div className="mb-2.5">
           <input
@@ -265,7 +298,6 @@ export function ComponentRowEditor({ guildId, row, index, onChange, onRemove }: 
       {row.type && row.type !== "buttons" && row.type !== "string" && (
         <div className="mb-2.5">
           <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-            <span className="text-[11px] font-semibold text-cyan-300 bg-cyan-500/10 px-2 py-1 rounded">{SELECT_LABELS[row.type]}</span>
             <input
               className="flex-1 min-w-[160px] bg-base-900 border border-white/10 rounded-lg p-2 text-xs"
               placeholder="Placeholder text, e.g. Choose an option…"

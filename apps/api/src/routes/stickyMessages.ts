@@ -25,7 +25,7 @@ router.get("/guilds/:guildId/sticky-messages", requireAuth, requireGuildPermissi
 });
 
 router.post("/guilds/:guildId/sticky-messages", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons } = req.body;
+  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra } = req.body;
   const data = {
     guildId: req.params.guildId,
     channelId,
@@ -35,6 +35,7 @@ router.post("/guilds/:guildId/sticky-messages", requireAuth, requireGuildPermiss
     embedDescription: embedDescription || null,
     embedColor: embedColor || null,
     buttons: sanitizeButtons(buttons),
+    embedExtra: embedExtra ?? Prisma.JsonNull,
   };
   const row = await prisma.stickyMessage.upsert({
     where: { channelId },
@@ -50,7 +51,7 @@ router.put("/guilds/:guildId/sticky-messages/:id", requireAuth, requireGuildPerm
     return res.status(404).json({ error: "Sticky message not found" });
   }
 
-  const { content, embedEnabled, embedTitle, embedDescription, embedColor, buttons } = req.body;
+  const { content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra } = req.body;
   const row = await prisma.stickyMessage.update({
     where: { id: req.params.id },
     data: {
@@ -60,6 +61,7 @@ router.put("/guilds/:guildId/sticky-messages/:id", requireAuth, requireGuildPerm
       embedDescription: embedDescription || null,
       embedColor: embedColor || null,
       buttons: sanitizeButtons(buttons),
+      embedExtra: embedExtra ?? Prisma.JsonNull,
     },
   });
   res.json(row);
@@ -86,6 +88,7 @@ router.post("/guilds/:guildId/sticky-messages/:id/resend", requireAuth, requireG
     embedDescription: sticky.embedDescription ?? sticky.content,
     embedColor: sticky.embedColor ?? undefined,
     buttons: Array.isArray(sticky.buttons) ? (sticky.buttons as Array<{ label: string; url: string }>) : [],
+    embedExtra: sticky.embedExtra,
   });
 
   const result = await postChannelMessage(sticky.channelId, payload);

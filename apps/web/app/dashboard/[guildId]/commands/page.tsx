@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
@@ -19,6 +20,7 @@ const EMPTY_FORM: CommandForm = {
   embedTitle: null,
   embedColor: "#5865F2",
   buttons: [],
+  embedExtra: {},
 };
 
 export default function CommandsPage({ params }: { params: { guildId: string } }) {
@@ -43,7 +45,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
 
   function startEdit(c: CustomCommand) {
     setEditingId(c.id);
-    setForm({ trigger: c.trigger, response: c.response, embedEnabled: c.embedEnabled, embedTitle: c.embedTitle, embedColor: c.embedColor ?? "#5865F2", buttons: c.buttons });
+    setForm({ trigger: c.trigger, response: c.response, embedEnabled: c.embedEnabled, embedTitle: c.embedTitle, embedColor: c.embedColor ?? "#5865F2", buttons: c.buttons, embedExtra: c.embedExtra ?? {} });
     setError(null);
     setShowEditor(true);
   }
@@ -60,6 +62,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
       embedTitle: form.embedTitle,
       embedColor: form.embedColor,
       buttons: form.buttons,
+      embedExtra: form.embedExtra,
     };
     if (editingId) {
       await api.updateCommand(params.guildId, editingId, body);
@@ -155,6 +158,11 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
               embedColor={form.embedColor ?? "#5865F2"}
               buttons={form.buttons}
               onChange={(next) => setForm({ ...form, ...next })}
+            />
+
+            <EmbedExtraFields
+              value={form.embedExtra ?? {}}
+              onChange={(v) => setForm({ ...form, embedExtra: v })}
             />
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>

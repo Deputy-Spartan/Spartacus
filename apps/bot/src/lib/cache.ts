@@ -20,6 +20,7 @@ export interface CustomCommandEntry {
   embedTitle: string | null;
   embedColor: string | null;
   buttons: unknown;
+  embedExtra: unknown;
 }
 
 export const customCommandCache = new LRUCache<string, Map<string, CustomCommandEntry>>({

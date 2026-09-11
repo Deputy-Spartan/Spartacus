@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
+import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -21,7 +21,7 @@ router.get("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermissi
 });
 
 router.put("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, embedTitle, embedMessage, embedColor, pingRoleId, useButton, buttonChannelId } = req.body;
+  const { channelId, embedTitle, embedMessage, embedColor, pingRoleId, useButton, buttonChannelId, embedExtra } = req.body;
   const existing = await prisma.birthdayConfig.findUnique({ where: { guildId: req.params.guildId } });
 
   // Changing the button channel (or turning the button on) invalidates any
@@ -37,6 +37,7 @@ router.put("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermissi
     pingRoleId,
     useButton,
     buttonChannelId,
+    embedExtra: embedExtra ?? Prisma.JsonNull,
     ...(buttonChannelChanged || buttonJustEnabled ? { buttonMessageId: null } : {}),
   };
 

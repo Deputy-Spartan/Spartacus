@@ -30,7 +30,7 @@ router.get("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
 });
 
 router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, welcomeText, goodbyeText, embedColor, embedEnabled, embedTitle, buttons } = req.body as {
+  const { channelId, welcomeText, goodbyeText, embedColor, embedEnabled, embedTitle, buttons, embedExtra } = req.body as {
     channelId?: string;
     welcomeText?: string;
     goodbyeText?: string;
@@ -38,6 +38,7 @@ router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
     embedEnabled?: boolean;
     embedTitle?: string;
     buttons?: unknown;
+    embedExtra?: Prisma.InputJsonValue;
   };
 
   const data = {
@@ -48,6 +49,7 @@ router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
     embedEnabled: Boolean(embedEnabled),
     embedTitle: embedTitle || null,
     buttons: sanitizeButtons(buttons),
+    embedExtra: embedExtra ?? Prisma.JsonNull,
   };
 
   const config = await prisma.welcomeConfig.upsert({

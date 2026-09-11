@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
+import { applyEmbedExtra } from "../lib/embedExtra";
 
 // Runs once a day at 9am server time — posts one embed per birthday config
 // per guild listing everyone whose birthday is today.
@@ -42,6 +43,7 @@ export function startBirthdayAnnouncerJob(client: Client) {
         .setTitle(config.embedTitle || "🎂 Happy Birthday!")
         .setDescription(message)
         .setTimestamp();
+      applyEmbedExtra(embed, config.embedExtra);
 
       await channel
         .send({ content: config.pingRoleId ? `<@&${config.pingRoleId}>` : undefined, embeds: [embed] })

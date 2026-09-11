@@ -20,6 +20,7 @@ export async function executeCustomCommand(interaction: ChatInputCommandInteract
         embedDescription: command.embedDescription,
         embedColor: command.embedColor,
         buttons: command.buttons,
+        embedExtra: command.embedExtra,
       }),
       ephemeral,
     });

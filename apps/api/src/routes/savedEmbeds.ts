@@ -19,7 +19,7 @@ router.get("/guilds/:guildId/saved-embeds", requireAuth, requireGuildPermission,
 });
 
 router.post("/guilds/:guildId/saved-embeds", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons } = req.body;
+  const { name, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra } = req.body;
   const data = {
     content,
     embedEnabled: Boolean(embedEnabled),
@@ -27,6 +27,7 @@ router.post("/guilds/:guildId/saved-embeds", requireAuth, requireGuildPermission
     embedDescription: embedDescription || null,
     embedColor: embedColor || null,
     buttons: sanitizeButtons(buttons),
+    embedExtra: (embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
   };
   const embed = await prisma.savedEmbed.upsert({
     where: { guildId_name: { guildId: req.params.guildId, name } },

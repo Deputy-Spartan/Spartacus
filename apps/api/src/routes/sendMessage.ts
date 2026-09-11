@@ -9,7 +9,7 @@ const router = Router();
 // Scheduler's Create Embed tab) — not tied to any saved record, so this
 // is a single fire-and-forget REST call rather than a CRUD resource.
 router.post("/guilds/:guildId/send-message", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons } = req.body as {
+  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra } = req.body as {
     channelId: string;
     content?: string;
     embedEnabled?: boolean;
@@ -17,11 +17,12 @@ router.post("/guilds/:guildId/send-message", requireAuth, requireGuildPermission
     embedDescription?: string;
     embedColor?: string;
     buttons?: Array<{ label: string; url: string }>;
+    embedExtra?: unknown;
   };
 
   if (!channelId) return res.status(400).json({ error: "channelId is required" });
 
-  const payload = buildRestMessagePayload({ content, embedEnabled, embedTitle, embedDescription, embedColor, buttons });
+  const payload = buildRestMessagePayload({ content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra });
   const result = await postChannelMessage(channelId, payload);
 
   if (result.error) return res.status(502).json({ error: result.error });

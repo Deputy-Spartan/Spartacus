@@ -6,6 +6,7 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -654,6 +655,7 @@ const EMPTY_CUSTOM_COMMAND: CustomSlashCommandInput = {
   embedTitle: "",
   embedColor: "#5865F2",
   buttons: [],
+  embedExtra: {},
 };
 
 function CommandsTab({ guildId }: { guildId: string }) {
@@ -826,6 +828,10 @@ function CommandsTab({ guildId }: { guildId: string }) {
                 embedColor={form.embedColor ?? "#5865F2"}
                 buttons={form.buttons ?? []}
                 onChange={(next) => setForm({ ...form, ...next })}
+              />
+              <EmbedExtraFields
+                value={form.embedExtra ?? {}}
+                onChange={(v) => setForm({ ...form, embedExtra: v })}
               />
             </div>
           )}

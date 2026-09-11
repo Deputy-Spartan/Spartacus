@@ -1,4 +1,5 @@
 import fetch from "node-fetch";
+import { applyEmbedExtraRest } from "./embedExtra";
 
 const DISCORD_API = "https://discord.com/api/v10";
 
@@ -124,6 +125,7 @@ interface SendPayloadInput {
   embedDescription?: string;
   embedColor?: string;
   buttons?: Array<{ label: string; url: string }>;
+  embedExtra?: unknown;
 }
 
 // Raw Discord REST shape (not discord.js builders) — this is called from
@@ -150,6 +152,7 @@ export function buildRestMessagePayload(input: SendPayloadInput) {
   };
   if (input.embedTitle) embed.title = input.embedTitle;
   if (input.embedColor) embed.color = hexToInt(input.embedColor);
+  applyEmbedExtraRest(embed, input.embedExtra);
 
   return { content: "", embeds: [embed], components };
 }

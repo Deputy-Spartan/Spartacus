@@ -10,6 +10,7 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EventPreview } from "../../../../components/ui/EventPreview";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm, usePrompt } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -24,6 +25,7 @@ import {
   type SavedEmbedRow,
   type RsvpRole,
 } from "../../../../lib/api";
+import type { EmbedExtra } from "../../../../lib/embedExtra";
 
 type View = "root" | "create" | "embed" | "calendar" | "current" | "past" | "scheduled" | "attendance" | "templates" | "settings";
 
@@ -60,6 +62,7 @@ const EMPTY_EVENT: EventInput = {
   embedColor: "#00E5FF",
   buttons: [],
   enabledRoles: [...ALL_ROLES],
+  embedExtra: {},
 };
 
 export default function EventsPage({ params }: { params: { guildId: string } }) {
@@ -100,6 +103,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
       embedColor: event.embedColor ?? "#00E5FF",
       buttons: event.buttons,
       enabledRoles: event.enabledRoles,
+      embedExtra: event.embedExtra ?? {},
     });
     setError(null);
     setView("create");
@@ -138,6 +142,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
       embedColor: t.embedColor ?? "#00E5FF",
       buttons: t.buttons,
       enabledRoles: t.enabledRoles,
+      embedExtra: t.embedExtra ?? {},
     }));
   }
 
@@ -309,6 +314,13 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
                     />
                   </div>
                 </div>
+              )}
+
+              {form.embedEnabled && (
+                <EmbedExtraFields
+                  value={form.embedExtra ?? {}}
+                  onChange={(v) => setForm({ ...form, embedExtra: v })}
+                />
               )}
 
               <div className="mb-4">
@@ -606,6 +618,7 @@ const EMPTY_TEMPLATE: EventTemplateInput = {
   embedColor: "#00E5FF",
   buttons: [],
   enabledRoles: [...ALL_ROLES],
+  embedExtra: {},
 };
 
 function TemplatesView({
@@ -739,6 +752,10 @@ function TemplatesView({
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
+            <EmbedExtraFields
+              value={form.embedExtra ?? {}}
+              onChange={(v) => setForm({ ...form, embedExtra: v })}
+            />
             <button onClick={save} className="neon-button">
               Save Template
             </button>
@@ -821,6 +838,7 @@ function CreateEmbedView({
   const [embedDescription, setEmbedDescription] = useState(initial?.embedDescription ?? "");
   const [embedColor, setEmbedColor] = useState(initial?.embedColor ?? "#00E5FF");
   const [buttons, setButtons] = useState<Array<{ label: string; url: string }>>(initial?.buttons ?? []);
+  const [embedExtra, setEmbedExtra] = useState<EmbedExtra>(initial?.embedExtra ?? {});
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -837,12 +855,13 @@ function CreateEmbedView({
     setEmbedDescription(e.embedDescription ?? "");
     setEmbedColor(e.embedColor ?? "#00E5FF");
     setButtons(e.buttons);
+    setEmbedExtra(e.embedExtra ?? {});
   }
 
   async function saveAsPreset() {
     const name = await prompt("Name this embed to save it for reuse:");
     if (!name) return;
-    const input: SavedEmbedInput = { name, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons };
+    const input: SavedEmbedInput = { name, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra };
     const saved = await api.saveSavedEmbed(guildId, input);
     setSavedEmbeds((prev) => [...prev.filter((e) => e.name !== saved.name), saved].sort((a, b) => a.name.localeCompare(b.name)));
   }
@@ -855,7 +874,7 @@ function CreateEmbedView({
     setSending(true);
     setError(null);
     try {
-      await api.sendMessage(guildId, { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons });
+      await api.sendMessage(guildId, { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra });
       setSent(true);
       setTimeout(() => setSent(false), 2000);
     } catch (e) {
@@ -946,6 +965,8 @@ function CreateEmbedView({
                   />
                 </div>
               </div>
+
+              <EmbedExtraFields value={embedExtra} onChange={setEmbedExtra} />
             </div>
           )}
 

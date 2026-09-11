@@ -22,13 +22,14 @@ router.get("/guilds/:guildId/commands", requireAuth, requireGuildPermission, asy
 });
 
 router.post("/guilds/:guildId/commands", requireAuth, requireGuildPermission, async (req, res) => {
-  const { trigger, response, embedEnabled, embedTitle, embedColor, buttons } = req.body as {
+  const { trigger, response, embedEnabled, embedTitle, embedColor, buttons, embedExtra } = req.body as {
     trigger: string;
     response: string;
     embedEnabled?: boolean;
     embedTitle?: string;
     embedColor?: string;
     buttons?: unknown;
+    embedExtra?: Prisma.InputJsonValue;
   };
 
   const data = {
@@ -37,6 +38,7 @@ router.post("/guilds/:guildId/commands", requireAuth, requireGuildPermission, as
     embedTitle: embedTitle || null,
     embedColor: embedColor || null,
     buttons: sanitizeButtons(buttons),
+    embedExtra: embedExtra ?? Prisma.JsonNull,
   };
 
   const command = await prisma.customCommand.upsert({
@@ -53,12 +55,13 @@ router.put("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission,
     return res.status(404).json({ error: "Command not found" });
   }
 
-  const { response, embedEnabled, embedTitle, embedColor, buttons } = req.body as {
+  const { response, embedEnabled, embedTitle, embedColor, buttons, embedExtra } = req.body as {
     response: string;
     embedEnabled?: boolean;
     embedTitle?: string;
     embedColor?: string;
     buttons?: unknown;
+    embedExtra?: Prisma.InputJsonValue;
   };
 
   const command = await prisma.customCommand.update({
@@ -69,6 +72,7 @@ router.put("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission,
       embedTitle: embedTitle || null,
       embedColor: embedColor || null,
       buttons: sanitizeButtons(buttons),
+      embedExtra: embedExtra ?? Prisma.JsonNull,
     },
   });
   res.json(command);

@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
@@ -19,6 +20,7 @@ const EMPTY: AnnouncementInput = {
   embedColor: "#00E5FF",
   buttons: [],
   scheduledFor: null,
+  embedExtra: {},
 };
 
 export default function AnnouncementsPage({ params }: { params: { guildId: string } }) {
@@ -92,6 +94,11 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             embedColor={form.embedColor}
             buttons={form.buttons}
             onChange={(next) => setForm({ ...form, ...next })}
+          />
+
+          <EmbedExtraFields
+            value={form.embedExtra ?? {}}
+            onChange={(v) => setForm({ ...form, embedExtra: v })}
           />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>

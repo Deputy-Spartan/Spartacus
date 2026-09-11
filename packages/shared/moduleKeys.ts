@@ -50,6 +50,12 @@ export const MODULE_KEYS = [
   "SERVER_TEMPLATES",
   "BUMP_REMINDER",
   "SUGGESTION_ANALYTICS",
+  "RANK_CARDS",
+  "CONFESSIONS",
+  "MEMBER_MILESTONES",
+  "RULES_GATE",
+  "PRESTIGE",
+  "REMINDERS",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -106,6 +112,12 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   SERVER_TEMPLATES: "Server Config Templates",
   BUMP_REMINDER: "Bump Reminder",
   SUGGESTION_ANALYTICS: "Suggestion Analytics",
+  RANK_CARDS: "Rank Cards",
+  CONFESSIONS: "Confessions",
+  MEMBER_MILESTONES: "Member Milestones",
+  RULES_GATE: "Rules Gate",
+  PRESTIGE: "Prestige",
+  REMINDERS: "Reminders",
 };
 
 export const SIGNUP_ROLES = [

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
+import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -11,7 +11,7 @@ router.get("/guilds/:guildId/announcements", requireAuth, requireGuildPermission
 });
 
 router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor } = req.body;
+  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra } = req.body;
   const row = await prisma.announcement.create({
     data: {
       guildId: req.params.guildId,
@@ -22,6 +22,7 @@ router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermissio
       embedColor,
       buttons: buttons ?? [],
       scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+      embedExtra: embedExtra ?? Prisma.JsonNull,
     },
   });
   res.status(201).json(row);

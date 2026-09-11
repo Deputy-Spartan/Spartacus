@@ -8,6 +8,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -20,6 +21,7 @@ const EMPTY_FORM: StickyMessageInput = {
   embedDescription: "",
   embedColor: "#5865F2",
   buttons: [],
+  embedExtra: {},
 };
 
 export default function StickyMessagesPage({ params }: { params: { guildId: string } }) {
@@ -56,6 +58,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
       embedDescription: row.embedDescription ?? "",
       embedColor: row.embedColor ?? "#5865F2",
       buttons: row.buttons,
+      embedExtra: row.embedExtra ?? {},
     });
     setError(null);
     setShowEditor(true);
@@ -223,6 +226,11 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
             <div className="mb-4">
               <ButtonsEditor guildId={params.guildId} buttons={form.buttons} onChange={(next) => setForm({ ...form, buttons: next })} />
             </div>
+
+            <EmbedExtraFields
+              value={form.embedExtra ?? {}}
+              onChange={(v) => setForm({ ...form, embedExtra: v })}
+            />
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
             <div className="mb-4">

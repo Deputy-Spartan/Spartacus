@@ -26,7 +26,8 @@ router.get("/guilds/:guildId/event-templates", requireAuth, requireGuildPermissi
 });
 
 router.post("/guilds/:guildId/event-templates", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, title, description, reminderMinutesBefore, embedEnabled, embedColor, buttons, enabledRoles } = req.body;
+  const { name, title, description, reminderMinutesBefore, embedEnabled, embedColor, buttons, enabledRoles, embedExtra } = req.body;
+  const embedExtraValue = (embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue;
 
   const template = await prisma.eventTemplate.upsert({
     where: { guildId_name: { guildId: req.params.guildId, name } },
@@ -40,6 +41,7 @@ router.post("/guilds/:guildId/event-templates", requireAuth, requireGuildPermiss
       embedColor: embedColor ?? "#00E5FF",
       buttons: sanitizeButtons(buttons),
       enabledRoles: sanitizeRoles(enabledRoles),
+      embedExtra: embedExtraValue,
     },
     update: {
       title,
@@ -49,6 +51,7 @@ router.post("/guilds/:guildId/event-templates", requireAuth, requireGuildPermiss
       embedColor: embedColor ?? "#00E5FF",
       buttons: sanitizeButtons(buttons),
       enabledRoles: sanitizeRoles(enabledRoles),
+      embedExtra: embedExtraValue,
     },
   });
   res.status(201).json(template);

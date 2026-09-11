@@ -26,6 +26,7 @@ export async function execute(member: GuildMember | PartialGuildMember) {
     embedDescription: text,
     embedColor: config.embedColor,
     buttons: config.buttons,
+    embedExtra: config.embedExtra,
   });
 
   await channel.send(payload);

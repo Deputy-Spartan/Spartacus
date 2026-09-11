@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { api, type WelcomeConfig } from "../../../../lib/api";
 
@@ -73,6 +74,11 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
             embedColor={config.embedColor}
             buttons={config.buttons}
             onChange={(next) => setConfig({ ...config, ...next })}
+          />
+
+          <EmbedExtraFields
+            value={config.embedExtra ?? {}}
+            onChange={(v) => setConfig({ ...config, embedExtra: v })}
           />
         </NeonCard>
 

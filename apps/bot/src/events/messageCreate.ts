@@ -102,7 +102,14 @@ export async function execute(message: Message) {
       guildCommands = new Map(
         rows.map((r) => [
           r.trigger.toLowerCase(),
-          { response: r.response, embedEnabled: r.embedEnabled, embedTitle: r.embedTitle, embedColor: r.embedColor, buttons: r.buttons },
+          {
+            response: r.response,
+            embedEnabled: r.embedEnabled,
+            embedTitle: r.embedTitle,
+            embedColor: r.embedColor,
+            buttons: r.buttons,
+            embedExtra: r.embedExtra,
+          },
         ])
       );
       customCommandCache.set(message.guildId, guildCommands);
@@ -118,6 +125,7 @@ export async function execute(message: Message) {
           embedDescription: command.response,
           embedColor: command.embedColor,
           buttons: command.buttons,
+          embedExtra: command.embedExtra,
         })
       );
     }

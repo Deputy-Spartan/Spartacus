@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder } fr
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { applyEmbedExtra } from "../lib/embedExtra";
 
 interface GiveawayButton {
   label: string;
@@ -28,6 +29,7 @@ export function startGiveawayPosterJob(client: Client) {
         )
         .setFooter({ text: `${giveaway.winnerCount} winner(s)` });
       if (giveaway.imageUrl) embed.setImage(giveaway.imageUrl);
+      applyEmbedExtra(embed, giveaway.embedExtra);
 
       const linkButtons = Array.isArray(giveaway.buttons) ? (giveaway.buttons as unknown as GiveawayButton[]) : [];
       const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
@@ -19,6 +20,7 @@ const EMPTY: GiveawayInput = {
   buttons: [],
   winnerCount: 1,
   endsAt: "",
+  embedExtra: {},
 };
 
 export default function GiveawaysPage({ params }: { params: { guildId: string } }) {
@@ -103,6 +105,8 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
               onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
             />
           </div>
+
+          <EmbedExtraFields value={form.embedExtra ?? {}} onChange={(v) => setForm({ ...form, embedExtra: v })} />
 
           <div className="mb-4">
             <ButtonsEditor guildId={params.guildId} buttons={form.buttons ?? []} onChange={(next: StickyButton[]) => setForm({ ...form, buttons: next })} />

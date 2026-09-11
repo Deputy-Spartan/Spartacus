@@ -34,6 +34,7 @@ export function startAnnouncementPosterJob(client: Client) {
         embedDescription: announcement.content,
         embedColor: announcement.embedColor,
         buttons: announcement.buttons,
+        embedExtra: announcement.embedExtra,
       });
 
       await channel.send(payload).catch((err) => {

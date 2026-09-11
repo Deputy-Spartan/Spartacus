@@ -6,6 +6,7 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 
@@ -86,6 +87,11 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
               onChange={(e) => persist({ ...config, embedColor: e.target.value })}
             />
           </div>
+
+          <EmbedExtraFields
+            value={config.embedExtra ?? {}}
+            onChange={(v) => persist({ ...config, embedExtra: v })}
+          />
         </NeonCard>
 
         <NeonCard>

@@ -73,11 +73,15 @@ import weeklyRecapSettingsRouter from "./routes/weeklyRecapSettings";
 import voiceActivityRouter from "./routes/voiceActivity";
 import achievementsRouter from "./routes/achievements";
 import warnEscalationRouter from "./routes/warnEscalation";
+import prestigeSettingsRouter from "./routes/prestigeSettings";
 import appealsRouter from "./routes/appeals";
 import growthAnalyticsRouter from "./routes/growthAnalytics";
 import serverTemplatesRouter from "./routes/serverTemplates";
 import bumpReminderRouter from "./routes/bumpReminder";
 import suggestionAnalyticsRouter from "./routes/suggestionAnalytics";
+import confessionSettingsRouter from "./routes/confessionSettings";
+import milestoneSettingsRouter from "./routes/milestoneSettings";
+import rulesGateSettingsRouter from "./routes/rulesGateSettings";
 
 const app = express();
 
@@ -150,6 +154,7 @@ app.use(commandTogglesRouter);
 app.use(customSlashCommandsRouter);
 app.use(modDigestSettingsRouter);
 app.use(warnEscalationRouter);
+app.use(prestigeSettingsRouter);
 app.use(appealsRouter);
 app.use(weeklyRecapSettingsRouter);
 app.use(voiceActivityRouter);
@@ -158,6 +163,9 @@ app.use(growthAnalyticsRouter);
 app.use(serverTemplatesRouter);
 app.use(bumpReminderRouter);
 app.use(suggestionAnalyticsRouter);
+app.use(confessionSettingsRouter);
+app.use(milestoneSettingsRouter);
+app.use(rulesGateSettingsRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

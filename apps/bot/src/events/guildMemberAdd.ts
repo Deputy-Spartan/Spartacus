@@ -27,6 +27,7 @@ export async function execute(member: GuildMember) {
       embedDescription: text,
       embedColor: config.embedColor,
       buttons: config.buttons,
+      embedExtra: config.embedExtra,
     },
     { thumbnailUrl: member.user.displayAvatarURL() }
   );

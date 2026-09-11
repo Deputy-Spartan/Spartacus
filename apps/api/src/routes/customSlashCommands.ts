@@ -36,8 +36,21 @@ router.get("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildPe
 });
 
 router.post("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, description, actionType, ephemeralReply, messageText, roleId, currencyAmount, embedEnabled, embedTitle, embedDescription, embedColor, buttons } =
-    req.body as {
+  const {
+    name,
+    description,
+    actionType,
+    ephemeralReply,
+    messageText,
+    roleId,
+    currencyAmount,
+    embedEnabled,
+    embedTitle,
+    embedDescription,
+    embedColor,
+    buttons,
+    embedExtra,
+  } = req.body as {
       name: string;
       description: string;
       actionType: string;
@@ -50,6 +63,7 @@ router.post("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildP
       embedDescription?: string;
       embedColor?: string;
       buttons?: unknown;
+      embedExtra?: Prisma.InputJsonValue;
     };
 
   if (!NAME_PATTERN.test(name)) {
@@ -84,6 +98,7 @@ router.post("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildP
       embedDescription: embedDescription || null,
       embedColor: embedColor || null,
       buttons: sanitizeButtons(buttons),
+      embedExtra: embedExtra ?? Prisma.JsonNull,
     },
   });
   res.status(201).json(row);

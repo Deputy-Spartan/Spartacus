@@ -52,6 +52,14 @@ export async function logCase(params: {
   return created;
 }
 
+// ---- Escalating Mute Duration ----
+// Pure so it can be unit-tested without touching Discord or the DB.
+// Caps at Discord's 28-day timeout maximum (2,419,200,000 ms).
+export function computeScaledTimeoutMinutes(baseMinutes: number, priorEscalationCount: number): number {
+  const maxMinutes = 2419200000 / 60000;
+  return Math.min(baseMinutes * Math.pow(2, priorEscalationCount), maxMinutes);
+}
+
 // ---- Warn Escalation ----
 // Fires only once per rolling window — right when the WARN count hits the
 // configured threshold, not on every warn after. The auto-escalation's own
@@ -79,7 +87,20 @@ async function checkWarnEscalation(client: Client, guildId: string, userId: stri
   const moderatorId = client.user?.id ?? "0";
 
   if (settings.action === "TIMEOUT") {
-    await member.timeout(settings.timeoutMinutes * 60 * 1000, reason).catch(() => null);
+    let timeoutMinutes = settings.timeoutMinutes;
+    if (settings.scaleDuration) {
+      const priorCount = await prisma.moderationCase.count({
+        where: {
+          guildId,
+          userId,
+          action: "MUTE",
+          moderatorId,
+          reason: { startsWith: "Auto-escalation" },
+        },
+      });
+      timeoutMinutes = computeScaledTimeoutMinutes(settings.timeoutMinutes, priorCount);
+    }
+    await member.timeout(timeoutMinutes * 60 * 1000, reason).catch(() => null);
     await logCase({ guildId, userId, action: "MUTE", reason, moderatorId, client });
   } else if (settings.action === "KICK") {
     await member.kick(reason).catch(() => null);

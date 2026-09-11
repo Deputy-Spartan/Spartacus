@@ -2,6 +2,7 @@ import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.
 import type { CommandModule } from "../types";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
+import { applyEmbedExtra } from "../../lib/embedExtra";
 
 // Reuses the same random-selection approach as apps/bot/src/jobs/giveawayEnder.ts
 // (uniform random pick without replacement) so reroll behavior stays consistent
@@ -58,6 +59,7 @@ const command: CommandModule = {
             ? `New winner(s): ${winners.map((w) => `<@${w}>`).join(", ")}!`
             : "No valid entries — no winner could be selected."
         );
+      applyEmbedExtra(embed, giveaway.embedExtra);
       await channel.send({ embeds: [embed] }).catch(() => null);
     }
 

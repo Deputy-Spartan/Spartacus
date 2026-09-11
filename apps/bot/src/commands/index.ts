@@ -6,6 +6,7 @@ import kick from "./moderation/kick";
 import mute from "./moderation/mute";
 import warn from "./moderation/warn";
 import purge from "./moderation/purge";
+import purgeUser from "./moderation/purge-user";
 import rank from "./leveling/rank";
 import leaderboard from "./leveling/leaderboard";
 import event from "./events/event";
@@ -24,7 +25,10 @@ import trivia from "./games/trivia";
 import report from "./moderation/report";
 import sticky from "./community/sticky";
 import birthday from "./community/birthday";
+import confess from "./community/confess";
 import giveawayReroll from "./engagement/giveawayReroll";
+import prestige from "./leveling/prestige";
+import remindme from "./utility/remindme";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -34,6 +38,7 @@ for (const command of [
   mute,
   warn,
   purge,
+  purgeUser,
   rank,
   leaderboard,
   event,
@@ -53,7 +58,10 @@ for (const command of [
   report,
   sticky,
   birthday,
+  confess,
   giveawayReroll,
+  prestige,
+  remindme,
 ]) {
   commands.set(command.data.name, command);
 }

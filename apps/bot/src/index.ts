@@ -29,6 +29,9 @@ import { startWeeklyRecapJob } from "./jobs/weeklyRecap";
 import { startGrowthSnapshotJob } from "./jobs/growthSnapshot";
 import { startBumpReminderJob } from "./jobs/bumpReminder";
 import { startSuggestionAnalyticsJob } from "./jobs/suggestionAnalytics";
+import { startRemindersJob } from "./jobs/reminders";
+import { startMemberMilestonesJob } from "./jobs/memberMilestones";
+import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -174,6 +177,9 @@ export function startBot() {
     startGrowthSnapshotJob(c);
     startBumpReminderJob(c);
     startSuggestionAnalyticsJob(c);
+    startRemindersJob(c);
+    startMemberMilestonesJob(c);
+    startRulesGatePosterJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);

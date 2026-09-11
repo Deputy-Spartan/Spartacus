@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type BaseMessageOptions } from "discord.js";
+import { applyEmbedExtra } from "./embedExtra";
 
 interface StickyButton {
   label: string;
@@ -12,6 +13,7 @@ export interface StickyMessageLike {
   embedDescription: string | null;
   embedColor: string | null;
   buttons: unknown;
+  embedExtra?: unknown;
 }
 
 export function buildStickyPayload(sticky: StickyMessageLike, options?: { thumbnailUrl?: string }): BaseMessageOptions {
@@ -35,6 +37,7 @@ export function buildStickyPayload(sticky: StickyMessageLike, options?: { thumbn
   embed.setDescription(sticky.embedDescription || sticky.content);
   if (sticky.embedColor) embed.setColor(sticky.embedColor as `#${string}`);
   if (options?.thumbnailUrl) embed.setThumbnail(options.thumbnailUrl);
+  applyEmbedExtra(embed, sticky.embedExtra);
 
   return { content: "", embeds: [embed], components };
 }

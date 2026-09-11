@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type BaseMessageOptions } from "discord.js";
+import { applyEmbedExtra } from "./embedExtra";
 
 interface LinkButton {
   label: string;
@@ -24,6 +25,7 @@ export interface EventLike {
   embedColor: string | null;
   buttons: unknown;
   enabledRoles: unknown;
+  embedExtra?: unknown;
 }
 
 function parseEnabledRoles(input: unknown): RsvpRole[] {
@@ -74,6 +76,7 @@ export function buildEventPayload(event: EventLike): BaseMessageOptions {
       ...roles.map((role) => ({ name: RSVP_ROLE_META[role].fieldName, value: "—", inline: true }))
     )
     .setFooter({ text: "Spartacus Event Coordination" });
+  applyEmbedExtra(embed, event.embedExtra);
 
   return { content: "", embeds: [embed], components: rows };
 }

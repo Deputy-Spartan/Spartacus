@@ -3,6 +3,7 @@ import { Client, EmbedBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { applyEmbedExtra } from "../lib/embedExtra";
 
 // Every minute, close out any giveaway whose end time has passed and hasn't
 // been resolved yet. One tick covers every guild.
@@ -35,6 +36,7 @@ export function startGiveawayEnderJob(client: Client) {
               ? `Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!`
               : "No valid entries — no winner could be selected."
           );
+        applyEmbedExtra(embed, giveaway.embedExtra);
         await channel.send({ embeds: [embed] }).catch((err) => {
           if (loggedThisTick < 5) { logError("bot", err, giveaway.guildId); loggedThisTick++; }
           return null;

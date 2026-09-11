@@ -85,6 +85,10 @@ model Guild {
   applicationSettings ApplicationSettings?
   growthSnapshots   GrowthSnapshot[]
   bumpReminderSettings BumpReminderSettings?
+  confessionSettings ConfessionSettings?
+  milestoneSettings MilestoneSettings?
+  rulesGateSettings RulesGateSettings?
+  prestigeSettings  PrestigeSettings?
   suggestionAnalyticsSettings SuggestionAnalyticsSettings?
   createdAt         DateTime             @default(now())
 }
@@ -142,6 +146,12 @@ enum ModuleKey {
   SERVER_TEMPLATES
   BUMP_REMINDER
   SUGGESTION_ANALYTICS
+  RANK_CARDS
+  CONFESSIONS
+  MEMBER_MILESTONES
+  RULES_GATE
+  PRESTIGE
+  REMINDERS
 }
 
 model GrowthSnapshot {
@@ -214,6 +224,7 @@ model WelcomeConfig {
   embedEnabled Boolean @default(true)
   embedTitle   String?
   buttons      Json    @default("[]")
+  embedExtra   Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
 }
 
 model CustomCommand {
@@ -226,6 +237,7 @@ model CustomCommand {
   embedTitle   String?
   embedColor   String?
   buttons      Json     @default("[]")
+  embedExtra   Json?
   createdAt    DateTime @default(now())
 
   @@unique([guildId, trigger])
@@ -251,6 +263,7 @@ model MemberXp {
   userId    String
   xp        Int      @default(0)
   level     Int      @default(0)
+  prestige  Int      @default(0)
   updatedAt DateTime @updatedAt
 
   @@unique([guildId, userId])
@@ -281,6 +294,7 @@ model Event {
   embedEnabled          Boolean       @default(true)
   embedColor            String?       @default("#00E5FF")
   buttons               Json          @default("[]")
+  embedExtra            Json?
   // Which RSVP role buttons show on the event (and correspondingly which
   // stat fields the embed shows) — e.g. a simple meetup might only want
   // Attending/Absent, not the raid roles.
@@ -337,6 +351,7 @@ model SavedEmbed {
   embedDescription String?
   embedColor       String?  @default("#00E5FF")
   buttons          Json     @default("[]")
+  embedExtra       Json?
   createdAt        DateTime @default(now())
 
   @@unique([guildId, name])
@@ -353,6 +368,7 @@ model EventTemplate {
   embedEnabled          Boolean  @default(true)
   embedColor            String?  @default("#00E5FF")
   buttons               Json     @default("[]")
+  embedExtra            Json?
   enabledRoles          Json     @default("[\"TANK\",\"DPS\",\"HEALER\",\"ATTENDING\",\"ABSENT\"]")
   createdAt             DateTime @default(now())
 
@@ -473,6 +489,7 @@ model StickyMessage {
   // Link buttons only (label + url) — no custom_id, so no interaction
   // handler is needed on the bot side. [{ "label": string, "url": string }]
   buttons          Json    @default("[]")
+  embedExtra       Json?
 }
 
 // ---- Starboard ----
@@ -660,6 +677,7 @@ model Giveaway {
   embedColor  String?  @default("#B14BFF")
   imageUrl    String?
   buttons     Json     @default("[]")
+  embedExtra  Json?
   winnerCount Int      @default(1)
   endsAt      DateTime
   ended       Boolean  @default(false)
@@ -1083,6 +1101,74 @@ model AccessAuditEntry {
   @@index([createdAt])
 }
 
+// ---- Confessions ----
+// Anonymous message relay — /confess posts the content to channelId with
+// no author info attached, numbered sequentially per guild.
+
+model ConfessionSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+  nextNumber Int    @default(1)
+}
+
+// ---- Member Milestones ----
+// Join-date anniversaries (1 year, 2 years, ...), checked daily — distinct
+// from Birthdays, which tracks a date the member entered themselves.
+
+model MilestoneSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+}
+
+// ---- Rules Gate ----
+// A single "I Agree" button on a posted rules message — clicking grants
+// roleId. Distinct from Verification (which is about proving you're not a
+// bot / account age), this is about confirming the rules were read.
+
+model RulesGateSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+  messageId String?
+  roleId    String?
+}
+
+// ---- Prestige ----
+// Once a member hits maxLevel, /prestige resets their MemberXp back to
+// level 0 (keeping the running prestige count) and optionally grants a
+// per-prestige role — keeps a long-lived leaderboard from going stale
+// once the earliest members are permanently far ahead of everyone else.
+
+model PrestigeSettings {
+  id       String  @id @default(cuid())
+  guild    Guild   @relation(fields: [guildId], references: [id])
+  guildId  String  @unique
+  maxLevel Int     @default(50)
+  roleId   String?
+}
+
+// ---- Reminders ----
+// Personal /remindme entries — checked by a minutely cron job, DMed back
+// to the user (falling back to the channel it was set in if the DM
+// fails), then deleted.
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  guildId   String?
+  channelId String
+  message   String
+  remindAt  DateTime
+  createdAt DateTime @default(now())
+
+  @@index([remindAt])
+}
+
 // ---- Bot Customization ----
 // Account-wide, not per-guild — a bot's username/avatar/presence/
 // description are Discord application-level settings, the same across
@@ -1224,6 +1310,7 @@ model CustomSlashCommand {
   embedDescription String?
   embedColor       String?
   buttons          Json    @default("[]")
+  embedExtra       Json?
   createdAt        DateTime @default(now())
 
   @@unique([guildId, name])
@@ -1264,6 +1351,7 @@ model Announcement {
   embedTitle   String?
   embedColor   String?   @default("#00E5FF")
   buttons      Json      @default("[]")
+  embedExtra   Json?
   scheduledFor DateTime?
   sentAt       DateTime?
   createdAt    DateTime  @default(now())
@@ -1298,6 +1386,7 @@ model BirthdayConfig {
   embedTitle      String? @default("🎂 Happy Birthday!")
   embedMessage    String? @default("Everyone wish {user} a happy birthday! 🎉")
   embedColor      String? @default("#FF69B4")
+  embedExtra      Json?
   pingRoleId      String?
   useButton       Boolean @default(false) // post a "Set My Birthday" button panel instead of relying on /birthday set alone
   buttonChannelId String?
@@ -1408,13 +1497,14 @@ model DashboardAuditEntry {
 // the trigger point rather than duplicating warn logic elsewhere.
 
 model WarnEscalationSettings {
-  id             String @id @default(cuid())
-  guild          Guild  @relation(fields: [guildId], references: [id])
-  guildId        String @unique
-  warnThreshold  Int    @default(3)
-  warnWindowDays Int    @default(30)
-  action         String @default("TIMEOUT") // TIMEOUT | KICK | BAN
-  timeoutMinutes Int    @default(60)
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String  @unique
+  warnThreshold  Int     @default(3)
+  warnWindowDays Int     @default(30)
+  action         String  @default("TIMEOUT") // TIMEOUT | KICK | BAN
+  timeoutMinutes Int     @default(60)
+  scaleDuration  Boolean @default(false) // when action is TIMEOUT, double timeoutMinutes for each prior auto-escalation instead of always using the same length
 }
 
 // ---- Ban/Mute Appeals ----

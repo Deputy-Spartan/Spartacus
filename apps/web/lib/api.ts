@@ -1,3 +1,5 @@
+import type { EmbedExtra } from "./embedExtra";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const TOKEN_KEY = "spartacus_token";
 
@@ -70,6 +72,7 @@ export interface WelcomeConfig {
   embedEnabled: boolean;
   embedTitle: string | null;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface AutomodConfig {
@@ -95,6 +98,7 @@ export interface CustomCommand {
   embedTitle: string | null;
   embedColor: string | null;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface StreamSubscription {
@@ -120,6 +124,7 @@ export interface EventRow {
   buttons: StickyButton[];
   enabledRoles: RsvpRole[];
   signups: Array<{ userId: string; role: string }>;
+  embedExtra?: EmbedExtra;
 }
 export interface EventInput {
   title: string;
@@ -131,6 +136,7 @@ export interface EventInput {
   embedColor: string;
   buttons: StickyButton[];
   enabledRoles: RsvpRole[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface EventTemplateRow {
@@ -143,6 +149,7 @@ export interface EventTemplateRow {
   embedColor: string | null;
   buttons: StickyButton[];
   enabledRoles: RsvpRole[];
+  embedExtra?: EmbedExtra;
 }
 export interface EventTemplateInput {
   name: string;
@@ -153,6 +160,7 @@ export interface EventTemplateInput {
   embedColor: string;
   buttons: StickyButton[];
   enabledRoles: RsvpRole[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface EventSettingsRow {
@@ -177,6 +185,7 @@ export interface SavedEmbedRow {
   embedDescription: string | null;
   embedColor: string | null;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 export interface SavedEmbedInput {
   name: string;
@@ -186,6 +195,7 @@ export interface SavedEmbedInput {
   embedDescription: string;
   embedColor: string;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface StatChannelRow {
@@ -246,6 +256,7 @@ export interface CustomSlashCommandRow {
   embedDescription: string | null;
   embedColor: string | null;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 export interface CustomSlashCommandInput {
   name: string;
@@ -260,6 +271,7 @@ export interface CustomSlashCommandInput {
   embedDescription?: string;
   embedColor?: string;
   buttons?: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface SendMessageInput {
@@ -270,6 +282,7 @@ export interface SendMessageInput {
   embedDescription: string;
   embedColor: string;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface LeaderboardRow {
@@ -383,6 +396,7 @@ export interface StickyMessageRow {
   embedDescription: string | null;
   embedColor: string | null;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 export interface StickyMessageInput {
   content: string;
@@ -391,6 +405,7 @@ export interface StickyMessageInput {
   embedDescription: string | null;
   embedColor: string | null;
   buttons: StickyButton[];
+  embedExtra?: EmbedExtra;
 }
 
 export interface StarboardConfig {
@@ -441,6 +456,7 @@ export interface AnnouncementRow {
   scheduledFor: string | null;
   sentAt: string | null;
   createdAt: string;
+  embedExtra?: EmbedExtra;
 }
 export interface AnnouncementInput {
   channelId: string;
@@ -450,6 +466,7 @@ export interface AnnouncementInput {
   embedColor: string;
   buttons: StickyButton[];
   scheduledFor: string | null;
+  embedExtra?: EmbedExtra;
 }
 
 export interface AutoPurgeConfigRow {
@@ -478,6 +495,7 @@ export interface BirthdayConfigRow {
   pingRoleId: string | null;
   useButton: boolean;
   buttonChannelId: string | null;
+  embedExtra?: EmbedExtra;
 }
 
 export interface BirthdayRow {
@@ -662,6 +680,7 @@ export interface GiveawayRow {
   endsAt: string;
   ended: boolean;
   entries: Array<{ userId: string }>;
+  embedExtra?: EmbedExtra;
 }
 export interface GiveawayInput {
   channelId: string;
@@ -669,6 +688,7 @@ export interface GiveawayInput {
   description?: string;
   embedColor?: string;
   imageUrl?: string;
+  embedExtra?: EmbedExtra;
   buttons?: StickyButton[];
   winnerCount: number;
   endsAt: string;
@@ -827,6 +847,12 @@ export interface WarnEscalationSettingsRow {
   warnWindowDays: number;
   action: "TIMEOUT" | "KICK" | "BAN";
   timeoutMinutes: number;
+  scaleDuration: boolean;
+}
+
+export interface PrestigeSettingsRow {
+  maxLevel: number;
+  roleId: string | null;
 }
 
 export interface BumpReminderSettingsRow {
@@ -835,7 +861,21 @@ export interface BumpReminderSettingsRow {
   nextReminderAt: string | null;
 }
 
+export interface RulesGateSettingsRow {
+  channelId: string | null;
+  roleId: string | null;
+}
+
 export interface SuggestionAnalyticsSettingsRow {
+  channelId: string | null;
+}
+
+export interface ConfessionSettingsRow {
+  channelId: string | null;
+  nextNumber: number;
+}
+
+export interface MilestoneSettingsRow {
   channelId: string | null;
 }
 
@@ -1285,9 +1325,25 @@ export const api = {
   updateWarnEscalationSettings: (guildId: string, input: Partial<WarnEscalationSettingsRow>) =>
     request<WarnEscalationSettingsRow>(`/guilds/${guildId}/warn-escalation`, { method: "PUT", body: JSON.stringify(input) }),
 
+  getPrestigeSettings: (guildId: string) => request<PrestigeSettingsRow>(`/guilds/${guildId}/prestige-settings`),
+  updatePrestigeSettings: (guildId: string, input: Partial<PrestigeSettingsRow>) =>
+    request<PrestigeSettingsRow>(`/guilds/${guildId}/prestige-settings`, { method: "PUT", body: JSON.stringify(input) }),
+
   getBumpReminderSettings: (guildId: string) => request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`),
   updateBumpReminderSettings: (guildId: string, input: Partial<BumpReminderSettingsRow>) =>
     request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getRulesGateSettings: (guildId: string) => request<RulesGateSettingsRow>(`/guilds/${guildId}/rules-gate-settings`),
+  updateRulesGateSettings: (guildId: string, input: Partial<RulesGateSettingsRow>) =>
+    request<RulesGateSettingsRow>(`/guilds/${guildId}/rules-gate-settings`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getConfessionSettings: (guildId: string) => request<ConfessionSettingsRow>(`/guilds/${guildId}/confession-settings`),
+  updateConfessionSettings: (guildId: string, input: Partial<ConfessionSettingsRow>) =>
+    request<ConfessionSettingsRow>(`/guilds/${guildId}/confession-settings`, { method: "PUT", body: JSON.stringify(input) }),
+
+  getMilestoneSettings: (guildId: string) => request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`),
+  updateMilestoneSettings: (guildId: string, input: Partial<MilestoneSettingsRow>) =>
+    request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`, { method: "PUT", body: JSON.stringify(input) }),
 
   getSuggestionAnalyticsSettings: (guildId: string) => request<SuggestionAnalyticsSettingsRow>(`/guilds/${guildId}/suggestion-analytics`),
   updateSuggestionAnalyticsSettings: (guildId: string, input: Partial<SuggestionAnalyticsSettingsRow>) =>

@@ -275,6 +275,18 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("rulesgate:agree:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "RULES_GATE");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Rules Gate is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const settingsId = interaction.customId.split(":")[2];
+    const { handleRulesGateAgree } = await import("../modules/community/rulesGate");
+    await handleRulesGateAgree(interaction, settingsId);
+    return;
+  }
+
   if (interaction.customId.startsWith("giveaway:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "GIVEAWAYS");
     if (!enabled) {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { FormError } from "../../../../components/ui/FormError";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { api, type WarnEscalationSettingsRow } from "../../../../lib/api";
 
 const DEFAULTS: WarnEscalationSettingsRow = {
@@ -11,6 +12,7 @@ const DEFAULTS: WarnEscalationSettingsRow = {
   warnWindowDays: 30,
   action: "TIMEOUT",
   timeoutMinutes: 60,
+  scaleDuration: false,
 };
 
 export default function WarnEscalationPage({ params }: { params: { guildId: string } }) {
@@ -90,6 +92,19 @@ export default function WarnEscalationPage({ params }: { params: { guildId: stri
               value={settings.timeoutMinutes}
               onChange={(e) => setSettings((s) => ({ ...s, timeoutMinutes: Number(e.target.value) }))}
             />
+          </div>
+        )}
+
+        {settings.action === "TIMEOUT" && (
+          <div className="mb-4 flex items-center gap-3">
+            <ToggleSwitch
+              enabled={settings.scaleDuration}
+              onChange={(next) => setSettings((s) => ({ ...s, scaleDuration: next }))}
+              label="Scale timeout duration"
+            />
+            <span className="text-sm text-slate-400">
+              Double the timeout length for each repeat offense instead of always using the same length.
+            </span>
           </div>
         )}
 

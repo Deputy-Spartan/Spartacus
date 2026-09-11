@@ -5,6 +5,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 import { ActivityType, Client, Events, GatewayIntentBits, Options, Partials, type PresenceStatusData } from "discord.js";
 import { logError, prisma } from "@spartacus/db";
 import { commands } from "./commands";
+import { registerCommands } from "./lib/registerCommands";
 import * as interactionCreate from "./events/interactionCreate";
 import * as messageCreate from "./events/messageCreate";
 import * as guildMemberAdd from "./events/guildMemberAdd";
@@ -157,6 +158,11 @@ export function startBot() {
 
   client.once("ready", async (c) => {
     console.log(`[bot] Logged in as ${c.user.tag}`);
+
+    registerCommands()
+      .then(({ count, scope }) => console.log(`[bot] Registered ${count} slash command(s) ${scope}.`))
+      .catch((err) => console.error("[bot] Failed to auto-register slash commands on boot:", err));
+
     startEventReminderJob(c);
     startEventSyncJob(c);
     startStatChannelsJob(c);

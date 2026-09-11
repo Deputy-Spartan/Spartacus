@@ -18,8 +18,8 @@ import { isOwner } from "../../lib/owner";
 // list the dashboard's own sidebar and module toggles are built from — so
 // this can never drift out of sync with what's actually on the dashboard
 // the way a hand-maintained channel list could. Every run computes a full
-// plan (what's missing, what's stale) and asks for confirmation before
-// touching anything; nothing is created or deleted automatically.
+// plan (what's missing, what's misplaced, what's stale) and asks for
+// confirmation before touching anything.
 interface ChannelSpec {
   name: string;
   type: "text" | "voice";
@@ -60,78 +60,122 @@ function buildLayout(): CategorySpec[] {
 interface Plan {
   categoriesToCreate: string[]; // category names that don't exist yet
   channelsToCreate: Array<{ categoryName: string; channel: ChannelSpec }>;
+  // A channel with the right name exists somewhere in the server but isn't
+  // parented under the category it's supposed to be in (this is what a
+  // botched category creation looks like — the channel got made but ended
+  // up top-level). Fixed by moving it, not creating a duplicate.
+  channelsToReparent: Array<{ channelId: string; label: string; targetCategoryName: string }>;
   staleChannelIds: string[];
   staleChannelLabels: string[];
   emptyCategoryIds: string[];
 }
 
 function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
+  const byName = new Map<string, Array<{ id: string; name: string; parentId: string | null }>>();
+  for (const c of guild.channels.cache.values()) {
+    if (c.type === ChannelType.GuildCategory) continue;
+    const key = c.name.toLowerCase();
+    if (!byName.has(key)) byName.set(key, []);
+    byName.get(key)!.push({ id: c.id, name: c.name, parentId: c.parentId });
+  }
+
+  const claimedChannelIds = new Set<string>();
   const categoriesToCreate: string[] = [];
   const channelsToCreate: Plan["channelsToCreate"] = [];
-  const staleChannelIds: string[] = [];
-  const staleChannelLabels: string[] = [];
-  const emptyCategoryIds: string[] = [];
+  const channelsToReparent: Plan["channelsToReparent"] = [];
 
   for (const category of layout) {
     const existingCategory = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === category.name);
-    if (!existingCategory) {
-      categoriesToCreate.push(category.name);
-      for (const ch of category.channels) channelsToCreate.push({ categoryName: category.name, channel: ch });
-      continue;
-    }
-
-    const currentNames = new Set(category.channels.map((ch) => ch.name.toLowerCase()));
-    const children = guild.channels.cache.filter((c) => c.parentId === existingCategory.id);
-    let kept = 0;
-
-    for (const child of children.values()) {
-      if (currentNames.has(child.name.toLowerCase())) kept++;
-      else {
-        staleChannelIds.push(child.id);
-        staleChannelLabels.push(`#${child.name} (${category.name})`);
-      }
-    }
-    if (kept === 0 && children.size > 0) emptyCategoryIds.push(existingCategory.id);
+    if (!existingCategory) categoriesToCreate.push(category.name);
 
     for (const ch of category.channels) {
-      const exists = [...children.values()].some((c) => c.name.toLowerCase() === ch.name.toLowerCase());
-      if (!exists) channelsToCreate.push({ categoryName: category.name, channel: ch });
+      const candidates = byName.get(ch.name.toLowerCase()) ?? [];
+      const alreadyCorrect = existingCategory && candidates.find((c) => c.parentId === existingCategory.id);
+      if (alreadyCorrect) {
+        claimedChannelIds.add(alreadyCorrect.id);
+        continue;
+      }
+      const misplaced = candidates.find((c) => !claimedChannelIds.has(c.id));
+      if (misplaced) {
+        claimedChannelIds.add(misplaced.id);
+        channelsToReparent.push({ channelId: misplaced.id, label: `#${misplaced.name}`, targetCategoryName: category.name });
+        continue;
+      }
+      channelsToCreate.push({ categoryName: category.name, channel: ch });
     }
   }
 
-  return { categoriesToCreate, channelsToCreate, staleChannelIds, staleChannelLabels, emptyCategoryIds };
+  // Stale: anything currently sitting under one of our managed categories
+  // that wasn't claimed above — i.e. doesn't match any current spec for
+  // that category, so it's left over from a retired/renamed feature.
+  const staleChannelIds: string[] = [];
+  const staleChannelLabels: string[] = [];
+  const emptyCategoryIds: string[] = [];
+  const managedCategoryNames = new Set(layout.map((c) => c.name));
+
+  for (const cat of guild.channels.cache.values()) {
+    if (cat.type !== ChannelType.GuildCategory || !managedCategoryNames.has(cat.name)) continue;
+    const children = guild.channels.cache.filter((c) => c.parentId === cat.id);
+    let kept = 0;
+    for (const child of children.values()) {
+      if (claimedChannelIds.has(child.id)) kept++;
+      else {
+        staleChannelIds.push(child.id);
+        staleChannelLabels.push(`#${child.name} (${cat.name})`);
+      }
+    }
+    if (kept === 0 && children.size > 0) emptyCategoryIds.push(cat.id);
+  }
+
+  return { categoriesToCreate, channelsToCreate, channelsToReparent, staleChannelIds, staleChannelLabels, emptyCategoryIds };
 }
 
-async function applyCreate(guild: Guild, layout: CategorySpec[], plan: Plan): Promise<{ created: number; failures: string[] }> {
-  let created = 0;
+async function ensureCategories(guild: Guild, names: string[]): Promise<{ ids: Map<string, string>; failures: string[] }> {
+  const ids = new Map<string, string>();
   const failures: string[] = [];
-  const categoryIdByName = new Map<string, string>();
-
-  for (const name of new Set(plan.channelsToCreate.map((c) => c.categoryName))) {
+  for (const name of names) {
     const existing = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === name);
     if (existing) {
-      categoryIdByName.set(name, existing.id);
+      ids.set(name, existing.id);
       continue;
     }
     try {
       const created = await guild.channels.create({ name, type: ChannelType.GuildCategory });
-      categoryIdByName.set(name, created.id);
+      ids.set(name, created.id);
     } catch (err) {
       failures.push(`(category) ${name}`);
       console.error(`[setup-test-server] failed to create category "${name}":`, err);
     }
   }
+  return { ids, failures };
+}
 
+async function applyCreate(guild: Guild, plan: Plan): Promise<{ created: number; failures: string[] }> {
+  const allCategoryNames = [...new Set([...plan.categoriesToCreate, ...plan.channelsToCreate.map((c) => c.categoryName)])];
+  const { ids: categoryIdByName, failures } = await ensureCategories(guild, allCategoryNames);
+
+  let created = 0;
   for (const { categoryName, channel } of plan.channelsToCreate) {
     const parentId = categoryIdByName.get(categoryName);
-    if (!parentId) continue;
+    if (!parentId) {
+      failures.push(channel.name);
+      continue;
+    }
     try {
-      await guild.channels.create({
+      const result = await guild.channels.create({
         name: channel.name,
         type: channel.type === "voice" ? ChannelType.GuildVoice : ChannelType.GuildText,
         parent: parentId,
       });
-      created++;
+      // Discord silently drops an invalid/stale parent instead of erroring
+      // rather than failing the request — verify it actually landed where
+      // it should so a bad parent id shows up as a loud failure, not a
+      // second orphaned channel.
+      if (result.parentId !== parentId) {
+        failures.push(`${channel.name} (created but not in ${categoryName} — check permissions)`);
+      } else {
+        created++;
+      }
     } catch (err) {
       failures.push(channel.name);
       console.error(`[setup-test-server] failed to create channel "${channel.name}":`, err);
@@ -139,6 +183,35 @@ async function applyCreate(guild: Guild, layout: CategorySpec[], plan: Plan): Pr
   }
 
   return { created, failures };
+}
+
+async function applyReparent(guild: Guild, plan: Plan): Promise<{ reparented: number; failures: string[] }> {
+  const failures: string[] = [];
+  let reparented = 0;
+  const categoryNames = [...new Set(plan.channelsToReparent.map((r) => r.targetCategoryName))];
+  const { ids: categoryIdByName, failures: categoryFailures } = await ensureCategories(guild, categoryNames);
+  failures.push(...categoryFailures);
+
+  for (const r of plan.channelsToReparent) {
+    const parentId = categoryIdByName.get(r.targetCategoryName);
+    if (!parentId) {
+      failures.push(r.label);
+      continue;
+    }
+    const channel = await guild.channels.fetch(r.channelId).catch(() => null);
+    if (!channel || !("setParent" in channel) || typeof channel.setParent !== "function") {
+      failures.push(r.label);
+      continue;
+    }
+    try {
+      await channel.setParent(parentId, { lockPermissions: false });
+      reparented++;
+    } catch (err) {
+      failures.push(r.label);
+      console.error(`[setup-test-server] failed to move "${r.label}" into ${r.targetCategoryName}:`, err);
+    }
+  }
+  return { reparented, failures };
 }
 
 async function applyDelete(guild: Guild, plan: Plan): Promise<{ deletedChannels: number; deletedCategories: number }> {
@@ -183,6 +256,16 @@ function summarize(plan: Plan): string {
         "."
     );
   }
+  if (plan.channelsToReparent.length > 0) {
+    parts.push(
+      `📦 Would move ${plan.channelsToReparent.length} existing channel(s) into their correct category (found the right channel, wrong place — e.g. sitting at the top level with no category):\n` +
+        plan.channelsToReparent
+          .slice(0, 15)
+          .map((r) => `${r.label} → ${r.targetCategoryName}`)
+          .join("\n") +
+        (plan.channelsToReparent.length > 15 ? `\n…and ${plan.channelsToReparent.length - 15} more` : "")
+    );
+  }
   if (plan.staleChannelIds.length > 0) {
     parts.push(
       `🗑️ Would remove ${plan.staleChannelIds.length} leftover channel(s) no longer matching any dashboard feature:\n` +
@@ -215,8 +298,8 @@ const command: CommandModule = {
     const layout = buildLayout();
     const plan = computePlan(interaction.guild, layout);
 
-    if (plan.channelsToCreate.length === 0 && plan.staleChannelIds.length === 0) {
-      await interaction.reply({ content: "✅ Already up to date — every dashboard feature has a channel, nothing stale.", ephemeral: true });
+    if (plan.channelsToCreate.length === 0 && plan.channelsToReparent.length === 0 && plan.staleChannelIds.length === 0) {
+      await interaction.reply({ content: "✅ Already up to date — every dashboard feature has a correctly-placed channel, nothing stale.", ephemeral: true });
       return;
     }
 
@@ -225,7 +308,7 @@ const command: CommandModule = {
     pendingPlans.set(token, { guildId: interaction.guild.id, plan, createdAt: Date.now() });
 
     const buttons = [new ButtonBuilder().setCustomId(`setuptestserver:confirm:${token}`).setLabel("Confirm").setStyle(ButtonStyle.Success)];
-    if (plan.channelsToCreate.length > 0 && plan.staleChannelIds.length > 0) {
+    if ((plan.channelsToCreate.length > 0 || plan.channelsToReparent.length > 0) && plan.staleChannelIds.length > 0) {
       buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:deleteonly:${token}`).setLabel("Delete stale only").setStyle(ButtonStyle.Danger));
     }
     buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:skip:${token}`).setLabel("Skip").setStyle(ButtonStyle.Secondary));
@@ -256,13 +339,18 @@ export async function handleSetupTestServerConfirm(interaction: ButtonInteractio
   const pending = await loadPending(interaction, token);
   if (!pending) return;
   const guild = interaction.guild!;
-  const layout = buildLayout();
 
-  const { created, failures } = await applyCreate(guild, layout, pending.plan);
+  const { created, failures: createFailures } = await applyCreate(guild, pending.plan);
+  const { reparented, failures: reparentFailures } = await applyReparent(guild, pending.plan);
   const { deletedChannels, deletedCategories } = await applyDelete(guild, pending.plan);
+  const failures = [...createFailures, ...reparentFailures];
 
-  const parts = [`✅ Created ${created} channel(s).`, `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} empty categor${deletedCategories === 1 ? "y" : "ies"}` : ""}.`];
-  if (failures.length > 0) parts.push(`⚠️ Couldn't create: ${failures.join(", ")} — check my Manage Channels permission.`);
+  const parts = [
+    `✅ Created ${created} channel(s).`,
+    `📦 Moved ${reparented} channel(s) into their correct category.`,
+    `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} empty categor${deletedCategories === 1 ? "y" : "ies"}` : ""}.`,
+  ];
+  if (failures.length > 0) parts.push(`⚠️ Couldn't finish: ${failures.join(", ")} — check my Manage Channels permission.`);
   await interaction.update({ content: parts.join("\n"), components: [] });
 }
 
@@ -271,14 +359,14 @@ export async function handleSetupTestServerDeleteOnly(interaction: ButtonInterac
   if (!pending) return;
   const { deletedChannels, deletedCategories } = await applyDelete(interaction.guild!, pending.plan);
   await interaction.update({
-    content: `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} empty categor${deletedCategories === 1 ? "y" : "ies"}` : ""}. Nothing was created.`,
+    content: `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} empty categor${deletedCategories === 1 ? "y" : "ies"}` : ""}. Nothing was created or moved.`,
     components: [],
   });
 }
 
 export async function handleSetupTestServerSkip(interaction: ButtonInteraction, token: string) {
   pendingPlans.delete(token);
-  await interaction.update({ content: "Skipped — nothing was created or deleted.", components: [] });
+  await interaction.update({ content: "Skipped — nothing was created, moved, or deleted.", components: [] });
 }
 
 export default command;

@@ -65,8 +65,9 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
   }
 
   async function save() {
-    if (!channelId || !form.content) {
-      setError("Select a channel and enter a message before saving.");
+    const hasContent = !!form.content.trim() || !!form.embedTitle?.trim() || !!form.embedDescription?.trim();
+    if (!channelId || !hasContent) {
+      setError("Select a channel and fill in at least one message field before saving.");
       return;
     }
     setError(null);
@@ -160,10 +161,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
             />
             {editingId && <p className="text-xs text-slate-600 -mt-3 mb-4">Channel can't be changed once created.</p>}
 
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-              {form.embedEnabled ? "Fallback / Embed Description" : "Message"}
-              <Required />
-            </label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
             <MarkdownToolbar guildId={params.guildId} textareaRef={contentRef} value={form.content} onChange={(v) => setForm({ ...form, content: v })} />
             <textarea
               ref={contentRef}

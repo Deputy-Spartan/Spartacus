@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { EmbedFields } from "../../../../components/ui/EmbedFields";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
@@ -144,7 +142,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
             {editingId && <p className="text-xs text-slate-600 -mt-3 mb-4">Trigger can't be changed once created.</p>}
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-              {form.embedEnabled ? "Embed Description" : "Response"}
+              Response
               <Required />
             </label>
             <textarea
@@ -152,20 +150,6 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
               placeholder="Response text…"
               value={form.response}
               onChange={(e) => setForm({ ...form, response: e.target.value })}
-            />
-
-            <EmbedFields
-              guildId={params.guildId}
-              embedEnabled={form.embedEnabled}
-              embedTitle={form.embedTitle ?? ""}
-              embedColor={form.embedColor ?? "#5865F2"}
-              buttons={form.buttons}
-              onChange={(next) => setForm({ ...form, ...next })}
-            />
-
-            <EmbedExtraFields
-              value={form.embedExtra ?? {}}
-              onChange={(v) => setForm({ ...form, embedExtra: v })}
             />
 
             <SavedEmbedPicker
@@ -181,12 +165,12 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
               )}
               <StickyPreview
                 content={form.response}
-                embedEnabled={form.embedEnabled}
-                embedTitle={form.embedTitle ?? ""}
+                embedEnabled={false}
+                embedTitle=""
                 embedDescription={form.response}
-                embedColor={form.embedColor ?? "#5865F2"}
-                buttons={form.buttons}
-                embedExtra={form.embedExtra}
+                embedColor="#5865F2"
+                buttons={[]}
+                embedExtra={{}}
               />
             </div>
 

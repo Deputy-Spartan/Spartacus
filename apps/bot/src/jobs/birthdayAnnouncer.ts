@@ -1,10 +1,9 @@
 import cron from "node-cron";
-import { EmbedBuilder, Client } from "discord.js";
+import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
-import { applyEmbedExtra } from "../lib/embedExtra";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 // Runs once a day at 9am server time — posts one embed per birthday config
@@ -40,20 +39,17 @@ export function startBirthdayAnnouncerJob(client: Client) {
       const message = (config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, mentions);
 
       const saved = await resolveSavedEmbed(config.savedEmbedId);
-      let payload;
       if (saved) {
-        payload = buildSavedEmbedPayload(saved);
-      } else {
-        const embed = new EmbedBuilder()
-          .setColor((config.embedColor as `#${string}`) || "#FF69B4")
-          .setTitle(config.embedTitle || "🎂 Happy Birthday!")
-          .setDescription(message)
-          .setTimestamp();
-        applyEmbedExtra(embed, config.embedExtra);
-        payload = { content: config.pingRoleId ? `<@&${config.pingRoleId}>` : undefined, embeds: [embed], components: [] };
+        const payload = buildSavedEmbedPayload(saved);
+        await channel.send(payload).catch((err) => {
+          if (loggedThisTick < 5) { logError("bot", err, guildId); loggedThisTick++; }
+          return null;
+        });
+        continue;
       }
 
-      await channel.send(payload).catch((err) => {
+      const pingPrefix = config.pingRoleId ? `<@&${config.pingRoleId}> ` : "";
+      await channel.send({ content: `${pingPrefix}${message}` }).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, guildId); loggedThisTick++; }
         return null;
       });

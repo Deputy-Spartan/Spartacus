@@ -6,12 +6,11 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { api, type LfgCommandRow, type LfgCommandInput, type LfgMode } from "../../../../lib/api";
+import { api, type LfgCommandRow, type LfgCommandInput } from "../../../../lib/api";
 
 const EMPTY: LfgCommandInput = {
   trigger: "",
@@ -61,7 +60,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
       roleId: row.roleId ?? "",
       includeSender: row.includeSender,
       enabled: row.enabled,
-      mode: row.mode,
+      mode: "plain",
       message: row.message ?? EMPTY.message,
       embedTitle: row.embedTitle ?? EMPTY.embedTitle,
       embedDescription: row.embedDescription ?? EMPTY.embedDescription,
@@ -85,7 +84,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
     setSaving(true);
     setError(null);
     try {
-      const payload: LfgCommandInput = { ...form, trigger: form.trigger.trim().toLowerCase() };
+      const payload: LfgCommandInput = { ...form, trigger: form.trigger.trim().toLowerCase(), mode: "plain" };
       if (editingId) {
         await api.updateLfgCommand(guildId, editingId, payload);
       } else {
@@ -103,10 +102,6 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
     if (!(await confirm(`Delete "!${row.trigger}"? It will be removed from Discord immediately.`, { danger: true }))) return;
     await api.deleteLfgCommand(guildId, row.id);
     refresh();
-  }
-
-  function setMode(mode: LfgMode) {
-    setForm((f) => ({ ...f, mode }));
   }
 
   return (
@@ -136,7 +131,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
                   {!row.enabled && <span className="ml-2 text-[10px] uppercase text-slate-500">Disabled</span>}
                 </p>
                 <p className="text-xs text-slate-500 truncate">
-                  {row.mode === "embed" ? "Embed" : "Plain text"} · locked to a channel · {row.roleId ? "pings a role" : "no role ping"}
+                  locked to a channel · {row.roleId ? "pings a role" : "no role ping"}
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -213,85 +208,22 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
             <ToggleSwitch enabled={!!form.enabled} onChange={(v) => setForm({ ...form, enabled: v })} />
           </div>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Announcement</label>
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setMode("plain")}
-              className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                form.mode === "plain" ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100" : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
-              }`}
-            >
-              Plain text
-            </button>
-            <button
-              onClick={() => setMode("embed")}
-              className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                form.mode === "embed" ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100" : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
-              }`}
-            >
-              Embed
-            </button>
-          </div>
-
           <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
 
-          {form.mode === "plain" ? (
-            <div className="mb-4">
-              <textarea
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 font-mono"
-                value={form.message ?? ""}
-                onChange={(e) => setForm({ ...form, message: e.target.value })}
-                placeholder="{user} is looking for a group in {voice}! {message}"
-              />
-              <p className="text-xs text-slate-600 mt-1.5">
-                Tokens: <code className="text-slate-400">{"{user}"}</code> <code className="text-slate-400">{"{voice}"}</code>{" "}
-                <code className="text-slate-400">{"{message}"}</code> — <code className="text-slate-400">{"{message}"}</code> is whatever the
-                sender typed after the command, shown to everyone.
-              </p>
-            </div>
-          ) : (
-            <div className="mb-4 space-y-3">
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Title</label>
-                <input
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                  value={form.embedTitle ?? ""}
-                  onChange={(e) => setForm({ ...form, embedTitle: e.target.value })}
-                  placeholder="🎮 {user} is looking for a group!"
-                />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Description</label>
-                <textarea
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20"
-                  value={form.embedDescription ?? ""}
-                  onChange={(e) => setForm({ ...form, embedDescription: e.target.value })}
-                  placeholder="Joining {voice} — {message}"
-                />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    className="h-9 w-12 rounded-lg border border-white/10 bg-base-950 cursor-pointer"
-                    value={form.embedColor ?? "#7B99BC"}
-                    onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                  />
-                  <input
-                    className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-                    value={form.embedColor ?? "#7B99BC"}
-                    onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                  />
-                </div>
-              </div>
-              <p className="text-xs text-slate-600">
-                Tokens work in the title and description: <code className="text-slate-400">{"{user}"}</code>{" "}
-                <code className="text-slate-400">{"{voice}"}</code> <code className="text-slate-400">{"{message}"}</code>
-              </p>
-              <EmbedExtraFields value={form.embedExtra ?? {}} onChange={(v) => setForm({ ...form, embedExtra: v })} />
-            </div>
-          )}
+          <div className="mb-4">
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Announcement Message</label>
+            <textarea
+              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 font-mono"
+              value={form.message ?? ""}
+              onChange={(e) => setForm({ ...form, message: e.target.value })}
+              placeholder="{user} is looking for a group in {voice}! {message}"
+            />
+            <p className="text-xs text-slate-600 mt-1.5">
+              Tokens: <code className="text-slate-400">{"{user}"}</code> <code className="text-slate-400">{"{voice}"}</code>{" "}
+              <code className="text-slate-400">{"{message}"}</code> — <code className="text-slate-400">{"{message}"}</code> is whatever the
+              sender typed after the command, shown to everyone. Used when no saved embed is selected above.
+            </p>
+          </div>
 
           <div className="mb-4">
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">

@@ -3,12 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
-import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
@@ -35,7 +33,6 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
   const [showEditor, setShowEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
-  const embedDescRef = useRef<HTMLTextAreaElement>(null);
 
   function refresh() {
     api.getStickyMessages(params.guildId).then(setRows);
@@ -173,65 +170,9 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
               onChange={(e) => setForm({ ...form, content: e.target.value })}
             />
 
-            <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
-              <span className="text-sm text-slate-300">Use an embed</span>
-              <ToggleSwitch enabled={form.embedEnabled} onChange={(v) => setForm({ ...form, embedEnabled: v })} />
-            </div>
-
-            {form.embedEnabled && (
-              <div className="mb-4 space-y-3">
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Title</label>
-                  <input
-                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                    value={form.embedTitle ?? ""}
-                    onChange={(e) => setForm({ ...form, embedTitle: e.target.value })}
-                    placeholder="Optional"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Description</label>
-                  <MarkdownToolbar
-                    guildId={params.guildId}
-                    textareaRef={embedDescRef}
-                    value={form.embedDescription ?? ""}
-                    onChange={(v) => setForm({ ...form, embedDescription: v })}
-                  />
-                  <textarea
-                    ref={embedDescRef}
-                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-16"
-                    value={form.embedDescription ?? ""}
-                    onChange={(e) => setForm({ ...form, embedDescription: e.target.value })}
-                    placeholder="Defaults to the message above if left blank"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      className="h-9 w-12 rounded-lg border border-white/10 bg-base-950 cursor-pointer"
-                      value={form.embedColor ?? "#5865F2"}
-                      onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                    />
-                    <input
-                      className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-                      value={form.embedColor ?? "#5865F2"}
-                      onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="mb-4">
               <ButtonsEditor guildId={params.guildId} buttons={form.buttons} onChange={(next) => setForm({ ...form, buttons: next })} />
             </div>
-
-            <EmbedExtraFields
-              value={form.embedExtra ?? {}}
-              onChange={(v) => setForm({ ...form, embedExtra: v })}
-            />
 
             <SavedEmbedPicker
               guildId={params.guildId}
@@ -246,12 +187,12 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
               )}
               <StickyPreview
                 content={form.content}
-                embedEnabled={form.embedEnabled}
-                embedTitle={form.embedTitle ?? ""}
-                embedDescription={form.embedDescription ?? ""}
-                embedColor={form.embedColor ?? "#5865F2"}
+                embedEnabled={false}
+                embedTitle=""
+                embedDescription=""
+                embedColor="#5865F2"
                 buttons={form.buttons}
-                embedExtra={form.embedExtra}
+                embedExtra={{}}
               />
             </div>
 

@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { EmbedFields } from "../../../../components/ui/EmbedFields";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type WelcomeConfig } from "../../../../lib/api";
@@ -68,20 +66,6 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
             onChange={(e) => setConfig({ ...config, goodbyeText: e.target.value })}
           />
 
-          <EmbedFields
-            guildId={params.guildId}
-            embedEnabled={config.embedEnabled}
-            embedTitle={config.embedTitle ?? ""}
-            embedColor={config.embedColor}
-            buttons={config.buttons}
-            onChange={(next) => setConfig({ ...config, ...next })}
-          />
-
-          <EmbedExtraFields
-            value={config.embedExtra ?? {}}
-            onChange={(v) => setConfig({ ...config, embedExtra: v })}
-          />
-
           <SavedEmbedPicker
             guildId={params.guildId}
             value={config.savedEmbedId ?? null}
@@ -96,12 +80,12 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
           )}
           <StickyPreview
             content={previewText}
-            embedEnabled={config.embedEnabled}
-            embedTitle={config.embedTitle ?? ""}
+            embedEnabled={false}
+            embedTitle=""
             embedDescription={previewText}
-            embedColor={config.embedColor}
-            buttons={config.buttons}
-            embedExtra={config.embedExtra}
+            embedColor="#5865F2"
+            buttons={[]}
+            embedExtra={{}}
           />
         </NeonCard>
       </div>

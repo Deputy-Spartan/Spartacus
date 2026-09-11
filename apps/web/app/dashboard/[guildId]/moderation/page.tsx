@@ -5,8 +5,6 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
-import { EmbedFields } from "../../../../components/ui/EmbedFields";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
@@ -652,8 +650,6 @@ const EMPTY_CUSTOM_COMMAND: CustomSlashCommandInput = {
   actionType: "SEND_MESSAGE",
   ephemeralReply: true,
   messageText: "",
-  embedEnabled: false,
-  embedTitle: "",
   embedColor: "#5865F2",
   buttons: [],
   embedExtra: {},
@@ -822,18 +818,6 @@ function CommandsTab({ guildId }: { guildId: string }) {
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-16 mb-4"
                 value={form.messageText}
                 onChange={(e) => setForm({ ...form, messageText: e.target.value })}
-              />
-              <EmbedFields
-                guildId={guildId}
-                embedEnabled={form.embedEnabled ?? true}
-                embedTitle={form.embedTitle ?? ""}
-                embedColor={form.embedColor ?? "#5865F2"}
-                buttons={form.buttons ?? []}
-                onChange={(next) => setForm({ ...form, ...next })}
-              />
-              <EmbedExtraFields
-                value={form.embedExtra ?? {}}
-                onChange={(v) => setForm({ ...form, embedExtra: v })}
               />
               <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
             </div>

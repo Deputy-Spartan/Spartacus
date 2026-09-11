@@ -5,8 +5,6 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
-import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -109,8 +107,6 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
             />
           </div>
 
-          <EmbedExtraFields value={form.embedExtra ?? {}} onChange={(v) => setForm({ ...form, embedExtra: v })} />
-
           <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
 
           <div className="mb-4">
@@ -163,20 +159,19 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
                     <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
                     <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
                   </div>
-                  <div className="rounded bg-[#2b2d31] border-l-4 p-3 max-w-md" style={{ borderColor: form.embedColor || "#B14BFF" }}>
-                    <EmbedExtraThumbnail embedExtra={form.embedExtra} />
-                    <EmbedExtraAuthor embedExtra={form.embedExtra} />
-                    <p className="text-[#f2f3f5] font-semibold text-sm mb-1">🎁 {form.prize || "Prize name"}</p>
-                    <p className="text-[#dbdee1] text-sm whitespace-pre-wrap mb-2">
-                      {form.description ? `${form.description}\n\n` : ""}
-                      Click <span className="font-semibold">Enter</span> below to join. Ends {form.endsAt ? new Date(form.endsAt).toLocaleString() : "…"}.
-                    </p>
-                    <EmbedExtraFieldsPreview embedExtra={form.embedExtra} />
-                    {form.imageUrl && <img src={form.imageUrl} alt="" className="rounded max-h-40 object-cover mb-2" />}
-                    <EmbedExtraImage embedExtra={form.embedExtra} />
-                    <p className="text-[#949ba4] text-xs">{form.winnerCount} winner(s)</p>
-                    <EmbedExtraFooter embedExtra={form.embedExtra} />
-                  </div>
+                  {form.savedEmbedId ? (
+                    <p className="text-xs text-slate-500 italic mb-2">Using your saved embed for this giveaway's announcement.</p>
+                  ) : (
+                    <div className="rounded bg-[#2b2d31] border-l-4 p-3 max-w-md" style={{ borderColor: form.embedColor || "#B14BFF" }}>
+                      <p className="text-[#f2f3f5] font-semibold text-sm mb-1">🎁 {form.prize || "Prize name"}</p>
+                      <p className="text-[#dbdee1] text-sm whitespace-pre-wrap mb-2">
+                        {form.description ? `${form.description}\n\n` : ""}
+                        Click <span className="font-semibold">Enter</span> below to join. Ends {form.endsAt ? new Date(form.endsAt).toLocaleString() : "…"}.
+                      </p>
+                      {form.imageUrl && <img src={form.imageUrl} alt="" className="rounded max-h-40 object-cover mb-2" />}
+                      <p className="text-[#949ba4] text-xs">{form.winnerCount} winner(s)</p>
+                    </div>
+                  )}
                   <div className="mt-2">
                     <span className="inline-block bg-[#248046] text-white text-xs font-medium px-3 py-1.5 rounded">Enter</span>
                   </div>

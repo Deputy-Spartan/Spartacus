@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { EmbedFields } from "../../../../components/ui/EmbedFields";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
@@ -25,6 +23,7 @@ const EMPTY: AnnouncementInput = {
   savedEmbedId: null,
 };
 
+
 export default function AnnouncementsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
@@ -38,8 +37,8 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   useEffect(refresh, [params.guildId]);
 
   async function send() {
-    if (!form.channelId || (!form.content && !form.embedTitle)) {
-      setError("Select a channel and enter a message or embed title before sending.");
+    if (!form.channelId || (!form.content && !form.savedEmbedId)) {
+      setError("Select a channel and enter a message or pick a saved embed before sending.");
       return;
     }
     setError(null);
@@ -89,20 +88,6 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             onChange={(e) => setForm({ ...form, content: e.target.value })}
           />
 
-          <EmbedFields
-            guildId={params.guildId}
-            embedEnabled={form.embedEnabled}
-            embedTitle={form.embedTitle}
-            embedColor={form.embedColor}
-            buttons={form.buttons}
-            onChange={(next) => setForm({ ...form, ...next })}
-          />
-
-          <EmbedExtraFields
-            value={form.embedExtra ?? {}}
-            onChange={(v) => setForm({ ...form, embedExtra: v })}
-          />
-
           <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
@@ -125,13 +110,16 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             <p className="font-medium mb-3">Preview</p>
             <StickyPreview
               content={form.content}
-              embedEnabled={form.embedEnabled}
-              embedTitle={form.embedTitle}
+              embedEnabled={false}
+              embedTitle=""
               embedDescription={form.content}
-              embedColor={form.embedColor}
+              embedColor=""
               buttons={form.buttons}
-              embedExtra={form.embedExtra}
+              embedExtra={{}}
             />
+            {form.savedEmbedId && (
+              <p className="text-xs text-slate-500 mt-2">Preview reflects the saved embed once sent.</p>
+            )}
           </NeonCard>
 
           <NeonCard>

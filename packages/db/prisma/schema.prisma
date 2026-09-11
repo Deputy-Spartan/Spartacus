@@ -90,6 +90,7 @@ model Guild {
   rulesGateSettings RulesGateSettings?
   prestigeSettings  PrestigeSettings?
   suggestionAnalyticsSettings SuggestionAnalyticsSettings?
+  lfgCommands       LfgCommand[]
   createdAt         DateTime             @default(now())
 }
 
@@ -152,6 +153,7 @@ enum ModuleKey {
   RULES_GATE
   PRESTIGE
   REMINDERS
+  LFG
 }
 
 model GrowthSnapshot {
@@ -1314,6 +1316,42 @@ model CustomSlashCommand {
   createdAt        DateTime @default(now())
 
   @@unique([guildId, name])
+}
+
+// ---- LFG (Looking For Group) ----
+// Each command is registered as a real Discord guild slash command (same
+// mechanism as CustomSlashCommand above, discordCommandId lets us clean it
+// up on delete/rename) AND matched against a "!trigger" text prefix in
+// messageCreate.ts — same trigger word drives both. A command is locked to
+// exactly one channel (@@unique guildId+channelId) so two commands can never
+// both fire in the same channel, but a guild can have any number of
+// commands, each with its own channel. Posting mode is either a plain-text
+// template or a full embed (title/description/color + the shared
+// embedExtra author/thumbnail/image/footer/fields set) — never both.
+model LfgCommand {
+  id                  String   @id @default(cuid())
+  guild               Guild    @relation(fields: [guildId], references: [id])
+  guildId             String
+  trigger             String // used as both the "!trigger" prefix word and the /trigger slash command name
+  description         String   @default("Post that you're looking for a group.") // shown in Discord's slash command picker
+  discordCommandId    String?
+  channelId           String
+  roleId              String? // optional role pinged alongside the sender
+  includeSender       Boolean  @default(true)
+  enabled             Boolean  @default(true)
+  mode                String   @default("plain") // "plain" | "embed"
+  message             String? // plain-text template: {user} {voice} {message}
+  embedTitle          String?
+  embedDescription    String?
+  embedColor          String?
+  embedExtra          Json?
+  errorMessage        String   @default("You need to be in a voice channel to use this command.")
+  wrongChannelMessage String   @default("This command can only be used in {channel}.")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([guildId, trigger])
+  @@unique([guildId, channelId])
 }
 
 // ---- Role Panels ----

@@ -82,6 +82,7 @@ import suggestionAnalyticsRouter from "./routes/suggestionAnalytics";
 import confessionSettingsRouter from "./routes/confessionSettings";
 import milestoneSettingsRouter from "./routes/milestoneSettings";
 import rulesGateSettingsRouter from "./routes/rulesGateSettings";
+import lfgCommandsRouter from "./routes/lfgCommands";
 
 const app = express();
 
@@ -166,6 +167,7 @@ app.use(suggestionAnalyticsRouter);
 app.use(confessionSettingsRouter);
 app.use(milestoneSettingsRouter);
 app.use(rulesGateSettingsRouter);
+app.use(lfgCommandsRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

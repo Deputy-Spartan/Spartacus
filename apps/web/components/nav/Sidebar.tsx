@@ -53,6 +53,7 @@ export const NAV_SECTIONS = [
       { href: "/member-milestones", label: "Member Milestones", icon: "🏅" },
       { href: "/confessions", label: "Anonymous", icon: "🤫" },
       { href: "/events", label: "Event Scheduler", icon: "⚔️" },
+      { href: "/lfg", label: "LFG", icon: "🔊" },
     ],
   },
   {

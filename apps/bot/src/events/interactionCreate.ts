@@ -88,13 +88,45 @@ export async function execute(interaction: Interaction) {
     const custom = await prisma.customSlashCommand.findUnique({
       where: { guildId_name: { guildId: interaction.guildId, name: interaction.commandName } },
     });
-    if (!custom) return;
+    if (custom) {
+      try {
+        const { executeCustomCommand } = await import("../modules/community/customSlashCommands");
+        await executeCustomCommand(interaction, custom);
+      } catch (err) {
+        console.error(`[custom-command:${interaction.commandName}] failed:`, err);
+        logError("bot", err, interaction.guildId ?? undefined);
+        const payload = { content: "Something went wrong running that command.", ephemeral: true };
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(payload);
+        } else {
+          await interaction.reply(payload);
+        }
+      }
+      return;
+    }
+
+    // Still not found — check the dashboard-created LFG commands, which are
+    // also registered as real per-guild slash commands (same mechanism as
+    // custom commands above) but live in their own table.
+    const lfg = await prisma.lfgCommand.findUnique({
+      where: { guildId_trigger: { guildId: interaction.guildId, trigger: interaction.commandName } },
+    });
+    if (!lfg) return;
+
+    const lfgModuleEnabled = await isModuleEnabled(interaction.guildId, "LFG");
+    if (!lfgModuleEnabled) {
+      await interaction.reply({
+        content: "⚠️ This feature is currently disabled for this server. An admin can enable it from the Spartacus dashboard.",
+        ephemeral: true,
+      });
+      return;
+    }
 
     try {
-      const { executeCustomCommand } = await import("../modules/community/customSlashCommands");
-      await executeCustomCommand(interaction, custom);
+      const { handleLfgInteraction } = await import("../modules/community/lfg");
+      await handleLfgInteraction(interaction, lfg);
     } catch (err) {
-      console.error(`[custom-command:${interaction.commandName}] failed:`, err);
+      console.error(`[lfg:${interaction.commandName}] failed:`, err);
       logError("bot", err, interaction.guildId ?? undefined);
       const payload = { content: "Something went wrong running that command.", ephemeral: true };
       if (interaction.replied || interaction.deferred) {

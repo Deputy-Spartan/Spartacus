@@ -240,6 +240,42 @@ export interface CommandToggleRow {
   enabled: boolean;
 }
 
+export type LfgMode = "plain" | "embed";
+
+export interface LfgCommandRow {
+  id: string;
+  trigger: string;
+  description: string;
+  channelId: string;
+  roleId: string | null;
+  includeSender: boolean;
+  enabled: boolean;
+  mode: LfgMode;
+  message: string | null;
+  embedTitle: string | null;
+  embedDescription: string | null;
+  embedColor: string | null;
+  embedExtra?: EmbedExtra;
+  errorMessage: string;
+  wrongChannelMessage: string;
+}
+export interface LfgCommandInput {
+  trigger: string;
+  description?: string;
+  channelId: string;
+  roleId?: string | null;
+  includeSender?: boolean;
+  enabled?: boolean;
+  mode?: LfgMode;
+  message?: string | null;
+  embedTitle?: string | null;
+  embedDescription?: string | null;
+  embedColor?: string | null;
+  embedExtra?: EmbedExtra | null;
+  errorMessage?: string;
+  wrongChannelMessage?: string;
+}
+
 export type CustomCommandActionType = "SEND_MESSAGE" | "GIVE_ROLE" | "REMOVE_ROLE" | "ADD_CURRENCY" | "POST_EMBED";
 
 export interface CustomSlashCommandRow {
@@ -1075,6 +1111,14 @@ export const api = {
     request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands`, { method: "POST", body: JSON.stringify(input) }),
   deleteCustomSlashCommand: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "DELETE" }),
+
+  getLfgCommands: (guildId: string) => request<LfgCommandRow[]>(`/guilds/${guildId}/lfg-commands`),
+  createLfgCommand: (guildId: string, input: LfgCommandInput) =>
+    request<LfgCommandRow>(`/guilds/${guildId}/lfg-commands`, { method: "POST", body: JSON.stringify(input) }),
+  updateLfgCommand: (guildId: string, id: string, input: Partial<LfgCommandInput>) =>
+    request<LfgCommandRow>(`/guilds/${guildId}/lfg-commands/${id}`, { method: "PUT", body: JSON.stringify(input) }),
+  deleteLfgCommand: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/lfg-commands/${id}`, { method: "DELETE" }),
 
   getLeaderboard: (guildId: string) => request<LeaderboardRow[]>(`/guilds/${guildId}/leaderboard`),
 

@@ -91,6 +91,20 @@ export async function execute(message: Message) {
     await checkCountingMessage(message);
   }
 
+  // --- LFG (looking for group) prefix trigger, e.g. !lfg need 2 more ---
+  if (message.content.startsWith("!") && (await isModuleEnabled(message.guildId, "LFG"))) {
+    const words = message.content.slice(1).trim().split(/\s+/);
+    const word = (words.shift() || "").toLowerCase();
+    if (word) {
+      const lfg = await prisma.lfgCommand.findUnique({ where: { guildId_trigger: { guildId: message.guildId, trigger: word } } });
+      if (lfg && lfg.enabled) {
+        const { handleLfgMessage } = await import("../modules/community/lfg");
+        await handleLfgMessage(message, lfg, words.join(" "));
+        return;
+      }
+    }
+  }
+
   // --- Dynamic custom commands (e.g. !socials) ---
   if (message.content.startsWith("!") && (await isModuleEnabled(message.guildId, "CUSTOM_COMMANDS"))) {
     const trigger = message.content.slice(1).trim().toLowerCase();

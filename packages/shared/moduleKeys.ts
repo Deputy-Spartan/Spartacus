@@ -56,6 +56,7 @@ export const MODULE_KEYS = [
   "RULES_GATE",
   "PRESTIGE",
   "REMINDERS",
+  "LFG",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -118,6 +119,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   RULES_GATE: "Rules Gate",
   PRESTIGE: "Prestige",
   REMINDERS: "Reminders",
+  LFG: "Looking For Group",
 };
 
 export const SIGNUP_ROLES = [

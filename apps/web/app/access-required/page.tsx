@@ -11,6 +11,7 @@ export default function AccessRequiredPage() {
   const [status, setStatus] = useState<AccessStatus | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [message, setMessage] = useState("");
 
   function refresh() {
     Promise.all([api.getMe(), api.getAccessStatus()])
@@ -28,7 +29,7 @@ export default function AccessRequiredPage() {
 
   async function requestAccess() {
     setRequesting(true);
-    await api.requestAccess().catch(() => null);
+    await api.requestAccess(message.trim() || undefined).catch(() => null);
     setRequesting(false);
     refresh();
   }
@@ -78,13 +79,33 @@ export default function AccessRequiredPage() {
         </div>
 
         {pending ? (
-          <button onClick={checkStatus} disabled={checking} className="neon-button w-full mt-5 disabled:opacity-50">
-            {checking ? "Checking…" : "Check status"}
-          </button>
+          <>
+            {status.message && (
+              <div className="bg-base-950 border border-white/10 rounded-lg p-3 mt-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Your message</p>
+                <p className="text-sm text-slate-300 whitespace-pre-wrap">{status.message}</p>
+              </div>
+            )}
+            <button onClick={checkStatus} disabled={checking} className="neon-button w-full mt-5 disabled:opacity-50">
+              {checking ? "Checking…" : "Check status"}
+            </button>
+          </>
         ) : (
-          <button onClick={requestAccess} disabled={requesting} className="neon-button w-full mt-5 disabled:opacity-50">
-            {requesting ? "Sending…" : "Request Access"}
-          </button>
+          <>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mt-5 mb-2">
+              Message to the owner <span className="normal-case text-slate-600">(optional)</span>
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              maxLength={500}
+              placeholder="e.g. I run the #announcements channel and need to update the welcome message"
+              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 resize-none"
+            />
+            <button onClick={requestAccess} disabled={requesting} className="neon-button w-full mt-3 disabled:opacity-50">
+              {requesting ? "Sending…" : "Request Access"}
+            </button>
+          </>
         )}
         <button
           onClick={() => {

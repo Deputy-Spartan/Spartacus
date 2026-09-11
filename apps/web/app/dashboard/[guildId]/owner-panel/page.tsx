@@ -97,10 +97,15 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
           <p className="text-xs text-slate-500 mb-3">These Discord accounts tried to sign in and asked for access.</p>
           <div className="divide-y divide-white/5">
             {requests.map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+              <div key={r.id} className="flex items-start justify-between py-2.5 text-sm gap-3">
                 <div className="min-w-0">
                   <p className="truncate">{r.username}</p>
                   <p className="text-xs text-slate-600 font-mono">{r.discordUserId}</p>
+                  {r.message && (
+                    <p className="text-xs text-slate-400 mt-1.5 bg-base-950 border border-white/5 rounded-lg p-2 whitespace-pre-wrap">
+                      {r.message}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => approve(r.id)} className="text-xs text-emerald-400 hover:text-emerald-300">

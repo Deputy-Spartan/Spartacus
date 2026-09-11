@@ -10,28 +10,31 @@ const router = Router();
 
 router.get("/access-status", requireAuthOnly, async (req: AuthedRequest, res) => {
   const userId = req.user!.id;
-  if (isOwner(userId)) return res.json({ status: "owner", plan: null });
+  if (isOwner(userId)) return res.json({ status: "owner", plan: null, message: null });
 
   const access = await prisma.dashboardAccess.findUnique({ where: { discordUserId: userId } });
-  if (access) return res.json({ status: "approved", plan: access.plan });
+  if (access) return res.json({ status: "approved", plan: access.plan, message: null });
 
   const pending = await prisma.accessRequest.findUnique({ where: { discordUserId: userId } });
-  if (pending) return res.json({ status: "pending", plan: null });
+  if (pending) return res.json({ status: "pending", plan: null, message: pending.message });
 
-  res.json({ status: "none", plan: null });
+  res.json({ status: "none", plan: null, message: null });
 });
 
 router.post("/access-requests", requireAuthOnly, async (req: AuthedRequest, res) => {
   const { id, username } = req.user!;
+  const { message } = req.body as { message?: string };
   if (isOwner(id)) return res.status(400).json({ error: "You're already the owner" });
 
   const existingAccess = await prisma.dashboardAccess.findUnique({ where: { discordUserId: id } });
   if (existingAccess) return res.status(400).json({ error: "You already have access" });
 
+  const trimmedMessage = message?.trim().slice(0, 500) || null;
+
   const row = await prisma.accessRequest.upsert({
     where: { discordUserId: id },
-    create: { discordUserId: id, username },
-    update: { username }, // refresh in case they changed their Discord username since first requesting
+    create: { discordUserId: id, username, message: trimmedMessage },
+    update: { username, message: trimmedMessage }, // refresh in case they changed their username or re-requested with a new message
   });
 
   if (process.env.OWNER_DISCORD_ID) {
@@ -43,7 +46,9 @@ router.post("/access-requests", requireAuthOnly, async (req: AuthedRequest, res)
         {
           color: 0xf5a524,
           title: "🔑 New dashboard access request",
-          description: `**${username}** (\`${id}\`) wants access to the Spartacus dashboard.`,
+          description: `**${username}** (\`${id}\`) wants access to the Spartacus dashboard.${
+            trimmedMessage ? `\n\n> ${trimmedMessage.replace(/\n/g, "\n> ")}` : ""
+          }`,
           footer: { text: "Approve or deny below, or on the Access Control page" },
           timestamp: new Date().toISOString(),
         },

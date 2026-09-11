@@ -899,12 +899,14 @@ export interface CurrentUser {
 export interface AccessStatus {
   status: "owner" | "approved" | "pending" | "none";
   plan: "FREE" | "PAID" | null;
+  message: string | null;
 }
 
 export interface AccessRequestRow {
   id: string;
   discordUserId: string;
   username: string;
+  message: string | null;
   requestedAt: string;
 }
 
@@ -921,7 +923,8 @@ export const api = {
   getGuilds: () => request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>("/guilds"),
 
   getAccessStatus: () => request<AccessStatus>("/access-status"),
-  requestAccess: () => request<AccessRequestRow>("/access-requests", { method: "POST" }),
+  requestAccess: (message?: string) =>
+    request<AccessRequestRow>("/access-requests", { method: "POST", body: JSON.stringify({ message }) }),
   getAccessRequests: () => request<AccessRequestRow[]>("/access-requests"),
   approveAccessRequest: (id: string) => request<DashboardAccessRow>(`/access-requests/${id}/approve`, { method: "POST" }),
   denyAccessRequest: (id: string) => request(`/access-requests/${id}/deny`, { method: "POST" }),

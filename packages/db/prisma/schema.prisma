@@ -1062,6 +1062,7 @@ model AccessRequest {
   id            String   @id @default(cuid())
   discordUserId String   @unique
   username      String
+  message       String? // why they want access, shown to the owner in the DM and the Access Control page
   requestedAt   DateTime @default(now())
 }
 

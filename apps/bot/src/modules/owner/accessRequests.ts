@@ -1,13 +1,11 @@
 import type { ButtonInteraction } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { isOwner } from "../../lib/owner";
 
 // These buttons only ever appear in the DM the API sends to OWNER_DISCORD_ID
 // (see apps/api/src/routes/access.ts) — but a DM's customId isn't
 // inherently private, so this still checks the clicker is actually the
 // owner rather than trusting "well, only they should have seen it".
-function isOwner(userId: string): boolean {
-  return !!process.env.OWNER_DISCORD_ID && userId === process.env.OWNER_DISCORD_ID;
-}
 
 function logAccessEvent(discordUserId: string, username: string, action: string, detail?: string) {
   prisma.accessAuditEntry.create({ data: { discordUserId, username, action, detail } }).catch(() => null);

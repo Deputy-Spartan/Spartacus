@@ -21,7 +21,7 @@ router.get("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermissi
 });
 
 router.put("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, embedTitle, embedMessage, embedColor, pingRoleId, useButton, buttonChannelId, embedExtra } = req.body;
+  const { channelId, embedTitle, embedMessage, embedColor, pingRoleId, useButton, buttonChannelId, embedExtra, savedEmbedId } = req.body;
   const existing = await prisma.birthdayConfig.findUnique({ where: { guildId: req.params.guildId } });
 
   // Changing the button channel (or turning the button on) invalidates any
@@ -38,6 +38,7 @@ router.put("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermissi
     useButton,
     buttonChannelId,
     embedExtra: embedExtra ?? Prisma.JsonNull,
+    savedEmbedId: savedEmbedId ?? null,
     ...(buttonChannelChanged || buttonJustEnabled ? { buttonMessageId: null } : {}),
   };
 

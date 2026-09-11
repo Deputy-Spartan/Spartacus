@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { applyEmbedExtra } from "../lib/embedExtra";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 // Every minute, close out any giveaway whose end time has passed and hasn't
 // been resolved yet. One tick covers every guild.
@@ -28,16 +29,22 @@ export function startGiveawayEnderJob(client: Client) {
       }
 
       if (isSendableChannel(channel)) {
-        const embed = new EmbedBuilder()
-          .setColor(0xb14bff)
-          .setTitle(`🎉 Giveaway Ended: ${giveaway.prize}`)
-          .setDescription(
-            winners.length > 0
-              ? `Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!`
-              : "No valid entries — no winner could be selected."
-          );
-        applyEmbedExtra(embed, giveaway.embedExtra);
-        await channel.send({ embeds: [embed] }).catch((err) => {
+        const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
+        const payload = saved
+          ? buildSavedEmbedPayload(saved)
+          : (() => {
+              const embed = new EmbedBuilder()
+                .setColor(0xb14bff)
+                .setTitle(`🎉 Giveaway Ended: ${giveaway.prize}`)
+                .setDescription(
+                  winners.length > 0
+                    ? `Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!`
+                    : "No valid entries — no winner could be selected."
+                );
+              applyEmbedExtra(embed, giveaway.embedExtra);
+              return { embeds: [embed] };
+            })();
+        await channel.send(payload).catch((err) => {
           if (loggedThisTick < 5) { logError("bot", err, giveaway.guildId); loggedThisTick++; }
           return null;
         });

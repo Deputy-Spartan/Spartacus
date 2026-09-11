@@ -7,6 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type WelcomeConfig } from "../../../../lib/api";
 
 export default function WelcomePage({ params }: { params: { guildId: string } }) {
@@ -80,10 +81,19 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
             value={config.embedExtra ?? {}}
             onChange={(v) => setConfig({ ...config, embedExtra: v })}
           />
+
+          <SavedEmbedPicker
+            guildId={params.guildId}
+            value={config.savedEmbedId ?? null}
+            onChange={(id) => setConfig({ ...config, savedEmbedId: id })}
+          />
         </NeonCard>
 
         <NeonCard>
           <p className="text-xs uppercase tracking-wide text-slate-500 mb-3">Live Preview (Welcome)</p>
+          {config.savedEmbedId && (
+            <p className="text-xs text-slate-600 mb-3">Preview reflects the saved embed once sent.</p>
+          )}
           <StickyPreview
             content={previewText}
             embedEnabled={config.embedEnabled}

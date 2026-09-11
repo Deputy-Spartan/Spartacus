@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 import { buildStickyPayload } from "../../lib/stickyRender";
+import { resolveSavedEmbed } from "../../lib/savedEmbedRender";
 
 export const name = Events.MessageCreate;
 
@@ -52,7 +53,8 @@ async function repost(channelId: string, channel: Message["channel"]) {
       await old?.delete().catch(() => null);
     }
 
-    const posted = await channel.send(buildStickyPayload(sticky)).catch(() => null);
+    const saved = await resolveSavedEmbed(sticky.savedEmbedId);
+    const posted = await channel.send(buildStickyPayload(sticky, { savedEmbed: saved })).catch(() => null);
     if (posted) {
       await prisma.stickyMessage.update({ where: { id: sticky.id }, data: { lastMessageId: posted.id } });
     }

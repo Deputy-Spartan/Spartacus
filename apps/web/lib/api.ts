@@ -73,6 +73,7 @@ export interface WelcomeConfig {
   embedTitle: string | null;
   buttons: StickyButton[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface AutomodConfig {
@@ -99,6 +100,7 @@ export interface CustomCommand {
   embedColor: string | null;
   buttons: StickyButton[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface StreamSubscription {
@@ -256,6 +258,7 @@ export interface LfgCommandRow {
   embedDescription: string | null;
   embedColor: string | null;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
   errorMessage: string;
   wrongChannelMessage: string;
 }
@@ -272,6 +275,7 @@ export interface LfgCommandInput {
   embedDescription?: string | null;
   embedColor?: string | null;
   embedExtra?: EmbedExtra | null;
+  savedEmbedId?: string | null;
   errorMessage?: string;
   wrongChannelMessage?: string;
 }
@@ -321,6 +325,10 @@ export interface EmbedCreatorPresetRow {
   id: string;
   name: string;
   data: EmbedCreatorState;
+  lastSentMode: "bot" | "webhook" | null;
+  lastSentChannelId: string | null;
+  lastSentWebhookUrl: string | null;
+  lastSentMessageId: string | null;
   createdAt: string;
 }
 export interface EmbedCreatorSendInput {
@@ -332,6 +340,7 @@ export interface EmbedCreatorSendInput {
   content?: string;
   embeds: EmbedCreatorEmbed[];
   components: EmbedCreatorComponentRow[];
+  presetId?: string;
 }
 export interface EmbedCreatorFetchResult {
   channelId: string;
@@ -357,6 +366,7 @@ export interface CustomSlashCommandRow {
   embedColor: string | null;
   buttons: StickyButton[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 export interface CustomSlashCommandInput {
   name: string;
@@ -372,6 +382,7 @@ export interface CustomSlashCommandInput {
   embedColor?: string;
   buttons?: StickyButton[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface SendMessageInput {
@@ -515,6 +526,7 @@ export interface StickyMessageRow {
   embedColor: string | null;
   buttons: StickyButton[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 export interface StickyMessageInput {
   content: string;
@@ -524,6 +536,7 @@ export interface StickyMessageInput {
   embedColor: string | null;
   buttons: StickyButton[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface StarboardConfig {
@@ -575,6 +588,7 @@ export interface AnnouncementRow {
   sentAt: string | null;
   createdAt: string;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 export interface AnnouncementInput {
   channelId: string;
@@ -585,6 +599,7 @@ export interface AnnouncementInput {
   buttons: StickyButton[];
   scheduledFor: string | null;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface AutoPurgeConfigRow {
@@ -614,6 +629,7 @@ export interface BirthdayConfigRow {
   useButton: boolean;
   buttonChannelId: string | null;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface BirthdayRow {
@@ -799,6 +815,7 @@ export interface GiveawayRow {
   ended: boolean;
   entries: Array<{ userId: string }>;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 export interface GiveawayInput {
   channelId: string;
@@ -810,6 +827,7 @@ export interface GiveawayInput {
   buttons?: StickyButton[];
   winnerCount: number;
   endsAt: string;
+  savedEmbedId?: string | null;
 }
 
 export interface EconomyMultiplier {

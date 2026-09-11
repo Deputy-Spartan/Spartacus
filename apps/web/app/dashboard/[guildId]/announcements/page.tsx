@@ -10,6 +10,7 @@ import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type AnnouncementInput, type AnnouncementRow } from "../../../../lib/api";
 
 const EMPTY: AnnouncementInput = {
@@ -21,6 +22,7 @@ const EMPTY: AnnouncementInput = {
   buttons: [],
   scheduledFor: null,
   embedExtra: {},
+  savedEmbedId: null,
 };
 
 export default function AnnouncementsPage({ params }: { params: { guildId: string } }) {
@@ -100,6 +102,8 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             value={form.embedExtra ?? {}}
             onChange={(v) => setForm({ ...form, embedExtra: v })}
           />
+
+          <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
           <input

@@ -5,6 +5,7 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildStickyPayload } from "../lib/stickyRender";
+import { resolveSavedEmbed } from "../lib/savedEmbedRender";
 
 // Checks every minute for announcements that are due — either scheduled for
 // a time that has now passed, or created with no schedule at all (send
@@ -27,15 +28,19 @@ export function startAnnouncementPosterJob(client: Client) {
         continue;
       }
 
-      const payload = buildStickyPayload({
-        content: announcement.content ?? "",
-        embedEnabled: announcement.embedEnabled,
-        embedTitle: announcement.embedTitle,
-        embedDescription: announcement.content,
-        embedColor: announcement.embedColor,
-        buttons: announcement.buttons,
-        embedExtra: announcement.embedExtra,
-      });
+      const saved = await resolveSavedEmbed(announcement.savedEmbedId);
+      const payload = buildStickyPayload(
+        {
+          content: announcement.content ?? "",
+          embedEnabled: announcement.embedEnabled,
+          embedTitle: announcement.embedTitle,
+          embedDescription: announcement.content,
+          embedColor: announcement.embedColor,
+          buttons: announcement.buttons,
+          embedExtra: announcement.embedExtra,
+        },
+        { savedEmbed: saved }
+      );
 
       await channel.send(payload).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, announcement.guildId); loggedThisTick++; }

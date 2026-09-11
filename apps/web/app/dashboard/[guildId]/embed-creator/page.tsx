@@ -44,6 +44,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
   const guildId = params.guildId;
   const [state, setState] = useState<EmbedCreatorState>(emptyState());
   const [editingMessage, setEditingMessage] = useState<{ channelId: string; messageId: string; channelLabel: string } | null>(null);
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [messageLink, setMessageLink] = useState("");
   const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
@@ -135,6 +136,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
           content: state.content,
           embeds: state.embeds,
           components: state.components,
+          presetId: activePresetId ?? undefined,
         });
         showToast("✅ Message updated");
       } else if (state.deliveryMode === "webhook") {
@@ -143,7 +145,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
           setSending(false);
           return;
         }
-        await api.sendEmbedCreatorMessage(guildId, {
+        const result = await api.sendEmbedCreatorMessage(guildId, {
           mode: "webhook",
           webhookUrl: state.webhookUrl,
           profileName: state.profileName || undefined,
@@ -151,7 +153,9 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
           content: state.content,
           embeds: state.embeds,
           components: state.components,
+          presetId: activePresetId ?? undefined,
         });
+        setEditingMessage({ channelId: "", messageId: result.id, channelLabel: "webhook" });
         showToast("✅ Sent via webhook");
       } else {
         if (!state.channelId) {
@@ -159,15 +163,18 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
           setSending(false);
           return;
         }
-        await api.sendEmbedCreatorMessage(guildId, {
+        const result = await api.sendEmbedCreatorMessage(guildId, {
           mode: "bot",
           channelId: state.channelId,
           content: state.content,
           embeds: state.embeds,
           components: state.components,
+          presetId: activePresetId ?? undefined,
         });
+        setEditingMessage({ channelId: state.channelId, messageId: result.id, channelLabel: state.channelId });
         showToast("✅ Sent to channel");
       }
+      if (activePresetId) api.getEmbedCreatorPresets(guildId).then(setPresets);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send.");
     }
@@ -177,13 +184,27 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
   async function handleSaveAsPreset() {
     const name = prompt("Name this preset:");
     if (!name || !name.trim()) return;
-    await api.saveEmbedCreatorPreset(guildId, name.trim(), state);
+    const saved = await api.saveEmbedCreatorPreset(guildId, name.trim(), state);
+    setActivePresetId(saved.id);
     api.getEmbedCreatorPresets(guildId).then(setPresets);
     showToast(`Saved as "${name.trim()}"`);
   }
   function loadPreset(preset: EmbedCreatorPresetRow) {
     setState(preset.data);
-    setEditingMessage(null);
+    setActivePresetId(preset.id);
+    // A preset that's already been sent somewhere carries its own
+    // destination forward — hitting Send again edits that same live
+    // message instead of posting a duplicate. The "✕" on the editing
+    // badge below detaches it if a fresh post is what's actually wanted.
+    if (preset.lastSentMessageId && preset.lastSentMode === "bot" && preset.lastSentChannelId) {
+      setEditingMessage({ channelId: preset.lastSentChannelId, messageId: preset.lastSentMessageId, channelLabel: preset.lastSentChannelId });
+      setState((s) => ({ ...s, deliveryMode: "bot", channelId: preset.lastSentChannelId! }));
+    } else if (preset.lastSentMessageId && preset.lastSentMode === "webhook" && preset.lastSentWebhookUrl) {
+      setEditingMessage({ channelId: "", messageId: preset.lastSentMessageId, channelLabel: "webhook" });
+      setState((s) => ({ ...s, deliveryMode: "webhook", webhookUrl: preset.lastSentWebhookUrl! }));
+    } else {
+      setEditingMessage(null);
+    }
     setPresetMenuOpen(false);
     showToast(`Loaded "${preset.name}"`);
   }
@@ -196,6 +217,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
     if (!confirm("Clear the message content, embeds, and components? This can't be undone.")) return;
     setState((s) => ({ ...emptyState(), deliveryMode: s.deliveryMode, channelId: s.channelId }));
     setEditingMessage(null);
+    setActivePresetId(null);
     showToast("Cleared");
   }
 
@@ -209,6 +231,25 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
         title="Embed Creator"
         description="Build a message with multiple embeds, buttons, and select menus — send it straight to a channel or through a webhook, with a live Discord preview as you go."
       />
+
+      <NeonCard className="mb-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">How to use this</p>
+        <ol className="text-xs text-slate-500 space-y-1.5 list-decimal list-inside">
+          <li>Write your message and add embeds/buttons below — the preview on the right updates as you go.</li>
+          <li>
+            Click <b className="text-slate-300">Save as Preset</b> to save it as a reusable "saved embed" — every other feature with a "Use a Saved Embed"
+            option (Welcome, Announcements, Giveaways, Custom Commands, Sticky Messages, Birthdays, Custom Slash Commands, LFG) can then pick it instead of
+            building its own embed from scratch.
+          </li>
+          <li>
+            Pick <b className="text-slate-300">Send via Bot</b> and a channel, or <b className="text-slate-300">Send via Webhook</b> with a webhook URL, then hit Send.
+          </li>
+          <li>
+            To fix a typo after sending, paste the message's link under <b className="text-slate-300">Edit an existing message</b> and hit Fetch — editing and hitting
+            Send again updates it in place instead of posting a duplicate. Loading a preset that's already been sent does this automatically too.
+          </li>
+        </ol>
+      </NeonCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div>
@@ -352,10 +393,11 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                       {presets.length === 0 && <p className="text-xs text-slate-500 px-2 py-2">No saved presets yet.</p>}
                       {presets.map((p) => (
                         <div key={p.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-base-700 text-xs">
-                          <span className="cursor-pointer flex-1" onClick={() => loadPreset(p)}>
-                            {p.name}
+                          <span className="cursor-pointer flex-1 min-w-0" onClick={() => loadPreset(p)}>
+                            <span className="block truncate">{p.name}</span>
+                            <span className="block text-[10px] text-slate-500">{p.lastSentMessageId ? "Sent — loads ready to Update" : "Not sent yet"}</span>
                           </span>
-                          <button onClick={() => deletePreset(p.id, p.name)} className="text-slate-500 hover:text-rose-400">
+                          <button onClick={() => deletePreset(p.id, p.name)} className="text-slate-500 hover:text-rose-400 shrink-0">
                             ✕
                           </button>
                         </div>

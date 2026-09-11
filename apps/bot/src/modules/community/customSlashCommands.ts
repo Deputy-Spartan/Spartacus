@@ -2,6 +2,7 @@ import { ChatInputCommandInteraction } from "discord.js";
 import type { CustomSlashCommand } from "@spartacus/db";
 import { addBalance } from "../../lib/economy";
 import { buildStickyPayload } from "../../lib/stickyRender";
+import { resolveSavedEmbed } from "../../lib/savedEmbedRender";
 
 export async function executeCustomCommand(interaction: ChatInputCommandInteraction, command: CustomSlashCommand) {
   const ephemeral = command.ephemeralReply;
@@ -12,16 +13,20 @@ export async function executeCustomCommand(interaction: ChatInputCommandInteract
   }
 
   if (command.actionType === "POST_EMBED") {
+    const saved = await resolveSavedEmbed(command.savedEmbedId);
     await interaction.reply({
-      ...buildStickyPayload({
-        content: command.messageText || "",
-        embedEnabled: command.embedEnabled,
-        embedTitle: command.embedTitle,
-        embedDescription: command.embedDescription,
-        embedColor: command.embedColor,
-        buttons: command.buttons,
-        embedExtra: command.embedExtra,
-      }),
+      ...buildStickyPayload(
+        {
+          content: command.messageText || "",
+          embedEnabled: command.embedEnabled,
+          embedTitle: command.embedTitle,
+          embedDescription: command.embedDescription,
+          embedColor: command.embedColor,
+          buttons: command.buttons,
+          embedExtra: command.embedExtra,
+        },
+        { savedEmbed: saved }
+      ),
       ephemeral,
     });
     return;

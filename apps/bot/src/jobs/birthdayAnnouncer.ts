@@ -5,6 +5,7 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { applyEmbedExtra } from "../lib/embedExtra";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 // Runs once a day at 9am server time — posts one embed per birthday config
 // per guild listing everyone whose birthday is today.
@@ -38,19 +39,24 @@ export function startBirthdayAnnouncerJob(client: Client) {
       const mentions = userIds.map((id) => `<@${id}>`).join(", ");
       const message = (config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, mentions);
 
-      const embed = new EmbedBuilder()
-        .setColor((config.embedColor as `#${string}`) || "#FF69B4")
-        .setTitle(config.embedTitle || "🎂 Happy Birthday!")
-        .setDescription(message)
-        .setTimestamp();
-      applyEmbedExtra(embed, config.embedExtra);
+      const saved = await resolveSavedEmbed(config.savedEmbedId);
+      let payload;
+      if (saved) {
+        payload = buildSavedEmbedPayload(saved);
+      } else {
+        const embed = new EmbedBuilder()
+          .setColor((config.embedColor as `#${string}`) || "#FF69B4")
+          .setTitle(config.embedTitle || "🎂 Happy Birthday!")
+          .setDescription(message)
+          .setTimestamp();
+        applyEmbedExtra(embed, config.embedExtra);
+        payload = { content: config.pingRoleId ? `<@&${config.pingRoleId}>` : undefined, embeds: [embed], components: [] };
+      }
 
-      await channel
-        .send({ content: config.pingRoleId ? `<@&${config.pingRoleId}>` : undefined, embeds: [embed] })
-        .catch((err) => {
-          if (loggedThisTick < 5) { logError("bot", err, guildId); loggedThisTick++; }
-          return null;
-        });
+      await channel.send(payload).catch((err) => {
+        if (loggedThisTick < 5) { logError("bot", err, guildId); loggedThisTick++; }
+        return null;
+      });
     }
   });
 }

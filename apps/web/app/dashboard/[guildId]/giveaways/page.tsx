@@ -7,6 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
@@ -22,6 +23,7 @@ const EMPTY: GiveawayInput = {
   winnerCount: 1,
   endsAt: "",
   embedExtra: {},
+  savedEmbedId: null,
 };
 
 export default function GiveawaysPage({ params }: { params: { guildId: string } }) {
@@ -108,6 +110,8 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
           </div>
 
           <EmbedExtraFields value={form.embedExtra ?? {}} onChange={(v) => setForm({ ...form, embedExtra: v })} />
+
+          <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
 
           <div className="mb-4">
             <ButtonsEditor guildId={params.guildId} buttons={form.buttons ?? []} onChange={(next: StickyButton[]) => setForm({ ...form, buttons: next })} />

@@ -25,6 +25,22 @@ interface SendBody {
   content?: string;
   embeds?: BuilderEmbed[];
   components?: BuilderComponentRow[];
+  presetId?: string; // when sending/updating from a saved preset in the library, records where it landed
+}
+
+async function recordLastSent(guildId: string, presetId: string | undefined, fields: { mode: string; channelId?: string; webhookUrl?: string; messageId: string }) {
+  if (!presetId) return;
+  const preset = await prisma.embedCreatorPreset.findUnique({ where: { id: presetId } });
+  if (!preset || preset.guildId !== guildId) return;
+  await prisma.embedCreatorPreset.update({
+    where: { id: presetId },
+    data: {
+      lastSentMode: fields.mode,
+      lastSentChannelId: fields.channelId ?? null,
+      lastSentWebhookUrl: fields.webhookUrl ?? null,
+      lastSentMessageId: fields.messageId,
+    },
+  });
 }
 
 router.get("/guilds/:guildId/embed-creator/presets", requireAuth, requireGuildPermission, async (req, res) => {
@@ -70,12 +86,14 @@ router.post("/guilds/:guildId/embed-creator/send", requireAuth, requireGuildPerm
       avatar_url: body.profileAvatar || undefined,
     });
     if ("error" in result && result.error) return res.status(502).json({ error: `Discord rejected this message: ${result.error}` });
+    if (result.id) await recordLastSent(req.params.guildId, body.presetId, { mode: "webhook", webhookUrl: body.webhookUrl, messageId: result.id });
     return res.status(201).json({ id: result.id });
   }
 
   if (!body.channelId) return res.status(400).json({ error: "Pick a channel to send to." });
   const result = await postChannelMessage(body.channelId, payload);
   if ("error" in result && result.error) return res.status(502).json({ error: `Discord rejected this message: ${result.error}` });
+  if (result.id) await recordLastSent(req.params.guildId, body.presetId, { mode: "bot", channelId: body.channelId, messageId: result.id });
   res.status(201).json({ id: result.id });
 });
 
@@ -132,12 +150,14 @@ router.patch("/guilds/:guildId/embed-creator/update", requireAuth, requireGuildP
     }
     const result = await editWebhookMessage(body.webhookUrl, body.messageId, payload);
     if (result.error) return res.status(502).json({ error: `Discord rejected the update: ${result.error}` });
+    await recordLastSent(req.params.guildId, body.presetId, { mode: "webhook", webhookUrl: body.webhookUrl, messageId: body.messageId });
     return res.json({ ok: true });
   }
 
   if (!body.channelId) return res.status(400).json({ error: "Missing channel id." });
   const result = await editChannelMessage(body.channelId, body.messageId, payload);
   if (result.error) return res.status(502).json({ error: `Discord rejected the update: ${result.error}` });
+  await recordLastSent(req.params.guildId, body.presetId, { mode: "bot", channelId: body.channelId, messageId: body.messageId });
   res.json({ ok: true });
 });
 

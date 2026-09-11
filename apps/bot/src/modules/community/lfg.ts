@@ -4,6 +4,7 @@ import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { applyEmbedExtra } from "../../lib/embedExtra";
 import { substituteLfgTokens, buildLfgPingLine } from "../../lib/lfg";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 
 // Regular (non-interaction) messages can't be truly ephemeral — this is the
 // standard workaround: reply normally, then delete it a few seconds later,
@@ -15,9 +16,17 @@ async function replyAndAutoDelete(message: Message, content: string) {
   if (sent) setTimeout(() => sent.delete().catch(() => null), AUTO_DELETE_MS);
 }
 
-function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceLabel: string, note: string) {
+async function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceLabel: string, note: string) {
   const ping = buildLfgPingLine(cfg, senderMention);
   const tokens = { user: senderMention, voice: voiceLabel, message: note || "—" };
+
+  if (cfg.savedEmbedId) {
+    const saved = await resolveSavedEmbed(cfg.savedEmbedId);
+    if (saved) {
+      const payload = buildSavedEmbedPayload(saved);
+      return { content: [ping, payload.content].filter(Boolean).join(" "), embeds: payload.embeds };
+    }
+  }
 
   if (cfg.mode === "embed") {
     const embed = new EmbedBuilder().setColor((cfg.embedColor as ColorResolvable) || "#7B99BC");
@@ -53,7 +62,7 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
   }
 
   const note = interaction.options.getString("message") ?? "";
-  const payload = buildAnnouncement(cfg, `${interaction.user}`, `<#${voiceChannelId}>`, note);
+  const payload = await buildAnnouncement(cfg, `${interaction.user}`, `<#${voiceChannelId}>`, note);
   await interaction.reply(payload);
 }
 
@@ -71,7 +80,7 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommand, note: 
   }
 
   if (!isSendableChannel(message.channel)) return;
-  const payload = buildAnnouncement(cfg, `${message.author}`, `<#${voiceChannelId}>`, note);
+  const payload = await buildAnnouncement(cfg, `${message.author}`, `<#${voiceChannelId}>`, note);
   await message.channel.send(payload);
 }
 

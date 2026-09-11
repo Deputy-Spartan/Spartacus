@@ -50,6 +50,7 @@ router.post("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildP
     embedColor,
     buttons,
     embedExtra,
+    savedEmbedId,
   } = req.body as {
       name: string;
       description: string;
@@ -64,6 +65,7 @@ router.post("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildP
       embedColor?: string;
       buttons?: unknown;
       embedExtra?: Prisma.InputJsonValue;
+      savedEmbedId?: string | null;
     };
 
   if (!NAME_PATTERN.test(name)) {
@@ -99,6 +101,7 @@ router.post("/guilds/:guildId/custom-slash-commands", requireAuth, requireGuildP
       embedColor: embedColor || null,
       buttons: sanitizeButtons(buttons),
       embedExtra: embedExtra ?? Prisma.JsonNull,
+      savedEmbedId: savedEmbedId ?? null,
     },
   });
   res.status(201).json(row);

@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type BaseMessageOptions } from "discord.js";
 import { applyEmbedExtra } from "./embedExtra";
+import { buildSavedEmbedPayload, type SavedEmbedData } from "./savedEmbedRender";
 
 interface StickyButton {
   label: string;
@@ -16,7 +17,14 @@ export interface StickyMessageLike {
   embedExtra?: unknown;
 }
 
-export function buildStickyPayload(sticky: StickyMessageLike, options?: { thumbnailUrl?: string }): BaseMessageOptions {
+// `savedEmbed` (already resolved via resolveSavedEmbed(row.savedEmbedId))
+// takes over the whole payload when present — Welcome, Custom Commands,
+// Announcements, and Sticky Messages all send through this one function,
+// so this is the single place that makes "use a saved embed" work for all
+// four instead of each needing its own branch.
+export function buildStickyPayload(sticky: StickyMessageLike, options?: { thumbnailUrl?: string; savedEmbed?: SavedEmbedData | null }): BaseMessageOptions {
+  if (options?.savedEmbed) return buildSavedEmbedPayload(options.savedEmbed);
+
   const buttons = Array.isArray(sticky.buttons) ? (sticky.buttons as StickyButton[]) : [];
 
   const components =

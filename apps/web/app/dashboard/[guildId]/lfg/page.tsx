@@ -7,6 +7,7 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
@@ -25,6 +26,7 @@ const EMPTY: LfgCommandInput = {
   embedDescription: "Joining {voice} — {message}",
   embedColor: "#7B99BC",
   embedExtra: {},
+  savedEmbedId: null,
   errorMessage: "You need to be in a voice channel to use this command.",
   wrongChannelMessage: "This command can only be used in {channel}.",
 };
@@ -65,6 +67,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
       embedDescription: row.embedDescription ?? EMPTY.embedDescription,
       embedColor: row.embedColor ?? EMPTY.embedColor,
       embedExtra: row.embedExtra ?? {},
+      savedEmbedId: row.savedEmbedId ?? null,
       errorMessage: row.errorMessage,
       wrongChannelMessage: row.wrongChannelMessage,
     });
@@ -229,6 +232,8 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
               Embed
             </button>
           </div>
+
+          <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
 
           {form.mode === "plain" ? (
             <div className="mb-4">

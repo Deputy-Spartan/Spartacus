@@ -9,6 +9,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 
 const MONTHS = [
@@ -93,6 +94,8 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
             value={config.embedExtra ?? {}}
             onChange={(v) => persist({ ...config, embedExtra: v })}
           />
+
+          <SavedEmbedPicker guildId={params.guildId} value={config.savedEmbedId ?? null} onChange={(id) => persist({ ...config, savedEmbedId: id })} />
         </NeonCard>
 
         <NeonCard>

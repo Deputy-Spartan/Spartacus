@@ -73,9 +73,9 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
           onClick={logout}
           title="Log out"
           aria-label="Log out"
-          className="shrink-0 text-slate-500 hover:text-rose-400 text-lg leading-none p-1"
+          className="shrink-0 text-slate-500 hover:text-rose-400 text-xs font-medium px-2 py-1.5"
         >
-          🚪
+          Logout
         </button>
       </div>
     </header>

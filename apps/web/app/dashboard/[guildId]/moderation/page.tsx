@@ -7,6 +7,7 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -656,6 +657,7 @@ const EMPTY_CUSTOM_COMMAND: CustomSlashCommandInput = {
   embedColor: "#5865F2",
   buttons: [],
   embedExtra: {},
+  savedEmbedId: null,
 };
 
 function CommandsTab({ guildId }: { guildId: string }) {
@@ -833,6 +835,7 @@ function CommandsTab({ guildId }: { guildId: string }) {
                 value={form.embedExtra ?? {}}
                 onChange={(v) => setForm({ ...form, embedExtra: v })}
               />
+              <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
             </div>
           )}
 

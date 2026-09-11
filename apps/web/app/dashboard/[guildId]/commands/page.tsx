@@ -6,6 +6,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -21,6 +22,7 @@ const EMPTY_FORM: CommandForm = {
   embedColor: "#5865F2",
   buttons: [],
   embedExtra: {},
+  savedEmbedId: null,
 };
 
 export default function CommandsPage({ params }: { params: { guildId: string } }) {
@@ -45,7 +47,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
 
   function startEdit(c: CustomCommand) {
     setEditingId(c.id);
-    setForm({ trigger: c.trigger, response: c.response, embedEnabled: c.embedEnabled, embedTitle: c.embedTitle, embedColor: c.embedColor ?? "#5865F2", buttons: c.buttons, embedExtra: c.embedExtra ?? {} });
+    setForm({ trigger: c.trigger, response: c.response, embedEnabled: c.embedEnabled, embedTitle: c.embedTitle, embedColor: c.embedColor ?? "#5865F2", buttons: c.buttons, embedExtra: c.embedExtra ?? {}, savedEmbedId: c.savedEmbedId ?? null });
     setError(null);
     setShowEditor(true);
   }
@@ -63,6 +65,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
       embedColor: form.embedColor,
       buttons: form.buttons,
       embedExtra: form.embedExtra,
+      savedEmbedId: form.savedEmbedId,
     };
     if (editingId) {
       await api.updateCommand(params.guildId, editingId, body);
@@ -165,8 +168,17 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
               onChange={(v) => setForm({ ...form, embedExtra: v })}
             />
 
+            <SavedEmbedPicker
+              guildId={params.guildId}
+              value={form.savedEmbedId ?? null}
+              onChange={(id) => setForm({ ...form, savedEmbedId: id })}
+            />
+
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
             <div className="mb-4">
+              {form.savedEmbedId && (
+                <p className="text-xs text-slate-600 mb-2">Preview reflects the saved embed once sent.</p>
+              )}
               <StickyPreview
                 content={form.response}
                 embedEnabled={form.embedEnabled}

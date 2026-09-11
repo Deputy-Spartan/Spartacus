@@ -2,6 +2,7 @@ import { Events, GuildMember, PartialGuildMember } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildStickyPayload } from "../lib/stickyRender";
+import { resolveSavedEmbed } from "../lib/savedEmbedRender";
 
 export const name = Events.GuildMemberRemove;
 
@@ -19,15 +20,19 @@ export async function execute(member: GuildMember | PartialGuildMember) {
     .replace("{user}", member.user.username)
     .replace("{server}", member.guild.name);
 
-  const payload = buildStickyPayload({
-    content: text,
-    embedEnabled: config.embedEnabled,
-    embedTitle: config.embedTitle,
-    embedDescription: text,
-    embedColor: config.embedColor,
-    buttons: config.buttons,
-    embedExtra: config.embedExtra,
-  });
+  const saved = await resolveSavedEmbed(config.savedEmbedId);
+  const payload = buildStickyPayload(
+    {
+      content: text,
+      embedEnabled: config.embedEnabled,
+      embedTitle: config.embedTitle,
+      embedDescription: text,
+      embedColor: config.embedColor,
+      buttons: config.buttons,
+      embedExtra: config.embedExtra,
+    },
+    { savedEmbed: saved }
+  );
 
   await channel.send(payload);
 }

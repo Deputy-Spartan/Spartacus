@@ -22,6 +22,7 @@ interface LfgBody {
   embedDescription?: string | null;
   embedColor?: string | null;
   embedExtra?: Prisma.InputJsonValue | null;
+  savedEmbedId?: string | null;
   errorMessage?: string;
   wrongChannelMessage?: string;
 }
@@ -84,6 +85,7 @@ router.post("/guilds/:guildId/lfg-commands", requireAuth, requireGuildPermission
       embedDescription: body.embedDescription ?? null,
       embedColor: body.embedColor ?? null,
       embedExtra: (body.embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      savedEmbedId: body.savedEmbedId ?? null,
       errorMessage: body.errorMessage?.trim() || "You need to be in a voice channel to use this command.",
       wrongChannelMessage: body.wrongChannelMessage?.trim() || "This command can only be used in {channel}.",
     },
@@ -150,6 +152,7 @@ router.put("/guilds/:guildId/lfg-commands/:id", requireAuth, requireGuildPermiss
       embedDescription: body.embedDescription !== undefined ? body.embedDescription : undefined,
       embedColor: body.embedColor !== undefined ? body.embedColor : undefined,
       embedExtra: body.embedExtra !== undefined ? ((body.embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue) : undefined,
+      savedEmbedId: body.savedEmbedId !== undefined ? body.savedEmbedId : undefined,
       errorMessage: body.errorMessage?.trim() || undefined,
       wrongChannelMessage: body.wrongChannelMessage?.trim() || undefined,
     },

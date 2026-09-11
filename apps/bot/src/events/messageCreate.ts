@@ -6,6 +6,7 @@ import { grantLevelRoles } from "../modules/leveling/levelRoles";
 import { prisma } from "../lib/prisma";
 import { customCommandCache } from "../lib/cache";
 import { buildStickyPayload } from "../lib/stickyRender";
+import { resolveSavedEmbed } from "../lib/savedEmbedRender";
 import { isSendableChannel } from "../lib/channels";
 import { awardMessageEarnings } from "../lib/economy";
 import { checkCountingMessage } from "../modules/games/countingGame";
@@ -133,6 +134,7 @@ export async function execute(message: Message) {
             embedColor: r.embedColor,
             buttons: r.buttons,
             embedExtra: r.embedExtra,
+            savedEmbedId: r.savedEmbedId,
           },
         ])
       );
@@ -141,16 +143,20 @@ export async function execute(message: Message) {
 
     const command = guildCommands.get(trigger);
     if (command && isSendableChannel(message.channel)) {
+      const saved = await resolveSavedEmbed(command.savedEmbedId);
       await message.channel.send(
-        buildStickyPayload({
-          content: command.response,
-          embedEnabled: command.embedEnabled,
-          embedTitle: command.embedTitle,
-          embedDescription: command.response,
-          embedColor: command.embedColor,
-          buttons: command.buttons,
-          embedExtra: command.embedExtra,
-        })
+        buildStickyPayload(
+          {
+            content: command.response,
+            embedEnabled: command.embedEnabled,
+            embedTitle: command.embedTitle,
+            embedDescription: command.response,
+            embedColor: command.embedColor,
+            buttons: command.buttons,
+            embedExtra: command.embedExtra,
+          },
+          { savedEmbed: saved }
+        )
       );
     }
   }

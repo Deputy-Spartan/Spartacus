@@ -2,6 +2,7 @@ import { Events, GuildMember } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildStickyPayload } from "../lib/stickyRender";
+import { resolveSavedEmbed } from "../lib/savedEmbedRender";
 
 export const name = Events.GuildMemberAdd;
 
@@ -19,6 +20,7 @@ export async function execute(member: GuildMember) {
     .replace("{user}", `<@${member.id}>`)
     .replace("{server}", member.guild.name);
 
+  const saved = await resolveSavedEmbed(config.savedEmbedId);
   const payload = buildStickyPayload(
     {
       content: text,
@@ -29,7 +31,7 @@ export async function execute(member: GuildMember) {
       buttons: config.buttons,
       embedExtra: config.embedExtra,
     },
-    { thumbnailUrl: member.user.displayAvatarURL() }
+    { thumbnailUrl: member.user.displayAvatarURL(), savedEmbed: saved }
   );
 
   await channel.send(payload);

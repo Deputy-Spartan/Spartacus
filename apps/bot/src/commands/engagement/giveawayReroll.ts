@@ -3,6 +3,7 @@ import type { CommandModule } from "../types";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { applyEmbedExtra } from "../../lib/embedExtra";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 
 // Reuses the same random-selection approach as apps/bot/src/jobs/giveawayEnder.ts
 // (uniform random pick without replacement) so reroll behavior stays consistent
@@ -51,16 +52,22 @@ const command: CommandModule = {
 
     const channel = await interaction.client.channels.fetch(giveaway.channelId).catch(() => null);
     if (isSendableChannel(channel)) {
-      const embed = new EmbedBuilder()
-        .setColor(0xb14bff)
-        .setTitle(`🔁 Reroll! ${giveaway.prize}`)
-        .setDescription(
-          winners.length > 0
-            ? `New winner(s): ${winners.map((w) => `<@${w}>`).join(", ")}!`
-            : "No valid entries — no winner could be selected."
-        );
-      applyEmbedExtra(embed, giveaway.embedExtra);
-      await channel.send({ embeds: [embed] }).catch(() => null);
+      const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
+      const payload = saved
+        ? buildSavedEmbedPayload(saved)
+        : (() => {
+            const embed = new EmbedBuilder()
+              .setColor(0xb14bff)
+              .setTitle(`🔁 Reroll! ${giveaway.prize}`)
+              .setDescription(
+                winners.length > 0
+                  ? `New winner(s): ${winners.map((w) => `<@${w}>`).join(", ")}!`
+                  : "No valid entries — no winner could be selected."
+              );
+            applyEmbedExtra(embed, giveaway.embedExtra);
+            return { embeds: [embed] };
+          })();
+      await channel.send(payload).catch(() => null);
     }
 
     await interaction.reply({

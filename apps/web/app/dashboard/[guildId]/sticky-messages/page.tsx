@@ -9,6 +9,7 @@ import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -22,6 +23,7 @@ const EMPTY_FORM: StickyMessageInput = {
   embedColor: "#5865F2",
   buttons: [],
   embedExtra: {},
+  savedEmbedId: null,
 };
 
 export default function StickyMessagesPage({ params }: { params: { guildId: string } }) {
@@ -59,6 +61,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
       embedColor: row.embedColor ?? "#5865F2",
       buttons: row.buttons,
       embedExtra: row.embedExtra ?? {},
+      savedEmbedId: row.savedEmbedId ?? null,
     });
     setError(null);
     setShowEditor(true);
@@ -230,8 +233,17 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
               onChange={(v) => setForm({ ...form, embedExtra: v })}
             />
 
+            <SavedEmbedPicker
+              guildId={params.guildId}
+              value={form.savedEmbedId ?? null}
+              onChange={(id) => setForm({ ...form, savedEmbedId: id })}
+            />
+
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
             <div className="mb-4">
+              {form.savedEmbedId && (
+                <p className="text-xs text-slate-600 mb-2">Preview reflects the saved embed once sent.</p>
+              )}
               <StickyPreview
                 content={form.content}
                 embedEnabled={form.embedEnabled}

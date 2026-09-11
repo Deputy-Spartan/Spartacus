@@ -228,6 +228,7 @@ model WelcomeConfig {
   embedTitle   String?
   buttons      Json    @default("[]")
   embedExtra   Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
+  savedEmbedId String? // when set, overrides embedTitle/embedExtra/etc. with an EmbedCreatorPreset's content at send time
 }
 
 model CustomCommand {
@@ -241,6 +242,7 @@ model CustomCommand {
   embedColor   String?
   buttons      Json     @default("[]")
   embedExtra   Json?
+  savedEmbedId String?
   createdAt    DateTime @default(now())
 
   @@unique([guildId, trigger])
@@ -521,6 +523,7 @@ model StickyMessage {
   // handler is needed on the bot side. [{ "label": string, "url": string }]
   buttons          Json    @default("[]")
   embedExtra       Json?
+  savedEmbedId     String?
 }
 
 // ---- Starboard ----
@@ -709,6 +712,7 @@ model Giveaway {
   imageUrl    String?
   buttons     Json     @default("[]")
   embedExtra  Json?
+  savedEmbedId String?
   winnerCount Int      @default(1)
   endsAt      DateTime
   ended       Boolean  @default(false)
@@ -1342,6 +1346,7 @@ model CustomSlashCommand {
   embedColor       String?
   buttons          Json    @default("[]")
   embedExtra       Json?
+  savedEmbedId     String?
   createdAt        DateTime @default(now())
 
   @@unique([guildId, name])
@@ -1374,6 +1379,7 @@ model LfgCommand {
   embedDescription    String?
   embedColor          String?
   embedExtra          Json?
+  savedEmbedId        String?
   errorMessage        String   @default("You need to be in a voice channel to use this command.")
   wrongChannelMessage String   @default("This command can only be used in {channel}.")
   createdAt           DateTime @default(now())
@@ -1384,20 +1390,30 @@ model LfgCommand {
 }
 
 // ---- Embed Creator ----
-// A Discohook-style multi-embed message composer. Deliberately stored as
-// one JSON blob rather than typed columns — the builder's shape (content,
-// up to 10 embeds, up to 5 component rows) is still evolving and this way
-// adding a field to what a preset remembers never needs a migration.
-// Sending itself has no persistent row: bot-mode and webhook-mode messages
-// are read back for editing straight from Discord's own API via the pasted
-// message link, not from anything we store.
+// A Discohook-style multi-embed message composer, and — since every other
+// embed-producing feature can now point at one of these instead of building
+// its own embed editor — the single shared library of saved embeds for the
+// whole dashboard. Deliberately stored as one JSON blob rather than typed
+// columns — the builder's shape (content, up to 10 embeds, up to 5
+// component rows) is still evolving and this way adding a field to what a
+// preset remembers never needs a migration.
+// lastSent* tracks where THIS preset itself was last sent via the Embed
+// Creator page's own Send/Update button, so "Update" there can edit that
+// live message in place. A feature that references this preset via its own
+// savedEmbedId (Welcome, Announcements, etc.) still sends independently
+// through its own existing channel/message flow — this tracking is only
+// for the preset's own direct send history.
 model EmbedCreatorPreset {
-  id        String   @id @default(cuid())
-  guild     Guild    @relation(fields: [guildId], references: [id])
-  guildId   String
-  name      String
-  data      Json // { content, embeds: [...], components: [...] }
-  createdAt DateTime @default(now())
+  id               String   @id @default(cuid())
+  guild            Guild    @relation(fields: [guildId], references: [id])
+  guildId          String
+  name             String
+  data             Json // { content, embeds: [...], components: [...] }
+  lastSentMode     String? // "bot" | "webhook"
+  lastSentChannelId String?
+  lastSentWebhookUrl String?
+  lastSentMessageId String?
+  createdAt        DateTime @default(now())
 
   @@unique([guildId, name])
 }
@@ -1438,6 +1454,7 @@ model Announcement {
   embedColor   String?   @default("#00E5FF")
   buttons      Json      @default("[]")
   embedExtra   Json?
+  savedEmbedId String?
   scheduledFor DateTime?
   sentAt       DateTime?
   createdAt    DateTime  @default(now())
@@ -1473,6 +1490,7 @@ model BirthdayConfig {
   embedMessage    String? @default("Everyone wish {user} a happy birthday! 🎉")
   embedColor      String? @default("#FF69B4")
   embedExtra      Json?
+  savedEmbedId    String?
   pingRoleId      String?
   useButton       Boolean @default(false) // post a "Set My Birthday" button panel instead of relying on /birthday set alone
   buttonChannelId String?

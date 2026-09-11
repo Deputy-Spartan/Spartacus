@@ -1,9 +1,10 @@
 import cron from "node-cron";
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, type BaseMessageOptions } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { applyEmbedExtra } from "../lib/embedExtra";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 interface GiveawayButton {
   label: string;
@@ -21,23 +22,31 @@ export function startGiveawayPosterJob(client: Client) {
       const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
       if (!isSendableChannel(channel)) continue;
 
-      const embed = new EmbedBuilder()
-        .setColor((giveaway.embedColor as `#${string}`) || "#B14BFF")
-        .setTitle(`🎁 ${giveaway.prize}`)
-        .setDescription(
-          `${giveaway.description ? `${giveaway.description}\n\n` : ""}Click **Enter** below to join. Ends <t:${Math.floor(giveaway.endsAt.getTime() / 1000)}:R>.`
-        )
-        .setFooter({ text: `${giveaway.winnerCount} winner(s)` });
-      if (giveaway.imageUrl) embed.setImage(giveaway.imageUrl);
-      applyEmbedExtra(embed, giveaway.embedExtra);
+      const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
+      let payload: BaseMessageOptions;
 
-      const linkButtons = Array.isArray(giveaway.buttons) ? (giveaway.buttons as unknown as GiveawayButton[]) : [];
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`giveaway:${giveaway.id}:enter`).setLabel("Enter").setStyle(ButtonStyle.Success),
-        ...linkButtons.map((b) => new ButtonBuilder().setLabel(b.label).setURL(b.url).setStyle(ButtonStyle.Link))
-      );
+      if (saved) {
+        payload = buildSavedEmbedPayload(saved);
+      } else {
+        const embed = new EmbedBuilder()
+          .setColor((giveaway.embedColor as `#${string}`) || "#B14BFF")
+          .setTitle(`🎁 ${giveaway.prize}`)
+          .setDescription(
+            `${giveaway.description ? `${giveaway.description}\n\n` : ""}Click **Enter** below to join. Ends <t:${Math.floor(giveaway.endsAt.getTime() / 1000)}:R>.`
+          )
+          .setFooter({ text: `${giveaway.winnerCount} winner(s)` });
+        if (giveaway.imageUrl) embed.setImage(giveaway.imageUrl);
+        applyEmbedExtra(embed, giveaway.embedExtra);
 
-      const message = await channel.send({ embeds: [embed], components: [row] }).catch((err) => {
+        const linkButtons = Array.isArray(giveaway.buttons) ? (giveaway.buttons as unknown as GiveawayButton[]) : [];
+        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId(`giveaway:${giveaway.id}:enter`).setLabel("Enter").setStyle(ButtonStyle.Success),
+          ...linkButtons.map((b) => new ButtonBuilder().setLabel(b.label).setURL(b.url).setStyle(ButtonStyle.Link))
+        );
+        payload = { embeds: [embed], components: [row] };
+      }
+
+      const message = await channel.send(payload).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, giveaway.guildId); loggedThisTick++; }
         return null;
       });

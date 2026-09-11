@@ -11,7 +11,7 @@ router.get("/guilds/:guildId/announcements", requireAuth, requireGuildPermission
 });
 
 router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra } = req.body;
+  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.announcement.create({
     data: {
       guildId: req.params.guildId,
@@ -23,6 +23,7 @@ router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermissio
       buttons: buttons ?? [],
       scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
       embedExtra: embedExtra ?? Prisma.JsonNull,
+      savedEmbedId: savedEmbedId ?? null,
     },
   });
   res.status(201).json(row);

@@ -406,12 +406,30 @@ export interface AntiRaidConfig {
   autoLockdown: boolean;
 }
 
-export interface ReactionRoleRow {
+export interface ReactionRoleOption {
   id: string;
-  channelId: string;
-  messageId: string;
   emoji: string;
   roleId: string;
+}
+export interface ReactionRolePanelRow {
+  id: string;
+  channelId: string;
+  messageId: string | null;
+  title: string | null;
+  description: string | null;
+  embedEnabled: boolean;
+  embedColor: string | null;
+  embedExtra?: EmbedExtra;
+  options: ReactionRoleOption[];
+}
+export interface ReactionRolePanelInput {
+  channelId: string;
+  title?: string;
+  description?: string;
+  embedEnabled?: boolean;
+  embedColor?: string;
+  embedExtra?: EmbedExtra;
+  options: Array<{ emoji: string; roleId: string }>;
 }
 
 export interface JoinRoleRow {
@@ -1159,11 +1177,13 @@ export const api = {
   setAntiRaid: (guildId: string, config: Partial<AntiRaidConfig>) =>
     request<AntiRaidConfig>(`/guilds/${guildId}/anti-raid`, { method: "PUT", body: JSON.stringify(config) }),
 
-  getReactionRoles: (guildId: string) => request<ReactionRoleRow[]>(`/guilds/${guildId}/reaction-roles`),
-  addReactionRole: (guildId: string, body: { channelId: string; messageId: string; emoji: string; roleId: string }) =>
-    request<ReactionRoleRow>(`/guilds/${guildId}/reaction-roles`, { method: "POST", body: JSON.stringify(body) }),
-  deleteReactionRole: (guildId: string, id: string) =>
-    request(`/guilds/${guildId}/reaction-roles/${id}`, { method: "DELETE" }),
+  getReactionRolePanels: (guildId: string) => request<ReactionRolePanelRow[]>(`/guilds/${guildId}/reaction-role-panels`),
+  addReactionRolePanel: (guildId: string, body: ReactionRolePanelInput) =>
+    request<ReactionRolePanelRow>(`/guilds/${guildId}/reaction-role-panels`, { method: "POST", body: JSON.stringify(body) }),
+  updateReactionRolePanel: (guildId: string, id: string, body: Partial<ReactionRolePanelInput>) =>
+    request<ReactionRolePanelRow>(`/guilds/${guildId}/reaction-role-panels/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteReactionRolePanel: (guildId: string, id: string) =>
+    request(`/guilds/${guildId}/reaction-role-panels/${id}`, { method: "DELETE" }),
 
   getJoinRoles: (guildId: string) => request<JoinRoleRow[]>(`/guilds/${guildId}/join-roles`),
   addJoinRole: (guildId: string, roleId: string) =>

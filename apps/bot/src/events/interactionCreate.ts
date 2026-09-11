@@ -193,9 +193,9 @@ export async function execute(interaction: Interaction) {
   }
 
   if (interaction.isStringSelectMenu() && interaction.customId.startsWith("rolepanelselect:")) {
-    const enabled = await isModuleEnabled(interaction.guildId, "ROLE_PANELS");
+    const enabled = await isModuleEnabled(interaction.guildId, "REACTION_ROLES");
     if (!enabled) {
-      await interaction.reply({ content: "⚠️ Role Panels is disabled for this server.", ephemeral: true });
+      await interaction.reply({ content: "⚠️ Reaction Roles is disabled for this server.", ephemeral: true });
       return;
     }
     const panelId = interaction.customId.split(":")[1];
@@ -249,9 +249,9 @@ export async function execute(interaction: Interaction) {
   }
 
   if (interaction.customId.startsWith("rolepanel:")) {
-    const enabled = await isModuleEnabled(interaction.guildId, "ROLE_PANELS");
+    const enabled = await isModuleEnabled(interaction.guildId, "REACTION_ROLES");
     if (!enabled) {
-      await interaction.reply({ content: "⚠️ Role Panels is disabled for this server.", ephemeral: true });
+      await interaction.reply({ content: "⚠️ Reaction Roles is disabled for this server.", ephemeral: true });
       return;
     }
     var rolePanelParts = interaction.customId.split(":");

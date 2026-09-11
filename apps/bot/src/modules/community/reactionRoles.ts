@@ -36,12 +36,3 @@ export async function onReactionRemove(reaction: MessageReaction | PartialMessag
   const member = await reaction.message.guild?.members.fetch(user.id).catch(() => null);
   await member?.roles.remove(mapping.roleId).catch(() => null);
 }
-
-// Called once at startup and whenever a mapping is created, so the bot's
-// own reaction is seeded on the target message for members to click.
-export async function seedReactionSeed(client: import("discord.js").Client, mapping: { channelId: string; messageId: string; emoji: string }) {
-  const channel = await client.channels.fetch(mapping.channelId).catch(() => null);
-  if (!channel || !channel.isTextBased()) return;
-  const message = await channel.messages.fetch(mapping.messageId).catch(() => null);
-  await message?.react(mapping.emoji).catch(() => null);
-}

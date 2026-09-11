@@ -43,8 +43,6 @@ export const NAV_SECTIONS = [
     items: [
       { href: "/welcome", label: "Welcome", icon: "👋" },
       { href: "/reaction-roles", label: "Reaction Roles", icon: "🎭" },
-      { href: "/role-panels", label: "Role Panels", icon: "🎚️" },
-      { href: "/join-roles", label: "Join Roles", icon: "🎫" },
       { href: "/sticky-messages", label: "Sticky Messages", icon: "📌" },
       { href: "/starboard", label: "Starboard", icon: "⭐" },
       { href: "/temp-channels", label: "Temp Channels", icon: "🔊" },

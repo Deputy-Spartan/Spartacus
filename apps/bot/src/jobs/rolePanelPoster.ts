@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, Str
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { isModuleEnabled } from "../lib/moduleGate";
 
 interface RolePanelOption {
   roleId: string;
@@ -19,6 +20,8 @@ export function startRolePanelPosterJob(client: Client) {
     const pending = await prisma.rolePanel.findMany({ where: { messageId: null }, take: 20 });
 
     for (const panel of pending) {
+      if (!(await isModuleEnabled(panel.guildId, "REACTION_ROLES"))) continue;
+
       const channel = await client.channels.fetch(panel.channelId).catch(() => null);
       if (!isSendableChannel(channel)) continue;
 

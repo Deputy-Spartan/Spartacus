@@ -19,6 +19,7 @@ model Guild {
   loggingConfig     LoggingConfig?
   antiRaidConfig    AntiRaidConfig?
   reactionRoles     ReactionRole[]
+  reactionRolePanels ReactionRolePanel[]
   joinRoles         JoinRole[]
   stickyMessages    StickyMessage[]
   starboardConfig   StarboardConfig?
@@ -104,7 +105,6 @@ enum ModuleKey {
   LOGGING
   ANTI_RAID
   REACTION_ROLES
-  JOIN_ROLES
   STICKY_MESSAGES
   STARBOARD
   TEMP_CHANNELS
@@ -131,7 +131,6 @@ enum ModuleKey {
   AI_CHAT
   AI_MODERATION
   SERVER_BACKUP
-  ROLE_PANELS
   ANNOUNCEMENTS
   SLOW_MODE
   BIRTHDAYS
@@ -450,18 +449,46 @@ model AntiRaidConfig {
 }
 
 // ---- Reaction Roles ----
+// A panel is the message itself (channel + optional title/description/embed
+// styling), posted automatically by reactionRolePoster.ts the moment it's
+// created — messageId starts null and gets filled in once posted, same
+// "poster job fills in messageId" pattern as RolePanel below. Each
+// ReactionRole row is one emoji->role mapping that belongs to a panel; the
+// poster job seeds the bot's own reaction for every option once the message
+// exists, and the reaction add/remove listeners match purely on
+// messageId+emoji so they didn't need to change when this got a panel layer.
+
+model ReactionRolePanel {
+  id           String         @id @default(cuid())
+  guild        Guild          @relation(fields: [guildId], references: [id])
+  guildId      String
+  channelId    String
+  messageId    String?
+  title        String?
+  description  String?
+  embedEnabled Boolean        @default(false)
+  embedColor   String?
+  embedExtra   Json?
+  createdAt    DateTime       @default(now())
+  options      ReactionRole[]
+
+  @@index([guildId])
+}
 
 model ReactionRole {
-  id        String @id @default(cuid())
-  guild     Guild  @relation(fields: [guildId], references: [id])
+  id        String            @id @default(cuid())
+  guild     Guild             @relation(fields: [guildId], references: [id])
   guildId   String
+  panel     ReactionRolePanel @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  panelId   String
   channelId String
-  messageId String
+  messageId String?
   emoji     String
   roleId    String
 
   @@unique([messageId, emoji])
   @@index([guildId])
+  @@index([panelId])
 }
 
 // ---- Join Roles ----

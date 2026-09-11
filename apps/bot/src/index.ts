@@ -17,6 +17,7 @@ import { startGiveawayEnderJob } from "./jobs/giveawayEnder";
 import { startGiveawayPosterJob } from "./jobs/giveawayPoster";
 import { startTicketPanelPosterJob } from "./jobs/ticketPanelPoster";
 import { startRolePanelPosterJob } from "./jobs/rolePanelPoster";
+import { startReactionRolePosterJob } from "./jobs/reactionRolePoster";
 import { startScheduledMessagesJob } from "./jobs/scheduledMessages";
 import { startStatChannelsJob } from "./jobs/statChannels";
 import { startStatusChannelPosterJob } from "./jobs/statusChannelPoster";
@@ -172,6 +173,7 @@ export function startBot() {
     startGiveawayPosterJob(c);
     startTicketPanelPosterJob(c);
     startRolePanelPosterJob(c);
+    startReactionRolePosterJob(c);
     startAnnouncementPosterJob(c);
     startAutoPurgeJob(c);
     startBirthdayAnnouncerJob(c);

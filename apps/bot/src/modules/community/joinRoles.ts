@@ -5,7 +5,7 @@ import { isModuleEnabled } from "../../lib/moduleGate";
 export const name = Events.GuildMemberAdd;
 
 export async function execute(member: GuildMember) {
-  const enabled = await isModuleEnabled(member.guild.id, "JOIN_ROLES");
+  const enabled = await isModuleEnabled(member.guild.id, "REACTION_ROLES");
   if (!enabled) return;
 
   const roles = await prisma.joinRole.findMany({ where: { guildId: member.guild.id } });

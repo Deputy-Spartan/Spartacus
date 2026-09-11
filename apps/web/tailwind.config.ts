@@ -7,15 +7,15 @@ const config: Config = {
     extend: {
       colors: {
         base: {
-          950: "#0B0F19",
-          900: "#111827",
-          800: "#1E2640",
-          700: "#2A3350",
+          950: "#1C1D20",
+          900: "#242529",
+          800: "#2C2E33",
+          700: "#37393F",
         },
         neon: {
-          blue: "#4C8DFF",
+          blue: "#7B99BC",
           purple: "#94A3B8",
-          cyan: "#4C8DFF",
+          cyan: "#5E7FA6",
         },
       },
       fontFamily: {
@@ -27,10 +27,10 @@ const config: Config = {
         "glow-purple": "none",
       },
       backgroundImage: {
-        "neon-gradient": "linear-gradient(135deg, #4C8DFF 0%, #4C8DFF 100%)",
+        "neon-gradient": "linear-gradient(135deg, #7B99BC 0%, #5E7FA6 100%)",
       },
       borderColor: {
-        "neon-blue": "rgba(76, 141, 255, 0.35)",
+        "neon-blue": "rgba(123, 153, 188, 0.35)",
       },
     },
   },

@@ -29,7 +29,7 @@ export function startAnnouncementPosterJob(client: Client) {
       }
 
       const saved = await resolveSavedEmbed(announcement.savedEmbedId);
-      const payload = buildStickyPayload(
+      const payload = await buildStickyPayload(
         {
           content: announcement.content ?? "",
           embedEnabled: announcement.embedEnabled,
@@ -39,7 +39,7 @@ export function startAnnouncementPosterJob(client: Client) {
           buttons: announcement.buttons,
           embedExtra: announcement.embedExtra,
         },
-        { savedEmbed: saved }
+        { savedEmbed: saved, guildId: announcement.guildId }
       );
 
       await channel.send(payload).catch((err) => {

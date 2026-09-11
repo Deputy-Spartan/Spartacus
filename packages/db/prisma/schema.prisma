@@ -93,6 +93,7 @@ model Guild {
   suggestionAnalyticsSettings SuggestionAnalyticsSettings?
   lfgCommands       LfgCommand[]
   embedCreatorPresets EmbedCreatorPreset[]
+  embedComponentActions EmbedComponentAction[]
   createdAt         DateTime             @default(now())
 }
 
@@ -1416,6 +1417,26 @@ model EmbedCreatorPreset {
   createdAt        DateTime @default(now())
 
   @@unique([guildId, name])
+}
+
+// ---- Embed Creator: component actions ----
+// A button or select menu's real behavior can't be embedded directly in the
+// Discord message component (custom_id is capped at 100 chars, nowhere near
+// enough for a role id + message text + etc.), so instead each configured
+// action gets one row here, and the component's custom_id is just
+// "ecaction:<id>" — created once at the moment a message actually gets
+// SENT (not when the preset is saved), so it stays resolvable for as long
+// as that message exists, independent of the preset being edited later.
+model EmbedComponentAction {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  kind      String // "button" | "select"
+  config    Json // button: {type, roleId?, currencyAmount?, messageText?, embedPresetId?, ephemeral?}
+                  // select: {selectType, defaultAction?, options?: [{value, action}]}
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
 }
 
 // ---- Role Panels ----

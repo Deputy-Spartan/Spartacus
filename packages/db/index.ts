@@ -37,6 +37,7 @@ prisma.$use(async (params, next) => {
 });
 
 export * from "@prisma/client";
+export * from "./embedComponents";
 
 // Best-effort error logging — never lets a logging failure become a
 // second error. Used by both the API's global error handler and the

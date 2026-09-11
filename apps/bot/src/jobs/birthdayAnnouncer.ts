@@ -40,7 +40,7 @@ export function startBirthdayAnnouncerJob(client: Client) {
 
       const saved = await resolveSavedEmbed(config.savedEmbedId);
       if (saved) {
-        const payload = buildSavedEmbedPayload(saved);
+        const payload = await buildSavedEmbedPayload(guildId, saved);
         await channel.send(payload).catch((err) => {
           if (loggedThisTick < 5) { logError("bot", err, guildId); loggedThisTick++; }
           return null;

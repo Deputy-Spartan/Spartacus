@@ -96,7 +96,7 @@ const command: CommandModule = {
         return;
       }
 
-      await interaction.reply({ ...buildStickyPayload(sticky), ephemeral: true });
+      await interaction.reply({ ...(await buildStickyPayload(sticky)), ephemeral: true });
     }
   },
 };

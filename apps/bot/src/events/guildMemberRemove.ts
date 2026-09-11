@@ -21,7 +21,7 @@ export async function execute(member: GuildMember | PartialGuildMember) {
     .replace("{server}", member.guild.name);
 
   const saved = await resolveSavedEmbed(config.savedEmbedId);
-  const payload = buildStickyPayload(
+  const payload = await buildStickyPayload(
     {
       content: text,
       embedEnabled: config.embedEnabled,
@@ -31,7 +31,7 @@ export async function execute(member: GuildMember | PartialGuildMember) {
       buttons: config.buttons,
       embedExtra: config.embedExtra,
     },
-    { savedEmbed: saved }
+    { savedEmbed: saved, guildId: member.guild.id }
   );
 
   await channel.send(payload);

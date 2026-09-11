@@ -41,7 +41,21 @@ export async function execute(interaction: Interaction) {
   // this answers with a clear message instead of Discord's own bare
   // "This interaction failed".
   if ((interaction.isButton() || interaction.isAnySelectMenu()) && interaction.customId.startsWith("ecnoop:")) {
-    await interaction.reply({ content: "This component isn't connected to an action yet — only link buttons work right now.", ephemeral: true });
+    await interaction.reply({ content: "This component isn't connected to an action yet.", ephemeral: true });
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith("ecaction:")) {
+    const actionId = interaction.customId.split(":")[1];
+    const { handleEmbedButtonAction } = await import("../modules/community/embedActions");
+    await handleEmbedButtonAction(interaction, actionId);
+    return;
+  }
+
+  if (interaction.isAnySelectMenu() && interaction.customId.startsWith("ecaction:")) {
+    const actionId = interaction.customId.split(":")[1];
+    const { handleEmbedSelectAction } = await import("../modules/community/embedActions");
+    await handleEmbedSelectAction(interaction, actionId);
     return;
   }
 

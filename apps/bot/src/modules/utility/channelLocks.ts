@@ -48,7 +48,7 @@ function shouldDelete(message: Message, lock: {
   return false;
 }
 
-function buildNotifyPayload(lock: ChannelLock, message: Message) {
+async function buildNotifyPayload(lock: ChannelLock, message: Message) {
   const content = (lock.notifyContent || "{user}, that message isn't allowed in {channel}.")
     .replace(/{user}/g, `${message.author}`)
     .replace(/{channel}/g, `<#${message.channelId}>`);
@@ -77,7 +77,7 @@ export async function execute(message: Message) {
   await message.delete().catch(() => null);
   if (!lock.notifyEnabled) return;
 
-  const payload = buildNotifyPayload(lock, message);
+  const payload = await buildNotifyPayload(lock, message);
 
   if (isSendableChannel(message.channel)) {
     const sent = await message.channel.send(payload).catch(() => null);

@@ -1,3 +1,5 @@
+import { prisma, createActionCustomId, type EmbedActionConfig, type EmbedSelectOption } from "@spartacus/db";
+
 // Converts the Embed Creator's builder-friendly shape (one object per
 // embed/row, arrays of plain fields) into the raw Discord message-body JSON
 // (embeds[] + components[] actions rows) that both the bot-send and
@@ -28,11 +30,15 @@ export interface BuilderButtonItem {
   label?: string;
   style?: "primary" | "secondary" | "success" | "danger";
   url?: string;
+  action?: EmbedActionConfig;
 }
 export interface BuilderComponentRow {
   type: "buttons" | "string" | "user" | "role" | "user_role" | "channel" | null;
   placeholder?: string;
   items?: BuilderButtonItem[];
+  options?: EmbedSelectOption[];
+  action?: EmbedActionConfig;
+  defaultValueId?: string; // pre-selects a role/channel/user in the picker — Discord's own "default value" for that select type
 }
 
 const BUTTON_STYLES: Record<string, number> = { primary: 1, secondary: 2, success: 3, danger: 4 };
@@ -46,6 +52,10 @@ function hexToInt(hex?: string): number | undefined {
 
 function randomId(): string {
   return Math.random().toString(36).slice(2, 11);
+}
+
+function hasAction(action?: EmbedActionConfig): boolean {
+  return !!action && action.type !== "none";
 }
 
 export function buildEmbedJson(em: BuilderEmbed): Record<string, unknown> | null {
@@ -72,44 +82,60 @@ export function buildEmbedJson(em: BuilderEmbed): Record<string, unknown> | null
   return embed;
 }
 
-// Non-link components (plain Button, every Select Menu type) have no bot
-// logic behind them yet — same real-world limitation Discohook itself has.
-// Rather than let Discord show its own bare "This interaction failed", every
-// one gets a custom_id prefixed "ecnoop:" that the bot recognizes and
-// answers with a clear, honest message instead (see
-// apps/bot/src/events/interactionCreate.ts).
-export function buildComponentsJson(rows: BuilderComponentRow[]): Array<Record<string, unknown>> {
-  return rows
-    .filter((r) => r.type)
-    .slice(0, 5)
-    .map((row) => {
-      if (row.type === "buttons") {
-        const items = (row.items || []).slice(0, 5).map((it) => {
-          if (it.kind === "link") {
-            return { type: 2, style: 5, label: (it.label || "Link").slice(0, 80), url: it.url || "https://discord.com" };
-          }
-          return { type: 2, style: BUTTON_STYLES[it.style || "primary"], label: (it.label || "Button").slice(0, 80), custom_id: `ecnoop:${randomId()}` };
-        });
-        return { type: 1, components: items };
-      }
+// A button/select with no configured action still gets a custom_id (every
+// interactive component needs one), just a plain random one prefixed
+// "ecnoop:" that the bot answers with an honest "not connected" message
+// instead of Discord's own bare interaction failure. One WITH an action
+// gets a real "ecaction:<id>" pointing at a persisted EmbedComponentAction
+// row the bot actually executes (see apps/bot/src/modules/community/embedActions.ts).
+export async function buildComponentsJson(guildId: string, rows: BuilderComponentRow[]): Promise<Array<Record<string, unknown>>> {
+  const result: Array<Record<string, unknown>> = [];
 
-      const selectType = SELECT_TYPES[row.type as string] ?? 3;
-      const component: Record<string, unknown> = {
-        type: selectType,
-        custom_id: `ecnoop:${randomId()}`,
-        placeholder: (row.placeholder || "Choose an option…").slice(0, 150),
-      };
-      // A STRING_SELECT is the one type Discord requires options for — this
-      // control isn't wired to real choices yet, so it ships one minimal
-      // placeholder option rather than a broken empty menu.
-      if (selectType === 3) component.options = [{ label: "Option 1", value: "option_1" }];
-      return { type: 1, components: [component] };
-    });
+  for (const row of rows.filter((r) => r.type).slice(0, 5)) {
+    if (row.type === "buttons") {
+      const items: Array<Record<string, unknown>> = [];
+      for (const it of (row.items || []).slice(0, 5)) {
+        if (it.kind === "link") {
+          items.push({ type: 2, style: 5, label: (it.label || "Link").slice(0, 80), url: it.url || "https://discord.com" });
+          continue;
+        }
+        const customId = hasAction(it.action) ? await createActionCustomId(prisma, guildId, "button", it.action) : `ecnoop:${randomId()}`;
+        items.push({ type: 2, style: BUTTON_STYLES[it.style || "primary"], label: (it.label || "Button").slice(0, 80), custom_id: customId });
+      }
+      result.push({ type: 1, components: items });
+      continue;
+    }
+
+    const selectType = SELECT_TYPES[row.type as string] ?? 3;
+    const hasAnyAction = hasAction(row.action) || (row.options || []).some((o) => hasAction(o.action));
+    const customId = hasAnyAction
+      ? await createActionCustomId(prisma, guildId, "select", {
+          selectType: row.type,
+          defaultAction: row.action,
+          options: (row.options || []).map((o) => ({ value: o.value, action: o.action })),
+        })
+      : `ecnoop:${randomId()}`;
+
+    const component: Record<string, unknown> = { type: selectType, custom_id: customId, placeholder: (row.placeholder || "Choose an option…").slice(0, 150) };
+    if (selectType === 3) {
+      const opts = (row.options && row.options.length ? row.options : [{ label: "Option 1", value: "option_1" }]).slice(0, 25);
+      component.options = opts.map((o) => ({ label: o.label.slice(0, 100), value: o.value.slice(0, 100) }));
+    }
+    // Discord's own "default value" — pre-selects a role/channel/user in the
+    // picker so it opens already showing a choice instead of empty.
+    const defaultType = row.type === "role" ? "role" : row.type === "channel" ? "channel" : row.type === "user" ? "user" : null;
+    if (defaultType && row.defaultValueId) {
+      component.default_values = [{ id: row.defaultValueId, type: defaultType }];
+    }
+    result.push({ type: 1, components: [component] });
+  }
+
+  return result;
 }
 
-export function buildMessagePayload(input: { content?: string; embeds?: BuilderEmbed[]; components?: BuilderComponentRow[] }) {
+export async function buildMessagePayload(guildId: string, input: { content?: string; embeds?: BuilderEmbed[]; components?: BuilderComponentRow[] }) {
   const embeds = (input.embeds || []).map(buildEmbedJson).filter((e): e is Record<string, unknown> => e !== null);
-  const components = buildComponentsJson(input.components || []);
+  const components = await buildComponentsJson(guildId, input.components || []);
   const payload: Record<string, unknown> = {};
   if (input.content) payload.content = input.content;
   if (embeds.length) payload.embeds = embeds;

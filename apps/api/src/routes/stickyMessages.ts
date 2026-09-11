@@ -87,7 +87,7 @@ router.post("/guilds/:guildId/sticky-messages/:id/resend", requireAuth, requireG
   let payload: Record<string, unknown>;
   if (sticky.savedEmbedId) {
     const preset = await prisma.embedCreatorPreset.findUnique({ where: { id: sticky.savedEmbedId } });
-    payload = preset ? buildMessagePayload(preset.data as Parameters<typeof buildMessagePayload>[0]) : {};
+    payload = preset ? await buildMessagePayload(req.params.guildId, preset.data as Parameters<typeof buildMessagePayload>[1]) : {};
   } else {
     payload = buildRestMessagePayload({
       content: sticky.content,

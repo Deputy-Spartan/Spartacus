@@ -145,7 +145,7 @@ export async function execute(message: Message) {
     if (command && isSendableChannel(message.channel)) {
       const saved = await resolveSavedEmbed(command.savedEmbedId);
       await message.channel.send(
-        buildStickyPayload(
+        await buildStickyPayload(
           {
             content: command.response,
             embedEnabled: command.embedEnabled,
@@ -155,7 +155,7 @@ export async function execute(message: Message) {
             buttons: command.buttons,
             embedExtra: command.embedExtra,
           },
-          { savedEmbed: saved }
+          { savedEmbed: saved, guildId: message.guildId! }
         )
       );
     }

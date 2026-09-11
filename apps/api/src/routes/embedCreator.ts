@@ -71,7 +71,7 @@ router.delete("/guilds/:guildId/embed-creator/presets/:id", requireAuth, require
 
 router.post("/guilds/:guildId/embed-creator/send", requireAuth, requireGuildPermission, async (req, res) => {
   const body = req.body as SendBody;
-  const payload = buildMessagePayload(body);
+  const payload = await buildMessagePayload(req.params.guildId, body);
   if (!payload.content && !payload.embeds && !payload.components) {
     return res.status(400).json({ error: "Nothing to send — add message content, at least one embed, or a component." });
   }
@@ -142,7 +142,7 @@ router.post("/guilds/:guildId/embed-creator/fetch", requireAuth, requireGuildPer
 router.patch("/guilds/:guildId/embed-creator/update", requireAuth, requireGuildPermission, async (req, res) => {
   const body = req.body as SendBody & { channelId?: string; messageId: string };
   if (!body.messageId) return res.status(400).json({ error: "Missing message id." });
-  const payload = buildMessagePayload(body);
+  const payload = await buildMessagePayload(req.params.guildId, body);
 
   if (body.mode === "webhook") {
     if (!body.webhookUrl || !parseWebhookUrl(body.webhookUrl)) {

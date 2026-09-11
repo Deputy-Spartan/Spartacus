@@ -15,7 +15,7 @@ export async function executeCustomCommand(interaction: ChatInputCommandInteract
   if (command.actionType === "POST_EMBED") {
     const saved = await resolveSavedEmbed(command.savedEmbedId);
     await interaction.reply({
-      ...buildStickyPayload(
+      ...(await buildStickyPayload(
         {
           content: command.messageText || "",
           embedEnabled: command.embedEnabled,
@@ -25,8 +25,8 @@ export async function executeCustomCommand(interaction: ChatInputCommandInteract
           buttons: command.buttons,
           embedExtra: command.embedExtra,
         },
-        { savedEmbed: saved }
-      ),
+        { savedEmbed: saved, guildId: command.guildId }
+      )),
       ephemeral,
     });
     return;

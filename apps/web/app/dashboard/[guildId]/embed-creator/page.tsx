@@ -367,7 +367,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
             <p className="font-medium text-sm">Buttons &amp; Select Menus ({state.components.length}/5 rows)</p>
           </div>
           {state.components.map((row, i) => (
-            <ComponentRowEditor key={row.id} row={row} index={i} onChange={(next) => updateRow(row.id, next)} onRemove={() => removeRow(row.id)} />
+            <ComponentRowEditor key={row.id} guildId={guildId} row={row} index={i} onChange={(next) => updateRow(row.id, next)} onRemove={() => removeRow(row.id)} />
           ))}
           <button onClick={addRow} disabled={state.components.length >= 5} className="w-full py-3 rounded-xl border border-dashed border-white/15 text-slate-400 text-sm font-medium hover:border-neon-blue/50 hover:text-neon-blue transition-colors disabled:opacity-40">
             + Add Row

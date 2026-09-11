@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { Client, EmbedBuilder } from "discord.js";
+import { Client, EmbedBuilder, type BaseMessageOptions } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
@@ -30,20 +30,19 @@ export function startGiveawayEnderJob(client: Client) {
 
       if (isSendableChannel(channel)) {
         const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
-        const payload = saved
-          ? buildSavedEmbedPayload(saved)
-          : (() => {
-              const embed = new EmbedBuilder()
-                .setColor(0xb14bff)
-                .setTitle(`🎉 Giveaway Ended: ${giveaway.prize}`)
-                .setDescription(
-                  winners.length > 0
-                    ? `Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!`
-                    : "No valid entries — no winner could be selected."
-                );
-              applyEmbedExtra(embed, giveaway.embedExtra);
-              return { embeds: [embed] };
-            })();
+        let payload: BaseMessageOptions;
+        if (saved) {
+          payload = await buildSavedEmbedPayload(giveaway.guildId, saved);
+        } else {
+          const embed = new EmbedBuilder()
+            .setColor(0xb14bff)
+            .setTitle(`🎉 Giveaway Ended: ${giveaway.prize}`)
+            .setDescription(
+              winners.length > 0 ? `Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!` : "No valid entries — no winner could be selected."
+            );
+          applyEmbedExtra(embed, giveaway.embedExtra);
+          payload = { embeds: [embed] };
+        }
         await channel.send(payload).catch((err) => {
           if (loggedThisTick < 5) { logError("bot", err, giveaway.guildId); loggedThisTick++; }
           return null;

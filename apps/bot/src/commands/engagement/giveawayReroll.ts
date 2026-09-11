@@ -1,4 +1,4 @@
-import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, type BaseMessageOptions } from "discord.js";
 import type { CommandModule } from "../types";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -53,20 +53,19 @@ const command: CommandModule = {
     const channel = await interaction.client.channels.fetch(giveaway.channelId).catch(() => null);
     if (isSendableChannel(channel)) {
       const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
-      const payload = saved
-        ? buildSavedEmbedPayload(saved)
-        : (() => {
-            const embed = new EmbedBuilder()
-              .setColor(0xb14bff)
-              .setTitle(`🔁 Reroll! ${giveaway.prize}`)
-              .setDescription(
-                winners.length > 0
-                  ? `New winner(s): ${winners.map((w) => `<@${w}>`).join(", ")}!`
-                  : "No valid entries — no winner could be selected."
-              );
-            applyEmbedExtra(embed, giveaway.embedExtra);
-            return { embeds: [embed] };
-          })();
+      let payload: BaseMessageOptions;
+      if (saved) {
+        payload = await buildSavedEmbedPayload(giveaway.guildId, saved);
+      } else {
+        const embed = new EmbedBuilder()
+          .setColor(0xb14bff)
+          .setTitle(`🔁 Reroll! ${giveaway.prize}`)
+          .setDescription(
+            winners.length > 0 ? `New winner(s): ${winners.map((w) => `<@${w}>`).join(", ")}!` : "No valid entries — no winner could be selected."
+          );
+        applyEmbedExtra(embed, giveaway.embedExtra);
+        payload = { embeds: [embed] };
+      }
       await channel.send(payload).catch(() => null);
     }
 

@@ -302,14 +302,32 @@ export interface EmbedCreatorEmbed {
   footerIconUrl?: string;
   timestamp?: boolean;
 }
+export type EmbedActionType = "none" | "give_role" | "remove_role" | "toggle_role" | "add_currency" | "send_message" | "post_embed" | "self_role" | "send_embed_to_channel";
+export interface EmbedActionConfig {
+  type: EmbedActionType;
+  roleId?: string;
+  currencyAmount?: number;
+  messageText?: string;
+  embedPresetId?: string;
+  ephemeral?: boolean;
+}
 export type EmbedCreatorButtonItem =
-  | { id: string; kind: "button"; label: string; style: "primary" | "secondary" | "success" | "danger" }
+  | { id: string; kind: "button"; label: string; style: "primary" | "secondary" | "success" | "danger"; action?: EmbedActionConfig }
   | { id: string; kind: "link"; label: string; url: string };
+export interface EmbedSelectOption {
+  id: string;
+  label: string;
+  value: string;
+  action?: EmbedActionConfig;
+}
 export interface EmbedCreatorComponentRow {
   id: string;
   type: "buttons" | "string" | "user" | "role" | "user_role" | "channel" | null;
   placeholder?: string;
   items: EmbedCreatorButtonItem[];
+  options?: EmbedSelectOption[]; // string select's configurable choices
+  action?: EmbedActionConfig; // user/role/channel/user_role select's single action
+  defaultValueId?: string; // pre-selects a role/channel/user in the picker
 }
 export interface EmbedCreatorState {
   content: string;

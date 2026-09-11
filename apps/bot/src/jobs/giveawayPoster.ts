@@ -26,7 +26,7 @@ export function startGiveawayPosterJob(client: Client) {
       let payload: BaseMessageOptions;
 
       if (saved) {
-        payload = buildSavedEmbedPayload(saved);
+        payload = await buildSavedEmbedPayload(giveaway.guildId, saved);
       } else {
         const embed = new EmbedBuilder()
           .setColor((giveaway.embedColor as `#${string}`) || "#B14BFF")

@@ -22,8 +22,11 @@ export interface StickyMessageLike {
 // Announcements, and Sticky Messages all send through this one function,
 // so this is the single place that makes "use a saved embed" work for all
 // four instead of each needing its own branch.
-export function buildStickyPayload(sticky: StickyMessageLike, options?: { thumbnailUrl?: string; savedEmbed?: SavedEmbedData | null }): BaseMessageOptions {
-  if (options?.savedEmbed) return buildSavedEmbedPayload(options.savedEmbed);
+export async function buildStickyPayload(
+  sticky: StickyMessageLike,
+  options?: { thumbnailUrl?: string; savedEmbed?: SavedEmbedData | null; guildId?: string }
+): Promise<BaseMessageOptions> {
+  if (options?.savedEmbed && options.guildId) return buildSavedEmbedPayload(options.guildId, options.savedEmbed);
 
   const buttons = Array.isArray(sticky.buttons) ? (sticky.buttons as StickyButton[]) : [];
 

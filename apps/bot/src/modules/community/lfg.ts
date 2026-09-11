@@ -23,7 +23,7 @@ async function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceLa
   if (cfg.savedEmbedId) {
     const saved = await resolveSavedEmbed(cfg.savedEmbedId);
     if (saved) {
-      const payload = buildSavedEmbedPayload(saved);
+      const payload = await buildSavedEmbedPayload(cfg.guildId, saved);
       return { content: [ping, payload.content].filter(Boolean).join(" "), embeds: payload.embeds };
     }
   }

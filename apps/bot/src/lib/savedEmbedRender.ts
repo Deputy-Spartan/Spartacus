@@ -10,7 +10,7 @@ import {
   UserSelectMenuBuilder,
   type BaseMessageOptions,
 } from "discord.js";
-import { prisma } from "./prisma";
+import { prisma, createActionCustomId, type EmbedActionConfig, type EmbedSelectOption } from "@spartacus/db";
 
 // Every embed-producing feature (Welcome, Custom Commands, Announcements,
 // Sticky Messages, Birthdays, Custom Slash Commands, Giveaways, LFG) can
@@ -45,11 +45,15 @@ interface SavedEmbedButtonItem {
   label?: string;
   style?: "primary" | "secondary" | "success" | "danger";
   url?: string;
+  action?: EmbedActionConfig;
 }
 interface SavedEmbedRow {
   type: "buttons" | "string" | "user" | "role" | "user_role" | "channel" | null;
   placeholder?: string;
   items?: SavedEmbedButtonItem[];
+  options?: EmbedSelectOption[];
+  action?: EmbedActionConfig;
+  defaultValueId?: string;
 }
 export interface SavedEmbedData {
   content?: string;
@@ -79,8 +83,11 @@ const BUTTON_STYLES: Record<string, ButtonStyle> = {
 function randomId(): string {
   return Math.random().toString(36).slice(2, 11);
 }
+function hasAction(action?: EmbedActionConfig): boolean {
+  return !!action && action.type !== "none";
+}
 
-export function buildSavedEmbedPayload(data: SavedEmbedData): BaseMessageOptions {
+export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedData): Promise<BaseMessageOptions> {
   const embeds = (data.embeds || [])
     .map((em) => {
       const hasContent = em.title || em.description || (em.fields && em.fields.length) || em.imageUrl || em.thumbnailUrl || em.authorName;
@@ -107,32 +114,65 @@ export function buildSavedEmbedPayload(data: SavedEmbedData): BaseMessageOptions
     })
     .filter((e): e is EmbedBuilder => e !== null);
 
-  const components = (data.components || [])
-    .filter((r) => r.type)
-    .slice(0, 5)
-    .map((row) => {
-      if (row.type === "buttons") {
-        const buttons = (row.items || []).slice(0, 5).map((it) =>
-          it.kind === "link"
-            ? new ButtonBuilder().setLabel((it.label || "Link").slice(0, 80)).setStyle(ButtonStyle.Link).setURL(it.url || "https://discord.com")
-            : new ButtonBuilder().setLabel((it.label || "Button").slice(0, 80)).setStyle(BUTTON_STYLES[it.style || "primary"]).setCustomId(`ecnoop:${randomId()}`)
-        );
-        return new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
+  const components: ActionRowBuilder<any>[] = [];
+  for (const row of (data.components || []).filter((r) => r.type).slice(0, 5)) {
+    if (row.type === "buttons") {
+      const buttons: ButtonBuilder[] = [];
+      for (const it of (row.items || []).slice(0, 5)) {
+        if (it.kind === "link") {
+          buttons.push(new ButtonBuilder().setLabel((it.label || "Link").slice(0, 80)).setStyle(ButtonStyle.Link).setURL(it.url || "https://discord.com"));
+          continue;
+        }
+        const customId = hasAction(it.action) ? await createActionCustomId(prisma, guildId, "button", it.action) : `ecnoop:${randomId()}`;
+        buttons.push(new ButtonBuilder().setLabel((it.label || "Button").slice(0, 80)).setStyle(BUTTON_STYLES[it.style || "primary"]).setCustomId(customId));
       }
+      components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons));
+      continue;
+    }
 
-      const customId = `ecnoop:${randomId()}`;
-      const placeholder = (row.placeholder || "Choose an option…").slice(0, 150);
-      if (row.type === "user") return new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(new UserSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder));
-      if (row.type === "role") return new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder));
-      if (row.type === "user_role") return new ActionRowBuilder<MentionableSelectMenuBuilder>().addComponents(new MentionableSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder));
-      if (row.type === "channel") return new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder));
-      // STRING_SELECT is the one type Discord requires options for — this
-      // control isn't wired to real choices yet (see interactionCreate.ts's
-      // "ecnoop:" handler), so it ships one minimal placeholder option.
-      return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder).addOptions({ label: "Option 1", value: "option_1" })
-      );
-    });
+    const hasAnyAction = hasAction(row.action) || (row.options || []).some((o) => hasAction(o.action));
+    const customId = hasAnyAction
+      ? await createActionCustomId(prisma, guildId, "select", {
+          selectType: row.type,
+          defaultAction: row.action,
+          options: (row.options || []).map((o) => ({ value: o.value, action: o.action })),
+        })
+      : `ecnoop:${randomId()}`;
+    const placeholder = (row.placeholder || "Choose an option…").slice(0, 150);
+
+    if (row.type === "user") {
+      const menu = new UserSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder);
+      if (row.defaultValueId) menu.setDefaultUsers([row.defaultValueId]);
+      components.push(new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(menu));
+      continue;
+    }
+    if (row.type === "role") {
+      const menu = new RoleSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder);
+      if (row.defaultValueId) menu.setDefaultRoles([row.defaultValueId]);
+      components.push(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(menu));
+      continue;
+    }
+    if (row.type === "user_role") {
+      components.push(new ActionRowBuilder<MentionableSelectMenuBuilder>().addComponents(new MentionableSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder)));
+      continue;
+    }
+    if (row.type === "channel") {
+      const menu = new ChannelSelectMenuBuilder().setCustomId(customId).setPlaceholder(placeholder);
+      if (row.defaultValueId) menu.setDefaultChannels([row.defaultValueId]);
+      components.push(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(menu));
+      continue;
+    }
+    // STRING_SELECT — the one type Discord requires real options for.
+    const opts = (row.options && row.options.length ? row.options : [{ label: "Option 1", value: "option_1" }]).slice(0, 25);
+    components.push(
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId(customId)
+          .setPlaceholder(placeholder)
+          .addOptions(opts.map((o) => ({ label: o.label.slice(0, 100), value: o.value.slice(0, 100) })))
+      )
+    );
+  }
 
   return { content: data.content || "", embeds, components };
 }

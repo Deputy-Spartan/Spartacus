@@ -54,7 +54,7 @@ async function repost(channelId: string, channel: Message["channel"]) {
     }
 
     const saved = await resolveSavedEmbed(sticky.savedEmbedId);
-    const posted = await channel.send(buildStickyPayload(sticky, { savedEmbed: saved })).catch(() => null);
+    const posted = await channel.send(await buildStickyPayload(sticky, { savedEmbed: saved, guildId: sticky.guildId })).catch(() => null);
     if (posted) {
       await prisma.stickyMessage.update({ where: { id: sticky.id }, data: { lastMessageId: posted.id } });
     }

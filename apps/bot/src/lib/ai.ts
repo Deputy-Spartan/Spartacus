@@ -29,7 +29,15 @@ export async function askClaude(system: string, userMessage: string, maxTokens =
     }),
   }).catch(() => null);
 
-  if (!res || !res.ok) return null;
+  if (!res) {
+    console.error("[ai] Request to Anthropic failed (network error) — AI Chat/Moderation reply will be skipped.");
+    return null;
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[ai] Anthropic API returned ${res.status} ${res.statusText} — check ANTHROPIC_API_KEY is valid. Body: ${body.slice(0, 500)}`);
+    return null;
+  }
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
   return data.content?.find((c) => c.type === "text")?.text ?? null;
 }

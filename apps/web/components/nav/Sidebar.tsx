@@ -51,7 +51,7 @@ export const NAV_SECTIONS = [
       { href: "/ai-chat", label: "AI Chat", icon: "💡" },
       { href: "/birthdays", label: "Birthdays", icon: "🎂" },
       { href: "/member-milestones", label: "Member Milestones", icon: "🏅" },
-      { href: "/confessions", label: "Confessions", icon: "🤫" },
+      { href: "/confessions", label: "Anonymous", icon: "🤫" },
       { href: "/events", label: "Event Scheduler", icon: "⚔️" },
     ],
   },

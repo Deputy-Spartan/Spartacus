@@ -7,9 +7,9 @@ const command: CommandModule = {
   moduleKey: "CONFESSIONS",
   data: new SlashCommandBuilder()
     .setName("confess")
-    .setDescription("Post an anonymous confession to this server")
+    .setDescription("Post an anonymous message to this server")
     .addStringOption((o) =>
-      o.setName("message").setDescription("Your confession").setRequired(true).setMaxLength(1000)
+      o.setName("message").setDescription("Your message").setRequired(true).setMaxLength(1000)
     ) as SlashCommandBuilder,
 
   async execute(interaction) {
@@ -18,7 +18,7 @@ const command: CommandModule = {
 
     const settings = await prisma.confessionSettings.findUnique({ where: { guildId } });
     if (!settings?.channelId) {
-      await interaction.reply({ content: "Confessions aren't set up on this server yet.", ephemeral: true });
+      await interaction.reply({ content: "Anonymous messages aren't set up on this server yet.", ephemeral: true });
       return;
     }
 
@@ -26,17 +26,17 @@ const command: CommandModule = {
     if (!isSendableChannel(channel)) {
       // Deliberately vague — don't confirm/deny channel state in a way that
       // could be used to probe configuration; just tell the user it didn't work.
-      await interaction.reply({ content: "Confessions couldn't be posted right now. Try again later.", ephemeral: true });
+      await interaction.reply({ content: "Your message couldn't be posted right now. Try again later.", ephemeral: true });
       return;
     }
 
-    const confessionNumber = settings.nextNumber;
+    const messageNumber = settings.nextNumber;
 
     // Embed intentionally carries no author/user/avatar reference anywhere —
     // that's the entire point of the feature. Never log the sender's id
-    // alongside the confession content either.
+    // alongside the message content either.
     const embed = new EmbedBuilder()
-      .setTitle(`Confession #${confessionNumber}`)
+      .setTitle(`Anonymous #${messageNumber}`)
       .setDescription(message)
       .setColor("#8A2BE2")
       .setTimestamp();
@@ -45,13 +45,13 @@ const command: CommandModule = {
 
     await prisma.confessionSettings.update({
       where: { guildId },
-      data: { nextNumber: confessionNumber + 1 },
+      data: { nextNumber: messageNumber + 1 },
     });
 
     // Ephemeral — only the sender ever sees this, and it says nothing about
     // which channel it was posted to (that's visible only by reading the
     // channel itself, same as anyone else would see it).
-    await interaction.reply({ content: "Your confession was posted anonymously.", ephemeral: true });
+    await interaction.reply({ content: "Your message was posted anonymously.", ephemeral: true });
   },
 };
 

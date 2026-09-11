@@ -26,12 +26,12 @@ export default function ConfessionsPage({ params }: { params: { guildId: string 
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="CONFESSIONS"
-        title="Confessions"
-        description="Lets members post anonymous confessions via /confess. No identity is ever attached to a posted confession, and no history of past confessions is stored — only the running counter persists."
+        title="Anonymous"
+        description="Lets members post anonymous messages via /confess. No identity is ever attached to a posted message, and no history of past messages is stored — only the running counter persists."
       />
 
       <NeonCard className="max-w-xl">
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Confessions Channel</label>
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Anonymous Channel</label>
         <ChannelSelect
           guildId={params.guildId}
           value={settings?.channelId ?? null}
@@ -42,7 +42,7 @@ export default function ConfessionsPage({ params }: { params: { guildId: string 
 
         {settings && (
           <p className="text-xs text-slate-500 mt-4">
-            Next confession will be <span className="text-slate-300">#{settings.nextNumber}</span>
+            Next message will be <span className="text-slate-300">#{settings.nextNumber}</span>
           </p>
         )}
         {saved && <p className="text-xs text-emerald-400 mt-2">Saved ✓</p>}

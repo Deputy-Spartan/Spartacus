@@ -113,7 +113,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   BUMP_REMINDER: "Bump Reminder",
   SUGGESTION_ANALYTICS: "Suggestion Analytics",
   RANK_CARDS: "Rank Cards",
-  CONFESSIONS: "Confessions",
+  CONFESSIONS: "Anonymous",
   MEMBER_MILESTONES: "Member Milestones",
   RULES_GATE: "Rules Gate",
   PRESTIGE: "Prestige",

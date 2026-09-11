@@ -229,6 +229,20 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("setuptestserver:confirm:")) {
+    const token = interaction.customId.split(":")[2];
+    const { handleSetupTestServerConfirm } = await import("../commands/utility/setupTestServer");
+    await handleSetupTestServerConfirm(interaction, token);
+    return;
+  }
+
+  if (interaction.customId.startsWith("setuptestserver:cancel:")) {
+    const token = interaction.customId.split(":")[2];
+    const { handleSetupTestServerCancel } = await import("../commands/utility/setupTestServer");
+    await handleSetupTestServerCancel(interaction, token);
+    return;
+  }
+
   if (interaction.customId.startsWith("ticketpanel:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "TICKETS");
     if (!enabled) {

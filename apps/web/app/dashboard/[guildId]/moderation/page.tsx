@@ -499,6 +499,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
   const [configs, setConfigs] = useState<AutoPurgeConfigRow[]>([]);
   const [channelId, setChannelId] = useState<string | null>(null);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [form, setForm] = useState(EMPTY_AUTOPURGE);
   const [emojiDraft, setEmojiDraft] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -508,8 +509,15 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
 
   function refresh() {
     api.getAutoPurgeConfigs(guildId).then(setConfigs);
+    api.getDiscordChannels(guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
   }
   useEffect(refresh, [guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
 
   // Polls the server every 15s so "last ran"/"next run" reflect reality
   // without a manual page refresh, and ticks a local clock every second so
@@ -565,7 +573,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
   }
 
   async function remove(row: AutoPurgeConfigRow) {
-    if (!(await confirm(`Stop auto-purging #${row.channelId.slice(0, 6)}?`))) return;
+    if (!(await confirm(`Stop auto-purging ${channelLabel(row.channelId)}?`))) return;
     await api.deleteAutoPurgeConfig(guildId, row.id);
     refresh();
   }
@@ -610,7 +618,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
             <Required />
           </label>
           {editingId ? (
-            <p className="text-sm text-slate-300 bg-base-950 border border-white/10 rounded-lg p-2.5 mb-1">#{channelId?.slice(0, 6)}</p>
+            <p className="text-sm text-slate-300 bg-base-950 border border-white/10 rounded-lg p-2.5 mb-1">{channelLabel(channelId ?? "")}</p>
           ) : (
             <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
           )}
@@ -726,7 +734,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
             {configs.map((c) => (
               <div key={c.id} className="flex items-center justify-between py-3 text-sm gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium">#{c.channelId.slice(0, 6)}</p>
+                  <p className="font-medium">{channelLabel(c.channelId)}</p>
                   <p className="text-xs text-slate-500">
                     every {formatDuration(c.intervalSeconds)}
                     {c.ignorePinned ? " · skips pinned" : ""}

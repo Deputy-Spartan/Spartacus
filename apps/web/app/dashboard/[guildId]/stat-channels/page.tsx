@@ -7,7 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type StatChannelRow } from "../../../../lib/api";
+import { api, type DiscordChannelOption, type StatChannelRow } from "../../../../lib/api";
 
 const STAT_TYPES = [
   { value: "MEMBER_COUNT", label: "Member Count" },
@@ -18,6 +18,7 @@ const STAT_TYPES = [
 export default function StatChannelsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState<StatChannelRow[]>([]);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [channelId, setChannelId] = useState<string | null>(null);
   const [statType, setStatType] = useState("MEMBER_COUNT");
   const [format, setFormat] = useState("{stat}: {count}");
@@ -25,8 +26,15 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
 
   function refresh() {
     api.getStatChannels(params.guildId).then(setRows);
+    api.getDiscordChannels(params.guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
   }
   useEffect(refresh, [params.guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
 
   async function add() {
     if (!channelId) {
@@ -62,7 +70,7 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
             {rows.map((r) => (
               <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
                 <div className="min-w-0">
-                  <span className="text-slate-300 truncate block">#{r.channelId}</span>
+                  <span className="text-slate-300 truncate block">{channelLabel(r.channelId)}</span>
                   <span className="text-slate-600 text-xs">
                     {STAT_TYPES.find((t) => t.value === r.statType)?.label} — "{r.format}"
                   </span>

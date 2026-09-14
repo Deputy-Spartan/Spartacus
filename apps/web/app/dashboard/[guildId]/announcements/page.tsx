@@ -9,7 +9,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
-import { api, type AnnouncementInput, type AnnouncementRow } from "../../../../lib/api";
+import { api, type AnnouncementInput, type AnnouncementRow, type DiscordChannelOption } from "../../../../lib/api";
 
 const EMPTY: AnnouncementInput = {
   channelId: "",
@@ -27,14 +27,22 @@ const EMPTY: AnnouncementInput = {
 export default function AnnouncementsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [form, setForm] = useState<AnnouncementInput>(EMPTY);
   const [scheduleLocal, setScheduleLocal] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getAnnouncements(params.guildId).then(setRows);
+    api.getDiscordChannels(params.guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
   }
   useEffect(refresh, [params.guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
 
   async function send() {
     if (!form.channelId || (!form.content && !form.savedEmbedId)) {
@@ -133,7 +141,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                     <div className="min-w-0">
                       <p className="truncate">{r.embedTitle || r.content || "(embed only)"}</p>
                       <p className="text-xs text-slate-500">
-                        #{r.channelId.slice(0, 6)} ·{" "}
+                        {channelLabel(r.channelId)} ·{" "}
                         {r.sentAt ? `sent ${new Date(r.sentAt).toLocaleString()}` : r.scheduledFor ? `scheduled ${new Date(r.scheduledFor).toLocaleString()}` : "sending soon"}
                       </p>
                     </div>

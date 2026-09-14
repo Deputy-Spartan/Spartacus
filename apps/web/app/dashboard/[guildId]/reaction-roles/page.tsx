@@ -17,6 +17,8 @@ import {
   type RolePanelOption,
   type RolePanelRow,
   type JoinRoleRow,
+  type DiscordChannelOption,
+  type DiscordRoleOption,
 } from "../../../../lib/api";
 
 type Tab = "reaction-roles" | "role-panels" | "join-roles";
@@ -79,11 +81,24 @@ function ReactionRolesTab({ guildId }: { guildId: string }) {
   const [pickEmoji, setPickEmoji] = useState("");
   const [showEditor, setShowEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
+  const [roleOptions, setRoleOptions] = useState<DiscordRoleOption[]>([]);
 
   function refresh() {
     api.getReactionRolePanels(guildId).then(setPanels);
+    api.getDiscordChannels(guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
+    api.getDiscordRoles(guildId).then(setRoleOptions);
   }
   useEffect(refresh, [guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
+  function roleLabel(id: string): string {
+    return roleOptions.find((r) => r.id === id)?.name ?? id;
+  }
 
   function startCreate() {
     setEditingId(null);
@@ -219,7 +234,7 @@ function ReactionRolesTab({ guildId }: { guildId: string }) {
           <div className="flex flex-wrap gap-2 mb-3">
             {form.options.map((o) => (
               <span key={o.emoji} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10">
-                {o.emoji} <span className="text-neon-blue">role {o.roleId.slice(0, 6)}…</span>
+                {o.emoji} <span className="text-neon-blue">@{roleLabel(o.roleId)}</span>
                 <button onClick={() => removeOption(o.emoji)} className="text-slate-500 hover:text-rose-400">
                   ×
                 </button>
@@ -263,7 +278,7 @@ function ReactionRolesTab({ guildId }: { guildId: string }) {
                 <div>
                   <p className="font-medium">{p.title || "(untitled panel)"}</p>
                   <p className="text-xs text-slate-500">
-                    #{p.channelId.slice(0, 6)} · {p.embedEnabled ? "Embed" : "Plain text"} · {p.options.length} mapping(s) ·{" "}
+                    {channelLabel(p.channelId)} · {p.embedEnabled ? "Embed" : "Plain text"} · {p.options.length} mapping(s) ·{" "}
                     {p.messageId ? "posted" : "posting…"}
                   </p>
                 </div>
@@ -300,11 +315,19 @@ function RolePanelsTab({ guildId }: { guildId: string }) {
   const [pickLabel, setPickLabel] = useState("");
   const [pickEmoji, setPickEmoji] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
 
   function refresh() {
     api.getRolePanels(guildId).then(setPanels);
+    api.getDiscordChannels(guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
   }
   useEffect(refresh, [guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
 
   function addOption() {
     if (!editing || !pickRoleId || !pickLabel.trim()) return;
@@ -443,7 +466,7 @@ function RolePanelsTab({ guildId }: { guildId: string }) {
                 <div>
                   <p className="font-medium">{p.name}</p>
                   <p className="text-xs text-slate-500">
-                    #{p.channelId.slice(0, 6)} · {p.layout === "DROPDOWN" ? "Dropdown" : "Button grid"} · {p.options.length} role(s)
+                    {channelLabel(p.channelId)} · {p.layout === "DROPDOWN" ? "Dropdown" : "Button grid"} · {p.options.length} role(s)
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

@@ -20,6 +20,8 @@ import {
   type ApplicationSettingsRow,
   type ApplicationStatus,
   type ApplicationTypeRow,
+  type DiscordChannelOption,
+  type DiscordRoleOption,
 } from "../../../../lib/api";
 
 type Tab = "panels" | "types" | "submissions" | "settings";
@@ -53,6 +55,11 @@ function EmptyState({ icon, title, desc, action }: { icon: string; title: string
 
 function RoleChipPicker({ guildId, value, onChange }: { guildId: string; value: string[]; onChange: (ids: string[]) => void }) {
   const [pick, setPick] = useState<string | null>(null);
+  const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
+
+  useEffect(() => {
+    api.getDiscordRoles(guildId).then(setRoles);
+  }, [guildId]);
 
   useEffect(() => {
     if (pick && !value.includes(pick)) {
@@ -67,7 +74,7 @@ function RoleChipPicker({ guildId, value, onChange }: { guildId: string; value: 
       <div className="flex flex-wrap gap-2 mb-2">
         {value.map((id) => (
           <span key={id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10 text-slate-300">
-            @{id.slice(0, 8)}
+            @{roles.find((r) => r.id === id)?.name ?? id}
             <button type="button" onClick={() => onChange(value.filter((v) => v !== id))} className="text-slate-500 hover:text-neon-blue">
               ×
             </button>
@@ -131,13 +138,21 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [description, setDescription] = useState("");
   const [layout, setLayout] = useState<ApplicationPanelLayout>("BUTTONS");
   const [typeIds, setTypeIds] = useState<string[]>([]);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getApplicationPanels(guildId).then(setPanels);
     api.getApplicationTypes(guildId).then(setTypes);
+    api.getDiscordChannels(guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
   }
   useEffect(refresh, [guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
 
   async function createPanel() {
     if (!channelId || typeIds.length === 0) {
@@ -284,7 +299,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
                     {p.name} {p.paused && <span className="text-xs text-amber-400 ml-1">(paused)</span>}
                   </p>
                   <p className="text-xs text-slate-500">
-                    #{p.channelId.slice(0, 6)} · {p.layout === "DROPDOWN" ? "Dropdown" : "Button grid"} · {p.typeIds.length} type(s)
+                    {channelLabel(p.channelId)} · {p.layout === "DROPDOWN" ? "Dropdown" : "Button grid"} · {p.typeIds.length} type(s)
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

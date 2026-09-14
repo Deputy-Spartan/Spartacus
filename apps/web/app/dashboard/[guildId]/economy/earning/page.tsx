@@ -7,7 +7,7 @@ import { ChannelSelect } from "../../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../../components/ui/RoleSelect";
 import { Required } from "../../../../../components/ui/Required";
 import { FormError } from "../../../../../components/ui/FormError";
-import { api, type EconomyConfig, type EconomyMultiplier } from "../../../../../lib/api";
+import { api, type DiscordChannelOption, type DiscordRoleOption, type EconomyConfig, type EconomyMultiplier } from "../../../../../lib/api";
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
@@ -29,10 +29,23 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
   const [newRoleId, setNewRoleId] = useState<string | null>(null);
   const [channelMultiplierError, setChannelMultiplierError] = useState<string | null>(null);
   const [roleMultiplierError, setRoleMultiplierError] = useState<string | null>(null);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
+  const [roleOptions, setRoleOptions] = useState<DiscordRoleOption[]>([]);
 
   useEffect(() => {
     api.getEconomyConfig(params.guildId).then(setConfig);
+    api.getDiscordChannels(params.guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
+    api.getDiscordRoles(params.guildId).then(setRoleOptions);
   }, [params.guildId]);
+
+  function channelLabel(id: string): string {
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
+  function roleLabel(id: string): string {
+    return roleOptions.find((r) => r.id === id)?.name ?? id;
+  }
 
   async function persist(next: EconomyConfig) {
     setConfig(next);
@@ -150,7 +163,7 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
           <div className="space-y-1.5 mb-2">
             {config.channelMultipliers.map((m) => (
               <div key={m.channelId} className="flex items-center justify-between bg-base-950 border border-white/10 rounded-lg px-3 py-2 text-sm">
-                <span>#{m.channelId?.slice(0, 8)}</span>
+                <span>{channelLabel(m.channelId ?? "")}</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -194,7 +207,7 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
           <div className="space-y-1.5 mb-2">
             {config.roleMultipliers.map((m) => (
               <div key={m.roleId} className="flex items-center justify-between bg-base-950 border border-white/10 rounded-lg px-3 py-2 text-sm">
-                <span>@{m.roleId?.slice(0, 8)}</span>
+                <span>@{roleLabel(m.roleId ?? "")}</span>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"

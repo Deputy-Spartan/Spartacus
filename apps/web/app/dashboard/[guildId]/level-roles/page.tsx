@@ -7,19 +7,25 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type LevelRoleRow } from "../../../../lib/api";
+import { api, type DiscordRoleOption, type LevelRoleRow } from "../../../../lib/api";
 
 export default function LevelRolesPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState<LevelRoleRow[]>([]);
   const [level, setLevel] = useState(10);
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [roleOptions, setRoleOptions] = useState<DiscordRoleOption[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
     api.getLevelRoles(params.guildId).then(setRows);
+    api.getDiscordRoles(params.guildId).then(setRoleOptions);
   }
   useEffect(refresh, [params.guildId]);
+
+  function roleLabel(id: string): string {
+    return roleOptions.find((r) => r.id === id)?.name ?? id;
+  }
 
   async function add() {
     if (!roleId) {
@@ -54,7 +60,7 @@ export default function LevelRolesPage({ params }: { params: { guildId: string }
             {rows.map((r) => (
               <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
                 <span>
-                  Level <span className="text-neon-blue font-semibold">{r.level}</span> → role {r.roleId}
+                  Level <span className="text-neon-blue font-semibold">{r.level}</span> → @{roleLabel(r.roleId)}
                 </span>
                 <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs">
                   Remove

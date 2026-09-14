@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
-import { buildTicketPanelPayload, postChannelMessage } from "../lib/discordRest";
+import { buildTicketPanelPayload, postChannelMessage, fetchChannelTranscriptText, postTranscriptMessage } from "../lib/discordRest";
 
 const router = Router();
 
@@ -93,7 +93,7 @@ router.get("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission,
 });
 
 router.post("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, emoji, description, categoryId, staffRoleIds, openMessage, modalFields, autoCloseHours, slaMinutes } = req.body;
+  const { name, emoji, description, categoryId, staffRoleIds, openMessage, modalFields, autoCloseHours, slaMinutes, transcriptChannelId, closeBehavior } = req.body;
   const row = await prisma.ticketType.create({
     data: {
       guildId: req.params.guildId,
@@ -106,13 +106,28 @@ router.post("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission
       modalFields: modalFields ?? [],
       autoCloseHours,
       slaMinutes,
+      transcriptChannelId,
+      closeBehavior,
     },
   });
   res.status(201).json(row);
 });
 
 router.patch("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const fields = ["name", "emoji", "description", "categoryId", "staffRoleIds", "openMessage", "modalFields", "autoCloseHours", "slaMinutes", "enabled"];
+  const fields = [
+    "name",
+    "emoji",
+    "description",
+    "categoryId",
+    "staffRoleIds",
+    "openMessage",
+    "modalFields",
+    "autoCloseHours",
+    "slaMinutes",
+    "enabled",
+    "transcriptChannelId",
+    "closeBehavior",
+  ];
   const data: Record<string, unknown> = {};
   for (const f of fields) if (req.body[f] !== undefined) data[f] = req.body[f];
   const row = await prisma.ticketType.update({ where: { id: req.params.id }, data });
@@ -172,6 +187,28 @@ router.patch("/guilds/:guildId/tickets/:id", requireAuth, requireGuildPermission
   if (status === "OPEN") data.closedAt = null;
   const row = await prisma.ticket.update({ where: { id: req.params.id }, data });
   res.json(row);
+});
+
+// Generates a transcript on demand — works for an open ticket (no need to
+// close it first) and lets the destination channel be overridden per call,
+// rather than only ever posting where TicketType/TicketSettings say to.
+router.post("/guilds/:guildId/tickets/:id/transcript", requireAuth, requireGuildPermission, async (req, res) => {
+  const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+  if (!ticket || ticket.guildId !== req.params.guildId) {
+    return res.status(404).json({ error: "Ticket not found" });
+  }
+
+  const type = ticket.typeId ? await prisma.ticketType.findUnique({ where: { id: ticket.typeId } }) : null;
+  const settings = await prisma.ticketSettings.findUnique({ where: { guildId: req.params.guildId } });
+  const destChannelId: string = req.body.channelId || type?.transcriptChannelId || settings?.transcriptChannelId || ticket.channelId;
+
+  const { text, error } = await fetchChannelTranscriptText(ticket.channelId);
+  if (error || !text) return res.status(422).json({ error: error || "Couldn't read that channel's messages." });
+
+  const posted = await postTranscriptMessage(destChannelId, `📄 Transcript for ticket #${ticket.ticketNumber}`, text);
+  if (posted.error) return res.status(422).json({ error: posted.error });
+
+  res.status(201).json({ channelId: destChannelId });
 });
 
 // ---- Tags ----
@@ -235,6 +272,7 @@ router.delete("/guilds/:guildId/ticket-knowledge/:id", requireAuth, requireGuild
 const DEFAULT_SETTINGS = {
   logChannelId: null as string | null,
   transcriptChannelId: null as string | null,
+  closeBehavior: "DELETE_AND_DM" as "DELETE_AND_DM" | "POST_ONLY",
   channelNameFormat: "ticket-{user}",
   ticketCap: 0,
   requireCloseReason: false,

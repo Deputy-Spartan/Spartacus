@@ -546,6 +546,41 @@ export function buildTicketPanelPayload(panel: TicketPanelForPost, types: Ticket
   return { embeds: [embed], components: [component] };
 }
 
+interface RawMessage {
+  author: { username: string };
+  content: string;
+  timestamp: string;
+}
+
+// Pure REST — lets the dashboard generate a transcript on demand (e.g. for a
+// ticket that's still open, or to re-post one to a different channel)
+// without depending on the bot's gateway connection. Discord message
+// content is only readable this way for channels the bot can see, same as
+// the bot process itself.
+export async function fetchChannelTranscriptText(channelId: string): Promise<{ text?: string; error?: string }> {
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}/messages?limit=100`, {
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+  });
+  if (!res.ok) return { error: res.status === 403 ? "The bot can't see that channel." : `Discord returned ${res.status}` };
+
+  const raw = (await res.json()) as RawMessage[];
+  const ordered = [...raw].reverse();
+  const text = ordered
+    .map((m) => `[${m.timestamp.slice(11, 19)}] ${m.author.username}: ${m.content || "[no text content]"}`)
+    .join("\n");
+  return { text: text || "(No messages in this channel.)" };
+}
+
+// Discord message content caps at 2000 characters — a generated transcript
+// that fits goes as one message; a longer one is truncated with a note
+// rather than silently cut off or requiring multipart file-upload plumbing
+// this REST-only path doesn't have.
+export async function postTranscriptMessage(channelId: string, header: string, text: string): Promise<{ error?: string; id?: string }> {
+  const budget = 1900 - header.length;
+  const body = text.length > budget ? `${text.slice(-budget)}\n\n…(truncated to the most recent messages)` : text;
+  return postChannelMessage(channelId, { content: `${header}\n\`\`\`\n${body}\n\`\`\`` });
+}
+
 export async function getGuildRoles(guildId: string): Promise<DiscordRole[]> {
   const cached = roleCache.get(guildId);
   if (cached && cached.expires > Date.now()) return cached.data;

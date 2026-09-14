@@ -16,6 +16,7 @@ import {
   type DiscordRoleOption,
   type TicketAnalytics,
   type TicketCannedResponseRow,
+  type TicketCloseBehavior,
   type TicketCounts,
   type TicketKnowledgeBaseRow,
   type TicketPanelRow,
@@ -25,12 +26,13 @@ import {
   type TicketTypeRow,
 } from "../../../../lib/api";
 
-type Tab = "panels" | "types" | "tickets" | "assist" | "resources" | "analytics" | "settings";
+type Tab = "panels" | "types" | "tickets" | "transcripts" | "assist" | "resources" | "analytics" | "settings";
 
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: "panels", label: "Panels", icon: "🎟️" },
   { key: "types", label: "Ticket Types", icon: "📁" },
   { key: "tickets", label: "Tickets", icon: "📥" },
+  { key: "transcripts", label: "Transcripts", icon: "📄" },
   { key: "assist", label: "Automated Assist", icon: "🤖" },
   { key: "resources", label: "Resources", icon: "💬" },
   { key: "analytics", label: "Analytics", icon: "📊" },
@@ -129,6 +131,7 @@ export default function TicketsPage({ params }: { params: { guildId: string } })
       {tab === "panels" && <PanelsTab guildId={params.guildId} onGoToTypes={() => setTab("types")} />}
       {tab === "types" && <TypesTab guildId={params.guildId} />}
       {tab === "tickets" && <TicketsTab guildId={params.guildId} />}
+      {tab === "transcripts" && <TranscriptsTab guildId={params.guildId} />}
       {tab === "assist" && <AssistTab guildId={params.guildId} />}
       {tab === "resources" && <ResourcesTab guildId={params.guildId} />}
       {tab === "analytics" && <AnalyticsTab guildId={params.guildId} />}
@@ -403,6 +406,8 @@ const EMPTY_TYPE: Partial<TicketTypeRow> = {
   autoCloseHours: null,
   slaMinutes: null,
   enabled: true,
+  transcriptChannelId: null,
+  closeBehavior: null,
 };
 
 function TypesTab({ guildId }: { guildId: string }) {
@@ -536,6 +541,22 @@ function TypesTab({ guildId }: { guildId: string }) {
             </div>
           </div>
 
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Transcript Channel (overrides the guild default)</label>
+          <ChannelSelect guildId={guildId} value={editing.transcriptChannelId ?? null} onChange={(id) => setEditing({ ...editing, transcriptChannelId: id })} />
+          <p className="text-xs text-slate-600 mt-1 mb-4">Leave empty to use the guild-wide default transcript channel from Settings.</p>
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">On Close (overrides the guild default)</label>
+          <select
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+            value={editing.closeBehavior ?? ""}
+            onChange={(e) => setEditing({ ...editing, closeBehavior: (e.target.value || null) as TicketCloseBehavior | null })}
+          >
+            <option value="">Use guild default</option>
+            <option value="DELETE_AND_DM">Delete the channel and DM the opener a copy</option>
+            <option value="POST_ONLY">Just post the transcript — leave the channel and opener alone</option>
+          </select>
+          <p className="text-xs text-slate-600 mb-4">"Just post the transcript" keeps the ticket channel open and skips the DM — useful if staff want to review it there first.</p>
+
           <div className="flex gap-2">
             <button onClick={save} disabled={!editing.name} className="neon-button disabled:opacity-50">
               Save Type
@@ -585,6 +606,132 @@ function TypesTab({ guildId }: { guildId: string }) {
                     Remove
                   </button>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </NeonCard>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Transcripts
+// ---------------------------------------------------------------------------
+
+function TranscriptsTab({ guildId }: { guildId: string }) {
+  const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [types, setTypes] = useState<TicketTypeRow[]>([]);
+  const [settings, setSettings] = useState<TicketSettingsRow | null>(null);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
+
+  const [selectedTicketId, setSelectedTicketId] = useState("");
+  const [destChannelId, setDestChannelId] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  function refresh() {
+    api.getTickets(guildId, { view: "all" }).then(setTickets);
+    api.getTicketTypes(guildId).then(setTypes);
+    api.getTicketSettings(guildId).then(setSettings);
+    api.getDiscordChannels(guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
+  }
+  useEffect(refresh, [guildId]);
+
+  function channelLabel(id: string | null): string {
+    if (!id) return "—";
+    const c = channelOptions.find((c) => c.id === id);
+    if (!c) return `#${id}`;
+    return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
+  }
+
+  function defaultChannelFor(ticket: TicketRow | undefined): string | null {
+    if (!ticket) return null;
+    const type = types.find((t) => t.id === ticket.typeId);
+    return type?.transcriptChannelId ?? settings?.transcriptChannelId ?? ticket.channelId;
+  }
+
+  const selectedTicket = tickets.find((t) => t.id === selectedTicketId);
+
+  function selectTicket(id: string) {
+    setSelectedTicketId(id);
+    setResult(null);
+    setDestChannelId(defaultChannelFor(tickets.find((t) => t.id === id)));
+  }
+
+  async function generate() {
+    if (!selectedTicket || !destChannelId) return;
+    setGenerating(true);
+    setResult(null);
+    try {
+      await api.generateTicketTranscript(guildId, selectedTicket.id, destChannelId);
+      setResult({ ok: true, message: `Posted to ${channelLabel(destChannelId)}.` });
+    } catch (err) {
+      setResult({ ok: false, message: err instanceof Error ? err.message : "Failed to generate the transcript." });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const withTranscripts = tickets.filter((t) => t.transcriptUrl);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400 max-w-2xl">
+        Generate a transcript for any ticket on demand — open or already closed — and choose exactly which channel it posts to. Where a transcript goes
+        automatically on close (and whether closing also deletes the channel and DMs the opener) is set per ticket type on the Ticket Types tab, or
+        guild-wide on Settings.
+      </p>
+
+      <NeonCard>
+        <p className="font-medium mb-3">Create a Transcript</p>
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Ticket</label>
+        <select
+          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
+          value={selectedTicketId}
+          onChange={(e) => selectTicket(e.target.value)}
+        >
+          <option value="">Select a ticket…</option>
+          {tickets.map((t) => (
+            <option key={t.id} value={t.id}>
+              #{t.ticketNumber} · {t.status} · {channelLabel(t.channelId)}
+            </option>
+          ))}
+        </select>
+
+        {selectedTicket && (
+          <>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Post To</label>
+            <ChannelSelect guildId={guildId} value={destChannelId} onChange={setDestChannelId} />
+            <p className="text-xs text-slate-600 mt-1 mb-4">Defaults to this ticket type's configured transcript channel — change it to post anywhere else.</p>
+
+            <button onClick={generate} disabled={!destChannelId || generating} className="neon-button disabled:opacity-50">
+              {generating ? "Generating…" : "Generate Transcript"}
+            </button>
+            {result && (
+              <p className={`text-xs mt-2 ${result.ok ? "text-emerald-400" : "text-rose-400"}`}>{result.ok ? "✅" : "⚠"} {result.message}</p>
+            )}
+          </>
+        )}
+      </NeonCard>
+
+      <NeonCard>
+        <p className="font-medium mb-3">Previously Generated</p>
+        {withTranscripts.length === 0 ? (
+          <EmptyState icon="📄" title="No transcripts yet" desc="Transcripts saved as a file (posted automatically when a ticket closes) show up here with a link." />
+        ) : (
+          <div className="divide-y divide-white/5">
+            {withTranscripts.map((t) => (
+              <div key={t.id} className="flex items-center justify-between py-3 text-sm">
+                <div>
+                  <p className="font-medium">Ticket #{t.ticketNumber}</p>
+                  <p className="text-xs text-slate-500">
+                    Opened by <code>{t.userId}</code> · {t.closedAt ? new Date(t.closedAt).toLocaleString() : "still open"}
+                  </p>
+                </div>
+                <a href={t.transcriptUrl ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-neon-blue hover:underline">
+                  View file ↗
+                </a>
               </div>
             ))}
           </div>
@@ -1173,8 +1320,24 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
       <NeonCard>
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Default Transcript Channel</label>
-        <p className="text-xs text-slate-500 mb-2">A close summary posts here for every ticket. Leave empty to skip posting summaries.</p>
+        <p className="text-xs text-slate-500 mb-2">
+          A close summary posts here for every ticket, unless its ticket type sets its own transcript channel on the Ticket Types tab. Leave empty to skip
+          posting summaries.
+        </p>
         <ChannelSelect guildId={guildId} value={settings.transcriptChannelId} onChange={(id) => persist({ ...settings, transcriptChannelId: id })} />
+      </NeonCard>
+
+      <NeonCard>
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Default On Close</label>
+        <p className="text-xs text-slate-500 mb-2">What happens when a ticket is closed, unless its ticket type overrides this.</p>
+        <select
+          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+          value={settings.closeBehavior}
+          onChange={(e) => persist({ ...settings, closeBehavior: e.target.value as TicketCloseBehavior })}
+        >
+          <option value="DELETE_AND_DM">Delete the channel and DM the opener a copy</option>
+          <option value="POST_ONLY">Just post the transcript — leave the channel and opener alone</option>
+        </select>
       </NeonCard>
 
       <NeonCard>

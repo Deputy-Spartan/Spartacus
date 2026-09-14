@@ -191,29 +191,41 @@ async function closeTicket(interaction: ButtonInteraction | ModalSubmitInteracti
     data: { status: "CLOSED", closedAt: new Date(), closeReason: closeReason ?? undefined },
   });
 
-  await interaction.reply("🔒 Closing this ticket in 5 seconds…");
-
   let settings: TicketSettings | null = null;
+  let type: TicketType | null = null;
   if (interaction.guild) {
     settings = await getSettings(interaction.guild.id);
-    if (settings?.transcriptChannelId) {
-      const transcriptChannel = await interaction.guild.channels.fetch(settings.transcriptChannelId).catch(() => null);
-      if (transcriptChannel?.isTextBased()) {
-        const durationMin = Math.round((Date.now() - new Date(ticket.createdAt).getTime()) / 60000);
-        await transcriptChannel
-          .send(
-            `📄 Ticket #${ticket.ticketNumber} closed by <@${interaction.user.id}>\n` +
-              `Opened by: <@${ticket.userId}>${ticket.claimedById ? ` · Claimed by: <@${ticket.claimedById}>` : ""}\n` +
-              `Duration: ${durationMin}m${closeReason ? `\nReason: ${closeReason}` : ""}`
-          )
-          .catch(() => null);
-      }
+    if (ticket.typeId) type = await prisma.ticketType.findUnique({ where: { id: ticket.typeId } });
+  }
+
+  // A ticket type's own transcript channel / close behavior override the
+  // guild-wide defaults on TicketSettings; falling back to those defaults
+  // covers legacy panels that don't select a type at all.
+  const transcriptChannelId = type?.transcriptChannelId ?? settings?.transcriptChannelId ?? null;
+  const closeBehavior = type?.closeBehavior ?? settings?.closeBehavior ?? "DELETE_AND_DM";
+  const deleteChannel = closeBehavior === "DELETE_AND_DM";
+
+  await interaction.reply(deleteChannel ? "🔒 Closing this ticket in 5 seconds…" : "🔒 Ticket closed — posting the transcript.");
+
+  if (interaction.guild && transcriptChannelId) {
+    const transcriptChannel = await interaction.guild.channels.fetch(transcriptChannelId).catch(() => null);
+    if (transcriptChannel?.isTextBased()) {
+      const durationMin = Math.round((Date.now() - new Date(ticket.createdAt).getTime()) / 60000);
+      await transcriptChannel
+        .send(
+          `📄 Ticket #${ticket.ticketNumber} closed by <@${interaction.user.id}>\n` +
+            `Opened by: <@${ticket.userId}>${ticket.claimedById ? ` · Claimed by: <@${ticket.claimedById}>` : ""}\n` +
+            `Duration: ${durationMin}m${closeReason ? `\nReason: ${closeReason}` : ""}`
+        )
+        .catch(() => null);
     }
   }
 
-  await postTranscript(interaction, ticket, settings).catch(() => null);
+  await postTranscript(interaction, ticket, { transcriptChannelId, dmOpener: deleteChannel }).catch(() => null);
 
-  setTimeout(() => interaction.channel?.delete().catch(() => null), 5000);
+  if (deleteChannel) {
+    setTimeout(() => interaction.channel?.delete().catch(() => null), 5000);
+  }
 }
 
 // Formats a batch of fetched messages (oldest-first) as plain-text transcript
@@ -239,7 +251,7 @@ export function formatTranscriptLines(
 async function postTranscript(
   interaction: ButtonInteraction | ModalSubmitInteraction,
   ticket: { id: string; ticketNumber: number; userId: string },
-  settings: TicketSettings | null
+  options: { transcriptChannelId: string | null; dmOpener: boolean }
 ) {
   const channel = interaction.channel;
   if (!channel || !channel.isTextBased()) return;
@@ -256,8 +268,8 @@ async function postTranscript(
 
   let transcriptUrl: string | null = null;
 
-  if (settings?.transcriptChannelId && interaction.guild) {
-    const transcriptChannel = await interaction.guild.channels.fetch(settings.transcriptChannelId).catch(() => null);
+  if (options.transcriptChannelId && interaction.guild) {
+    const transcriptChannel = await interaction.guild.channels.fetch(options.transcriptChannelId).catch(() => null);
     if (transcriptChannel?.isTextBased()) {
       const sent = await transcriptChannel
         .send({ content: `📄 Transcript for ticket #${ticket.ticketNumber}`, files: [buildAttachment()] })
@@ -266,20 +278,23 @@ async function postTranscript(
     }
   } else if (isSendableChannel(channel)) {
     // No dedicated log channel configured — post it to the ticket channel
-    // itself, right before it gets archived/deleted, so it's preserved one
-    // last time in the channel's own history.
+    // itself, right before it gets archived/deleted (if it is), so it's
+    // preserved one last time in the channel's own history.
     const sent = await channel
       .send({ content: `📄 Transcript for ticket #${ticket.ticketNumber}`, files: [buildAttachment()] })
       .catch(() => null);
     transcriptUrl = sent?.attachments.first()?.url ?? null;
   }
 
-  // Best-effort DM copy to the ticket opener — many users have DMs closed.
-  const opener = await interaction.client.users.fetch(ticket.userId).catch(() => null);
-  if (opener) {
-    await opener
-      .send({ content: `📄 Here's the transcript for your ticket #${ticket.ticketNumber}.`, files: [buildAttachment()] })
-      .catch(() => null);
+  // Best-effort DM copy to the ticket opener — many users have DMs closed —
+  // only when the close behavior calls for it; POST_ONLY skips this entirely.
+  if (options.dmOpener) {
+    const opener = await interaction.client.users.fetch(ticket.userId).catch(() => null);
+    if (opener) {
+      await opener
+        .send({ content: `📄 Here's the transcript for your ticket #${ticket.ticketNumber}.`, files: [buildAttachment()] })
+        .catch(() => null);
+    }
   }
 
   // Discord attachment CDN URLs can expire/rotate over long timescales —

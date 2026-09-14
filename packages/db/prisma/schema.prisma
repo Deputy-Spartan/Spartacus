@@ -624,7 +624,17 @@ model TicketType {
   enabled        Boolean  @default(true)
   createdAt      DateTime @default(now())
 
+  // Overrides the guild-wide defaults on TicketSettings for tickets opened
+  // under this type — null falls back to the guild default.
+  transcriptChannelId String?
+  closeBehavior       TicketCloseBehavior?
+
   @@index([guildId])
+}
+
+enum TicketCloseBehavior {
+  DELETE_AND_DM // delete the ticket channel and DM the opener a copy of the transcript
+  POST_ONLY // leave the channel alone; just post the transcript
 }
 
 enum TicketStatus {
@@ -691,6 +701,7 @@ model TicketSettings {
   guildId             String  @unique
   logChannelId        String?
   transcriptChannelId String?
+  closeBehavior       TicketCloseBehavior @default(DELETE_AND_DM)
   channelNameFormat   String  @default("ticket-{user}")
   ticketCap           Int     @default(0)
   requireCloseReason  Boolean @default(false)

@@ -737,6 +737,8 @@ export interface TicketModalField {
   style?: "SHORT" | "PARAGRAPH";
 }
 
+export type TicketCloseBehavior = "DELETE_AND_DM" | "POST_ONLY";
+
 export interface TicketTypeRow {
   id: string;
   name: string;
@@ -749,6 +751,8 @@ export interface TicketTypeRow {
   autoCloseHours: number | null;
   slaMinutes: number | null;
   enabled: boolean;
+  transcriptChannelId: string | null;
+  closeBehavior: TicketCloseBehavior | null;
 }
 
 export type TicketStatus = "OPEN" | "CLAIMED" | "CLOSED";
@@ -800,6 +804,7 @@ export interface TicketSettingsRow {
   guildId: string;
   logChannelId: string | null;
   transcriptChannelId: string | null;
+  closeBehavior: TicketCloseBehavior;
   channelNameFormat: string;
   ticketCap: number;
   requireCloseReason: boolean;
@@ -1402,6 +1407,8 @@ export const api = {
   getTicketCounts: (guildId: string) => request<TicketCounts>(`/guilds/${guildId}/tickets/counts`),
   updateTicket: (guildId: string, id: string, body: Partial<TicketRow>) =>
     request<TicketRow>(`/guilds/${guildId}/tickets/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  generateTicketTranscript: (guildId: string, id: string, channelId?: string) =>
+    request<{ channelId: string }>(`/guilds/${guildId}/tickets/${id}/transcript`, { method: "POST", body: JSON.stringify({ channelId }) }),
 
   getTicketTags: (guildId: string) => request<TicketTagRow[]>(`/guilds/${guildId}/ticket-tags`),
   addTicketTag: (guildId: string, body: Partial<TicketTagRow>) =>

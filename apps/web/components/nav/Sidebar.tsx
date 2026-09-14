@@ -144,9 +144,15 @@ export function Sidebar({
   }, [query, allSections]);
 
   const searching = query.trim().length > 0;
+  const sectionKeys = useMemo(() => allSections.filter((s) => s.section).map((s) => s.section as string), [allSections]);
+  const allCollapsed = sectionKeys.length > 0 && sectionKeys.every((k) => collapsed[k]);
 
   function toggleSection(key: string) {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function toggleAllSections() {
+    setCollapsed(allCollapsed ? {} : Object.fromEntries(sectionKeys.map((k) => [k, true])));
   }
 
   // Picking a page closes the drawer on mobile (it's covering the content
@@ -179,7 +185,7 @@ export function Sidebar({
       </div>
 
       <div className="px-3 pb-3 shrink-0">
-        <div className="relative">
+        <div className="relative mb-2">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
           <input
             value={query}
@@ -188,6 +194,14 @@ export function Sidebar({
             className="w-full bg-base-950 border border-white/10 rounded-lg pl-7 pr-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
           />
         </div>
+        {!searching && (
+          <button
+            onClick={toggleAllSections}
+            className="w-full text-[10px] font-semibold uppercase tracking-widest text-slate-600 hover:text-slate-400 border border-white/10 rounded-lg py-1.5 transition-colors"
+          >
+            {allCollapsed ? "Expand All" : "Collapse All"}
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 px-3 space-y-1 pb-6">

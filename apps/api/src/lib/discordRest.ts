@@ -352,6 +352,39 @@ export async function setChannelSlowmode(channelId: string, seconds: number): Pr
   return {};
 }
 
+// Discord rate-limits a single channel to ~2 renames per 10 minutes — this
+// surfaces that as a real error message instead of the caller having to
+// guess why a rename silently did nothing.
+export async function setChannelName(channelId: string, name: string): Promise<{ error?: string }> {
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    if (res.status === 429) return { error: "Discord is rate-limiting renames on this channel — wait a few minutes and try again." };
+    return { error: (await res.text().catch(() => "")) || `Discord returned ${res.status}` };
+  }
+  return {};
+}
+
+export interface GuildCounts {
+  memberCount: number;
+  boostCount: number;
+}
+
+// Pure REST — works from the API process without needing the bot's live
+// gateway connection, using Discord's own approximate member count that
+// GET /guilds/:id?with_counts=true returns.
+export async function getGuildCounts(guildId: string): Promise<GuildCounts | null> {
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}?with_counts=true`, {
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { approximate_member_count?: number; premium_subscription_count?: number };
+  return { memberCount: data.approximate_member_count ?? 0, boostCount: data.premium_subscription_count ?? 0 };
+}
+
 interface AppCommandOption {
   type: number; // 6 = USER
   name: string;
@@ -446,6 +479,71 @@ export async function deleteGuildScheduledEvent(guildId: string, eventId: string
     method: "DELETE",
     headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
   }).catch(() => null);
+}
+
+interface TicketPanelForPost {
+  id: string;
+  name: string;
+  description: string | null;
+  buttonLabel: string;
+  layout: string;
+}
+
+interface TicketTypeForPost {
+  id: string;
+  name: string;
+  emoji: string | null;
+  description: string | null;
+}
+
+// Mirrors apps/bot/src/jobs/ticketPanelPoster.ts's message shape, but posted
+// immediately via REST right after the panel is created/edited on the
+// dashboard instead of waiting for that job's next once-a-minute tick.
+export function buildTicketPanelPayload(panel: TicketPanelForPost, types: TicketTypeForPost[]) {
+  const embed = {
+    color: 0x3b82f6,
+    title: panel.name,
+    description: panel.description || "Click below to open a ticket.",
+  };
+
+  let component: Record<string, unknown>;
+
+  if (types.length === 0) {
+    component = {
+      type: 1,
+      components: [{ type: 2, style: 1, custom_id: `ticketpanel:${panel.id}`, label: panel.buttonLabel }],
+    };
+  } else if (panel.layout === "DROPDOWN") {
+    component = {
+      type: 1,
+      components: [
+        {
+          type: 3,
+          custom_id: `ticketpanel:${panel.id}`,
+          placeholder: "Select a ticket type…",
+          options: types.map((t) => ({
+            label: t.name,
+            value: t.id,
+            emoji: t.emoji ? { name: t.emoji } : undefined,
+            description: t.description?.slice(0, 100) || undefined,
+          })),
+        },
+      ],
+    };
+  } else {
+    component = {
+      type: 1,
+      components: types.slice(0, 5).map((t) => ({
+        type: 2,
+        style: 1,
+        custom_id: `ticketpanel:${panel.id}:${t.id}`,
+        label: t.name,
+        emoji: t.emoji ? { name: t.emoji } : undefined,
+      })),
+    };
+  }
+
+  return { embeds: [embed], components: [component] };
 }
 
 export async function getGuildRoles(guildId: string): Promise<DiscordRole[]> {

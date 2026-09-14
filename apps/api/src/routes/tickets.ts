@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { buildTicketPanelPayload, postChannelMessage } from "../lib/discordRest";
 
 const router = Router();
 
@@ -12,9 +13,27 @@ router.get("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermission
   res.json(rows);
 });
 
-// The bot posts the actual button/dropdown panel message and writes messageId
-// back once live (see apps/bot/src/jobs/ticketPanelPoster.ts) — the dashboard
-// only defines where it should go and which ticket types it offers.
+// Posts (or reposts) a panel's live message immediately via REST, rather than
+// leaving it to apps/bot/src/jobs/ticketPanelPoster.ts's once-a-minute tick —
+// that job still exists as a fallback for when this immediate post fails
+// (e.g. the API process is mid-deploy) or the bot was offline when the panel
+// was saved.
+async function postPanelNow(panel: { id: string; guildId: string; channelId: string; name: string; description: string | null; buttonLabel: string; layout: string; typeIds: unknown }) {
+  const typeIds = Array.isArray(panel.typeIds) ? (panel.typeIds as string[]) : [];
+  const types = typeIds.length
+    ? await prisma.ticketType.findMany({ where: { id: { in: typeIds }, enabled: true } })
+    : [];
+  const payload = buildTicketPanelPayload(panel, types);
+  const result = await postChannelMessage(panel.channelId, payload);
+  if (result.id) {
+    await prisma.ticketPanel.update({ where: { id: panel.id }, data: { messageId: result.id } });
+  }
+  return result;
+}
+
+// The dashboard defines where a panel should go and which ticket types it
+// offers; postPanelNow() above sends the actual button/dropdown message the
+// instant it's created or edited.
 router.post("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermission, async (req, res) => {
   const { name, channelId, layout, typeIds, description, categoryId, buttonLabel, supportRoleId } = req.body;
   const row = await prisma.ticketPanel.create({
@@ -30,7 +49,8 @@ router.post("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermissio
       supportRoleId,
     },
   });
-  res.status(201).json(row);
+  const posted = await postPanelNow(row);
+  res.status(201).json({ ...row, messageId: posted.id ?? row.messageId, postError: posted.error });
 });
 
 router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
@@ -43,9 +63,13 @@ router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPerm
   if (paused !== undefined) data.paused = paused;
   if (buttonLabel !== undefined) data.buttonLabel = buttonLabel;
   if (supportRoleId !== undefined) data.supportRoleId = supportRoleId;
-  // Editing content invalidates the posted message so the poster job redraws it.
+  // Editing content invalidates the posted message so it gets redrawn.
   if (Object.keys(data).length > 0) data.messageId = null;
   const row = await prisma.ticketPanel.update({ where: { id: req.params.id }, data });
+  if (row.messageId === null && !row.paused) {
+    const posted = await postPanelNow(row);
+    return res.json({ ...row, messageId: posted.id ?? row.messageId, postError: posted.error });
+  }
   res.json(row);
 });
 

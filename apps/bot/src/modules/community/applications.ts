@@ -4,15 +4,16 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  ModalBuilder,
-  ModalSubmitInteraction,
+  Events,
+  Message,
   PermissionFlagsBits,
   StringSelectMenuInteraction,
-  TextInputBuilder,
-  TextInputStyle,
 } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
+
+export const name = Events.MessageCreate;
 
 interface ApplicationQuestion {
   label: string;
@@ -20,39 +21,14 @@ interface ApplicationQuestion {
   required: boolean;
 }
 
-const PAGE_SIZE = 5; // Discord's hard cap on text inputs per modal
-
-// Applications support unlimited questions by chaining modals — 5 questions
-// per popup, immediately followed by the next one, until every question has
-// been asked. Answers accumulate here between pages since a modal submit
-// can't carry more than its own customId back to us.
-const pendingAnswers = new Map<string, Array<{ label: string; answer: string }>>();
-
-function sessionKey(userId: string, typeId: string) {
-  return `${userId}:${typeId}`;
-}
-
 function questionsOf(type: { questions: unknown }): ApplicationQuestion[] {
   return Array.isArray(type.questions) ? (type.questions as unknown as ApplicationQuestion[]) : [];
 }
 
-function buildQuestionModal(panelId: string, typeId: string, typeName: string, page: number, pageQuestions: ApplicationQuestion[]) {
-  return new ModalBuilder()
-    .setCustomId(`applicationmodal:${panelId}:${typeId}:${page}`)
-    .setTitle(page === 0 ? typeName.slice(0, 45) : `${typeName.slice(0, 35)} (cont.)`)
-    .addComponents(
-      pageQuestions.map((q, i) =>
-        new ActionRowBuilder<TextInputBuilder>().addComponents(
-          new TextInputBuilder()
-            .setCustomId(`q${i}`)
-            .setLabel(q.label.slice(0, 45))
-            .setStyle(q.style === "PARAGRAPH" ? TextInputStyle.Paragraph : TextInputStyle.Short)
-            .setRequired(q.required)
-        )
-      )
-    );
-}
-
+// Applications are conducted entirely over DM — one question at a time, the
+// applicant just types their answer back — rather than Discord's modal
+// system, which caps at 5 fields per popup. A draft on ApplicationDraft
+// tracks where in the question list a given user currently is.
 export async function handleApplyButton(
   interaction: ButtonInteraction | StringSelectMenuInteraction,
   panelId: string,
@@ -77,100 +53,147 @@ export async function handleApplyButton(
     return;
   }
 
-  pendingAnswers.delete(sessionKey(interaction.user.id, type.id)); // start fresh in case of an abandoned earlier attempt
-  await interaction.showModal(buildQuestionModal(panelId, type.id, type.name, 0, questions.slice(0, PAGE_SIZE)));
-}
+  const existing = await prisma.applicationDraft.findUnique({ where: { userId: interaction.user.id } });
+  if (existing) {
+    await interaction.reply({
+      content: existing.typeId === type.id
+        ? "You already have an application in progress — check your DMs and keep answering, or ignore this to start over."
+        : "You already have a different application in progress in your DMs. Finish or ignore that one first.",
+      ephemeral: true,
+    });
+    if (existing.typeId === type.id) return;
+  }
 
-export async function handleApplicationContinue(interaction: ButtonInteraction, panelId: string, typeId: string, pageStr: string) {
-  const type = await prisma.applicationType.findUnique({ where: { id: typeId } });
-  if (!type) {
-    await interaction.reply({ content: "This application type no longer exists.", ephemeral: true });
+  const firstQuestion = questions[0];
+  const introDm = await interaction.user
+    .send(
+      `📋 **${type.name}**\n` +
+        (type.description ? `${type.description}\n\n` : "\n") +
+        `I'll ask ${questions.length} question${questions.length === 1 ? "" : "s"}, one at a time — just reply here with your answer to each.\n\n` +
+        `**1/${questions.length}.** ${firstQuestion.label}`
+    )
+    .catch(() => null);
+
+  if (!introDm) {
+    await interaction.reply({
+      content: "⚠️ I couldn't DM you — please enable DMs from server members and try again.",
+      ephemeral: true,
+    });
     return;
   }
 
-  const questions = questionsOf(type);
-  const page = Number(pageStr) || 0;
-  const pageQuestions = questions.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-
-  await interaction.showModal(buildQuestionModal(panelId, typeId, type.name, page, pageQuestions));
-}
-
-export async function handleApplicationSubmit(interaction: ModalSubmitInteraction, panelId: string, typeId: string, pageStr: string) {
-  if (!interaction.guild) return;
-
-  const type = await prisma.applicationType.findUnique({ where: { id: typeId } });
-  if (!type) {
-    await interaction.reply({ content: "This application type no longer exists.", ephemeral: true });
-    return;
-  }
-
-  const questions = questionsOf(type);
-  const page = Number(pageStr) || 0;
-  const pageQuestions = questions.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-
-  const key = sessionKey(interaction.user.id, typeId);
-  const soFar = pendingAnswers.get(key) ?? [];
-  const withThisPage = [
-    ...soFar,
-    ...pageQuestions.map((q, i) => ({ label: q.label, answer: interaction.fields.getTextInputValue(`q${i}`) || "(no answer)" })),
-  ];
-
-  const nextPageStart = (page + 1) * PAGE_SIZE;
-  if (nextPageStart < questions.length) {
-    // More questions left. Discord won't let a modal submission open another
-    // modal directly — only a button/select interaction can — so this asks
-    // for one more click to continue, which itself opens the next modal.
-    pendingAnswers.set(key, withThisPage);
-    const continueRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`applicationcontinue:${panelId}:${typeId}:${page + 1}`)
-        .setLabel(`Continue (${withThisPage.length}/${questions.length} answered)`)
-        .setStyle(ButtonStyle.Primary)
-    );
-    await interaction.reply({ content: "Got it — click below to answer the rest.", components: [continueRow], ephemeral: true });
-    return;
-  }
-
-  pendingAnswers.delete(key);
-  const answers = withThisPage;
-
-  const application = await prisma.application.create({
-    data: { guildId: interaction.guild.id, panelId, typeId, userId: interaction.user.id, answers },
+  await prisma.applicationDraft.upsert({
+    where: { userId: interaction.user.id },
+    create: { guildId: panel.guildId, panelId, typeId: type.id, userId: interaction.user.id, questionIndex: 0, answers: [] },
+    update: { guildId: panel.guildId, panelId, typeId: type.id, questionIndex: 0, answers: [] },
   });
 
-  await interaction.reply({ content: "✅ Your application has been submitted for review.", ephemeral: true });
+  await interaction.reply({ content: "📬 Check your DMs — I've sent you the first question.", ephemeral: true });
+}
 
-  const settings = await prisma.applicationSettings.findUnique({ where: { guildId: interaction.guild.id } });
-  const reviewChannelId = type.reviewChannelId ?? settings?.logChannelId;
-  if (reviewChannelId) {
-    const reviewChannel = await interaction.guild.channels.fetch(reviewChannelId).catch(() => null);
-    if (isSendableChannel(reviewChannel)) {
-      const staffRoleIds = Array.isArray(type.staffRoleIds) ? (type.staffRoleIds as string[]) : [];
-      const settingsRoleIds = settings && Array.isArray(settings.supportRoleIds) ? (settings.supportRoleIds as string[]) : [];
-      const pingRoles = [...new Set([...staffRoleIds, ...settingsRoleIds])];
+// Every non-bot DM is checked against an in-progress draft (matched by
+// userId only, since a DM channel carries no guildId of its own) — replies
+// advance the draft to the next question, or finalize it once every
+// question's answered.
+export async function execute(message: Message) {
+  if (message.author.bot || message.guild) return; // only DMs
 
-      // A Discord embed caps at 25 fields — beyond that, questions still get
-      // asked and recorded, just not all individually itemized in the review
-      // embed (the dashboard's Submissions tab always has the full list).
-      const embed = new EmbedBuilder()
-        .setColor(0x4c8dff)
-        .setTitle(`New Application — ${type.name}`)
-        .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
-        .addFields(answers.slice(0, 25).map((a) => ({ name: a.label.slice(0, 256), value: a.answer.slice(0, 1024) })))
-        .setFooter({ text: `Applicant ID: ${interaction.user.id}${answers.length > 25 ? ` · ${answers.length - 25} more answer(s) on the dashboard` : ""}` })
-        .setTimestamp();
+  const draft = await prisma.applicationDraft.findUnique({ where: { userId: message.author.id } });
+  if (!draft) return;
 
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`application:${application.id}:accept`).setLabel("Accept").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId(`application:${application.id}:deny`).setLabel("Deny").setStyle(ButtonStyle.Danger)
-      );
-
-      const message = await reviewChannel
-        .send({ content: pingRoles.map((r) => `<@&${r}>`).join(" ") || undefined, embeds: [embed], components: [row] })
-        .catch(() => null);
-      if (message) await prisma.application.update({ where: { id: application.id }, data: { reviewMessageId: message.id } });
-    }
+  const enabled = await isModuleEnabled(draft.guildId, "APPLICATIONS");
+  if (!enabled) {
+    await prisma.applicationDraft.delete({ where: { id: draft.id } }).catch(() => null);
+    await message.reply("⚠️ Applications got disabled for that server — this application has been cancelled.").catch(() => null);
+    return;
   }
+
+  const type = await prisma.applicationType.findUnique({ where: { id: draft.typeId } });
+  if (!type) {
+    await prisma.applicationDraft.delete({ where: { id: draft.id } }).catch(() => null);
+    await message.reply("⚠️ This application type no longer exists — it's been cancelled.").catch(() => null);
+    return;
+  }
+
+  const questions = questionsOf(type);
+  const current = questions[draft.questionIndex];
+  if (!current) {
+    // Shouldn't happen, but leaves no dangling draft if question list shrank mid-conversation.
+    await prisma.applicationDraft.delete({ where: { id: draft.id } }).catch(() => null);
+    return;
+  }
+
+  const answer = message.content.trim();
+  if (current.required && !answer) {
+    await message.reply("That question needs an answer — please reply with some text.").catch(() => null);
+    return;
+  }
+
+  const answers = [...(Array.isArray(draft.answers) ? (draft.answers as Array<{ label: string; answer: string }>) : []), {
+    label: current.label,
+    answer: answer || "(no answer)",
+  }];
+
+  const nextIndex = draft.questionIndex + 1;
+  const nextQuestion = questions[nextIndex];
+
+  if (nextQuestion) {
+    await prisma.applicationDraft.update({ where: { id: draft.id }, data: { questionIndex: nextIndex, answers } });
+    await message.reply(`**${nextIndex + 1}/${questions.length}.** ${nextQuestion.label}`).catch(() => null);
+    return;
+  }
+
+  await prisma.applicationDraft.delete({ where: { id: draft.id } }).catch(() => null);
+  await finalizeApplication(message, draft.guildId, draft.panelId, type, answers);
+}
+
+async function finalizeApplication(
+  message: Message,
+  guildId: string,
+  panelId: string,
+  type: { id: string; name: string; reviewChannelId: string | null; staffRoleIds: unknown },
+  answers: Array<{ label: string; answer: string }>
+) {
+  const application = await prisma.application.create({
+    data: { guildId, panelId, typeId: type.id, userId: message.author.id, answers },
+  });
+
+  await message.reply("✅ Thanks — your application has been submitted for review!").catch(() => null);
+
+  const guild = await message.client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) return;
+
+  const settings = await prisma.applicationSettings.findUnique({ where: { guildId } });
+  const reviewChannelId = type.reviewChannelId ?? settings?.logChannelId;
+  if (!reviewChannelId) return;
+
+  const reviewChannel = await guild.channels.fetch(reviewChannelId).catch(() => null);
+  if (!isSendableChannel(reviewChannel)) return;
+
+  const staffRoleIds = Array.isArray(type.staffRoleIds) ? (type.staffRoleIds as string[]) : [];
+  const settingsRoleIds = settings && Array.isArray(settings.supportRoleIds) ? (settings.supportRoleIds as string[]) : [];
+  const pingRoles = [...new Set([...staffRoleIds, ...settingsRoleIds])];
+
+  // A Discord embed caps at 25 fields — beyond that, questions still get
+  // asked and recorded, just not all individually itemized in the review
+  // embed (the dashboard's Submissions tab always has the full list).
+  const embed = new EmbedBuilder()
+    .setColor(0x4c8dff)
+    .setTitle(`New Application — ${type.name}`)
+    .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
+    .addFields(answers.slice(0, 25).map((a, i) => ({ name: `${i + 1}. ${a.label}`.slice(0, 256), value: a.answer.slice(0, 1024) })))
+    .setFooter({ text: `Applicant ID: ${message.author.id}${answers.length > 25 ? ` · ${answers.length - 25} more answer(s) on the dashboard` : ""}` })
+    .setTimestamp();
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`application:${application.id}:accept`).setLabel("Accept").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`application:${application.id}:deny`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+  );
+
+  const sent = await reviewChannel
+    .send({ content: pingRoles.map((r) => `<@&${r}>`).join(" ") || undefined, embeds: [embed], components: [row] })
+    .catch(() => null);
+  if (sent) await prisma.application.update({ where: { id: application.id }, data: { reviewMessageId: sent.id } });
 }
 
 export async function handleApplicationReview(interaction: ButtonInteraction, applicationId: string, decision: "accept" | "deny") {

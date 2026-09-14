@@ -83,6 +83,7 @@ model Guild {
   applicationPanels ApplicationPanel[]
   applicationTypes  ApplicationType[]
   applications      Application[]
+  applicationDrafts ApplicationDraft[]
   applicationSettings ApplicationSettings?
   growthSnapshots   GrowthSnapshot[]
   bumpReminderSettings BumpReminderSettings?
@@ -1605,6 +1606,22 @@ model Application {
   createdAt       DateTime          @default(now())
 
   @@index([guildId, status])
+}
+
+// An in-progress DM Q&A conversation, one question at a time — like the
+// "Appy" bot flow, instead of Discord's 5-field-per-modal form. One active
+// draft per user (across guilds, kept simple): a DM reply is matched by
+// userId only, since DM channels carry no guildId of their own.
+model ApplicationDraft {
+  id            String   @id @default(cuid())
+  guild         Guild    @relation(fields: [guildId], references: [id])
+  guildId       String
+  panelId       String
+  typeId        String
+  userId        String   @unique
+  questionIndex Int      @default(0)
+  answers       Json     @default("[]") // [{ label, answer }] accumulated so far
+  createdAt     DateTime @default(now())
 }
 
 model ApplicationSettings {

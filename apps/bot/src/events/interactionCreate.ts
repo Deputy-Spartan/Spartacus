@@ -179,18 +179,6 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if (interaction.isModalSubmit() && interaction.customId.startsWith("applicationmodal:")) {
-    const enabled = await isModuleEnabled(interaction.guildId, "APPLICATIONS");
-    if (!enabled) {
-      await interaction.reply({ content: "⚠️ Applications is disabled for this server.", ephemeral: true });
-      return;
-    }
-    var applicationModalParts = interaction.customId.split(":");
-    const { handleApplicationSubmit } = await import("../modules/community/applications");
-    await handleApplicationSubmit(interaction, applicationModalParts[1], applicationModalParts[2], applicationModalParts[3]);
-    return;
-  }
-
   if (interaction.isStringSelectMenu() && interaction.customId.startsWith("ticketpanel:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "TICKETS");
     if (!enabled) {
@@ -324,18 +312,6 @@ export async function execute(interaction: Interaction) {
     var applicationPanelParts = interaction.customId.split(":");
     const { handleApplyButton } = await import("../modules/community/applications");
     await handleApplyButton(interaction, applicationPanelParts[1], applicationPanelParts[2]);
-    return;
-  }
-
-  if (interaction.customId.startsWith("applicationcontinue:")) {
-    const enabled = await isModuleEnabled(interaction.guildId, "APPLICATIONS");
-    if (!enabled) {
-      await interaction.reply({ content: "⚠️ Applications is disabled for this server.", ephemeral: true });
-      return;
-    }
-    var applicationContinueParts = interaction.customId.split(":");
-    const { handleApplicationContinue } = await import("../modules/community/applications");
-    await handleApplicationContinue(interaction, applicationContinueParts[1], applicationContinueParts[2], applicationContinueParts[3]);
     return;
   }
 

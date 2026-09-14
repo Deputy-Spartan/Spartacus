@@ -96,7 +96,7 @@ export default function ApplicationsPage({ params }: { params: { guildId: string
         guildId={params.guildId}
         moduleKey="APPLICATIONS"
         title="Applications"
-        description="Members apply via a button/dropdown panel and modal form — submissions post to your review channel with Accept/Deny buttons."
+        description="Members apply via a button/dropdown panel, then answer questions one at a time in their DMs — submissions post to your review channel with Accept/Deny buttons."
       />
 
       <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
@@ -132,6 +132,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [panels, setPanels] = useState<ApplicationPanelRow[]>([]);
   const [types, setTypes] = useState<ApplicationTypeRow[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [name, setName] = useState("Staff Applications");
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -154,19 +155,47 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
   }
 
-  async function createPanel() {
+  function resetForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setName("Staff Applications");
+    setChannelId(null);
+    setDescription("");
+    setLayout("BUTTONS");
+    setTypeIds([]);
+  }
+
+  function openCreate() {
+    resetForm();
+    setError(null);
+    setShowForm(true);
+  }
+
+  function openEdit(panel: ApplicationPanelRow) {
+    setEditingId(panel.id);
+    setName(panel.name);
+    setChannelId(panel.channelId);
+    setDescription(panel.description ?? "");
+    setLayout(panel.layout);
+    setTypeIds(panel.typeIds);
+    setError(null);
+    setShowForm(true);
+  }
+
+  async function savePanel() {
     if (!channelId || typeIds.length === 0) {
       setError("Select a channel and at least one application type before posting.");
       return;
     }
     setError(null);
-    await api.addApplicationPanel(guildId, { name, channelId, description, layout, typeIds });
-    setShowForm(false);
-    setName("Staff Applications");
-    setChannelId(null);
-    setDescription("");
-    setTypeIds([]);
-    setError(null);
+    if (editingId) {
+      // The channel a panel is posted in can't change without deleting and
+      // recreating it (Discord has no "move this message" API).
+      await api.updateApplicationPanel(guildId, editingId, { name, description, layout, typeIds });
+    } else {
+      await api.addApplicationPanel(guildId, { name, channelId, description, layout, typeIds });
+    }
+    resetForm();
     refresh();
   }
 
@@ -194,7 +223,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             ⚠ Create an application type first
           </span>
         ) : (
-          <button onClick={() => { setError(null); setShowForm(true); }} className="neon-button-sm shrink-0">
+          <button onClick={openCreate} className="neon-button-sm shrink-0">
             + New panel
           </button>
         )}
@@ -208,7 +237,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
 
       {showForm && (
         <NeonCard>
-          <p className="font-medium mb-3">Create Panel</p>
+          <p className="font-medium mb-3">{editingId ? "Edit Panel" : "Create Panel"}</p>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Panel Name</label>
           <input className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4" value={name} onChange={(e) => setName(e.target.value)} />
 
@@ -223,9 +252,15 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Post In Channel
-            <Required />
+            {!editingId && <Required />}
           </label>
-          <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
+          {editingId ? (
+            <p className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 text-slate-400">
+              {channelLabel(channelId ?? "")} <span className="text-slate-600">(can&apos;t be changed — delete and recreate the panel to move it)</span>
+            </p>
+          ) : (
+            <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
+          )}
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Layout</label>
           <select
@@ -261,10 +296,10 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
           </div>
 
           <div className="flex gap-2">
-            <button onClick={createPanel} disabled={!channelId || typeIds.length === 0} className="neon-button disabled:opacity-50">
-              Post Panel
+            <button onClick={savePanel} disabled={!channelId || typeIds.length === 0} className="neon-button disabled:opacity-50">
+              {editingId ? "Save Changes" : "Post Panel"}
             </button>
-            <button onClick={() => { setError(null); setShowForm(false); }} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            <button onClick={resetForm} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
               Cancel
             </button>
           </div>
@@ -284,7 +319,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
                   Create your first application type
                 </button>
               ) : (
-                <button onClick={() => setShowForm(true)} className="neon-button">
+                <button onClick={openCreate} className="neon-button">
                   Create your first panel
                 </button>
               )
@@ -303,6 +338,9 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <button onClick={() => openEdit(p)} className="text-xs text-slate-500 hover:text-neon-blue">
+                    Edit
+                  </button>
                   <button onClick={() => togglePause(p)} className="text-xs text-slate-500 hover:text-neon-blue">
                     {p.paused ? "Resume" : "Pause"}
                   </button>
@@ -448,8 +486,7 @@ function TypesTab({ guildId }: { guildId: string }) {
             <Required />
           </label>
           <p className="text-xs text-slate-600 mb-2">
-            Discord only allows 5 questions per popup, so applicants get one popup per 5 — answer the first 5, then the next popup opens
-            automatically until they're done.
+            Applicants are DM'd one question at a time and just reply with their answer — no Discord form popup, so there's no limit on how many you add.
           </p>
           <div className="space-y-1.5 mb-2">
             {(editing.questions ?? []).map((q, i) => (

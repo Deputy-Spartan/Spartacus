@@ -79,6 +79,17 @@ export async function execute(message: Message) {
 
   const payload = await buildNotifyPayload(lock, message);
 
+  // notifyHidden is the closest real equivalent to "ephemeral" for a plain
+  // message (no interaction to reply ephemerally to) — send it as a DM
+  // instead of posting in the channel, so nobody but the author sees it.
+  if (lock.notifyHidden) {
+    const sent = await message.author.send(payload).catch(() => null); // silently drop if the member has DMs closed
+    if (sent && lock.notifyDeleteAfterSec > 0) {
+      setTimeout(() => sent.delete().catch(() => null), lock.notifyDeleteAfterSec * 1000);
+    }
+    return;
+  }
+
   if (isSendableChannel(message.channel)) {
     const sent = await message.channel.send(payload).catch(() => null);
     if (sent && lock.notifyDeleteAfterSec > 0) {

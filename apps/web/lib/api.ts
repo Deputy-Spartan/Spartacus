@@ -922,6 +922,7 @@ export interface ChannelLockRow {
   requiredPrefixes: string[];
   bannedWords: string[];
   notifyEnabled: boolean;
+  notifyHidden: boolean;
   notifyContent: string | null;
   notifyEmbedEnabled: boolean;
   notifyEmbedTitle: string | null;
@@ -939,6 +940,7 @@ export interface ChannelLockInput {
   requiredPrefixes: string[];
   bannedWords: string[];
   notifyEnabled: boolean;
+  notifyHidden: boolean;
   notifyContent: string | null;
   notifyEmbedEnabled: boolean;
   notifyEmbedTitle: string | null;

@@ -18,6 +18,7 @@ router.get("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermission
 function buildNotifyFields(body: Record<string, unknown>) {
   return {
     notifyEnabled: Boolean(body.notifyEnabled),
+    notifyHidden: Boolean(body.notifyHidden),
     notifyContent: typeof body.notifyContent === "string" ? body.notifyContent : undefined,
     notifyEmbedEnabled: Boolean(body.notifyEmbedEnabled),
     notifyEmbedTitle: typeof body.notifyEmbedTitle === "string" ? body.notifyEmbedTitle : undefined,

@@ -1067,14 +1067,18 @@ model ChannelLock {
   bannedWords       Json     @default("[]")
 
   // Deletion notice — posted in-channel and/or DMed to the author when their
-  // message gets removed for violating this lock.
+  // message gets removed for violating this lock. notifyHidden switches the
+  // in-channel post off entirely in favor of a DM — the closest real
+  // equivalent to "ephemeral" for a plain (non-interaction) message, since
+  // Discord has no true ephemeral concept outside slash command replies.
   notifyEnabled      Boolean  @default(false)
+  notifyHidden       Boolean  @default(false)
   notifyContent      String?  @default("{user}, that message isn't allowed in {channel}.")
   notifyEmbedEnabled Boolean  @default(false)
   notifyEmbedTitle   String?
   notifyEmbedColor   String?  @default("#00E5FF")
   notifyButtons      Json     @default("[]")
-  notifyDeleteAfterSec Int    @default(6) // 0 disables auto-delete of the in-channel notice
+  notifyDeleteAfterSec Int    @default(6) // 0 disables auto-delete of the in-channel notice (ignored when notifyHidden)
   dmUser             Boolean  @default(false)
 
   createdAt         DateTime @default(now())

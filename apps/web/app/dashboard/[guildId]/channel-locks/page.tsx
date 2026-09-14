@@ -27,6 +27,7 @@ const EMPTY_FORM: ChannelLockInput = {
   requiredPrefixes: [],
   bannedWords: [],
   notifyEnabled: false,
+  notifyHidden: false,
   notifyContent: "{user}, that message isn't allowed in {channel}.",
   notifyEmbedEnabled: false,
   notifyEmbedTitle: "",
@@ -146,6 +147,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       requiredPrefixes: row.requiredPrefixes,
       bannedWords: row.bannedWords,
       notifyEnabled: row.notifyEnabled,
+      notifyHidden: row.notifyHidden,
       notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
       notifyEmbedEnabled: row.notifyEmbedEnabled,
       notifyEmbedTitle: row.notifyEmbedTitle ?? "",
@@ -323,6 +325,14 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 enabled={form.notifyEnabled}
                 onChange={(v) => setForm({ ...form, notifyEnabled: v })}
               />
+              {form.notifyEnabled && (
+                <Row
+                  label="Hide the notice"
+                  hint="Discord has no true 'only you can see this' for a regular message — the closest equivalent is sending it as a DM instead of posting it in the channel, so no one else sees it."
+                  enabled={form.notifyHidden}
+                  onChange={(v) => setForm({ ...form, notifyHidden: v })}
+                />
+              )}
             </div>
 
             {form.notifyEnabled && (
@@ -375,7 +385,9 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 </div>
 
                 <div className="mb-4">
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Auto-delete notice after (seconds)</label>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                    Auto-delete {form.notifyHidden ? "the DM" : "notice"} after (seconds)
+                  </label>
                   <input
                     type="number"
                     min={0}
@@ -383,17 +395,21 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                     value={form.notifyDeleteAfterSec}
                     onChange={(e) => setForm({ ...form, notifyDeleteAfterSec: Number(e.target.value) })}
                   />
-                  <p className="text-xs text-slate-600 mt-1">0 leaves the in-channel notice up permanently.</p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    {form.notifyHidden ? "0 leaves the DM up permanently." : "0 leaves the in-channel notice up permanently."}
+                  </p>
                 </div>
 
-                <div className="mb-4">
-                  <Row
-                    label="Also DM the member"
-                    hint="Sends the same notice as a direct message, in addition to the in-channel one."
-                    enabled={form.dmUser}
-                    onChange={(v) => setForm({ ...form, dmUser: v })}
-                  />
-                </div>
+                {!form.notifyHidden && (
+                  <div className="mb-4">
+                    <Row
+                      label="Also DM the member"
+                      hint="Sends the same notice as a direct message, in addition to the in-channel one."
+                      enabled={form.dmUser}
+                      onChange={(v) => setForm({ ...form, dmUser: v })}
+                    />
+                  </div>
+                )}
               </>
             )}
 

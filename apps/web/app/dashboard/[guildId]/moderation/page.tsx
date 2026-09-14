@@ -502,28 +502,65 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
   const [form, setForm] = useState(EMPTY_AUTOPURGE);
   const [emojiDraft, setEmojiDraft] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   function refresh() {
     api.getAutoPurgeConfigs(guildId).then(setConfigs);
   }
   useEffect(refresh, [guildId]);
 
-  async function create() {
+  // Polls the server every 15s so "last ran"/"next run" reflect reality
+  // without a manual page refresh, and ticks a local clock every second so
+  // the relative "next run in Xm" text keeps counting down smoothly between
+  // those polls instead of jumping once every 15s.
+  useEffect(() => {
+    const poll = setInterval(refresh, 15_000);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+    };
+  }, [guildId]);
+
+  function openAdd() {
+    setEditingId(null);
+    setChannelId(null);
+    setForm(EMPTY_AUTOPURGE);
+    setEmojiDraft("");
+    setError(null);
+    setShowForm(true);
+  }
+
+  function openEdit(row: AutoPurgeConfigRow) {
+    setEditingId(row.id);
+    setChannelId(row.channelId);
+    setForm({
+      intervalSeconds: row.intervalSeconds,
+      ignorePinned: row.ignorePinned,
+      ignoreImages: row.ignoreImages,
+      ignoreLinks: row.ignoreLinks,
+      protectedEmojis: row.protectedEmojis,
+    });
+    setEmojiDraft("");
+    setError(null);
+    setShowForm(true);
+  }
+
+  async function save() {
     if (!channelId) {
       setError("Select a channel before saving.");
       return;
     }
     setError(null);
-    await api.addAutoPurgeConfig(guildId, { channelId, ...form });
-    setChannelId(null);
-    setForm(EMPTY_AUTOPURGE);
+    if (editingId) {
+      await api.updateAutoPurgeConfig(guildId, editingId, form);
+    } else {
+      await api.addAutoPurgeConfig(guildId, { channelId, ...form });
+    }
     setShowForm(false);
-    refresh();
-  }
-
-  async function update(row: AutoPurgeConfigRow, patch: Partial<AutoPurgeConfigRow>) {
-    await api.updateAutoPurgeConfig(guildId, row.id, patch);
+    setEditingId(null);
     refresh();
   }
 
@@ -533,6 +570,15 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
     refresh();
   }
 
+  function runStatus(row: AutoPurgeConfigRow): string {
+    if (!row.lastRunAt) return "not run yet";
+    const lastRun = new Date(row.lastRunAt).getTime();
+    const dueAt = lastRun + row.intervalSeconds * 1000;
+    const secondsAgo = Math.max(0, Math.floor((now - lastRun) / 1000));
+    if (dueAt <= now) return `last ran ${formatDuration(secondsAgo)} ago · due on the next check (every 10m)`;
+    return `last ran ${formatDuration(secondsAgo)} ago · next in ~${formatDuration(Math.ceil((dueAt - now) / 1000))}`;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -540,25 +586,35 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
           Automatically deletes messages in the channels below on a schedule — everything eligible up to Discord's 14-day bulk-delete
           limit, minus whatever you choose to protect.
         </p>
-        <button
-          onClick={() => {
-            setError(null);
-            setShowForm(true);
-          }}
-          className="neon-button-sm shrink-0"
-        >
+        <button onClick={openAdd} className="neon-button-sm shrink-0">
           + Add channel
         </button>
       </div>
 
       {showForm && (
         <NeonCard className="max-w-lg">
-          <p className="font-medium mb-3">Auto-Purge a Channel</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="font-medium">{editingId ? "Edit Auto-Purge" : "Auto-Purge a Channel"}</p>
+            <button
+              onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}
+              className="text-slate-500 hover:text-slate-300 text-xs"
+            >
+              Close
+            </button>
+          </div>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Channel
             <Required />
           </label>
-          <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
+          {editingId ? (
+            <p className="text-sm text-slate-300 bg-base-950 border border-white/10 rounded-lg p-2.5 mb-1">#{channelId?.slice(0, 6)}</p>
+          ) : (
+            <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
+          )}
+          {editingId && <p className="text-xs text-slate-600 -mt-1 mb-4">Channel can't be changed once set — remove and re-add to purge a different one.</p>}
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Run every</label>
           {(() => {
@@ -645,10 +701,16 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
           )}
 
           <div className="flex gap-2">
-            <button onClick={create} disabled={!channelId} className="neon-button disabled:opacity-50">
-              Save
+            <button onClick={save} disabled={!channelId} className="neon-button disabled:opacity-50">
+              {editingId ? "Save Changes" : "Save"}
             </button>
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            <button
+              onClick={() => {
+                setShowForm(false);
+                setEditingId(null);
+              }}
+              className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200"
+            >
               Cancel
             </button>
           </div>
@@ -662,8 +724,8 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
         ) : (
           <div className="divide-y divide-white/5">
             {configs.map((c) => (
-              <div key={c.id} className="flex items-center justify-between py-3 text-sm">
-                <div>
+              <div key={c.id} className="flex items-center justify-between py-3 text-sm gap-3">
+                <div className="min-w-0">
                   <p className="font-medium">#{c.channelId.slice(0, 6)}</p>
                   <p className="text-xs text-slate-500">
                     every {formatDuration(c.intervalSeconds)}
@@ -671,12 +733,17 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
                     {c.ignoreImages ? " · skips images" : ""}
                     {c.ignoreLinks ? " · skips links" : ""}
                     {c.protectedEmojis.length > 0 ? ` · protects ${c.protectedEmojis.join(" ")}` : ""}
-                    {c.lastRunAt ? ` · last ran ${new Date(c.lastRunAt).toLocaleString()}` : " · not run yet"}
                   </p>
+                  <p className="text-xs text-neon-blue/80 mt-0.5">{runStatus(c)}</p>
                 </div>
-                <button onClick={() => remove(c)} className="text-slate-500 hover:text-rose-400 text-xs">
-                  Remove
-                </button>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button onClick={() => openEdit(c)} className="text-slate-400 hover:text-slate-200 text-xs">
+                    Edit
+                  </button>
+                  <button onClick={() => remove(c)} className="text-slate-500 hover:text-rose-400 text-xs">
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>

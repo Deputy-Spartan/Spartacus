@@ -7,10 +7,11 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
+import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type ChannelLockInput, type ChannelLockRow } from "../../../../lib/api";
+import { api, type ChannelLockInput, type ChannelLockRow, type DiscordChannelOption } from "../../../../lib/api";
 
 const NOTIFY_TOKENS = [
   { token: "{user}", description: "Mentions the member whose message was removed" },
@@ -109,11 +110,21 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
   const [form, setForm] = useState<ChannelLockInput>(EMPTY_FORM);
   const [showEditor, setShowEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
 
   function refresh() {
     api.getChannelLocks(params.guildId).then(setRows);
   }
   useEffect(refresh, [params.guildId]);
+  useEffect(() => {
+    api.getDiscordChannels(params.guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
+  }, [params.guildId]);
+
+  function channelLabel(id: string): string {
+    const ch = channelOptions.find((c) => c.id === id);
+    if (!ch) return `#${id}`;
+    return ch.categoryName ? `${ch.categoryName} / #${ch.name}` : `#${ch.name}`;
+  }
 
   function startCreate() {
     setEditingId(null);
@@ -191,7 +202,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
             {rows.map((r) => (
               <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
                 <div className="min-w-0">
-                  <span className="text-slate-300 truncate block">#{r.channelId}</span>
+                  <span className="text-slate-300 truncate block">{channelLabel(r.channelId)}</span>
                   <span className="text-slate-600 text-xs">
                     {r.slashCommandsOnly
                       ? "Slash commands only"
@@ -205,6 +216,8 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                         ]
                           .filter(Boolean)
                           .join(" · ") || "no restrictions"}
+                    {r.notifyEnabled ? " · notifies on delete" : ""}
+                    {r.dmUser ? " · DMs member" : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -240,7 +253,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
               kind="text"
               placeholder={editingId ? undefined : "Select a channel…"}
             />
-            {editingId && <p className="text-xs text-slate-600 -mt-3 mb-4">Channel can't be changed once created.</p>}
+            {editingId && <p className="text-xs text-slate-600 -mt-3 mb-4">Locked to {channelLabel(channelId ?? "")} — channel can't be changed once created.</p>}
 
             <div className="mb-4">
               <Row
@@ -346,6 +359,18 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                       })
                     }
                     titleLabel="Notice Embed Title"
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Live Preview</p>
+                  <StickyPreview
+                    content={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
+                    embedEnabled={form.notifyEmbedEnabled}
+                    embedTitle={form.notifyEmbedTitle ?? ""}
+                    embedDescription={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
+                    embedColor={form.notifyEmbedColor ?? "#00E5FF"}
+                    buttons={form.notifyButtons}
                   />
                 </div>
 

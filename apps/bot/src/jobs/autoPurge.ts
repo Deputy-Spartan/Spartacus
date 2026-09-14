@@ -26,15 +26,14 @@ function shouldSkip(
   return false;
 }
 
-// Runs every 10 minutes; each configured channel only actually purges once
-// its own intervalSeconds has elapsed since lastRunAt. That 10-minute tick
-// is the real floor on resolution — an interval configured shorter than
-// that still only ever fires on the next tick, never more often. Pages
-// backward through the channel deleting everything eligible up to
-// Discord's 14-day bulk-delete boundary, skipping whatever the config says
-// to protect.
+// Runs every minute; each configured channel only actually purges once its
+// own intervalSeconds has elapsed since lastRunAt. That 1-minute tick is
+// the real floor on resolution — an interval configured shorter than that
+// still only ever fires on the next tick, never more often. Pages backward
+// through the channel deleting everything eligible up to Discord's 14-day
+// bulk-delete boundary, skipping whatever the config says to protect.
 export function startAutoPurgeJob(client: Client) {
-  cron.schedule("*/10 * * * *", async () => {
+  cron.schedule("* * * * *", async () => {
     let loggedThisTick = 0;
     const configs = await prisma.autoPurgeConfig.findMany();
 

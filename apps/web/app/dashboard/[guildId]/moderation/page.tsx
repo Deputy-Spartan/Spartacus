@@ -575,7 +575,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
     const lastRun = new Date(row.lastRunAt).getTime();
     const dueAt = lastRun + row.intervalSeconds * 1000;
     const secondsAgo = Math.max(0, Math.floor((now - lastRun) / 1000));
-    if (dueAt <= now) return `last ran ${formatDuration(secondsAgo)} ago · due on the next check (every 10m)`;
+    if (dueAt <= now) return `last ran ${formatDuration(secondsAgo)} ago · due on the next check (every 1m)`;
     return `last ran ${formatDuration(secondsAgo)} ago · next in ~${formatDuration(Math.ceil((dueAt - now) / 1000))}`;
   }
 
@@ -654,7 +654,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
               </div>
             );
           })()}
-          <p className="text-xs text-slate-600 mb-4">Checked every 10 minutes, so anything shorter than that still only runs on the next check.</p>
+          <p className="text-xs text-slate-600 mb-4">Checked every minute, so anything shorter than that still only runs on the next check.</p>
 
           <div className="mb-4">
             {[

@@ -1490,7 +1490,7 @@ model AutoPurgeConfig {
   guild           Guild     @relation(fields: [guildId], references: [id])
   guildId         String
   channelId       String    @unique
-  intervalMinutes Int       @default(60)
+  intervalSeconds Int       @default(3600) // the checking job itself only ticks every 10 minutes, so anything shorter than that isn't actually honored more often
   ignorePinned    Boolean   @default(true)
   ignoreImages    Boolean   @default(false)
   ignoreLinks     Boolean   @default(false)

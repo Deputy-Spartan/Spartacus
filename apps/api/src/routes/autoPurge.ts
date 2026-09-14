@@ -11,11 +11,11 @@ router.get("/guilds/:guildId/auto-purge", requireAuth, requireGuildPermission, a
 });
 
 router.post("/guilds/:guildId/auto-purge", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, intervalMinutes, ignorePinned, ignoreImages, ignoreLinks, protectedEmojis } = req.body;
+  const { channelId, intervalSeconds, ignorePinned, ignoreImages, ignoreLinks, protectedEmojis } = req.body;
   const data = {
     guildId: req.params.guildId,
     channelId,
-    intervalMinutes: Number(intervalMinutes) || 60,
+    intervalSeconds: Number(intervalSeconds) || 3600,
     ignorePinned: Boolean(ignorePinned),
     ignoreImages: Boolean(ignoreImages),
     ignoreLinks: Boolean(ignoreLinks),
@@ -29,9 +29,9 @@ router.patch("/guilds/:guildId/auto-purge/:id", requireAuth, requireGuildPermiss
   const existing = await prisma.autoPurgeConfig.findUnique({ where: { id: req.params.id } });
   if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Not found" });
 
-  const { intervalMinutes, ignorePinned, ignoreImages, ignoreLinks, protectedEmojis } = req.body;
+  const { intervalSeconds, ignorePinned, ignoreImages, ignoreLinks, protectedEmojis } = req.body;
   const data: Record<string, unknown> = {};
-  if (intervalMinutes !== undefined) data.intervalMinutes = Number(intervalMinutes);
+  if (intervalSeconds !== undefined) data.intervalSeconds = Number(intervalSeconds);
   if (ignorePinned !== undefined) data.ignorePinned = Boolean(ignorePinned);
   if (ignoreImages !== undefined) data.ignoreImages = Boolean(ignoreImages);
   if (ignoreLinks !== undefined) data.ignoreLinks = Boolean(ignoreLinks);

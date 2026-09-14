@@ -469,12 +469,31 @@ function AuditLogTab({ guildId }: { guildId: string }) {
 }
 
 const EMPTY_AUTOPURGE = {
-  intervalMinutes: 60,
+  intervalSeconds: 3600,
   ignorePinned: true,
   ignoreImages: false,
   ignoreLinks: false,
   protectedEmojis: [] as string[],
 };
+
+function secondsToParts(total: number) {
+  const clamped = Math.max(0, total);
+  const days = Math.floor(clamped / 86400);
+  const minutes = Math.floor((clamped % 86400) / 60);
+  const seconds = clamped % 60;
+  return { days, minutes, seconds };
+}
+function partsToSeconds(days: number, minutes: number, seconds: number) {
+  return Math.max(0, days) * 86400 + Math.max(0, minutes) * 60 + Math.max(0, seconds);
+}
+function formatDuration(totalSeconds: number) {
+  const { days, minutes, seconds } = secondsToParts(totalSeconds);
+  const parts: string[] = [];
+  if (days) parts.push(`${days}d`);
+  if (minutes) parts.push(`${minutes}m`);
+  if (seconds || parts.length === 0) parts.push(`${seconds}s`);
+  return parts.join(" ");
+}
 
 function AutoPurgeTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
@@ -541,14 +560,45 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
           </label>
           <ChannelSelect guildId={guildId} value={channelId} onChange={setChannelId} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Run every (minutes)</label>
-          <input
-            type="number"
-            min={5}
-            className="w-32 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            value={form.intervalMinutes}
-            onChange={(e) => setForm({ ...form, intervalMinutes: Number(e.target.value) })}
-          />
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Run every</label>
+          {(() => {
+            const { days, minutes, seconds } = secondsToParts(form.intervalSeconds);
+            return (
+              <div className="grid grid-cols-3 gap-2 mb-1">
+                <div>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    value={days}
+                    onChange={(e) => setForm({ ...form, intervalSeconds: partsToSeconds(Number(e.target.value), minutes, seconds) })}
+                  />
+                  <p className="text-[10px] text-slate-600 mt-1">Days</p>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    value={minutes}
+                    onChange={(e) => setForm({ ...form, intervalSeconds: partsToSeconds(days, Number(e.target.value), seconds) })}
+                  />
+                  <p className="text-[10px] text-slate-600 mt-1">Minutes</p>
+                </div>
+                <div>
+                  <input
+                    type="number"
+                    min={0}
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    value={seconds}
+                    onChange={(e) => setForm({ ...form, intervalSeconds: partsToSeconds(days, minutes, Number(e.target.value)) })}
+                  />
+                  <p className="text-[10px] text-slate-600 mt-1">Seconds</p>
+                </div>
+              </div>
+            );
+          })()}
+          <p className="text-xs text-slate-600 mb-4">Checked every 10 minutes, so anything shorter than that still only runs on the next check.</p>
 
           <div className="mb-4">
             {[
@@ -616,7 +666,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
                 <div>
                   <p className="font-medium">#{c.channelId.slice(0, 6)}</p>
                   <p className="text-xs text-slate-500">
-                    every {c.intervalMinutes}m
+                    every {formatDuration(c.intervalSeconds)}
                     {c.ignorePinned ? " · skips pinned" : ""}
                     {c.ignoreImages ? " · skips images" : ""}
                     {c.ignoreLinks ? " · skips links" : ""}

@@ -623,7 +623,7 @@ export interface AnnouncementInput {
 export interface AutoPurgeConfigRow {
   id: string;
   channelId: string;
-  intervalMinutes: number;
+  intervalSeconds: number;
   ignorePinned: boolean;
   ignoreImages: boolean;
   ignoreLinks: boolean;

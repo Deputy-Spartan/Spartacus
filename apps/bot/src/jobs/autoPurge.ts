@@ -27,16 +27,19 @@ function shouldSkip(
 }
 
 // Runs every 10 minutes; each configured channel only actually purges once
-// its own intervalMinutes has elapsed since lastRunAt. Pages backward
-// through the channel deleting everything eligible up to Discord's 14-day
-// bulk-delete boundary, skipping whatever the config says to protect.
+// its own intervalSeconds has elapsed since lastRunAt. That 10-minute tick
+// is the real floor on resolution — an interval configured shorter than
+// that still only ever fires on the next tick, never more often. Pages
+// backward through the channel deleting everything eligible up to
+// Discord's 14-day bulk-delete boundary, skipping whatever the config says
+// to protect.
 export function startAutoPurgeJob(client: Client) {
   cron.schedule("*/10 * * * *", async () => {
     let loggedThisTick = 0;
     const configs = await prisma.autoPurgeConfig.findMany();
 
     for (const config of configs) {
-      const dueAt = config.lastRunAt ? new Date(config.lastRunAt.getTime() + config.intervalMinutes * 60_000) : new Date(0);
+      const dueAt = config.lastRunAt ? new Date(config.lastRunAt.getTime() + config.intervalSeconds * 1000) : new Date(0);
       if (dueAt > new Date()) continue;
 
       const enabled = await isModuleEnabled(config.guildId, "MODERATION");

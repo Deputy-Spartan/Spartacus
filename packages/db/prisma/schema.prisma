@@ -1577,9 +1577,12 @@ model ApplicationType {
   description     String?
   reviewChannelId String?
   staffRoleIds    Json     @default("[]")
-  questions       Json     @default("[]") // [{ label, style: "SHORT"|"PARAGRAPH", required }] — max 5 (Discord modal limit)
+  questions       Json     @default("[]") // [{ label, style: "SHORT"|"PARAGRAPH", required }] — unlimited, asked one per DM
+  introMessage    String?  // sent as the opening DM before the first question; {type} placeholder
+  submittedMessage String? // sent as the DM confirmation once every question is answered; {type} placeholder
   acceptMessage   String?  @default("🎉 Your application for {type} was accepted!")
   denyMessage     String?  @default("Your application for {type} was not accepted this time.")
+  customResponses Json     @default("[]") // [{ id, label, message }] — extra buttons on the review embed that just DM the applicant, no status change; capped at 3 in the UI
   enabled         Boolean  @default(true)
   createdAt       DateTime @default(now())
 

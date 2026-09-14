@@ -46,7 +46,8 @@ router.get("/guilds/:guildId/application-types", requireAuth, requireGuildPermis
 });
 
 router.post("/guilds/:guildId/application-types", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, emoji, description, reviewChannelId, staffRoleIds, questions, acceptMessage, denyMessage } = req.body;
+  const { name, emoji, description, reviewChannelId, staffRoleIds, questions, introMessage, submittedMessage, acceptMessage, denyMessage, customResponses } =
+    req.body;
   const row = await prisma.applicationType.create({
     data: {
       guildId: req.params.guildId,
@@ -56,15 +57,31 @@ router.post("/guilds/:guildId/application-types", requireAuth, requireGuildPermi
       reviewChannelId,
       staffRoleIds: staffRoleIds ?? [],
       questions: questions ?? [],
+      introMessage,
+      submittedMessage,
       acceptMessage,
       denyMessage,
+      customResponses: customResponses ?? [],
     },
   });
   res.status(201).json(row);
 });
 
 router.patch("/guilds/:guildId/application-types/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const fields = ["name", "emoji", "description", "reviewChannelId", "staffRoleIds", "questions", "acceptMessage", "denyMessage", "enabled"];
+  const fields = [
+    "name",
+    "emoji",
+    "description",
+    "reviewChannelId",
+    "staffRoleIds",
+    "questions",
+    "introMessage",
+    "submittedMessage",
+    "acceptMessage",
+    "denyMessage",
+    "customResponses",
+    "enabled",
+  ];
   const data: Record<string, unknown> = {};
   for (const f of fields) if (req.body[f] !== undefined) data[f] = req.body[f];
   const row = await prisma.applicationType.update({ where: { id: req.params.id }, data });

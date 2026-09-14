@@ -676,6 +676,11 @@ export interface ApplicationQuestion {
   required: boolean;
 }
 
+export interface ApplicationCustomResponse {
+  label: string;
+  message: string;
+}
+
 export interface ApplicationTypeRow {
   id: string;
   name: string;
@@ -684,8 +689,11 @@ export interface ApplicationTypeRow {
   reviewChannelId: string | null;
   staffRoleIds: string[];
   questions: ApplicationQuestion[];
+  introMessage: string | null;
+  submittedMessage: string | null;
   acceptMessage: string | null;
   denyMessage: string | null;
+  customResponses: ApplicationCustomResponse[];
   enabled: boolean;
 }
 

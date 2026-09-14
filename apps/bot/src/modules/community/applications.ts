@@ -65,14 +65,13 @@ export async function handleApplyButton(
   }
 
   const firstQuestion = questions[0];
-  const introDm = await interaction.user
-    .send(
-      `📋 **${type.name}**\n` +
-        (type.description ? `${type.description}\n\n` : "\n") +
-        `I'll ask ${questions.length} question${questions.length === 1 ? "" : "s"}, one at a time — just reply here with your answer to each.\n\n` +
-        `**1/${questions.length}.** ${firstQuestion.label}`
-    )
-    .catch(() => null);
+  const preamble = (
+    type.introMessage ||
+    `📋 **${type.name}**\n` +
+      (type.description ? `${type.description}\n\n` : "\n") +
+      `I'll ask ${questions.length} question${questions.length === 1 ? "" : "s"}, one at a time — just reply here with your answer to each.`
+  ).replace(/{type}/g, type.name);
+  const introDm = await interaction.user.send(`${preamble}\n\n**1/${questions.length}.** ${firstQuestion.label}`).catch(() => null);
 
   if (!introDm) {
     await interaction.reply({
@@ -151,14 +150,22 @@ async function finalizeApplication(
   message: Message,
   guildId: string,
   panelId: string,
-  type: { id: string; name: string; reviewChannelId: string | null; staffRoleIds: unknown },
+  type: {
+    id: string;
+    name: string;
+    reviewChannelId: string | null;
+    staffRoleIds: unknown;
+    submittedMessage: string | null;
+    customResponses: unknown;
+  },
   answers: Array<{ label: string; answer: string }>
 ) {
   const application = await prisma.application.create({
     data: { guildId, panelId, typeId: type.id, userId: message.author.id, answers },
   });
 
-  await message.reply("✅ Thanks — your application has been submitted for review!").catch(() => null);
+  const submittedText = (type.submittedMessage || "✅ Thanks — your application has been submitted for review!").replace(/{type}/g, type.name);
+  await message.reply(submittedText).catch(() => null);
 
   const guild = await message.client.guilds.fetch(guildId).catch(() => null);
   if (!guild) return;
@@ -185,9 +192,17 @@ async function finalizeApplication(
     .setFooter({ text: `Applicant ID: ${message.author.id}${answers.length > 25 ? ` · ${answers.length - 25} more answer(s) on the dashboard` : ""}` })
     .setTimestamp();
 
+  const customResponses = Array.isArray(type.customResponses) ? (type.customResponses as Array<{ label: string }>) : [];
+
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`application:${application.id}:accept`).setLabel("Accept").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`application:${application.id}:deny`).setLabel("Deny").setStyle(ButtonStyle.Danger)
+    new ButtonBuilder().setCustomId(`application:${application.id}:deny`).setLabel("Deny").setStyle(ButtonStyle.Danger),
+    // Extra staff-defined buttons (capped at 3 in the dashboard UI, so 5
+    // total fits in one Discord action row) — each just DMs the applicant
+    // its configured message and doesn't touch the application's status.
+    ...customResponses.slice(0, 3).map((r, i) =>
+      new ButtonBuilder().setCustomId(`application:${application.id}:custom:${i}`).setLabel(r.label.slice(0, 80)).setStyle(ButtonStyle.Secondary)
+    )
   );
 
   const sent = await reviewChannel
@@ -231,4 +246,34 @@ export async function handleApplicationReview(interaction: ButtonInteraction, ap
 
   const applicant = await interaction.client.users.fetch(application.userId).catch(() => null);
   await applicant?.send(dmText).catch(() => null);
+}
+
+// A staff-defined "custom response" button — DMs the applicant a canned
+// message (e.g. "Waitlisted", "Need more info") without changing the
+// application's PENDING/ACCEPTED/DENIED status, so Accept/Deny stay usable
+// afterward. Any staff member can use these (unlike Accept/Deny, which
+// requires Manage Guild) since they don't decide the outcome.
+export async function handleApplicationCustomResponse(interaction: ButtonInteraction, applicationId: string, indexStr: string) {
+  const application = await prisma.application.findUnique({ where: { id: applicationId } });
+  if (!application) {
+    await interaction.reply({ content: "This application no longer exists.", ephemeral: true });
+    return;
+  }
+
+  const type = application.typeId ? await prisma.applicationType.findUnique({ where: { id: application.typeId } }) : null;
+  const customResponses = Array.isArray(type?.customResponses) ? (type!.customResponses as Array<{ label: string; message: string }>) : [];
+  const response = customResponses[Number(indexStr)];
+  if (!response) {
+    await interaction.reply({ content: "This response button is no longer configured.", ephemeral: true });
+    return;
+  }
+
+  const dmText = response.message.replace(/{type}/g, type?.name ?? "this role");
+  const applicant = await interaction.client.users.fetch(application.userId).catch(() => null);
+  const sent = await applicant?.send(dmText).catch(() => null);
+
+  await interaction.reply({
+    content: sent ? `✅ Sent "${response.label}" to <@${application.userId}>.` : `⚠️ Couldn't DM <@${application.userId}> — they may have DMs closed.`,
+    ephemeral: true,
+  });
 }

@@ -322,6 +322,11 @@ export async function execute(interaction: Interaction) {
       return;
     }
     var applicationParts = interaction.customId.split(":");
+    if (applicationParts[2] === "custom") {
+      const { handleApplicationCustomResponse } = await import("../modules/community/applications");
+      await handleApplicationCustomResponse(interaction, applicationParts[1], applicationParts[3]);
+      return;
+    }
     const { handleApplicationReview } = await import("../modules/community/applications");
     await handleApplicationReview(interaction, applicationParts[1], applicationParts[2] as "accept" | "deny");
     return;

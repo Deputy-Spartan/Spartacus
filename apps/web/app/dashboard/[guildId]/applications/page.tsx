@@ -368,8 +368,11 @@ const EMPTY_TYPE: Partial<ApplicationTypeRow> = {
   reviewChannelId: null,
   staffRoleIds: [],
   questions: [],
+  introMessage: "",
+  submittedMessage: "",
   acceptMessage: "🎉 Your application for {type} was accepted!",
   denyMessage: "Your application for {type} was not accepted this time.",
+  customResponses: [],
   enabled: true,
 };
 
@@ -379,6 +382,8 @@ function TypesTab({ guildId }: { guildId: string }) {
   const [panels, setPanels] = useState<ApplicationPanelRow[]>([]);
   const [editing, setEditing] = useState<Partial<ApplicationTypeRow> | null>(null);
   const [questionDraft, setQuestionDraft] = useState("");
+  const [responseLabelDraft, setResponseLabelDraft] = useState("");
+  const [responseMessageDraft, setResponseMessageDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function refresh() {
@@ -399,6 +404,22 @@ function TypesTab({ guildId }: { guildId: string }) {
   function removeQuestion(index: number) {
     if (!editing) return;
     setEditing({ ...editing, questions: (editing.questions ?? []).filter((_, i) => i !== index) });
+  }
+
+  function addCustomResponse() {
+    if (!editing || !responseLabelDraft.trim() || !responseMessageDraft.trim()) return;
+    if ((editing.customResponses ?? []).length >= 3) return;
+    setEditing({
+      ...editing,
+      customResponses: [...(editing.customResponses ?? []), { label: responseLabelDraft.trim(), message: responseMessageDraft.trim() }],
+    });
+    setResponseLabelDraft("");
+    setResponseMessageDraft("");
+  }
+
+  function removeCustomResponse(index: number) {
+    if (!editing) return;
+    setEditing({ ...editing, customResponses: (editing.customResponses ?? []).filter((_, i) => i !== index) });
   }
 
   async function save() {
@@ -514,6 +535,26 @@ function TypesTab({ guildId }: { guildId: string }) {
             </button>
           </div>
 
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Opening Message (DM)</label>
+          <textarea
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+            rows={2}
+            value={editing.introMessage ?? ""}
+            onChange={(e) => setEditing({ ...editing, introMessage: e.target.value })}
+            placeholder={`📋 ${editing.name || "Application"}\n\nI'll ask you a few questions, one at a time — just reply here with your answer to each.`}
+          />
+          <p className="text-xs text-slate-600 mb-4">Sent before the first question. The first question itself is appended automatically. Leave blank to use the default wording.</p>
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Submitted Confirmation (DM)</label>
+          <textarea
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+            rows={2}
+            value={editing.submittedMessage ?? ""}
+            onChange={(e) => setEditing({ ...editing, submittedMessage: e.target.value })}
+            placeholder="✅ Thanks — your application has been submitted for review!"
+          />
+          <p className="text-xs text-slate-600 mb-4">Sent right after the last question is answered.</p>
+
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Accept Message (DM)</label>
           <textarea
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
@@ -530,6 +571,50 @@ function TypesTab({ guildId }: { guildId: string }) {
             onChange={(e) => setEditing({ ...editing, denyMessage: e.target.value })}
           />
           <p className="text-xs text-slate-600 -mt-3 mb-4">Use {"{type}"} to reference the application type's name.</p>
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Custom Response Buttons (up to 3)</label>
+          <p className="text-xs text-slate-600 mb-2">
+            Extra buttons on the review message next to Accept/Deny — clicking one DMs the applicant your message here without changing their status
+            (Accept/Deny still work afterward).
+          </p>
+          <div className="space-y-1.5 mb-2">
+            {(editing.customResponses ?? []).map((r, i) => (
+              <div key={i} className="flex items-center justify-between bg-base-950 border border-white/10 rounded-lg px-3 py-2 text-sm gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium">{r.label}</p>
+                  <p className="text-xs text-slate-500 truncate">{r.message}</p>
+                </div>
+                <button onClick={() => removeCustomResponse(i)} className="text-slate-500 hover:text-rose-400 shrink-0">
+                  ×
+                </button>
+              </div>
+            ))}
+            {(editing.customResponses ?? []).length === 0 && <span className="text-xs text-slate-500">No custom buttons added yet.</span>}
+          </div>
+          {(editing.customResponses ?? []).length < 3 && (
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr_auto] gap-2 mb-4">
+              <input
+                className="bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                placeholder="Button label (e.g. Waitlisted)"
+                value={responseLabelDraft}
+                onChange={(e) => setResponseLabelDraft(e.target.value)}
+              />
+              <input
+                className="bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                placeholder="Message to DM the applicant"
+                value={responseMessageDraft}
+                onChange={(e) => setResponseMessageDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addCustomResponse()}
+              />
+              <button
+                onClick={addCustomResponse}
+                disabled={!responseLabelDraft.trim() || !responseMessageDraft.trim()}
+                className="neon-button-sm disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          )}
 
           <div className="flex gap-2">
             <button onClick={save} disabled={!editing.name || (editing.questions?.length ?? 0) === 0} className="neon-button disabled:opacity-50">

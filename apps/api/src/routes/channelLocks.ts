@@ -26,6 +26,7 @@ function buildNotifyFields(body: Record<string, unknown>) {
     notifyButtons: Array.isArray(body.notifyButtons) ? (body.notifyButtons as Prisma.InputJsonValue) : [],
     notifyDeleteAfterSec: Number.isFinite(Number(body.notifyDeleteAfterSec)) ? Number(body.notifyDeleteAfterSec) : 6,
     dmUser: Boolean(body.dmUser),
+    savedEmbedId: typeof body.savedEmbedId === "string" ? body.savedEmbedId : null,
   };
 }
 

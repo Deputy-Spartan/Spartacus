@@ -3,6 +3,7 @@ import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { buildTicketPanelPayload, postChannelMessage, fetchChannelTranscriptText, postTranscriptMessage } from "../lib/discordRest";
+import { buildMessagePayload } from "../lib/embedCreatorPayload";
 
 const router = Router();
 
@@ -18,12 +19,31 @@ router.get("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermission
 // that job still exists as a fallback for when this immediate post fails
 // (e.g. the API process is mid-deploy) or the bot was offline when the panel
 // was saved.
-async function postPanelNow(panel: { id: string; guildId: string; channelId: string; name: string; description: string | null; buttonLabel: string; layout: string; typeIds: unknown }) {
+async function postPanelNow(panel: {
+  id: string;
+  guildId: string;
+  channelId: string;
+  name: string;
+  description: string | null;
+  buttonLabel: string;
+  layout: string;
+  typeIds: unknown;
+  savedEmbedId: string | null;
+}) {
   const typeIds = Array.isArray(panel.typeIds) ? (panel.typeIds as string[]) : [];
   const types = typeIds.length
     ? await prisma.ticketType.findMany({ where: { id: { in: typeIds }, enabled: true } })
     : [];
-  const payload = buildTicketPanelPayload(panel, types);
+
+  let savedEmbeds: Array<Record<string, unknown>> | undefined;
+  if (panel.savedEmbedId) {
+    const preset = await prisma.embedCreatorPreset.findUnique({ where: { id: panel.savedEmbedId } });
+    if (preset) savedEmbeds = (await buildMessagePayload(panel.guildId, preset.data as Parameters<typeof buildMessagePayload>[1])).embeds as
+      | Array<Record<string, unknown>>
+      | undefined;
+  }
+
+  const payload = buildTicketPanelPayload(panel, types, savedEmbeds);
   const result = await postChannelMessage(panel.channelId, payload);
   if (result.id) {
     await prisma.ticketPanel.update({ where: { id: panel.id }, data: { messageId: result.id } });
@@ -35,7 +55,7 @@ async function postPanelNow(panel: { id: string; guildId: string; channelId: str
 // offers; postPanelNow() above sends the actual button/dropdown message the
 // instant it's created or edited.
 router.post("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, channelId, layout, typeIds, description, categoryId, buttonLabel, supportRoleId } = req.body;
+  const { name, channelId, layout, typeIds, description, categoryId, buttonLabel, supportRoleId, savedEmbedId } = req.body;
   const row = await prisma.ticketPanel.create({
     data: {
       guildId: req.params.guildId,
@@ -47,6 +67,7 @@ router.post("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermissio
       categoryId,
       buttonLabel: buttonLabel ?? "Open a Ticket",
       supportRoleId,
+      savedEmbedId: savedEmbedId ?? null,
     },
   });
   const posted = await postPanelNow(row);
@@ -54,7 +75,7 @@ router.post("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermissio
 });
 
 router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, layout, typeIds, description, paused, buttonLabel, supportRoleId } = req.body;
+  const { name, layout, typeIds, description, paused, buttonLabel, supportRoleId, savedEmbedId } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
   if (layout !== undefined) data.layout = layout;
@@ -63,6 +84,7 @@ router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPerm
   if (paused !== undefined) data.paused = paused;
   if (buttonLabel !== undefined) data.buttonLabel = buttonLabel;
   if (supportRoleId !== undefined) data.supportRoleId = supportRoleId;
+  if (savedEmbedId !== undefined) data.savedEmbedId = savedEmbedId;
   // Editing content invalidates the posted message so it gets redrawn.
   if (Object.keys(data).length > 0) data.messageId = null;
   const row = await prisma.ticketPanel.update({ where: { id: req.params.id }, data });

@@ -499,12 +499,19 @@ interface TicketTypeForPost {
 // Mirrors apps/bot/src/jobs/ticketPanelPoster.ts's message shape, but posted
 // immediately via REST right after the panel is created/edited on the
 // dashboard instead of waiting for that job's next once-a-minute tick.
-export function buildTicketPanelPayload(panel: TicketPanelForPost, types: TicketTypeForPost[]) {
-  const embed = {
-    color: 0x3b82f6,
-    title: panel.name,
-    description: panel.description || "Click below to open a ticket.",
-  };
+// `savedEmbeds` (already resolved from the panel's savedEmbedId, if set)
+// replaces the default name/description embed — the open-ticket
+// button/select row is always required, so it's built the same either way.
+export function buildTicketPanelPayload(panel: TicketPanelForPost, types: TicketTypeForPost[], savedEmbeds?: Array<Record<string, unknown>>) {
+  const embeds = savedEmbeds?.length
+    ? savedEmbeds
+    : [
+        {
+          color: 0x3b82f6,
+          title: panel.name,
+          description: panel.description || "Click below to open a ticket.",
+        },
+      ];
 
   let component: Record<string, unknown>;
 
@@ -543,7 +550,7 @@ export function buildTicketPanelPayload(panel: TicketPanelForPost, types: Ticket
     };
   }
 
-  return { embeds: [embed], components: [component] };
+  return { embeds, components: [component] };
 }
 
 interface RawMessage {

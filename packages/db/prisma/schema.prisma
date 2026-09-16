@@ -605,6 +605,7 @@ model TicketPanel {
   categoryId    String?
   buttonLabel   String            @default("Open a Ticket")
   supportRoleId String?
+  savedEmbedId  String? // overrides name/description above with a shared Embed Creator preset, resolved live at send time — the open-ticket button/select row still always posts alongside it
 
   @@index([guildId])
 }
@@ -1092,6 +1093,7 @@ model ChannelLock {
   notifyButtons      Json     @default("[]")
   notifyDeleteAfterSec Int    @default(6) // 0 disables auto-delete of the in-channel notice (ignored when notifyHidden)
   dmUser             Boolean  @default(false)
+  savedEmbedId       String?  // overrides the notify* fields above with a shared Embed Creator preset, resolved live at send time
 
   createdAt         DateTime @default(now())
 }
@@ -1565,6 +1567,7 @@ model ApplicationPanel {
   typeIds     Json                   @default("[]") // ordered ApplicationType ids offered on this panel
   messageId   String?
   paused      Boolean                @default(false)
+  savedEmbedId String? // overrides name/description above with a shared Embed Creator preset, resolved live at send time — the apply button/select row still always posts alongside it
 
   @@index([guildId])
 }

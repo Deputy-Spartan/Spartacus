@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, Str
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 // Posts (or reposts, after edits clear messageId) the button/dropdown panel
 // for any ApplicationPanel that doesn't have a live message yet.
@@ -21,10 +22,12 @@ export function startApplicationPanelPosterJob(client: Client) {
         : [];
       if (types.length === 0) continue;
 
-      const embed = new EmbedBuilder()
-        .setColor(0x4c8dff)
-        .setTitle(panel.name)
-        .setDescription(panel.description || "Click below to apply.");
+      // A saved embed only ever supplies the embed body — the apply
+      // button/select row below is always required.
+      const savedEmbed = await resolveSavedEmbed(panel.savedEmbedId);
+      const embeds = savedEmbed
+        ? (await buildSavedEmbedPayload(panel.guildId, savedEmbed)).embeds
+        : [new EmbedBuilder().setColor(0x4c8dff).setTitle(panel.name).setDescription(panel.description || "Click below to apply.")];
 
       const component =
         panel.layout === "DROPDOWN"
@@ -49,7 +52,7 @@ export function startApplicationPanelPosterJob(client: Client) {
               })
             );
 
-      const message = await channel.send({ embeds: [embed], components: [component] }).catch((err) => {
+      const message = await channel.send({ embeds, components: [component] }).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, panel.guildId); loggedThisTick++; }
         return null;
       });

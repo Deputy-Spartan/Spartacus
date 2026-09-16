@@ -9,6 +9,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import {
   api,
@@ -139,6 +140,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [description, setDescription] = useState("");
   const [layout, setLayout] = useState<ApplicationPanelLayout>("BUTTONS");
   const [typeIds, setTypeIds] = useState<string[]>([]);
+  const [savedEmbedId, setSavedEmbedId] = useState<string | null>(null);
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +165,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     setDescription("");
     setLayout("BUTTONS");
     setTypeIds([]);
+    setSavedEmbedId(null);
   }
 
   function openCreate() {
@@ -178,6 +181,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     setDescription(panel.description ?? "");
     setLayout(panel.layout);
     setTypeIds(panel.typeIds);
+    setSavedEmbedId(panel.savedEmbedId);
     setError(null);
     setShowForm(true);
   }
@@ -191,9 +195,9 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     if (editingId) {
       // The channel a panel is posted in can't change without deleting and
       // recreating it (Discord has no "move this message" API).
-      await api.updateApplicationPanel(guildId, editingId, { name, description, layout, typeIds });
+      await api.updateApplicationPanel(guildId, editingId, { name, description, layout, typeIds, savedEmbedId });
     } else {
-      await api.addApplicationPanel(guildId, { name, channelId, description, layout, typeIds });
+      await api.addApplicationPanel(guildId, { name, channelId, description, layout, typeIds, savedEmbedId });
     }
     resetForm();
     refresh();
@@ -249,6 +253,9 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Shown in the panel embed."
           />
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed (overrides name/description above)</label>
+          <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={setSavedEmbedId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Post In Channel

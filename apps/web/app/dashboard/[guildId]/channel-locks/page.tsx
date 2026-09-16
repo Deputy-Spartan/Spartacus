@@ -8,6 +8,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { EmbedFields } from "../../../../components/ui/EmbedFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -35,6 +36,7 @@ const EMPTY_FORM: ChannelLockInput = {
   notifyButtons: [],
   notifyDeleteAfterSec: 6,
   dmUser: false,
+  savedEmbedId: null,
 };
 
 function Row({ label, hint, enabled, onChange }: { label: string; hint: string; enabled: boolean; onChange: (v: boolean) => void }) {
@@ -155,6 +157,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       notifyButtons: row.notifyButtons,
       notifyDeleteAfterSec: row.notifyDeleteAfterSec,
       dmUser: row.dmUser,
+      savedEmbedId: row.savedEmbedId ?? null,
     });
     setError(null);
     setShowEditor(true);
@@ -353,35 +356,46 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 />
 
                 <div className="mb-4">
-                  <EmbedFields
-                    guildId={params.guildId}
-                    embedEnabled={form.notifyEmbedEnabled}
-                    embedTitle={form.notifyEmbedTitle ?? ""}
-                    embedColor={form.notifyEmbedColor ?? "#00E5FF"}
-                    buttons={form.notifyButtons}
-                    onChange={(next) =>
-                      setForm({
-                        ...form,
-                        notifyEmbedEnabled: next.embedEnabled,
-                        notifyEmbedTitle: next.embedTitle,
-                        notifyEmbedColor: next.embedColor,
-                        notifyButtons: next.buttons,
-                      })
-                    }
-                    titleLabel="Notice Embed Title"
-                  />
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed (overrides the fields below)</label>
+                  <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
                 </div>
+
+                {!form.savedEmbedId && (
+                  <div className="mb-4">
+                    <EmbedFields
+                      guildId={params.guildId}
+                      embedEnabled={form.notifyEmbedEnabled}
+                      embedTitle={form.notifyEmbedTitle ?? ""}
+                      embedColor={form.notifyEmbedColor ?? "#00E5FF"}
+                      buttons={form.notifyButtons}
+                      onChange={(next) =>
+                        setForm({
+                          ...form,
+                          notifyEmbedEnabled: next.embedEnabled,
+                          notifyEmbedTitle: next.embedTitle,
+                          notifyEmbedColor: next.embedColor,
+                          notifyButtons: next.buttons,
+                        })
+                      }
+                      titleLabel="Notice Embed Title"
+                    />
+                  </div>
+                )}
 
                 <div className="mb-4">
                   <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Live Preview</p>
-                  <StickyPreview
-                    content={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
-                    embedEnabled={form.notifyEmbedEnabled}
-                    embedTitle={form.notifyEmbedTitle ?? ""}
-                    embedDescription={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
-                    embedColor={form.notifyEmbedColor ?? "#00E5FF"}
-                    buttons={form.notifyButtons}
-                  />
+                  {form.savedEmbedId ? (
+                    <p className="text-xs text-slate-500 italic">Using your saved embed for this notice.</p>
+                  ) : (
+                    <StickyPreview
+                      content={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
+                      embedEnabled={form.notifyEmbedEnabled}
+                      embedTitle={form.notifyEmbedTitle ?? ""}
+                      embedDescription={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
+                      embedColor={form.notifyEmbedColor ?? "#00E5FF"}
+                      buttons={form.notifyButtons}
+                    />
+                  )}
                 </div>
 
                 <div className="mb-4">

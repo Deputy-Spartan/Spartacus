@@ -13,21 +13,22 @@ router.get("/guilds/:guildId/application-panels", requireAuth, requireGuildPermi
 });
 
 router.post("/guilds/:guildId/application-panels", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, channelId, description, layout, typeIds } = req.body;
+  const { name, channelId, description, layout, typeIds, savedEmbedId } = req.body;
   const row = await prisma.applicationPanel.create({
-    data: { guildId: req.params.guildId, name, channelId, description, layout: layout ?? "BUTTONS", typeIds: typeIds ?? [] },
+    data: { guildId: req.params.guildId, name, channelId, description, layout: layout ?? "BUTTONS", typeIds: typeIds ?? [], savedEmbedId: savedEmbedId ?? null },
   });
   res.status(201).json(row);
 });
 
 router.patch("/guilds/:guildId/application-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, description, layout, typeIds, paused } = req.body;
+  const { name, description, layout, typeIds, paused, savedEmbedId } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
   if (description !== undefined) data.description = description;
   if (layout !== undefined) data.layout = layout;
   if (typeIds !== undefined) data.typeIds = typeIds;
   if (paused !== undefined) data.paused = paused;
+  if (savedEmbedId !== undefined) data.savedEmbedId = savedEmbedId;
   if (Object.keys(data).length > 0) data.messageId = null; // invalidate the posted message so the poster job redraws it
   const row = await prisma.applicationPanel.update({ where: { id: req.params.id }, data });
   res.json(row);

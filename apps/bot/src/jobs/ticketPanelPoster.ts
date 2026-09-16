@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, Str
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 // Posts the button/dropdown panel for any TicketPanel created or edited via
 // the dashboard that doesn't have a live message yet (editing clears
@@ -21,10 +22,13 @@ export function startTicketPanelPosterJob(client: Client) {
         ? await prisma.ticketType.findMany({ where: { id: { in: typeIds }, enabled: true } })
         : [];
 
-      const embed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle(panel.name)
-        .setDescription(panel.description || "Click below to open a ticket.");
+      // A saved embed only ever supplies the embed body here — the open-ticket
+      // button/select row below is always required, so it's never taken from
+      // the saved embed's own (usually empty) components.
+      const savedEmbed = await resolveSavedEmbed(panel.savedEmbedId);
+      const embeds = savedEmbed
+        ? (await buildSavedEmbedPayload(panel.guildId, savedEmbed)).embeds
+        : [new EmbedBuilder().setColor(0x3b82f6).setTitle(panel.name).setDescription(panel.description || "Click below to open a ticket.")];
 
       let component: ActionRowBuilder<ButtonBuilder> | ActionRowBuilder<StringSelectMenuBuilder>;
 
@@ -56,7 +60,7 @@ export function startTicketPanelPosterJob(client: Client) {
         );
       }
 
-      const message = await channel.send({ embeds: [embed], components: [component] }).catch((err) => {
+      const message = await channel.send({ embeds, components: [component] }).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, panel.guildId); loggedThisTick++; }
         return null;
       });

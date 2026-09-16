@@ -278,6 +278,11 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
               <div className="mb-1">
                 <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
                 <ChannelSelect guildId={guildId} value={state.channelId || null} onChange={(id) => setState((s) => ({ ...s, channelId: id }))} kind="text" placeholder="Select a channel…" />
+                <p className="text-xs text-slate-600 mt-2">
+                  Sent via Bot always shows as "Spartacus" — Discord doesn't allow a bot token to change its name/avatar per message. Switch to{" "}
+                  <b className="text-slate-400">Send via Webhook</b> to post under a custom name and avatar, or change the bot's own identity everywhere in{" "}
+                  <a href={`/dashboard/${guildId}/bot-customization`} className="text-neon-blue hover:underline">Bot Customization</a>.
+                </p>
               </div>
             ) : (
               <div className="mb-1 space-y-3">
@@ -310,6 +315,10 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                     />
                   </div>
                 </div>
+                <p className="text-xs text-slate-600">
+                  Applies when you first send it. Discord doesn't let an edit change a webhook message's name/avatar afterward — send a new message instead
+                  if you need to change those.
+                </p>
               </div>
             )}
 

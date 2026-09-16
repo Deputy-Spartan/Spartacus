@@ -669,6 +669,7 @@ export interface ApplicationPanelRow {
   typeIds: string[];
   messageId: string | null;
   paused: boolean;
+  savedEmbedId: string | null;
 }
 
 export interface ApplicationQuestion {
@@ -737,6 +738,7 @@ export interface TicketPanelRow {
   categoryId: string | null;
   buttonLabel: string;
   supportRoleId: string | null;
+  savedEmbedId: string | null;
 }
 
 export interface TicketModalField {
@@ -944,6 +946,7 @@ export interface ChannelLockRow {
   notifyButtons: StickyButton[];
   notifyDeleteAfterSec: number;
   dmUser: boolean;
+  savedEmbedId: string | null;
 }
 export interface ChannelLockInput {
   allowImages: boolean;
@@ -962,6 +965,7 @@ export interface ChannelLockInput {
   notifyButtons: StickyButton[];
   notifyDeleteAfterSec: number;
   dmUser: boolean;
+  savedEmbedId: string | null;
 }
 
 export function buildBotInviteUrl(clientId: string, guildId?: string) {

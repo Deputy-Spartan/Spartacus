@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 import { buildStickyPayload } from "../../lib/stickyRender";
+import { resolveSavedEmbed } from "../../lib/savedEmbedRender";
 import type { ChannelLock } from "@spartacus/db";
 
 export const name = Events.MessageCreate;
@@ -53,14 +54,22 @@ async function buildNotifyPayload(lock: ChannelLock, message: Message) {
     .replace(/{user}/g, `${message.author}`)
     .replace(/{channel}/g, `<#${message.channelId}>`);
 
-  return buildStickyPayload({
-    content,
-    embedEnabled: lock.notifyEmbedEnabled,
-    embedTitle: lock.notifyEmbedTitle,
-    embedDescription: content,
-    embedColor: lock.notifyEmbedColor,
-    buttons: lock.notifyButtons,
-  });
+  // A saved embed overrides the whole notice (same rule as Welcome, Sticky
+  // Messages, etc.) — it's static content from the shared library, so the
+  // {user}/{channel} tokens above only apply to the non-saved path.
+  const savedEmbed = await resolveSavedEmbed(lock.savedEmbedId);
+
+  return buildStickyPayload(
+    {
+      content,
+      embedEnabled: lock.notifyEmbedEnabled,
+      embedTitle: lock.notifyEmbedTitle,
+      embedDescription: content,
+      embedColor: lock.notifyEmbedColor,
+      buttons: lock.notifyButtons,
+    },
+    { savedEmbed, guildId: lock.guildId }
+  );
 }
 
 export async function execute(message: Message) {

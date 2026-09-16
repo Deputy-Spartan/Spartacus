@@ -10,6 +10,7 @@ import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExampl
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import {
   api,
   type DiscordChannelOption,
@@ -161,6 +162,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [typeIds, setTypeIds] = useState<string[]>([]);
   const [supportRoleId, setSupportRoleId] = useState<string | null>(null);
   const [buttonLabel, setButtonLabel] = useState("Open a Ticket");
+  const [savedEmbedId, setSavedEmbedId] = useState<string | null>(null);
 
   function refresh() {
     api.getTicketPanels(guildId).then(setPanels);
@@ -186,6 +188,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     setTypeIds([]);
     setSupportRoleId(null);
     setButtonLabel("Open a Ticket");
+    setSavedEmbedId(null);
   }
 
   function openCreate() {
@@ -203,6 +206,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     setTypeIds(panel.typeIds);
     setSupportRoleId(panel.supportRoleId);
     setButtonLabel(panel.buttonLabel);
+    setSavedEmbedId(panel.savedEmbedId);
     setError(null);
     setShowForm(true);
   }
@@ -217,9 +221,9 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
       // The channel a panel is posted in can't change without deleting and
       // recreating it (Discord has no "move this message" API) — everything
       // else about an existing panel can be edited freely.
-      await api.updateTicketPanel(guildId, editingId, { name, description, layout, typeIds, buttonLabel, supportRoleId });
+      await api.updateTicketPanel(guildId, editingId, { name, description, layout, typeIds, buttonLabel, supportRoleId, savedEmbedId });
     } else {
-      await api.addTicketPanel(guildId, { name, channelId, description, layout, typeIds, buttonLabel, supportRoleId });
+      await api.addTicketPanel(guildId, { name, channelId, description, layout, typeIds, buttonLabel, supportRoleId, savedEmbedId });
     }
     resetForm();
     refresh();
@@ -277,6 +281,9 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Shown in the panel embed."
           />
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed (overrides name/description above)</label>
+          <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={setSavedEmbedId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Post In Channel

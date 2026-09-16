@@ -84,11 +84,11 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
                 {em.title && <p className="text-[#f2f3f5] font-semibold text-sm mb-1" dangerouslySetInnerHTML={{ __html: mdToHtml(em.title) }} />}
                 {em.description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(em.description) }} />}
                 {em.fields.filter((f) => f.name || f.value).length > 0 && (
-                  <div className={`grid gap-2 mt-2 ${em.fields.some((f) => f.inline) ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1"}`}>
+                  <div className={`grid gap-2 mt-2 ${em.fields.some((f) => f.inline) ? "grid-cols-3" : "grid-cols-1"}`}>
                     {em.fields
                       .filter((f) => f.name || f.value)
                       .map((f, i) => (
-                        <div key={i} className={f.inline ? "" : "sm:col-span-3"}>
+                        <div key={i} className={f.inline ? "" : "col-span-3"}>
                           <p className="text-[#f2f3f5] text-xs font-semibold" dangerouslySetInnerHTML={{ __html: mdToHtml(f.name || "Field") }} />
                           <p className="text-[#dbdee1] text-xs whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(f.value) }} />
                         </div>

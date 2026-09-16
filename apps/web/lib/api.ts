@@ -604,6 +604,7 @@ export interface AnnouncementRow {
   buttons: StickyButton[];
   scheduledFor: string | null;
   sentAt: string | null;
+  messageId: string | null;
   createdAt: string;
   embedExtra?: EmbedExtra;
   savedEmbedId?: string | null;
@@ -1345,6 +1346,8 @@ export const api = {
   getAnnouncements: (guildId: string) => request<AnnouncementRow[]>(`/guilds/${guildId}/announcements`),
   addAnnouncement: (guildId: string, body: AnnouncementInput) =>
     request<AnnouncementRow>(`/guilds/${guildId}/announcements`, { method: "POST", body: JSON.stringify(body) }),
+  updateAnnouncement: (guildId: string, id: string, body: AnnouncementInput) =>
+    request<AnnouncementRow>(`/guilds/${guildId}/announcements/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteAnnouncement: (guildId: string, id: string) => request(`/guilds/${guildId}/announcements/${id}`, { method: "DELETE" }),
 
   getAutoPurgeConfigs: (guildId: string) => request<AutoPurgeConfigRow[]>(`/guilds/${guildId}/auto-purge`),

@@ -42,11 +42,11 @@ export function startAnnouncementPosterJob(client: Client) {
         { savedEmbed: saved, guildId: announcement.guildId }
       );
 
-      await channel.send(payload).catch((err) => {
+      const sent = await channel.send(payload).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, announcement.guildId); loggedThisTick++; }
         return null;
       });
-      await prisma.announcement.update({ where: { id: announcement.id }, data: { sentAt: new Date() } });
+      await prisma.announcement.update({ where: { id: announcement.id }, data: { sentAt: new Date(), messageId: sent?.id ?? null } });
     }
   });
 }

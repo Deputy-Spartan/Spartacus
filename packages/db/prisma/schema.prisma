@@ -1494,6 +1494,7 @@ model Announcement {
   savedEmbedId String?
   scheduledFor DateTime?
   sentAt       DateTime?
+  messageId    String? // the live Discord message, once sent — lets an edit after sending update it in place instead of only being possible before
   createdAt    DateTime  @default(now())
 
   @@index([guildId, sentAt])

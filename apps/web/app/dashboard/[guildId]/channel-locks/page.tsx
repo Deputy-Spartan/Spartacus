@@ -32,7 +32,6 @@ const EMPTY_FORM: ChannelLockInput = {
   allowedRoleIds: [],
   notifyEnabled: false,
   notifyHidden: false,
-  notifyEphemeral: false,
   notifyContent: "{user}, that message isn't allowed in {channel}.",
   notifyEmbedEnabled: false,
   notifyEmbedTitle: "",
@@ -198,7 +197,6 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       allowedRoleIds: row.allowedRoleIds,
       notifyEnabled: row.notifyEnabled,
       notifyHidden: row.notifyHidden,
-      notifyEphemeral: row.notifyEphemeral,
       notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
       notifyEmbedEnabled: row.notifyEmbedEnabled,
       notifyEmbedTitle: row.notifyEmbedTitle ?? "",
@@ -413,16 +411,15 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 <div className="pt-3">
                   <p className="text-sm text-slate-200 mb-1">Where the notice goes</p>
                   <p className="text-xs text-slate-500 mb-3">
-                    Ephemeral posts a small button in-channel that reveals the real notice with Discord's own "Only you can see this · Dismiss message"
-                    treatment when the affected member clicks it. Hide skips the channel entirely and DMs it instead. Shown in channel, it includes its
-                    own Dismiss button only the affected member can use to close it early.
+                    Shown in channel, the notice includes a Dismiss button only the affected member can use to close it early. Hide skips the channel
+                    entirely and DMs it instead.
                   </p>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setForm({ ...form, notifyHidden: false, notifyEphemeral: false })}
+                      onClick={() => setForm({ ...form, notifyHidden: false })}
                       className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                        !form.notifyHidden && !form.notifyEphemeral
+                        !form.notifyHidden
                           ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
                           : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
                       }`}
@@ -431,18 +428,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                     </button>
                     <button
                       type="button"
-                      onClick={() => setForm({ ...form, notifyEphemeral: true, notifyHidden: false })}
-                      className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                        form.notifyEphemeral
-                          ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
-                          : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
-                      }`}
-                    >
-                      Ephemeral
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, notifyHidden: true, notifyEphemeral: false })}
+                      onClick={() => setForm({ ...form, notifyHidden: true })}
                       className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
                         form.notifyHidden
                           ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
@@ -518,7 +504,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
 
                 <div className="mb-4">
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-                    Auto-delete {form.notifyHidden ? "the DM" : form.notifyEphemeral ? "the button prompt" : "notice"} after (seconds)
+                    Auto-delete {form.notifyHidden ? "the DM" : "notice"} after (seconds)
                   </label>
                   <input
                     type="number"
@@ -528,15 +514,11 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                     onChange={(e) => setForm({ ...form, notifyDeleteAfterSec: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-600 mt-1">
-                    {form.notifyHidden
-                      ? "0 leaves the DM up permanently."
-                      : form.notifyEphemeral
-                      ? "0 leaves the button prompt up permanently — the ephemeral reveal itself always disappears on its own, same as any Discord ephemeral reply."
-                      : "0 leaves the in-channel notice up permanently."}
+                    {form.notifyHidden ? "0 leaves the DM up permanently." : "0 leaves the in-channel notice up permanently."}
                   </p>
                 </div>
 
-                {!form.notifyHidden && !form.notifyEphemeral && (
+                {!form.notifyHidden && (
                   <div className="mb-4">
                     <Row
                       label="Also DM the member"

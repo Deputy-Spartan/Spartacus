@@ -88,15 +88,16 @@ async function buildNotifyPayload(lock: ChannelLock, authorMention: string, chan
   );
 }
 
-// Adds a "Dismiss" button only the affected member can use — anyone else
-// clicking gets a small "not for you" instead of being able to close it
-// early for someone else. Skipped if the payload is already at Discord's
-// 5-action-row cap (only possible via a saved embed with 5 rows of its own).
+// Adds a "Dismiss message" button only the affected member can use —
+// anyone else clicking gets a small "not for you" instead of being able to
+// close it early for someone else. Skipped if the payload is already at
+// Discord's 5-action-row cap (only possible via a saved embed with 5 rows
+// of its own).
 function withDismissButton(payload: BaseMessageOptions, authorId: string): BaseMessageOptions {
   const existing = Array.isArray(payload.components) ? payload.components : [];
   if (existing.length >= 5) return payload;
   const dismissRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`channellockdismiss:${authorId}`).setLabel("Dismiss").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(`channellockdismiss:${authorId}`).setLabel("Dismiss message").setStyle(ButtonStyle.Secondary)
   );
   return { ...payload, components: [...existing, dismissRow] };
 }
@@ -114,25 +115,6 @@ export async function execute(message: Message) {
 
   await message.delete().catch(() => null);
   if (!lock.notifyEnabled) return;
-
-  // Ephemeral: nothing revealing goes in the channel — just a small
-  // "click to see why" prompt whose button reply is a real Discord
-  // ephemeral message, only reachable via an interaction, scoped to the
-  // author via the button's customId.
-  if (lock.notifyEphemeral) {
-    if (isSendableChannel(message.channel)) {
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`channellockreveal:${lock.id}:${message.author.id}`).setLabel("Why was this removed?").setStyle(ButtonStyle.Secondary)
-      );
-      const sent = await message.channel
-        .send({ content: `${message.author}, your message was removed.`, components: [row] })
-        .catch(() => null);
-      if (sent && lock.notifyDeleteAfterSec > 0) {
-        setTimeout(() => sent.delete().catch(() => null), lock.notifyDeleteAfterSec * 1000);
-      }
-    }
-    return;
-  }
 
   const payload = await buildNotifyPayload(lock, `${message.author}`, message.channelId);
 
@@ -168,23 +150,4 @@ export async function handleChannelLockDismiss(interaction: ButtonInteraction, a
     return;
   }
   await interaction.message.delete().catch(() => null);
-}
-
-// The "Why was this removed?" button — only the member the notice is about
-// can reveal it; anyone else clicking gets their own small ephemeral
-// "not for you" instead of the real content.
-export async function handleChannelLockReveal(interaction: ButtonInteraction, lockId: string, authorId: string) {
-  if (interaction.user.id !== authorId) {
-    await interaction.reply({ content: "This notice isn't for you.", ephemeral: true });
-    return;
-  }
-
-  const lock = await prisma.channelLock.findUnique({ where: { id: lockId } });
-  if (!lock) {
-    await interaction.reply({ content: "This channel lock no longer exists.", ephemeral: true });
-    return;
-  }
-
-  const payload = await buildNotifyPayload(lock, `<@${authorId}>`, interaction.channelId);
-  await interaction.reply({ ...payload, ephemeral: true });
 }

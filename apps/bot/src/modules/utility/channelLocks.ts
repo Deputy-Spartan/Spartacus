@@ -1,4 +1,4 @@
-import { Events, Message } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, Events, Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
@@ -49,10 +49,14 @@ function shouldDelete(message: Message, lock: {
   return false;
 }
 
-async function buildNotifyPayload(lock: ChannelLock, message: Message) {
+// Builds the actual notice content — shared by the in-channel/DM paths
+// (which have the real deleted Message to pull {user}/{channel} from) and
+// the ephemeral reveal (which only has a channelId + userId from a button
+// click, no Message).
+async function buildNotifyPayload(lock: ChannelLock, authorMention: string, channelId: string) {
   const content = (lock.notifyContent || "{user}, that message isn't allowed in {channel}.")
-    .replace(/{user}/g, `${message.author}`)
-    .replace(/{channel}/g, `<#${message.channelId}>`);
+    .replace(/{user}/g, authorMention)
+    .replace(/{channel}/g, `<#${channelId}>`);
 
   // A saved embed overrides the whole notice (same rule as Welcome, Sticky
   // Messages, etc.) — it's static content from the shared library, so the
@@ -86,11 +90,30 @@ export async function execute(message: Message) {
   await message.delete().catch(() => null);
   if (!lock.notifyEnabled) return;
 
-  const payload = await buildNotifyPayload(lock, message);
+  // Ephemeral: nothing revealing goes in the channel — just a small
+  // "click to see why" prompt whose button reply is ephemeral (Discord's
+  // real ephemeral mechanism, only reachable via an interaction), scoped to
+  // the author via the button's customId.
+  if (lock.notifyEphemeral) {
+    if (isSendableChannel(message.channel)) {
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`channellockreveal:${lock.id}:${message.author.id}`).setLabel("Why was this removed?").setStyle(ButtonStyle.Secondary)
+      );
+      const sent = await message.channel
+        .send({ content: `${message.author}, your message was removed.`, components: [row] })
+        .catch(() => null);
+      if (sent && lock.notifyDeleteAfterSec > 0) {
+        setTimeout(() => sent.delete().catch(() => null), lock.notifyDeleteAfterSec * 1000);
+      }
+    }
+    return;
+  }
+
+  const payload = await buildNotifyPayload(lock, `${message.author}`, message.channelId);
 
   // notifyHidden is the closest real equivalent to "ephemeral" for a plain
-  // message (no interaction to reply ephemerally to) — send it as a DM
-  // instead of posting in the channel, so nobody but the author sees it.
+  // message when nothing above already covers it — send it as a DM instead
+  // of posting in-channel, so nobody but the author sees it.
   if (lock.notifyHidden) {
     const sent = await message.author.send(payload).catch(() => null); // silently drop if the member has DMs closed
     if (sent && lock.notifyDeleteAfterSec > 0) {
@@ -109,4 +132,23 @@ export async function execute(message: Message) {
   if (lock.dmUser) {
     await message.author.send(payload).catch(() => null); // silently drop if the member has DMs closed
   }
+}
+
+// The "Why was this removed?" button — only the member the notice is about
+// can reveal it; anyone else clicking gets their own small ephemeral
+// "not for you" instead of the real content.
+export async function handleChannelLockReveal(interaction: ButtonInteraction, lockId: string, authorId: string) {
+  if (interaction.user.id !== authorId) {
+    await interaction.reply({ content: "This notice isn't for you.", ephemeral: true });
+    return;
+  }
+
+  const lock = await prisma.channelLock.findUnique({ where: { id: lockId } });
+  if (!lock) {
+    await interaction.reply({ content: "This channel lock no longer exists.", ephemeral: true });
+    return;
+  }
+
+  const payload = await buildNotifyPayload(lock, `<@${authorId}>`, interaction.channelId);
+  await interaction.reply({ ...payload, ephemeral: true });
 }

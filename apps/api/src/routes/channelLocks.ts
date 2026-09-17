@@ -19,6 +19,7 @@ function buildNotifyFields(body: Record<string, unknown>) {
   return {
     notifyEnabled: Boolean(body.notifyEnabled),
     notifyHidden: Boolean(body.notifyHidden),
+    notifyEphemeral: Boolean(body.notifyEphemeral),
     notifyContent: typeof body.notifyContent === "string" ? body.notifyContent : undefined,
     notifyEmbedEnabled: Boolean(body.notifyEmbedEnabled),
     notifyEmbedTitle: typeof body.notifyEmbedTitle === "string" ? body.notifyEmbedTitle : undefined,

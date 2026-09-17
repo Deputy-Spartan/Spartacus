@@ -939,6 +939,7 @@ export interface ChannelLockRow {
   bannedWords: string[];
   notifyEnabled: boolean;
   notifyHidden: boolean;
+  notifyEphemeral: boolean;
   notifyContent: string | null;
   notifyEmbedEnabled: boolean;
   notifyEmbedTitle: string | null;
@@ -958,6 +959,7 @@ export interface ChannelLockInput {
   bannedWords: string[];
   notifyEnabled: boolean;
   notifyHidden: boolean;
+  notifyEphemeral: boolean;
   notifyContent: string | null;
   notifyEmbedEnabled: boolean;
   notifyEmbedTitle: string | null;

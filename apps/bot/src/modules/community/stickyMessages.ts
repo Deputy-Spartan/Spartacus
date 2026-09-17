@@ -19,7 +19,10 @@ const inFlight = new Set<string>(); // channelId currently mid-repost, guards ag
 // commands) — discord.js supports multiple listeners on the same event,
 // so this stays a separate, focused module rather than one giant handler.
 export async function execute(message: Message) {
-  if (message.author.bot || !message.guildId) return;
+  // Only skip the bot's own messages (its own repost of this very sticky) —
+  // other bots/apps posting in the channel (e.g. a stats bot's slash command
+  // reply) should still push the sticky back down to the bottom.
+  if (message.author.id === message.client.user?.id || !message.guildId) return;
   const enabled = await isModuleEnabled(message.guildId, "STICKY_MESSAGES");
   if (!enabled) return;
 

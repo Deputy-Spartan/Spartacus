@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type LfgCommandRow, type LfgCommandInput } from "../../../../lib/api";
+
+const MESSAGE_TOKENS = [
+  { token: "{user}", description: "Mentions the member who ran the command" },
+  { token: "{voice}", description: "Mentions the voice channel they're currently in" },
+  { token: "{message}", description: "Whatever the sender typed after the command, shown to everyone" },
+];
+
+const WRONG_CHANNEL_TOKENS = [{ token: "{channel}", description: "Mentions the locked channel this command is restricted to" }];
 
 const EMPTY: LfgCommandInput = {
   trigger: "",
@@ -33,6 +42,8 @@ const EMPTY: LfgCommandInput = {
 export default function LfgPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
   const confirm = useConfirm();
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+  const wrongChannelRef = useRef<HTMLTextAreaElement>(null);
   const [rows, setRows] = useState<LfgCommandRow[] | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -213,15 +224,16 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
           <div className="mb-4">
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Announcement Message</label>
             <textarea
+              ref={messageRef}
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 font-mono"
               value={form.message ?? ""}
               onChange={(e) => setForm({ ...form, message: e.target.value })}
               placeholder="{user} is looking for a group in {voice}! {message}"
             />
-            <p className="text-xs text-slate-600 mt-1.5">
-              Tokens: <code className="text-slate-400">{"{user}"}</code> <code className="text-slate-400">{"{voice}"}</code>{" "}
-              <code className="text-slate-400">{"{message}"}</code> — <code className="text-slate-400">{"{message}"}</code> is whatever the
-              sender typed after the command, shown to everyone. Used when no saved embed is selected above.
+            <PlaceholderExamples items={MESSAGE_TOKENS} inputRef={messageRef} value={form.message ?? ""} onChange={(v) => setForm({ ...form, message: v })} />
+            <p className="text-xs text-slate-600 -mt-2">
+              <code className="text-slate-400">{"{message}"}</code> is whatever the sender typed after the command, shown to everyone. Used when no saved
+              embed is selected above.
             </p>
           </div>
 
@@ -241,13 +253,17 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
               Wrong-channel message (hidden — shown if used outside the locked channel)
             </label>
             <textarea
+              ref={wrongChannelRef}
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-16"
               value={form.wrongChannelMessage ?? ""}
               onChange={(e) => setForm({ ...form, wrongChannelMessage: e.target.value })}
             />
-            <p className="text-xs text-slate-600 mt-1.5">
-              <code className="text-slate-400">{"{channel}"}</code> inserts the locked channel's name.
-            </p>
+            <PlaceholderExamples
+              items={WRONG_CHANNEL_TOKENS}
+              inputRef={wrongChannelRef}
+              value={form.wrongChannelMessage ?? ""}
+              onChange={(v) => setForm({ ...form, wrongChannelMessage: v })}
+            />
           </div>
 
           <button onClick={save} disabled={saving} className="neon-button disabled:opacity-50">

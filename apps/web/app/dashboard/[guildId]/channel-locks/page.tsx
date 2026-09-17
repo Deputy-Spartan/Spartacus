@@ -329,12 +329,37 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 onChange={(v) => setForm({ ...form, notifyEnabled: v })}
               />
               {form.notifyEnabled && (
-                <Row
-                  label="Hide the notice"
-                  hint="Discord has no true 'only you can see this' for a regular message — the closest equivalent is sending it as a DM instead of posting it in the channel, so no one else sees it."
-                  enabled={form.notifyHidden}
-                  onChange={(v) => setForm({ ...form, notifyHidden: v })}
-                />
+                <div className="pt-3">
+                  <p className="text-sm text-slate-200 mb-1">Where the notice goes</p>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Discord has no true "only you can see this" for a regular message — Hide sends it as a DM instead of posting it in the channel, so no
+                    one else sees it.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, notifyHidden: false })}
+                      className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
+                        !form.notifyHidden
+                          ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
+                          : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
+                      }`}
+                    >
+                      Show in channel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, notifyHidden: true })}
+                      className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
+                        form.notifyHidden
+                          ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
+                          : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
+                      }`}
+                    >
+                      Hide (DM only)
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 

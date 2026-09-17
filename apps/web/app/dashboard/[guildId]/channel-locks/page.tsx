@@ -412,7 +412,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                   <p className="text-sm text-slate-200 mb-1">Where the notice goes</p>
                   <p className="text-xs text-slate-500 mb-3">
                     Discord has no true "only you can see this" for a regular message — Hide sends it as a DM instead of posting it in the channel, so no
-                    one else sees it.
+                    one else sees it. Shown in channel, it includes a Dismiss button only the affected member can use to close it early.
                   </p>
                   <div className="flex gap-2">
                     <button

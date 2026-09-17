@@ -322,6 +322,15 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("channellockdismiss:")) {
+    // No module-disabled guard on purpose — dismissing a notice that already
+    // posted can't bypass the lock either way.
+    const authorId = interaction.customId.split(":")[1];
+    const { handleChannelLockDismiss } = await import("../modules/utility/channelLocks");
+    await handleChannelLockDismiss(interaction, authorId);
+    return;
+  }
+
   if (interaction.customId.startsWith("applicationpanel:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "APPLICATIONS");
     if (!enabled) {

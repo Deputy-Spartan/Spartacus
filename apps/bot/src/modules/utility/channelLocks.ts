@@ -1,4 +1,4 @@
-import { Events, Message } from "discord.js";
+import { ActionRowBuilder, BaseMessageOptions, ButtonBuilder, ButtonInteraction, ButtonStyle, Events, Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
@@ -85,6 +85,19 @@ async function buildNotifyPayload(lock: ChannelLock, message: Message) {
   );
 }
 
+// Adds a "Dismiss" button only the affected member can use — anyone else
+// clicking gets a small "not for you" instead of being able to close it
+// early for someone else. Skipped if the payload is already at Discord's
+// 5-action-row cap (only possible via a saved embed with 5 rows of its own).
+function withDismissButton(payload: BaseMessageOptions, authorId: string): BaseMessageOptions {
+  const existing = Array.isArray(payload.components) ? payload.components : [];
+  if (existing.length >= 5) return payload;
+  const dismissRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`channellockdismiss:${authorId}`).setLabel("Dismiss").setStyle(ButtonStyle.Secondary)
+  );
+  return { ...payload, components: [...existing, dismissRow] };
+}
+
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId) return;
 
@@ -113,7 +126,7 @@ export async function execute(message: Message) {
   }
 
   if (isSendableChannel(message.channel)) {
-    const sent = await message.channel.send(payload).catch(() => null);
+    const sent = await message.channel.send(withDismissButton(payload, message.author.id)).catch(() => null);
     if (sent && lock.notifyDeleteAfterSec > 0) {
       setTimeout(() => sent.delete().catch(() => null), lock.notifyDeleteAfterSec * 1000);
     }
@@ -122,4 +135,15 @@ export async function execute(message: Message) {
   if (lock.dmUser) {
     await message.author.send(payload).catch(() => null); // silently drop if the member has DMs closed
   }
+}
+
+// The in-channel notice's "Dismiss" button — only the member the notice is
+// about can use it to close it early; anyone else gets their own small
+// "not for you" instead of being able to dismiss it for someone else.
+export async function handleChannelLockDismiss(interaction: ButtonInteraction, authorId: string) {
+  if (interaction.user.id !== authorId) {
+    await interaction.reply({ content: "This notice isn't for you.", ephemeral: true });
+    return;
+  }
+  await interaction.message.delete().catch(() => null);
 }

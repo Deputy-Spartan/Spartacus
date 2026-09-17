@@ -40,6 +40,8 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     bannedWords,
     allowedUserIds,
     allowedRoleIds,
+    notifyEnabled,
+    notifyContent,
   } = req.body;
 
   const data = {
@@ -55,6 +57,8 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     bannedWords: sanitizeStringList(bannedWords),
     allowedUserIds: sanitizeStringList(allowedUserIds),
     allowedRoleIds: sanitizeStringList(allowedRoleIds),
+    notifyEnabled: Boolean(notifyEnabled),
+    notifyContent: typeof notifyContent === "string" ? notifyContent : undefined,
   };
 
   const row = await prisma.channelLock.upsert({
@@ -82,6 +86,8 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
     bannedWords,
     allowedUserIds,
     allowedRoleIds,
+    notifyEnabled,
+    notifyContent,
   } = req.body;
   const row = await prisma.channelLock.update({
     where: { id: req.params.id },
@@ -96,6 +102,8 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
       bannedWords: sanitizeStringList(bannedWords),
       allowedUserIds: sanitizeStringList(allowedUserIds),
       allowedRoleIds: sanitizeStringList(allowedRoleIds),
+      notifyEnabled: Boolean(notifyEnabled),
+      notifyContent: typeof notifyContent === "string" ? notifyContent : undefined,
     },
   });
   res.json(row);

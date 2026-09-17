@@ -326,6 +326,15 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("channellockreveal:")) {
+    // No module-disabled guard on purpose — the reveal carries no ability
+    // to bypass the lock that triggered it either way.
+    const revealParts = interaction.customId.split(":");
+    const { handleChannelLockReveal } = await import("../modules/utility/channelLocks");
+    await handleChannelLockReveal(interaction, revealParts[1], revealParts[2]);
+    return;
+  }
+
   if (interaction.customId.startsWith("applicationpanel:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "APPLICATIONS");
     if (!enabled) {

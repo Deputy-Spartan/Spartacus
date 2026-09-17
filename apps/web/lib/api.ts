@@ -940,6 +940,8 @@ export interface ChannelLockRow {
   bannedWords: string[];
   allowedUserIds: string[];
   allowedRoleIds: string[];
+  notifyEnabled: boolean;
+  notifyContent: string | null;
 }
 export interface ChannelLockInput {
   allowImages: boolean;
@@ -952,6 +954,8 @@ export interface ChannelLockInput {
   bannedWords: string[];
   allowedUserIds: string[];
   allowedRoleIds: string[];
+  notifyEnabled: boolean;
+  notifyContent: string | null;
 }
 
 export function buildBotInviteUrl(clientId: string, guildId?: string) {

@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { api, type ChannelLockInput, type ChannelLockRow, type DiscordChannelOption, type DiscordRoleOption } from "../../../../lib/api";
+
+const NOTIFY_TOKENS = [
+  { token: "{user}", description: "Mentions the member whose message was removed" },
+  { token: "{channel}", description: "Mentions the channel the message was removed from" },
+];
 
 const EMPTY_FORM: ChannelLockInput = {
   allowImages: true,
@@ -21,6 +27,8 @@ const EMPTY_FORM: ChannelLockInput = {
   bannedWords: [],
   allowedUserIds: [],
   allowedRoleIds: [],
+  notifyEnabled: false,
+  notifyContent: "{user}, that message isn't allowed in {channel}.",
 };
 
 function Row({ label, hint, enabled, onChange }: { label: string; hint: string; enabled: boolean; onChange: (v: boolean) => void }) {
@@ -131,6 +139,7 @@ function TagList({
 
 export default function ChannelLocksPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
+  const notifyContentRef = useRef<HTMLTextAreaElement>(null);
   const [rows, setRows] = useState<ChannelLockRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -175,6 +184,8 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       bannedWords: row.bannedWords,
       allowedUserIds: row.allowedUserIds,
       allowedRoleIds: row.allowedRoleIds,
+      notifyEnabled: row.notifyEnabled,
+      notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
     });
     setError(null);
     setShowEditor(true);
@@ -241,6 +252,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                           .filter(Boolean)
                           .join(" · ") || "no restrictions"}
                     {r.allowedUserIds.length + r.allowedRoleIds.length > 0 ? ` · restricted to ${r.allowedUserIds.length + r.allowedRoleIds.length} sender(s)` : ""}
+                    {r.notifyEnabled ? " · notifies on delete" : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -366,6 +378,33 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 <p className="text-xs text-slate-500 mb-1">Allowed Users / Bots (paste an ID)</p>
                 <TagList values={form.allowedUserIds} onChange={(v) => setForm({ ...form, allowedUserIds: v })} placeholder="Right-click → Copy ID" />
               </div>
+            </div>
+
+            <div className="pt-4 border-t border-white/5 mb-4">
+              <Row
+                label="Notify on delete"
+                hint="Posts a button when a message is removed — clicking it reveals your message below as a real Discord ephemeral reply, visible only to the member who clicked."
+                enabled={form.notifyEnabled}
+                onChange={(v) => setForm({ ...form, notifyEnabled: v })}
+              />
+              {form.notifyEnabled && (
+                <div className="pt-3">
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Notice Message</label>
+                  <textarea
+                    ref={notifyContentRef}
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    rows={2}
+                    value={form.notifyContent ?? ""}
+                    onChange={(e) => setForm({ ...form, notifyContent: e.target.value })}
+                  />
+                  <PlaceholderExamples
+                    items={NOTIFY_TOKENS}
+                    inputRef={notifyContentRef}
+                    value={form.notifyContent ?? ""}
+                    onChange={(v) => setForm({ ...form, notifyContent: v })}
+                  />
+                </div>
+              )}
             </div>
 
             <button onClick={save} className="neon-button">

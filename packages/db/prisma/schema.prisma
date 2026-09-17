@@ -1091,6 +1091,16 @@ model ChannelLock {
   allowedUserIds    Json     @default("[]")
   allowedRoleIds    Json     @default("[]")
 
+  // When a regular message gets deleted for breaking one of the rules
+  // above, this posts a small button in-channel; clicking it (only the
+  // affected member can meaningfully do so) reveals notifyContent as a
+  // real Discord ephemeral reply — the same "Only you can see this ·
+  // Dismiss message" treatment Discord gives a slash command's ephemeral
+  // reply, which is otherwise impossible for a plain message with no
+  // interaction attached to it.
+  notifyEnabled Boolean @default(false)
+  notifyContent String? @default("{user}, that message isn't allowed in {channel}.")
+
   createdAt         DateTime @default(now())
 }
 

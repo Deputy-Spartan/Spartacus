@@ -1,6 +1,7 @@
-import { Events, Message } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, Events, Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
+import { isSendableChannel } from "../../lib/channels";
 
 export const name = Events.MessageCreate;
 
@@ -58,6 +59,12 @@ function shouldDelete(message: Message, lock: {
   return false;
 }
 
+function buildNoticeText(notifyContent: string | null, authorMention: string, channelId: string): string {
+  return (notifyContent || "{user}, that message isn't allowed in {channel}.")
+    .replace(/{user}/g, authorMention)
+    .replace(/{channel}/g, `<#${channelId}>`);
+}
+
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId) return;
 
@@ -70,4 +77,32 @@ export async function execute(message: Message) {
   if (!shouldDelete(message, lock)) return;
 
   await message.delete().catch(() => null);
+  if (!lock.notifyEnabled || !isSendableChannel(message.channel)) return;
+
+  // A plain deleted message carries no interaction, and Discord's ephemeral
+  // flag only ever attaches to a reply to one — so this button click is
+  // what manufactures that interaction. Clicking it is the only way to get
+  // the real "Only you can see this · Dismiss message" treatment here.
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`channellockreveal:${lock.id}:${message.author.id}`).setLabel("Why was this removed?").setStyle(ButtonStyle.Secondary)
+  );
+  await message.channel.send({ content: `${message.author}, your message was removed.`, components: [row] }).catch(() => null);
+}
+
+// The "Why was this removed?" button — only the member the notice is about
+// can reveal it; anyone else clicking gets their own small ephemeral
+// "not for you" instead of the real content.
+export async function handleChannelLockReveal(interaction: ButtonInteraction, lockId: string, authorId: string) {
+  if (interaction.user.id !== authorId) {
+    await interaction.reply({ content: "This notice isn't for you.", ephemeral: true });
+    return;
+  }
+
+  const lock = await prisma.channelLock.findUnique({ where: { id: lockId } });
+  if (!lock) {
+    await interaction.reply({ content: "This channel lock no longer exists.", ephemeral: true });
+    return;
+  }
+
+  await interaction.reply({ content: buildNoticeText(lock.notifyContent, `<@${authorId}>`, interaction.channelId), ephemeral: true });
 }

@@ -942,6 +942,7 @@ export interface ChannelLockRow {
   allowedRoleIds: string[];
   notifyEnabled: boolean;
   notifyHidden: boolean;
+  notifyEphemeral: boolean;
   notifyContent: string | null;
   notifyEmbedEnabled: boolean;
   notifyEmbedTitle: string | null;
@@ -964,6 +965,7 @@ export interface ChannelLockInput {
   allowedRoleIds: string[];
   notifyEnabled: boolean;
   notifyHidden: boolean;
+  notifyEphemeral: boolean;
   notifyContent: string | null;
   notifyEmbedEnabled: boolean;
   notifyEmbedTitle: string | null;

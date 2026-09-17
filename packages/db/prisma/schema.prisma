@@ -1091,13 +1091,17 @@ model ChannelLock {
   allowedUserIds    Json     @default("[]")
   allowedRoleIds    Json     @default("[]")
 
-  // Deletion notice — posted in-channel and/or DMed to the author when their
-  // message gets removed for violating this lock. notifyHidden switches the
-  // in-channel post off entirely in favor of a DM — the closest real
-  // equivalent to "ephemeral" for a plain (non-interaction) message, since
-  // Discord has no true ephemeral concept outside an interaction reply.
+  // Deletion notice — posted in-channel, DMed, or revealed ephemerally when
+  // their message gets removed for violating this lock. notifyHidden (DM)
+  // and notifyEphemeral are mutually exclusive alternatives to the plain
+  // in-channel post — Discord has no true ephemeral concept outside an
+  // interaction reply, so notifyEphemeral posts a small "click to see why"
+  // button in-channel and only the clicking member ever sees the real
+  // notice, via an ephemeral interaction reply (Discord's own "Only you can
+  // see this · Dismiss message" UI).
   notifyEnabled      Boolean  @default(false)
   notifyHidden       Boolean  @default(false)
+  notifyEphemeral    Boolean  @default(false)
   notifyContent      String?  @default("{user}, that message isn't allowed in {channel}.")
   notifyEmbedEnabled Boolean  @default(false)
   notifyEmbedTitle   String?

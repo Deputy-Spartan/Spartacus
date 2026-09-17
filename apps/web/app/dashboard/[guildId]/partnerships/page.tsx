@@ -15,8 +15,11 @@ interface PartnershipRow {
   since: string;
 }
 
+type Tab = "active" | "create";
+
 export default function PartnershipsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
+  const [tab, setTab] = useState<Tab>("active");
   const [rows, setRows] = useState<PartnershipRow[]>([]);
   const [partnerName, setPartnerName] = useState("");
   const [partnerInvite, setPartnerInvite] = useState("");
@@ -28,6 +31,13 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
   }
   useEffect(refresh, [params.guildId]);
 
+  function resetDraft() {
+    setPartnerName("");
+    setPartnerInvite("");
+    setType("Ad Exchange");
+    setError(null);
+  }
+
   async function add() {
     if (!partnerName) {
       setError("Enter the partner server's name before adding.");
@@ -35,8 +45,8 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
     }
     setError(null);
     await api.addPartnership(params.guildId, { partnerName, partnerInvite, type });
-    setPartnerName("");
-    setPartnerInvite("");
+    resetDraft();
+    setTab("active");
     refresh();
   }
 
@@ -51,29 +61,64 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
       <h1 className="text-2xl font-bold mb-1">Server Partnerships</h1>
       <p className="text-slate-400 mb-6">Track cross-promotion agreements with other servers.</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <NeonCard>
-          <p className="font-medium mb-3">Partners</p>
-          {rows.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
-          <div className="divide-y divide-white/5">
-            {rows.map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2.5 text-sm">
-                <div>
-                  <p className="font-medium">{r.partnerName}</p>
-                  <p className="text-xs text-slate-500">
-                    {r.type} · since {new Date(r.since).toLocaleDateString()}
-                  </p>
-                </div>
-                <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs">
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        </NeonCard>
+      <div className="flex gap-1 mb-5 border-b border-white/5">
+        <button
+          onClick={() => setTab("active")}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          Active Partnerships
+        </button>
+        <button
+          onClick={() => {
+            resetDraft();
+            setTab("create");
+          }}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "create" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          + Create New
+        </button>
+      </div>
 
-        <NeonCard>
-          <p className="font-medium mb-3">Add Partner</p>
+      {tab === "active" &&
+        (rows.length === 0 ? (
+          <NeonCard>
+            <div className="text-center py-10">
+              <p className="text-sm text-slate-400 mb-1">No partnerships yet.</p>
+              <p className="text-xs text-slate-600 mb-4">Add one to track a cross-promotion agreement with another server.</p>
+              <button onClick={() => setTab("create")} className="neon-button-sm">
+                + Create New
+              </button>
+            </div>
+          </NeonCard>
+        ) : (
+          <NeonCard>
+            <div className="divide-y divide-white/5">
+              {rows.map((r) => (
+                <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{r.partnerName}</p>
+                    <p className="text-xs text-slate-500">
+                      {r.type} · since {new Date(r.since).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </NeonCard>
+        ))}
+
+      {tab === "create" && (
+        <NeonCard className="max-w-lg">
+          <p className="font-medium mb-3">New Partnership</p>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Partner Server Name
             <Required />
@@ -99,12 +144,12 @@ export default function PartnershipsPage({ params }: { params: { guildId: string
             <option>Full Alliance</option>
             <option>Content Partner</option>
           </select>
-          <button onClick={add} className="neon-button">
-            Add Partner
+          <button onClick={add} disabled={!partnerName} className="neon-button disabled:opacity-50">
+            Create Partnership
           </button>
           <FormError message={error} />
         </NeonCard>
-      </div>
+      )}
     </div>
   );
 }

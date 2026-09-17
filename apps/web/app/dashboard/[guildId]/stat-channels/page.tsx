@@ -9,6 +9,8 @@ import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { api, type DiscordChannelOption, type StatChannelRow } from "../../../../lib/api";
 
+type Tab = "active" | "create";
+
 const STAT_TYPES = [
   { value: "MEMBER_COUNT", label: "Member Count" },
   { value: "BOOST_COUNT", label: "Boost Count" },
@@ -17,6 +19,7 @@ const STAT_TYPES = [
 
 export default function StatChannelsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
+  const [tab, setTab] = useState<Tab>("active");
   const [rows, setRows] = useState<StatChannelRow[]>([]);
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -36,6 +39,13 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
     return c.categoryName ? `${c.categoryName} / #${c.name}` : `#${c.name}`;
   }
 
+  function resetDraft() {
+    setChannelId(null);
+    setStatType("MEMBER_COUNT");
+    setFormat("{stat}: {count}");
+    setError(null);
+  }
+
   async function add() {
     if (!channelId) {
       setError("Select a voice channel before adding.");
@@ -43,7 +53,8 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
     }
     setError(null);
     await api.addStatChannel(params.guildId, channelId, statType, format);
-    setChannelId(null);
+    resetDraft();
+    setTab("active");
     refresh();
   }
 
@@ -62,28 +73,63 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
         description="Renames a voice channel to show a live count — Discord limits renames to about once every 5 minutes, so updates every 10 minutes."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <NeonCard>
-          <p className="font-medium mb-3">Active Stat Channels</p>
-          {rows.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
-          <div className="divide-y divide-white/5">
-            {rows.map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-                <div className="min-w-0">
-                  <span className="text-slate-300 truncate block">{channelLabel(r.channelId)}</span>
-                  <span className="text-slate-600 text-xs">
-                    {STAT_TYPES.find((t) => t.value === r.statType)?.label} — "{r.format}"
-                  </span>
-                </div>
-                <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        </NeonCard>
+      <div className="flex gap-1 mb-5 border-b border-white/5">
+        <button
+          onClick={() => setTab("active")}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          Active Stat Channels
+        </button>
+        <button
+          onClick={() => {
+            resetDraft();
+            setTab("create");
+          }}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "create" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          + Create New
+        </button>
+      </div>
 
-        <NeonCard>
+      {tab === "active" &&
+        (rows.length === 0 ? (
+          <NeonCard>
+            <div className="text-center py-10">
+              <p className="text-sm text-slate-400 mb-1">No stat channels yet.</p>
+              <p className="text-xs text-slate-600 mb-4">Create one to show a live count in a voice channel's name.</p>
+              <button onClick={() => setTab("create")} className="neon-button-sm">
+                + Create New
+              </button>
+            </div>
+          </NeonCard>
+        ) : (
+          <NeonCard>
+            <div className="divide-y divide-white/5">
+              {rows.map((r) => (
+                <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                  <div className="min-w-0">
+                    <span className="text-slate-300 truncate block">{channelLabel(r.channelId)}</span>
+                    <span className="text-slate-600 text-xs">
+                      {STAT_TYPES.find((t) => t.value === r.statType)?.label} — "{r.format}"
+                    </span>
+                  </div>
+                  <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </NeonCard>
+        ))}
+
+      {tab === "create" && (
+        <NeonCard className="max-w-lg">
           <p className="font-medium mb-3">New Stat Channel</p>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Channel
@@ -115,11 +161,11 @@ export default function StatChannelsPage({ params }: { params: { guildId: string
           </p>
 
           <button onClick={add} disabled={!channelId} className="neon-button disabled:opacity-50">
-            Add Stat Channel
+            Create Stat Channel
           </button>
           <FormError message={error} />
         </NeonCard>
-      </div>
+      )}
     </div>
   );
 }

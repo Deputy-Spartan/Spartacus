@@ -13,6 +13,8 @@ import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { api, type StickyMessageInput, type StickyMessageRow } from "../../../../lib/api";
 
+type Tab = "active" | "create";
+
 const EMPTY_FORM: StickyMessageInput = {
   content: "",
   embedEnabled: false,
@@ -24,30 +26,98 @@ const EMPTY_FORM: StickyMessageInput = {
   savedEmbedId: null,
 };
 
+// The full field set — shared by the Active tab's inline editor and the
+// Create tab's fresh draft, wired to whichever value/onChange the caller
+// passes in.
+function StickyFields({
+  guildId,
+  channelId,
+  onChannelChange,
+  channelLocked,
+  form,
+  onChange,
+}: {
+  guildId: string;
+  channelId: string | null;
+  onChannelChange: (id: string | null) => void;
+  channelLocked: boolean;
+  form: StickyMessageInput;
+  onChange: (patch: Partial<StickyMessageInput>) => void;
+}) {
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  return (
+    <>
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+        Channel
+        <Required />
+      </label>
+      <ChannelSelect
+        guildId={guildId}
+        value={channelId}
+        onChange={onChannelChange}
+        kind="text"
+        placeholder={channelLocked ? undefined : "Select a channel…"}
+      />
+      {channelLocked && <p className="text-xs text-slate-600 -mt-3 mb-4">Channel can't be changed once created.</p>}
+
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
+      <MarkdownToolbar guildId={guildId} textareaRef={contentRef} value={form.content} onChange={(v) => onChange({ content: v })} />
+      <textarea
+        ref={contentRef}
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 min-h-20"
+        value={form.content}
+        onChange={(e) => onChange({ content: e.target.value })}
+      />
+
+      <div className="mb-4">
+        <ButtonsEditor guildId={guildId} buttons={form.buttons} onChange={(next) => onChange({ buttons: next })} />
+      </div>
+
+      <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => onChange({ savedEmbedId: id })} />
+
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
+      <div className="mb-4">
+        {form.savedEmbedId && <p className="text-xs text-slate-600 mb-2">Preview reflects the saved embed once sent.</p>}
+        <StickyPreview
+          content={form.content}
+          embedEnabled={false}
+          embedTitle=""
+          embedDescription=""
+          embedColor="#5865F2"
+          buttons={form.buttons}
+          embedExtra={{}}
+        />
+      </div>
+    </>
+  );
+}
+
 export default function StickyMessagesPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
+  const [tab, setTab] = useState<Tab>("active");
   const [rows, setRows] = useState<StickyMessageRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
   const [form, setForm] = useState<StickyMessageInput>(EMPTY_FORM);
-  const [showEditor, setShowEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  const [draftChannelId, setDraftChannelId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<StickyMessageInput>(EMPTY_FORM);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   function refresh() {
     api.getStickyMessages(params.guildId).then(setRows);
   }
   useEffect(refresh, [params.guildId]);
 
-  function startCreate() {
-    setEditingId(null);
-    setChannelId(null);
-    setForm(EMPTY_FORM);
-    setError(null);
-    setShowEditor(true);
+  function resetDraft() {
+    setDraftChannelId(null);
+    setDraft(EMPTY_FORM);
+    setCreateError(null);
   }
 
-  function startEdit(row: StickyMessageRow) {
+  function openEdit(row: StickyMessageRow) {
     setEditingId(row.id);
     setChannelId(row.channelId);
     setForm({
@@ -61,29 +131,38 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
       savedEmbedId: row.savedEmbedId ?? null,
     });
     setError(null);
-    setShowEditor(true);
   }
 
-  async function save() {
+  async function saveEdit() {
+    if (!editingId) return;
     const hasContent = !!form.content.trim() || !!form.embedTitle?.trim() || !!form.embedDescription?.trim();
-    if (!channelId || !hasContent) {
-      setError("Select a channel and fill in at least one message field before saving.");
+    if (!hasContent) {
+      setError("Fill in at least one message field before saving.");
       return;
     }
     setError(null);
-    if (editingId) {
-      await api.updateStickyMessage(params.guildId, editingId, form);
-    } else {
-      await api.addStickyMessage(params.guildId, channelId, form);
+    await api.updateStickyMessage(params.guildId, editingId, form);
+    setEditingId(null);
+    refresh();
+  }
+
+  async function create() {
+    const hasContent = !!draft.content.trim() || !!draft.embedTitle?.trim() || !!draft.embedDescription?.trim();
+    if (!draftChannelId || !hasContent) {
+      setCreateError("Select a channel and fill in at least one message field before saving.");
+      return;
     }
-    setShowEditor(false);
+    setCreateError(null);
+    await api.addStickyMessage(params.guildId, draftChannelId, draft);
+    resetDraft();
+    setTab("active");
     refresh();
   }
 
   async function remove(id: string) {
     if (!(await confirm("Delete this sticky message?"))) return;
     await api.deleteStickyMessage(params.guildId, id);
-    if (editingId === id) setShowEditor(false);
+    if (editingId === id) setEditingId(null);
     refresh();
   }
 
@@ -103,106 +182,105 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
         description="The bot reposts this message to the bottom of the channel every time someone else sends a message there."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <NeonCard>
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-medium">Active Stickies</p>
-            <button onClick={startCreate} className="neon-button-sm">
-              + New Sticky
-            </button>
-          </div>
-          {rows.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
-          <div className="divide-y divide-white/5">
-            {rows.map((r) => (
-              <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-                <div className="min-w-0">
-                  <span className="text-slate-400 truncate block">{r.embedTitle || r.content}</span>
-                  <span className="text-slate-600 text-xs">
-                    {r.embedEnabled && "Embed"}
-                    {r.embedEnabled && r.buttons.length > 0 && " · "}
-                    {r.buttons.length > 0 && `${r.buttons.length} button${r.buttons.length === 1 ? "" : "s"}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => resend(r.id)} disabled={resendingId === r.id} className="text-slate-500 hover:text-neon-blue text-xs disabled:opacity-50">
-                    {resendingId === r.id ? "Resending…" : "Resend"}
-                  </button>
-                  <button onClick={() => startEdit(r)} className="text-slate-500 hover:text-neon-blue text-xs">
-                    Edit
-                  </button>
-                  <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs">
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </NeonCard>
+      <div className="flex gap-1 mb-5 border-b border-white/5">
+        <button
+          onClick={() => setTab("active")}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          Active Stickies
+        </button>
+        <button
+          onClick={() => {
+            resetDraft();
+            setTab("create");
+          }}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "create" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          + Create New
+        </button>
+      </div>
 
-        {showEditor && (
+      {tab === "active" &&
+        (rows.length === 0 ? (
           <NeonCard>
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-medium">{editingId ? "Edit Sticky" : "Add Sticky"}</p>
-              <button onClick={() => setShowEditor(false)} className="text-slate-500 hover:text-slate-300 text-xs">
-                Close
+            <div className="text-center py-10">
+              <p className="text-sm text-slate-400 mb-1">No sticky messages yet.</p>
+              <p className="text-xs text-slate-600 mb-4">Create one to keep a message pinned to the bottom of a channel.</p>
+              <button onClick={() => setTab("create")} className="neon-button-sm">
+                + Create New
               </button>
             </div>
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-              Channel
-              <Required />
-            </label>
-            <ChannelSelect
-              guildId={params.guildId}
-              value={channelId}
-              onChange={setChannelId}
-              kind="text"
-              placeholder={editingId ? undefined : "Select a channel…"}
-            />
-            {editingId && <p className="text-xs text-slate-600 -mt-3 mb-4">Channel can't be changed once created.</p>}
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
-            <MarkdownToolbar guildId={params.guildId} textareaRef={contentRef} value={form.content} onChange={(v) => setForm({ ...form, content: v })} />
-            <textarea
-              ref={contentRef}
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 min-h-20"
-              value={form.content}
-              onChange={(e) => setForm({ ...form, content: e.target.value })}
-            />
-
-            <div className="mb-4">
-              <ButtonsEditor guildId={params.guildId} buttons={form.buttons} onChange={(next) => setForm({ ...form, buttons: next })} />
-            </div>
-
-            <SavedEmbedPicker
-              guildId={params.guildId}
-              value={form.savedEmbedId ?? null}
-              onChange={(id) => setForm({ ...form, savedEmbedId: id })}
-            />
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
-            <div className="mb-4">
-              {form.savedEmbedId && (
-                <p className="text-xs text-slate-600 mb-2">Preview reflects the saved embed once sent.</p>
-              )}
-              <StickyPreview
-                content={form.content}
-                embedEnabled={false}
-                embedTitle=""
-                embedDescription=""
-                embedColor="#5865F2"
-                buttons={form.buttons}
-                embedExtra={{}}
-              />
-            </div>
-
-            <button onClick={save} className="neon-button">
-              {editingId ? "Save Changes" : "Set Sticky"}
-            </button>
-            <FormError message={error} />
           </NeonCard>
-        )}
-      </div>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((r) => (
+              <NeonCard key={r.id}>
+                <div className="flex items-center justify-between gap-3">
+                  <button className="min-w-0 flex-1 text-left" onClick={() => (editingId === r.id ? setEditingId(null) : openEdit(r))}>
+                    <span className="text-slate-300 truncate block">{r.embedTitle || r.content}</span>
+                    <span className="text-slate-600 text-xs">
+                      {r.embedEnabled && "Embed"}
+                      {r.embedEnabled && r.buttons.length > 0 && " · "}
+                      {r.buttons.length > 0 && `${r.buttons.length} button${r.buttons.length === 1 ? "" : "s"}`}
+                    </span>
+                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button onClick={() => resend(r.id)} disabled={resendingId === r.id} className="text-slate-500 hover:text-neon-blue text-xs disabled:opacity-50">
+                      {resendingId === r.id ? "Resending…" : "Resend"}
+                    </button>
+                    <button onClick={() => (editingId === r.id ? setEditingId(null) : openEdit(r))} className="text-slate-500 hover:text-neon-blue text-xs">
+                      {editingId === r.id ? "Close" : "Edit"}
+                    </button>
+                    <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                {editingId === r.id && (
+                  <div className="mt-4 pt-4 border-t border-white/5">
+                    <StickyFields
+                      guildId={params.guildId}
+                      channelId={channelId}
+                      onChannelChange={setChannelId}
+                      channelLocked
+                      form={form}
+                      onChange={(patch) => setForm({ ...form, ...patch })}
+                    />
+                    <button onClick={saveEdit} className="neon-button">
+                      Save Changes
+                    </button>
+                    <FormError message={error} />
+                  </div>
+                )}
+              </NeonCard>
+            ))}
+          </div>
+        ))}
+
+      {tab === "create" && (
+        <NeonCard>
+          <p className="font-medium mb-3">Add Sticky</p>
+          <StickyFields
+            guildId={params.guildId}
+            channelId={draftChannelId}
+            onChannelChange={setDraftChannelId}
+            channelLocked={false}
+            form={draft}
+            onChange={(patch) => setDraft({ ...draft, ...patch })}
+          />
+          <button onClick={create} className="neon-button">
+            Set Sticky
+          </button>
+          <FormError message={createError} />
+        </NeonCard>
+      )}
     </div>
   );
 }

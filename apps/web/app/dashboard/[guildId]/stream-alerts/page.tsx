@@ -8,8 +8,11 @@ import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { api, type StreamSubscription } from "../../../../lib/api";
 
+type Tab = "active" | "create";
+
 export default function StreamAlertsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
+  const [tab, setTab] = useState<Tab>("active");
   const [subs, setSubs] = useState<StreamSubscription[]>([]);
   const [platform, setPlatform] = useState<"twitch" | "youtube">("twitch");
   const [channelName, setChannelName] = useState("");
@@ -22,6 +25,13 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
 
   useEffect(refresh, [params.guildId]);
 
+  function resetDraft() {
+    setPlatform("twitch");
+    setChannelName("");
+    setAnnounceChannelId("");
+    setError(null);
+  }
+
   async function add() {
     if (!channelName || !announceChannelId) {
       setError("Enter a channel name and an announce channel ID before adding.");
@@ -29,8 +39,8 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
     }
     setError(null);
     await api.addStreamSubscription(params.guildId, { platform, channelName, announceChannelId });
-    setChannelName("");
-    setAnnounceChannelId("");
+    resetDraft();
+    setTab("active");
     refresh();
   }
 
@@ -49,35 +59,70 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
         description="Ping a channel the moment a subscribed creator goes live."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <NeonCard>
-          <p className="font-medium mb-3">Subscriptions</p>
-          {subs.length === 0 && <p className="text-sm text-slate-500">No subscriptions yet.</p>}
-          <div className="divide-y divide-white/5">
-            {subs.map((sub) => (
-              <div key={sub.id} className="flex items-center justify-between py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{sub.channelName}</p>
-                  <p className="text-xs text-slate-500 capitalize">{sub.platform}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  {sub.isLive ? (
-                    <span className="text-xs font-semibold text-rose-400 border border-rose-400/40 rounded px-2 py-0.5">
-                      LIVE
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-500">Offline</span>
-                  )}
-                  <button onClick={() => remove(sub.id)} className="text-slate-500 hover:text-rose-400 text-xs">
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </NeonCard>
+      <div className="flex gap-1 mb-5 border-b border-white/5">
+        <button
+          onClick={() => setTab("active")}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          Active Subscriptions
+        </button>
+        <button
+          onClick={() => {
+            resetDraft();
+            setTab("create");
+          }}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "create" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          + Create New
+        </button>
+      </div>
 
-        <NeonCard>
+      {tab === "active" &&
+        (subs.length === 0 ? (
+          <NeonCard>
+            <div className="text-center py-10">
+              <p className="text-sm text-slate-400 mb-1">No subscriptions yet.</p>
+              <p className="text-xs text-slate-600 mb-4">Subscribe to a creator to get notified when they go live.</p>
+              <button onClick={() => setTab("create")} className="neon-button-sm">
+                + Create New
+              </button>
+            </div>
+          </NeonCard>
+        ) : (
+          <NeonCard>
+            <div className="divide-y divide-white/5">
+              {subs.map((sub) => (
+                <div key={sub.id} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <p className="text-sm font-medium">{sub.channelName}</p>
+                    <p className="text-xs text-slate-500 capitalize">{sub.platform}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {sub.isLive ? (
+                      <span className="text-xs font-semibold text-rose-400 border border-rose-400/40 rounded px-2 py-0.5">
+                        LIVE
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">Offline</span>
+                    )}
+                    <button onClick={() => remove(sub.id)} className="text-slate-500 hover:text-rose-400 text-xs">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </NeonCard>
+        ))}
+
+      {tab === "create" && (
+        <NeonCard className="max-w-lg">
           <p className="font-medium mb-3">Add Subscription</p>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Platform</label>
           <select
@@ -116,7 +161,7 @@ export default function StreamAlertsPage({ params }: { params: { guildId: string
           </button>
           <FormError message={error} />
         </NeonCard>
-      </div>
+      )}
     </div>
   );
 }

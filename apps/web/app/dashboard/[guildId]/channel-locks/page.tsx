@@ -1,23 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { EmbedFields } from "../../../../components/ui/EmbedFields";
-import { StickyPreview } from "../../../../components/ui/StickyPreview";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
-import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { api, type ChannelLockInput, type ChannelLockRow, type DiscordChannelOption, type DiscordRoleOption } from "../../../../lib/api";
-
-const NOTIFY_TOKENS = [
-  { token: "{user}", description: "Mentions the member whose message was removed" },
-  { token: "{channel}", description: "Mentions the channel the message was removed from" },
-];
 
 const EMPTY_FORM: ChannelLockInput = {
   allowImages: true,
@@ -30,16 +21,6 @@ const EMPTY_FORM: ChannelLockInput = {
   bannedWords: [],
   allowedUserIds: [],
   allowedRoleIds: [],
-  notifyEnabled: false,
-  notifyHidden: false,
-  notifyContent: "{user}, that message isn't allowed in {channel}.",
-  notifyEmbedEnabled: false,
-  notifyEmbedTitle: "",
-  notifyEmbedColor: "#00E5FF",
-  notifyButtons: [],
-  notifyDeleteAfterSec: 6,
-  dmUser: false,
-  savedEmbedId: null,
 };
 
 function Row({ label, hint, enabled, onChange }: { label: string; hint: string; enabled: boolean; onChange: (v: boolean) => void }) {
@@ -150,7 +131,6 @@ function TagList({
 
 export default function ChannelLocksPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
-  const notifyContentRef = useRef<HTMLTextAreaElement>(null);
   const [rows, setRows] = useState<ChannelLockRow[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -195,16 +175,6 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       bannedWords: row.bannedWords,
       allowedUserIds: row.allowedUserIds,
       allowedRoleIds: row.allowedRoleIds,
-      notifyEnabled: row.notifyEnabled,
-      notifyHidden: row.notifyHidden,
-      notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
-      notifyEmbedEnabled: row.notifyEmbedEnabled,
-      notifyEmbedTitle: row.notifyEmbedTitle ?? "",
-      notifyEmbedColor: row.notifyEmbedColor ?? "#00E5FF",
-      notifyButtons: row.notifyButtons,
-      notifyDeleteAfterSec: row.notifyDeleteAfterSec,
-      dmUser: row.dmUser,
-      savedEmbedId: row.savedEmbedId ?? null,
     });
     setError(null);
     setShowEditor(true);
@@ -271,8 +241,6 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                           .filter(Boolean)
                           .join(" · ") || "no restrictions"}
                     {r.allowedUserIds.length + r.allowedRoleIds.length > 0 ? ` · restricted to ${r.allowedUserIds.length + r.allowedRoleIds.length} sender(s)` : ""}
-                    {r.notifyEnabled ? " · notifies on delete" : ""}
-                    {r.dmUser ? " · DMs member" : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -384,7 +352,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
               </>
             )}
 
-            <div className="pt-4 border-t border-white/5">
+            <div className="pt-4 border-t border-white/5 mb-4">
               <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Restrict Who Can Post Here (optional)</label>
               <p className="text-xs text-slate-600 mb-2">
                 Leave both empty to allow anyone the rules above allow. Add a role or user/bot ID and only they can post — everyone else gets deleted
@@ -394,142 +362,11 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 <p className="text-xs text-slate-500 mb-1">Allowed Roles</p>
                 <AllowedRolesPicker guildId={params.guildId} value={form.allowedRoleIds} onChange={(v) => setForm({ ...form, allowedRoleIds: v })} />
               </div>
-              <div className="mb-4">
+              <div>
                 <p className="text-xs text-slate-500 mb-1">Allowed Users / Bots (paste an ID)</p>
                 <TagList values={form.allowedUserIds} onChange={(v) => setForm({ ...form, allowedUserIds: v })} placeholder="Right-click → Copy ID" />
               </div>
             </div>
-
-            <div className="mb-4 pt-4 border-t border-white/5">
-              <Row
-                label="Notify on delete"
-                hint="Post a message (and/or DM the author) when their message is removed for breaking this lock."
-                enabled={form.notifyEnabled}
-                onChange={(v) => setForm({ ...form, notifyEnabled: v })}
-              />
-              {form.notifyEnabled && (
-                <div className="pt-3">
-                  <p className="text-sm text-slate-200 mb-1">Where the notice goes</p>
-                  <p className="text-xs text-slate-500 mb-3">
-                    Shown in channel, the notice includes a Dismiss button only the affected member can use to close it early. Hide skips the channel
-                    entirely and DMs it instead.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, notifyHidden: false })}
-                      className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                        !form.notifyHidden
-                          ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
-                          : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
-                      }`}
-                    >
-                      Show in channel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, notifyHidden: true })}
-                      className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                        form.notifyHidden
-                          ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
-                          : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
-                      }`}
-                    >
-                      Hide (DM only)
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {form.notifyEnabled && (
-              <>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Notice Message</label>
-                <textarea
-                  ref={notifyContentRef}
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                  rows={2}
-                  value={form.notifyContent ?? ""}
-                  onChange={(e) => setForm({ ...form, notifyContent: e.target.value })}
-                />
-                <PlaceholderExamples
-                  items={NOTIFY_TOKENS}
-                  inputRef={notifyContentRef}
-                  value={form.notifyContent ?? ""}
-                  onChange={(v) => setForm({ ...form, notifyContent: v })}
-                />
-
-                <div className="mb-4">
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed (overrides the fields below)</label>
-                  <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
-                </div>
-
-                {!form.savedEmbedId && (
-                  <div className="mb-4">
-                    <EmbedFields
-                      guildId={params.guildId}
-                      embedEnabled={form.notifyEmbedEnabled}
-                      embedTitle={form.notifyEmbedTitle ?? ""}
-                      embedColor={form.notifyEmbedColor ?? "#00E5FF"}
-                      buttons={form.notifyButtons}
-                      onChange={(next) =>
-                        setForm({
-                          ...form,
-                          notifyEmbedEnabled: next.embedEnabled,
-                          notifyEmbedTitle: next.embedTitle,
-                          notifyEmbedColor: next.embedColor,
-                          notifyButtons: next.buttons,
-                        })
-                      }
-                      titleLabel="Notice Embed Title"
-                    />
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Live Preview</p>
-                  {form.savedEmbedId ? (
-                    <p className="text-xs text-slate-500 italic">Using your saved embed for this notice.</p>
-                  ) : (
-                    <StickyPreview
-                      content={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
-                      embedEnabled={form.notifyEmbedEnabled}
-                      embedTitle={form.notifyEmbedTitle ?? ""}
-                      embedDescription={(form.notifyContent ?? "").replace(/{user}/g, "@Draven").replace(/{channel}/g, "#this-channel")}
-                      embedColor={form.notifyEmbedColor ?? "#00E5FF"}
-                      buttons={form.notifyButtons}
-                    />
-                  )}
-                </div>
-
-                <div className="mb-4">
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-                    Auto-delete {form.notifyHidden ? "the DM" : "notice"} after (seconds)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="w-32 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                    value={form.notifyDeleteAfterSec}
-                    onChange={(e) => setForm({ ...form, notifyDeleteAfterSec: Number(e.target.value) })}
-                  />
-                  <p className="text-xs text-slate-600 mt-1">
-                    {form.notifyHidden ? "0 leaves the DM up permanently." : "0 leaves the in-channel notice up permanently."}
-                  </p>
-                </div>
-
-                {!form.notifyHidden && (
-                  <div className="mb-4">
-                    <Row
-                      label="Also DM the member"
-                      hint="Sends the same notice as a direct message, in addition to the in-channel one."
-                      enabled={form.dmUser}
-                      onChange={(v) => setForm({ ...form, dmUser: v })}
-                    />
-                  </div>
-                )}
-              </>
-            )}
 
             <button onClick={save} className="neon-button">
               {editingId ? "Save Changes" : "Create Lock"}

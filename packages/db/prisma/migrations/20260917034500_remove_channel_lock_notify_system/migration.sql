@@ -1,0 +1,11 @@
+ALTER TABLE "ChannelLock"
+  DROP COLUMN "notifyEnabled",
+  DROP COLUMN "notifyHidden",
+  DROP COLUMN "notifyContent",
+  DROP COLUMN "notifyEmbedEnabled",
+  DROP COLUMN "notifyEmbedTitle",
+  DROP COLUMN "notifyEmbedColor",
+  DROP COLUMN "notifyButtons",
+  DROP COLUMN "notifyDeleteAfterSec",
+  DROP COLUMN "dmUser",
+  DROP COLUMN "savedEmbedId";

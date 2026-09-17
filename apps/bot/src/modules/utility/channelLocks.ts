@@ -1,10 +1,6 @@
-import { ActionRowBuilder, BaseMessageOptions, ButtonBuilder, ButtonInteraction, ButtonStyle, Events, Message } from "discord.js";
+import { Events, Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
-import { isSendableChannel } from "../../lib/channels";
-import { buildStickyPayload } from "../../lib/stickyRender";
-import { resolveSavedEmbed } from "../../lib/savedEmbedRender";
-import type { ChannelLock } from "@spartacus/db";
 
 export const name = Events.MessageCreate;
 
@@ -62,46 +58,6 @@ function shouldDelete(message: Message, lock: {
   return false;
 }
 
-// Takes an author mention + channelId rather than a full Message, so the
-// ephemeral reveal (which only has a button click, no original Message) can
-// build the identical payload the in-channel/DM paths use.
-async function buildNotifyPayload(lock: ChannelLock, authorMention: string, channelId: string) {
-  const content = (lock.notifyContent || "{user}, that message isn't allowed in {channel}.")
-    .replace(/{user}/g, authorMention)
-    .replace(/{channel}/g, `<#${channelId}>`);
-
-  // A saved embed overrides the whole notice (same rule as Welcome, Sticky
-  // Messages, etc.) — it's static content from the shared library, so the
-  // {user}/{channel} tokens above only apply to the non-saved path.
-  const savedEmbed = await resolveSavedEmbed(lock.savedEmbedId);
-
-  return buildStickyPayload(
-    {
-      content,
-      embedEnabled: lock.notifyEmbedEnabled,
-      embedTitle: lock.notifyEmbedTitle,
-      embedDescription: content,
-      embedColor: lock.notifyEmbedColor,
-      buttons: lock.notifyButtons,
-    },
-    { savedEmbed, guildId: lock.guildId }
-  );
-}
-
-// Adds a "Dismiss message" button only the affected member can use —
-// anyone else clicking gets a small "not for you" instead of being able to
-// close it early for someone else. Skipped if the payload is already at
-// Discord's 5-action-row cap (only possible via a saved embed with 5 rows
-// of its own).
-function withDismissButton(payload: BaseMessageOptions, authorId: string): BaseMessageOptions {
-  const existing = Array.isArray(payload.components) ? payload.components : [];
-  if (existing.length >= 5) return payload;
-  const dismissRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`channellockdismiss:${authorId}`).setLabel("Dismiss message").setStyle(ButtonStyle.Secondary)
-  );
-  return { ...payload, components: [...existing, dismissRow] };
-}
-
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId) return;
 
@@ -114,40 +70,4 @@ export async function execute(message: Message) {
   if (!shouldDelete(message, lock)) return;
 
   await message.delete().catch(() => null);
-  if (!lock.notifyEnabled) return;
-
-  const payload = await buildNotifyPayload(lock, `${message.author}`, message.channelId);
-
-  // notifyHidden is the closest real equivalent to "ephemeral" for a plain
-  // message when nothing above already covers it — send it as a DM instead
-  // of posting in-channel, so nobody but the author sees it.
-  if (lock.notifyHidden) {
-    const sent = await message.author.send(payload).catch(() => null); // silently drop if the member has DMs closed
-    if (sent && lock.notifyDeleteAfterSec > 0) {
-      setTimeout(() => sent.delete().catch(() => null), lock.notifyDeleteAfterSec * 1000);
-    }
-    return;
-  }
-
-  if (isSendableChannel(message.channel)) {
-    const sent = await message.channel.send(withDismissButton(payload, message.author.id)).catch(() => null);
-    if (sent && lock.notifyDeleteAfterSec > 0) {
-      setTimeout(() => sent.delete().catch(() => null), lock.notifyDeleteAfterSec * 1000);
-    }
-  }
-
-  if (lock.dmUser) {
-    await message.author.send(payload).catch(() => null); // silently drop if the member has DMs closed
-  }
-}
-
-// The in-channel notice's "Dismiss" button — only the member the notice is
-// about can use it to close it early; anyone else gets their own small
-// "not for you" instead of being able to dismiss it for someone else.
-export async function handleChannelLockDismiss(interaction: ButtonInteraction, authorId: string) {
-  if (interaction.user.id !== authorId) {
-    await interaction.reply({ content: "This notice isn't for you.", ephemeral: true });
-    return;
-  }
-  await interaction.message.delete().catch(() => null);
 }

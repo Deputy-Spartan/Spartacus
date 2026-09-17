@@ -940,16 +940,6 @@ export interface ChannelLockRow {
   bannedWords: string[];
   allowedUserIds: string[];
   allowedRoleIds: string[];
-  notifyEnabled: boolean;
-  notifyHidden: boolean;
-  notifyContent: string | null;
-  notifyEmbedEnabled: boolean;
-  notifyEmbedTitle: string | null;
-  notifyEmbedColor: string | null;
-  notifyButtons: StickyButton[];
-  notifyDeleteAfterSec: number;
-  dmUser: boolean;
-  savedEmbedId: string | null;
 }
 export interface ChannelLockInput {
   allowImages: boolean;
@@ -962,16 +952,6 @@ export interface ChannelLockInput {
   bannedWords: string[];
   allowedUserIds: string[];
   allowedRoleIds: string[];
-  notifyEnabled: boolean;
-  notifyHidden: boolean;
-  notifyContent: string | null;
-  notifyEmbedEnabled: boolean;
-  notifyEmbedTitle: string | null;
-  notifyEmbedColor: string | null;
-  notifyButtons: StickyButton[];
-  notifyDeleteAfterSec: number;
-  dmUser: boolean;
-  savedEmbedId: string | null;
 }
 
 export function buildBotInviteUrl(clientId: string, guildId?: string) {

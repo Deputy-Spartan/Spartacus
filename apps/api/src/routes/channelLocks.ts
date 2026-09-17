@@ -27,21 +27,6 @@ router.get("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermission
   res.json(rows);
 });
 
-function buildNotifyFields(body: Record<string, unknown>) {
-  return {
-    notifyEnabled: Boolean(body.notifyEnabled),
-    notifyHidden: Boolean(body.notifyHidden),
-    notifyContent: typeof body.notifyContent === "string" ? body.notifyContent : undefined,
-    notifyEmbedEnabled: Boolean(body.notifyEmbedEnabled),
-    notifyEmbedTitle: typeof body.notifyEmbedTitle === "string" ? body.notifyEmbedTitle : undefined,
-    notifyEmbedColor: typeof body.notifyEmbedColor === "string" ? body.notifyEmbedColor : undefined,
-    notifyButtons: Array.isArray(body.notifyButtons) ? (body.notifyButtons as Prisma.InputJsonValue) : [],
-    notifyDeleteAfterSec: Number.isFinite(Number(body.notifyDeleteAfterSec)) ? Number(body.notifyDeleteAfterSec) : 6,
-    dmUser: Boolean(body.dmUser),
-    savedEmbedId: typeof body.savedEmbedId === "string" ? body.savedEmbedId : null,
-  };
-}
-
 router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermission, async (req, res) => {
   const {
     channelId,
@@ -70,7 +55,6 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     bannedWords: sanitizeStringList(bannedWords),
     allowedUserIds: sanitizeStringList(allowedUserIds),
     allowedRoleIds: sanitizeStringList(allowedRoleIds),
-    ...buildNotifyFields(req.body),
   };
 
   const row = await prisma.channelLock.upsert({
@@ -112,7 +96,6 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
       bannedWords: sanitizeStringList(bannedWords),
       allowedUserIds: sanitizeStringList(allowedUserIds),
       allowedRoleIds: sanitizeStringList(allowedRoleIds),
-      ...buildNotifyFields(req.body),
     },
   });
   res.json(row);

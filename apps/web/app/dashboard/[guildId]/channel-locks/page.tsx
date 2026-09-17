@@ -12,7 +12,7 @@ import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbed
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type ChannelLockInput, type ChannelLockRow, type DiscordChannelOption } from "../../../../lib/api";
+import { api, type ChannelLockInput, type ChannelLockRow, type DiscordChannelOption, type DiscordRoleOption } from "../../../../lib/api";
 
 const NOTIFY_TOKENS = [
   { token: "{user}", description: "Mentions the member whose message was removed" },
@@ -25,11 +25,13 @@ const EMPTY_FORM: ChannelLockInput = {
   allowFiles: true,
   allowMessages: true,
   slashCommandsOnly: false,
+  allowedCommands: [],
   requiredPrefixes: [],
   bannedWords: [],
+  allowedUserIds: [],
+  allowedRoleIds: [],
   notifyEnabled: false,
   notifyHidden: false,
-  notifyEphemeral: false,
   notifyContent: "{user}, that message isn't allowed in {channel}.",
   notifyEmbedEnabled: false,
   notifyEmbedTitle: "",
@@ -48,6 +50,47 @@ function Row({ label, hint, enabled, onChange }: { label: string; hint: string; 
         <p className="text-xs text-slate-500">{hint}</p>
       </div>
       <ToggleSwitch enabled={enabled} onChange={onChange} label={label} />
+    </div>
+  );
+}
+
+function AllowedRolesPicker({ guildId, value, onChange }: { guildId: string; value: string[]; onChange: (ids: string[]) => void }) {
+  const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
+  useEffect(() => {
+    api.getDiscordRoles(guildId).then(setRoles);
+  }, [guildId]);
+  const available = roles.filter((r) => !value.includes(r.id));
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {value.map((id) => {
+          const role = roles.find((r) => r.id === id);
+          return (
+            <span key={id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10 text-slate-300">
+              @{role?.name ?? id}
+              <button type="button" onClick={() => onChange(value.filter((v) => v !== id))} className="text-slate-500 hover:text-neon-blue">
+                ×
+              </button>
+            </span>
+          );
+        })}
+        {value.length === 0 && <span className="text-xs text-slate-500">None selected.</span>}
+      </div>
+      <select
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onChange([...value, e.target.value]);
+        }}
+      >
+        <option value="">Add a role…</option>
+        {available.map((r) => (
+          <option key={r.id} value={r.id}>
+            @{r.name}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -147,11 +190,13 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       allowFiles: row.allowFiles,
       allowMessages: row.allowMessages,
       slashCommandsOnly: row.slashCommandsOnly,
+      allowedCommands: row.allowedCommands,
       requiredPrefixes: row.requiredPrefixes,
       bannedWords: row.bannedWords,
+      allowedUserIds: row.allowedUserIds,
+      allowedRoleIds: row.allowedRoleIds,
       notifyEnabled: row.notifyEnabled,
       notifyHidden: row.notifyHidden,
-      notifyEphemeral: row.notifyEphemeral,
       notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
       notifyEmbedEnabled: row.notifyEmbedEnabled,
       notifyEmbedTitle: row.notifyEmbedTitle ?? "",
@@ -212,7 +257,9 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                   <span className="text-slate-300 truncate block">{channelLabel(r.channelId)}</span>
                   <span className="text-slate-600 text-xs">
                     {r.slashCommandsOnly
-                      ? "Slash commands only"
+                      ? r.allowedCommands.length > 0
+                        ? `Slash commands only (${r.allowedCommands.length} allowed)`
+                        : "Slash commands only"
                       : [
                           !r.allowImages && "no images",
                           !r.allowLinks && "no links",
@@ -223,6 +270,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                         ]
                           .filter(Boolean)
                           .join(" · ") || "no restrictions"}
+                    {r.allowedUserIds.length + r.allowedRoleIds.length > 0 ? ` · restricted to ${r.allowedUserIds.length + r.allowedRoleIds.length} sender(s)` : ""}
                     {r.notifyEnabled ? " · notifies on delete" : ""}
                     {r.dmUser ? " · DMs member" : ""}
                   </span>
@@ -269,6 +317,19 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 enabled={form.slashCommandsOnly}
                 onChange={(v) => setForm({ ...form, slashCommandsOnly: v })}
               />
+              {form.slashCommandsOnly && (
+                <div className="pt-3">
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Restrict to Specific Commands (optional)</label>
+                  <TagList
+                    values={form.allowedCommands}
+                    onChange={(v) => setForm({ ...form, allowedCommands: v })}
+                    placeholder="e.g. ticket (no slash)"
+                  />
+                  <p className="text-xs text-slate-600 mt-1">
+                    Leave empty to allow every slash command. Add one or more to refuse everything else with an ephemeral error before it runs.
+                  </p>
+                </div>
+              )}
               {!form.slashCommandsOnly && (
                 <>
                   <Row
@@ -323,6 +384,22 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
               </>
             )}
 
+            <div className="pt-4 border-t border-white/5">
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Restrict Who Can Post Here (optional)</label>
+              <p className="text-xs text-slate-600 mb-2">
+                Leave both empty to allow anyone the rules above allow. Add a role or user/bot ID and only they can post — everyone else gets deleted
+                immediately, before any other rule is even checked.
+              </p>
+              <div className="mb-3">
+                <p className="text-xs text-slate-500 mb-1">Allowed Roles</p>
+                <AllowedRolesPicker guildId={params.guildId} value={form.allowedRoleIds} onChange={(v) => setForm({ ...form, allowedRoleIds: v })} />
+              </div>
+              <div className="mb-4">
+                <p className="text-xs text-slate-500 mb-1">Allowed Users / Bots (paste an ID)</p>
+                <TagList values={form.allowedUserIds} onChange={(v) => setForm({ ...form, allowedUserIds: v })} placeholder="Right-click → Copy ID" />
+              </div>
+            </div>
+
             <div className="mb-4 pt-4 border-t border-white/5">
               <Row
                 label="Notify on delete"
@@ -334,15 +411,15 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                 <div className="pt-3">
                   <p className="text-sm text-slate-200 mb-1">Where the notice goes</p>
                   <p className="text-xs text-slate-500 mb-3">
-                    Discord only has a true "only you can see this" for interactions — Ephemeral posts a small button in-channel that reveals the real
-                    notice privately when the member clicks it. Hide skips the channel entirely and DMs it instead.
+                    Discord has no true "only you can see this" for a regular message — Hide sends it as a DM instead of posting it in the channel, so no
+                    one else sees it.
                   </p>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setForm({ ...form, notifyHidden: false, notifyEphemeral: false })}
+                      onClick={() => setForm({ ...form, notifyHidden: false })}
                       className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                        !form.notifyHidden && !form.notifyEphemeral
+                        !form.notifyHidden
                           ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
                           : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
                       }`}
@@ -351,18 +428,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                     </button>
                     <button
                       type="button"
-                      onClick={() => setForm({ ...form, notifyEphemeral: true, notifyHidden: false })}
-                      className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
-                        form.notifyEphemeral
-                          ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
-                          : "border-white/10 bg-base-950 text-slate-400 hover:border-white/20"
-                      }`}
-                    >
-                      Ephemeral
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, notifyHidden: true, notifyEphemeral: false })}
+                      onClick={() => setForm({ ...form, notifyHidden: true })}
                       className={`flex-1 rounded-lg p-2.5 text-sm border transition-colors ${
                         form.notifyHidden
                           ? "border-neon-blue bg-base-800 shadow-glow-blue text-slate-100"
@@ -438,7 +504,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
 
                 <div className="mb-4">
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-                    Auto-delete {form.notifyHidden ? "the DM" : form.notifyEphemeral ? "the button prompt" : "notice"} after (seconds)
+                    Auto-delete {form.notifyHidden ? "the DM" : "notice"} after (seconds)
                   </label>
                   <input
                     type="number"
@@ -448,15 +514,11 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                     onChange={(e) => setForm({ ...form, notifyDeleteAfterSec: Number(e.target.value) })}
                   />
                   <p className="text-xs text-slate-600 mt-1">
-                    {form.notifyHidden
-                      ? "0 leaves the DM up permanently."
-                      : form.notifyEphemeral
-                      ? "0 leaves the button prompt up permanently — the ephemeral reveal itself always disappears on its own, same as any Discord ephemeral reply."
-                      : "0 leaves the in-channel notice up permanently."}
+                    {form.notifyHidden ? "0 leaves the DM up permanently." : "0 leaves the in-channel notice up permanently."}
                   </p>
                 </div>
 
-                {!form.notifyHidden && !form.notifyEphemeral && (
+                {!form.notifyHidden && (
                   <div className="mb-4">
                     <Row
                       label="Also DM the member"

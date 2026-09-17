@@ -19,7 +19,6 @@ function buildNotifyFields(body: Record<string, unknown>) {
   return {
     notifyEnabled: Boolean(body.notifyEnabled),
     notifyHidden: Boolean(body.notifyHidden),
-    notifyEphemeral: Boolean(body.notifyEphemeral),
     notifyContent: typeof body.notifyContent === "string" ? body.notifyContent : undefined,
     notifyEmbedEnabled: Boolean(body.notifyEmbedEnabled),
     notifyEmbedTitle: typeof body.notifyEmbedTitle === "string" ? body.notifyEmbedTitle : undefined,
@@ -32,8 +31,19 @@ function buildNotifyFields(body: Record<string, unknown>) {
 }
 
 router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, allowImages, allowLinks, allowFiles, allowMessages, slashCommandsOnly, requiredPrefixes, bannedWords } =
-    req.body;
+  const {
+    channelId,
+    allowImages,
+    allowLinks,
+    allowFiles,
+    allowMessages,
+    slashCommandsOnly,
+    allowedCommands,
+    requiredPrefixes,
+    bannedWords,
+    allowedUserIds,
+    allowedRoleIds,
+  } = req.body;
 
   const data = {
     guildId: req.params.guildId,
@@ -43,8 +53,11 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     allowFiles: Boolean(allowFiles),
     allowMessages: Boolean(allowMessages),
     slashCommandsOnly: Boolean(slashCommandsOnly),
+    allowedCommands: sanitizeStringList(allowedCommands),
     requiredPrefixes: sanitizeStringList(requiredPrefixes),
     bannedWords: sanitizeStringList(bannedWords),
+    allowedUserIds: sanitizeStringList(allowedUserIds),
+    allowedRoleIds: sanitizeStringList(allowedRoleIds),
     ...buildNotifyFields(req.body),
   };
 
@@ -62,7 +75,18 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
     return res.status(404).json({ error: "Channel lock not found" });
   }
 
-  const { allowImages, allowLinks, allowFiles, allowMessages, slashCommandsOnly, requiredPrefixes, bannedWords } = req.body;
+  const {
+    allowImages,
+    allowLinks,
+    allowFiles,
+    allowMessages,
+    slashCommandsOnly,
+    allowedCommands,
+    requiredPrefixes,
+    bannedWords,
+    allowedUserIds,
+    allowedRoleIds,
+  } = req.body;
   const row = await prisma.channelLock.update({
     where: { id: req.params.id },
     data: {
@@ -71,8 +95,11 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
       allowFiles: Boolean(allowFiles),
       allowMessages: Boolean(allowMessages),
       slashCommandsOnly: Boolean(slashCommandsOnly),
+      allowedCommands: sanitizeStringList(allowedCommands),
       requiredPrefixes: sanitizeStringList(requiredPrefixes),
       bannedWords: sanitizeStringList(bannedWords),
+      allowedUserIds: sanitizeStringList(allowedUserIds),
+      allowedRoleIds: sanitizeStringList(allowedRoleIds),
       ...buildNotifyFields(req.body),
     },
   });

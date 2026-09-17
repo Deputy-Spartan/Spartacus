@@ -62,6 +62,25 @@ export async function execute(interaction: Interaction) {
   if (!interaction.guildId) return;
 
   if (interaction.isChatInputCommand()) {
+    // A Channel Lock restricted to specific slash commands refuses anything
+    // else here — interactions can't be "deleted" the way a plain message
+    // can, so this is the equivalent gate for them. Only applies once an
+    // admin has actually listed commands; a bare slashCommandsOnly lock
+    // (empty list) still allows every command, unchanged from before.
+    const lock = (await isModuleEnabled(interaction.guildId, "CHANNEL_LOCKS"))
+      ? await prisma.channelLock.findUnique({ where: { channelId: interaction.channelId } })
+      : null;
+    if (lock?.slashCommandsOnly) {
+      const allowedCommands = Array.isArray(lock.allowedCommands) ? (lock.allowedCommands as string[]) : [];
+      if (allowedCommands.length > 0 && !allowedCommands.includes(interaction.commandName)) {
+        await interaction.reply({
+          content: `⚠️ Only these commands are allowed in this channel: ${allowedCommands.map((c) => `\`/${c}\``).join(", ")}`,
+          ephemeral: true,
+        });
+        return;
+      }
+    }
+
     // Independent of everything below — a whole module can stay on while
     // this one specific command (built-in or custom) is switched off from
     // the Moderator → Commands tab.
@@ -300,16 +319,6 @@ export async function execute(interaction: Interaction) {
     }
     const { handleBirthdayButton } = await import("../modules/community/birthdayPanel");
     await handleBirthdayButton(interaction);
-    return;
-  }
-
-  if (interaction.customId.startsWith("channellockreveal:")) {
-    // No module-disabled guard here on purpose — the lock that triggered
-    // this button may have been disabled after the prompt was posted, and
-    // the reveal itself carries no ability to bypass the lock either way.
-    const revealParts = interaction.customId.split(":");
-    const { handleChannelLockReveal } = await import("../modules/utility/channelLocks");
-    await handleChannelLockReveal(interaction, revealParts[1], revealParts[2]);
     return;
   }
 

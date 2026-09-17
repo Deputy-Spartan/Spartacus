@@ -10,6 +10,18 @@ function sanitizeStringList(input: unknown): Prisma.InputJsonValue {
   return input.filter((s): s is string => typeof s === "string" && s.length > 0).slice(0, 25);
 }
 
+// Command names are matched against interaction.commandName, which Discord
+// never includes a leading slash in — strip one off here in case someone
+// types "/ticket" instead of "ticket", so the allowlist actually matches.
+function sanitizeCommandList(input: unknown): Prisma.InputJsonValue {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((s): s is string => typeof s === "string" && s.length > 0)
+    .map((s) => s.trim().replace(/^\//, "").toLowerCase())
+    .filter((s) => s.length > 0)
+    .slice(0, 25);
+}
+
 router.get("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermission, async (req, res) => {
   const rows = await prisma.channelLock.findMany({ where: { guildId: req.params.guildId } });
   res.json(rows);
@@ -54,7 +66,7 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     allowFiles: Boolean(allowFiles),
     allowMessages: Boolean(allowMessages),
     slashCommandsOnly: Boolean(slashCommandsOnly),
-    allowedCommands: sanitizeStringList(allowedCommands),
+    allowedCommands: sanitizeCommandList(allowedCommands),
     requiredPrefixes: sanitizeStringList(requiredPrefixes),
     bannedWords: sanitizeStringList(bannedWords),
     allowedUserIds: sanitizeStringList(allowedUserIds),
@@ -96,7 +108,7 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
       allowFiles: Boolean(allowFiles),
       allowMessages: Boolean(allowMessages),
       slashCommandsOnly: Boolean(slashCommandsOnly),
-      allowedCommands: sanitizeStringList(allowedCommands),
+      allowedCommands: sanitizeCommandList(allowedCommands),
       requiredPrefixes: sanitizeStringList(requiredPrefixes),
       bannedWords: sanitizeStringList(bannedWords),
       allowedUserIds: sanitizeStringList(allowedUserIds),

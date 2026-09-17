@@ -71,7 +71,11 @@ export async function execute(interaction: Interaction) {
       ? await prisma.channelLock.findUnique({ where: { channelId: interaction.channelId } })
       : null;
     if (lock?.slashCommandsOnly) {
-      const allowedCommands = Array.isArray(lock.allowedCommands) ? (lock.allowedCommands as string[]) : [];
+      // Defensively strip a leading slash here too, in case a lock saved
+      // before the dashboard started normalizing this still has one stored.
+      const allowedCommands = Array.isArray(lock.allowedCommands)
+        ? (lock.allowedCommands as string[]).map((c) => c.replace(/^\//, "").toLowerCase())
+        : [];
       if (allowedCommands.length > 0 && !allowedCommands.includes(interaction.commandName)) {
         await interaction.reply({
           content: `⚠️ Only these commands are allowed in this channel: ${allowedCommands.map((c) => `\`/${c}\``).join(", ")}`,

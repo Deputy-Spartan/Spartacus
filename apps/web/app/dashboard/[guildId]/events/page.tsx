@@ -318,6 +318,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
 
               {form.embedEnabled && (
                 <EmbedExtraFields
+                  guildId={params.guildId}
                   value={form.embedExtra ?? {}}
                   onChange={(v) => setForm({ ...form, embedExtra: v })}
                 />
@@ -753,6 +754,7 @@ function TemplatesView({
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
             <EmbedExtraFields
+              guildId={guildId}
               value={form.embedExtra ?? {}}
               onChange={(v) => setForm({ ...form, embedExtra: v })}
             />
@@ -966,7 +968,7 @@ function CreateEmbedView({
                 </div>
               </div>
 
-              <EmbedExtraFields value={embedExtra} onChange={setEmbedExtra} />
+              <EmbedExtraFields guildId={guildId} value={embedExtra} onChange={setEmbedExtra} />
             </div>
           )}
 

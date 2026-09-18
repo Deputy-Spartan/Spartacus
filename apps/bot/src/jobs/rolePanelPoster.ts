@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
+import { applyEmbedExtra } from "../lib/embedExtra";
 
 interface RolePanelOption {
   roleId: string;
@@ -28,10 +29,13 @@ export function startRolePanelPosterJob(client: Client) {
       const options: RolePanelOption[] = Array.isArray(panel.options) ? (panel.options as unknown as RolePanelOption[]) : [];
       if (options.length === 0) continue;
 
-      const embed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle(panel.name)
-        .setDescription(panel.description || "Click below to pick your roles.");
+      const embed = applyEmbedExtra(
+        new EmbedBuilder()
+          .setColor((panel.embedEnabled && panel.embedColor ? (panel.embedColor as `#${string}`) : "#3b82f6"))
+          .setTitle(panel.name)
+          .setDescription(panel.description || "Click below to pick your roles."),
+        panel.embedEnabled ? panel.embedExtra : null
+      );
 
       const component =
         panel.layout === "DROPDOWN"

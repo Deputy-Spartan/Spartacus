@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import type { EmbedExtra, EmbedFieldEntry } from "../../lib/embedExtra";
+import { ImageUrlField } from "./ImageUrlField";
 
 interface EmbedExtraFieldsProps {
+  guildId: string;
   value: EmbedExtra;
   onChange: (next: EmbedExtra) => void;
 }
@@ -13,7 +15,7 @@ interface EmbedExtraFieldsProps {
 // author, thumbnail, large image, footer icon, timestamp, and up to 25
 // name/value fields. Collapsed behind a details/summary so pages that
 // don't need it stay visually simple by default.
-export function EmbedExtraFields({ value, onChange }: EmbedExtraFieldsProps) {
+export function EmbedExtraFields({ guildId, value, onChange }: EmbedExtraFieldsProps) {
   const [open, setOpen] = useState(
     !!(value.authorName || value.thumbnailUrl || value.imageUrl || value.footerIconUrl || value.timestamp || value.fields?.length)
   );
@@ -81,21 +83,21 @@ export function EmbedExtraFields({ value, onChange }: EmbedExtraFieldsProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
-              <label className="text-[10px] uppercase tracking-wide text-slate-500 block mb-1">Thumbnail URL</label>
-              <input
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2 text-xs"
+              <label className="text-[10px] uppercase tracking-wide text-slate-500 block mb-1">Thumbnail</label>
+              <ImageUrlField
+                guildId={guildId}
                 value={value.thumbnailUrl ?? ""}
-                onChange={(e) => set("thumbnailUrl", e.target.value || undefined)}
-                placeholder="Small image, top-right"
+                onChange={(v) => set("thumbnailUrl", v || undefined)}
+                placeholder="Small image, top-right — paste a link or upload"
               />
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wide text-slate-500 block mb-1">Image URL</label>
-              <input
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2 text-xs"
+              <label className="text-[10px] uppercase tracking-wide text-slate-500 block mb-1">Image</label>
+              <ImageUrlField
+                guildId={guildId}
                 value={value.imageUrl ?? ""}
-                onChange={(e) => set("imageUrl", e.target.value || undefined)}
-                placeholder="Large image, full width"
+                onChange={(v) => set("imageUrl", v || undefined)}
+                placeholder="Large image, full width — paste a link or upload"
               />
             </div>
             <div>

@@ -49,6 +49,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Separate from request() because a file upload must let the browser set
+// its own multipart boundary in Content-Type — request() always forces
+// application/json.
+async function uploadFile(path: string, file: File): Promise<{ url: string }> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error((body && typeof body.error === "string" && body.error) || `Upload failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export interface ModuleState {
   enabled: boolean;
   config: Record<string, unknown> | null;
@@ -592,6 +612,9 @@ export interface RolePanelRow {
   layout: RolePanelLayout;
   options: RolePanelOption[];
   messageId: string | null;
+  embedEnabled: boolean;
+  embedColor: string | null;
+  embedExtra?: EmbedExtra;
 }
 
 export interface AnnouncementRow {
@@ -1135,6 +1158,8 @@ export interface AccessAuditEntryRow {
 }
 
 export const api = {
+  uploadImage: (guildId: string, file: File) => uploadFile(`/guilds/${guildId}/upload-image`, file),
+
   getMe: () => request<CurrentUser>("/me"),
   getGuilds: () => request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>("/guilds"),
 

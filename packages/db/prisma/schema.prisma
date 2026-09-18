@@ -10,6 +10,10 @@ generator client {
 model Guild {
   id                String               @id // Discord guild ID
   name              String?
+  // A text channel the bot creates on first upload to host images the
+  // dashboard's "upload an image" controls send — Discord's CDN needs a
+  // real message to attach a file to, so this is where those messages live.
+  assetChannelId    String?
   modules           ModuleToggle[]
   welcomeConfig     WelcomeConfig?
   customCommands    CustomCommand[]
@@ -1473,15 +1477,18 @@ enum RolePanelLayout {
 }
 
 model RolePanel {
-  id          String          @id @default(cuid())
-  guild       Guild           @relation(fields: [guildId], references: [id])
-  guildId     String
-  name        String
-  channelId   String
-  description String?
-  layout      RolePanelLayout @default(BUTTONS)
-  options     Json            @default("[]") // [{ roleId, label, emoji }]
-  messageId   String?
+  id           String          @id @default(cuid())
+  guild        Guild           @relation(fields: [guildId], references: [id])
+  guildId      String
+  name         String
+  channelId    String
+  description  String?
+  layout       RolePanelLayout @default(BUTTONS)
+  options      Json            @default("[]") // [{ roleId, label, emoji }]
+  messageId    String?
+  embedEnabled Boolean         @default(false)
+  embedColor   String?
+  embedExtra   Json? // author/thumbnail/image/footer/fields — same shape as ReactionRolePanel.embedExtra, kept in sync for UI parity
 
   @@index([guildId])
 }

@@ -311,6 +311,63 @@ export async function createGuildChannel(guildId: string, channel: Partial<Disco
   return (await res.json()) as DiscordChannel;
 }
 
+// Discord's CDN only ever hosts a file that's actually attached to a real
+// message — there's no plain "upload a file, get a URL" endpoint. So the
+// dashboard's "upload an image" controls need somewhere to post that
+// message; this creates (once per guild, then reuses) a text channel
+// hidden from @everyone specifically to host those attachments.
+async function getOrCreateAssetChannel(guildId: string): Promise<string | null> {
+  const { prisma } = await import("@spartacus/db");
+  const guild = await prisma.guild.findUnique({ where: { id: guildId } });
+  if (guild?.assetChannelId) {
+    const check = await fetch(`${DISCORD_API}/channels/${guild.assetChannelId}`, {
+      headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+    });
+    if (check.ok) return guild.assetChannelId;
+  }
+
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}/channels`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "spartacus-uploads",
+      type: 0,
+      topic: "Hidden storage for images uploaded from the dashboard — safe to leave alone.",
+      permission_overwrites: [{ id: guildId, type: 0, deny: "1024" }], // 1024 = VIEW_CHANNEL, denied for @everyone
+    }),
+  });
+  if (!res.ok) return null;
+  const created = (await res.json()) as { id: string };
+  await prisma.guild.update({ where: { id: guildId }, data: { assetChannelId: created.id } }).catch(() => null);
+  return created.id;
+}
+
+export async function uploadImageAsset(
+  guildId: string,
+  file: { buffer: Buffer; filename: string; mimetype: string }
+): Promise<{ url?: string; error?: string }> {
+  const channelId = await getOrCreateAssetChannel(guildId);
+  if (!channelId) return { error: "Couldn't create a storage channel for uploads — check the bot has Manage Channels." };
+
+  // Uses the runtime's native fetch/FormData/Blob (Node 18+) rather than the
+  // node-fetch import used everywhere else in this file — node-fetch v3
+  // doesn't implement the WHATWG FormData multipart body these need.
+  const form = new FormData();
+  form.append("payload_json", JSON.stringify({ content: "📎 Uploaded from the dashboard" }));
+  form.append("files[0]", new Blob([new Uint8Array(file.buffer)], { type: file.mimetype }), file.filename);
+
+  const res = await globalThis.fetch(`${DISCORD_API}/channels/${channelId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+    body: form,
+  });
+  if (!res.ok) return { error: (await res.text().catch(() => "")) || `Discord returned ${res.status}` };
+
+  const message = (await res.json()) as { attachments?: Array<{ url: string }> };
+  const url = message.attachments?.[0]?.url;
+  return url ? { url } : { error: "Upload succeeded but Discord didn't return a file URL." };
+}
+
 export interface DiscordMemberInfo {
   id: string;
   username: string;

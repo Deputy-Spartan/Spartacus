@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
+import { resolveEmojiInput } from "../lib/discordRest";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -32,6 +33,16 @@ function cleanOptions(options: OptionInput[] | undefined): CleanOption[] | undef
   return options.map(cleanOption).filter((o): o is CleanOption => o !== null).slice(0, 20);
 }
 
+// Resolves ":name:" shortcodes etc. on every option; returns the first error.
+async function resolveEmojis(guildId: string, opts: CleanOption[]): Promise<string | null> {
+  for (const o of opts) {
+    const r = await resolveEmojiInput(guildId, o.emoji);
+    if (r.error) return r.error;
+    o.emoji = r.emoji ?? o.emoji;
+  }
+  return null;
+}
+
 function toRow(o: CleanOption) {
   return { emoji: o.emoji, roleId: o.roleIds[0] ?? "", extraRoleIds: o.roleIds.slice(1), channelIds: o.channelIds };
 }
@@ -62,6 +73,8 @@ router.post("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPe
   if (!channelId || clean.length === 0) {
     return res.status(400).json({ error: "A channel and at least one emoji with a role or channel are required." });
   }
+  const emojiError = await resolveEmojis(guildId, clean);
+  if (emojiError) return res.status(400).json({ error: emojiError });
   const emojiSet = new Set(clean.map((o) => o.emoji));
   if (emojiSet.size !== clean.length) {
     return res.status(400).json({ error: "Each emoji in this panel must be unique." });
@@ -107,6 +120,8 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
   const nextChannelId = channelId || existing.channelId;
   const clean = cleanOptions(options);
   if (clean) {
+    const emojiError = await resolveEmojis(guildId, clean);
+    if (emojiError) return res.status(400).json({ error: emojiError });
     const emojiSet = new Set(clean.map((o) => o.emoji));
     if (emojiSet.size !== clean.length) {
       return res.status(400).json({ error: "Each emoji in this panel must be unique." });

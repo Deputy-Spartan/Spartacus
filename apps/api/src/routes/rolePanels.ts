@@ -1,9 +1,22 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
+import { resolveEmojiInput } from "../lib/discordRest";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
 const router = Router();
+
+async function resolveOptionEmojis(guildId: string, options: unknown): Promise<{ options?: unknown; error?: string }> {
+  if (!Array.isArray(options)) return { options };
+  const out = [];
+  for (const o of options as Array<{ emoji?: string }>) {
+    if (!o.emoji) { out.push(o); continue; }
+    const r = await resolveEmojiInput(guildId, o.emoji);
+    if (r.error) return { error: r.error };
+    out.push({ ...o, emoji: r.emoji });
+  }
+  return { options: out };
+}
 
 router.get("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission, async (req, res) => {
   const rows = await prisma.rolePanel.findMany({ where: { guildId: req.params.guildId } });
@@ -12,6 +25,8 @@ router.get("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission, 
 
 router.post("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission, async (req, res) => {
   const { name, channelId, description, layout, options, embedEnabled, embedColor, embedExtra, savedEmbedId } = req.body;
+  const resolved = await resolveOptionEmojis(req.params.guildId, options);
+  if (resolved.error) return res.status(400).json({ error: resolved.error });
   const row = await prisma.rolePanel.create({
     data: {
       guildId: req.params.guildId,
@@ -19,7 +34,7 @@ router.post("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission,
       channelId,
       description,
       layout: layout ?? "BUTTONS",
-      options: options ?? [],
+      options: (resolved.options ?? []) as Prisma.InputJsonValue,
       embedEnabled: Boolean(embedEnabled),
       embedColor: embedColor ?? undefined,
       embedExtra: embedExtra ?? Prisma.JsonNull,
@@ -35,7 +50,11 @@ router.patch("/guilds/:guildId/role-panels/:id", requireAuth, requireGuildPermis
   if (name !== undefined) data.name = name;
   if (description !== undefined) data.description = description;
   if (layout !== undefined) data.layout = layout;
-  if (options !== undefined) data.options = options;
+  if (options !== undefined) {
+    const resolved = await resolveOptionEmojis(req.params.guildId, options);
+    if (resolved.error) return res.status(400).json({ error: resolved.error });
+    data.options = resolved.options;
+  }
   if (embedEnabled !== undefined) data.embedEnabled = Boolean(embedEnabled);
   if (embedColor !== undefined) data.embedColor = embedColor;
   if (embedExtra !== undefined) data.embedExtra = embedExtra ?? Prisma.JsonNull;

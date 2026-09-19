@@ -673,3 +673,22 @@ export async function getGuildEmojis(guildId: string): Promise<DiscordGuildEmoji
   const data = (await res.json()) as Array<{ id: string; name: string; animated?: boolean }>;
   return data.map((e) => ({ id: e.id, name: e.name, animated: Boolean(e.animated) }));
 }
+
+// Turns what someone typed in an emoji box into something Discord can react
+// with: ":name:" becomes the server's real "<:name:id>" code, unicode and
+// full custom codes pass through, and anything else is reported back.
+export async function resolveEmojiInput(guildId: string, raw: string): Promise<{ emoji?: string; error?: string }> {
+  const text = (raw ?? "").trim();
+  if (!text) return { emoji: "" };
+  if (/^<a?:\w+:\d+>$/.test(text)) return { emoji: text };
+  const short = text.match(/^:(\w+):$/);
+  if (short) {
+    const emojis = await getGuildEmojis(guildId).catch(() => []);
+    const hit = emojis.find((e) => e.name.toLowerCase() === short[1].toLowerCase());
+    return hit
+      ? { emoji: `<${hit.animated ? "a" : ""}:${hit.name}:${hit.id}>` }
+      : { error: `There's no emoji named ${text} on this server. Pick it from the emoji picker instead.` };
+  }
+  if (/^[\x00-\x7F]+$/.test(text)) return { error: `"${text}" isn't an emoji. Paste an emoji or pick one from the emoji picker.` };
+  return { emoji: text };
+}

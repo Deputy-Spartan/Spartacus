@@ -6,6 +6,8 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type AntiRaidConfig } from "../../../../lib/api";
+import { useAutoSave } from "../../../../lib/useAutoSave";
+import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 export default function AntiRaidPage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<AntiRaidConfig | null>(null);
@@ -21,6 +23,8 @@ export default function AntiRaidPage({ params }: { params: { guildId: string } }
     setConfig(await api.setAntiRaid(params.guildId, config));
     setSaving(false);
   }
+
+  const autoSave = useAutoSave(config, save);
 
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
@@ -86,6 +90,7 @@ export default function AntiRaidPage({ params }: { params: { guildId: string } }
       <button onClick={save} disabled={saving} className="neon-button mt-4">
         {saving ? "Saving…" : "Save Changes"}
       </button>
+      <SaveStatus status={autoSave} />
     </div>
   );
 }

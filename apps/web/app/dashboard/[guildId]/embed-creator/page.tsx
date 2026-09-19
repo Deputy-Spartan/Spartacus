@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { useAutoSave } from "../../../../lib/useAutoSave";
+import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { MentionTextarea } from "../../../../components/ui/MentionTextarea";
 import { FormError } from "../../../../components/ui/FormError";
 import { EmbedCard } from "../../../../components/embedCreator/EmbedCard";
@@ -202,6 +204,9 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
         : `✅ "${editingPreset.name}" updated — anywhere it's used will show the new version.`
     );
   }
+
+  // Editing a saved embed saves and pushes to Discord by itself a moment after the last change.
+  const autoSave = useAutoSave(editingPreset ? state : null, handleUpdatePreset, 2500, editingPreset?.id);
 
   // "Save as New" (from the Create tab) makes a brand new preset, then drops
   // the user into the Saved Embeds tab already editing it, so the flow reads
@@ -506,6 +511,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                   <button onClick={handleUpdatePreset} className="neon-button flex-1">
                     Save &amp; Update
                   </button>
+                  <div className="basis-full"><SaveStatus status={autoSave} /></div>
                   <button onClick={handleSend} disabled={sending} className="neon-button-sm disabled:opacity-50">
                     {sending ? "Sending…" : sendLabel}
                   </button>

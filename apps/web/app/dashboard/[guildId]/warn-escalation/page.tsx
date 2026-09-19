@@ -6,6 +6,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { FormError } from "../../../../components/ui/FormError";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { api, type WarnEscalationSettingsRow } from "../../../../lib/api";
+import { useAutoSave } from "../../../../lib/useAutoSave";
+import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 const DEFAULTS: WarnEscalationSettingsRow = {
   warnThreshold: 3,
@@ -37,6 +39,8 @@ export default function WarnEscalationPage({ params }: { params: { guildId: stri
     setSaving(true);
     await api.updateWarnEscalationSettings(params.guildId, settings).finally(() => setSaving(false));
   }
+
+  const autoSave = useAutoSave(settings, save);
 
   return (
     <div>
@@ -111,6 +115,7 @@ export default function WarnEscalationPage({ params }: { params: { guildId: stri
         <button onClick={save} disabled={saving} className="neon-button disabled:opacity-50">
           {saving ? "Saving…" : "Save"}
         </button>
+      <SaveStatus status={autoSave} />
         <FormError message={error} />
       </NeonCard>
     </div>

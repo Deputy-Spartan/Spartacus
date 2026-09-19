@@ -6,6 +6,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { FormError } from "../../../../components/ui/FormError";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { api, type PrestigeSettingsRow } from "../../../../lib/api";
+import { useAutoSave } from "../../../../lib/useAutoSave";
+import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 const DEFAULTS: PrestigeSettingsRow = {
   maxLevel: 50,
@@ -30,6 +32,8 @@ export default function PrestigePage({ params }: { params: { guildId: string } }
     setSaving(true);
     await api.updatePrestigeSettings(params.guildId, settings).finally(() => setSaving(false));
   }
+
+  const autoSave = useAutoSave(settings, save);
 
   return (
     <div>
@@ -63,6 +67,7 @@ export default function PrestigePage({ params }: { params: { guildId: string } }
         <button onClick={save} disabled={saving} className="neon-button disabled:opacity-50">
           {saving ? "Saving…" : "Save"}
         </button>
+      <SaveStatus status={autoSave} />
         <FormError message={error} />
       </NeonCard>
     </div>

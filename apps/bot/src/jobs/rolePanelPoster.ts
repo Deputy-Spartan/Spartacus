@@ -12,7 +12,7 @@ import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRend
 // the dashboard that doesn't have a live message yet (editing clears
 // messageId so this redraws it).
 export function startRolePanelPosterJob(client: Client) {
-  cron.schedule("* * * * *", async () => {
+  cron.schedule("*/5 * * * * *", async () => {
     let loggedThisTick = 0;
     const pending = await prisma.rolePanel.findMany({ where: { messageId: null }, take: 20 });
 

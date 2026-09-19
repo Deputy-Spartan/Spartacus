@@ -337,6 +337,32 @@ function PanelsTab({ guildId }: { guildId: string }) {
   const [draft, setDraft] = useState<PanelDraft>(EMPTY_DRAFT);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "pending" | "ok" | "warn"; text: string } | null>(null);
+
+  // The bot posts (or re-posts) the Discord message a few seconds after a
+  // save, so watch the panel until it has a message id and say what happened.
+  async function watchPosting(source: "reaction" | "panel", id: string, verb: "Posted" | "Updated") {
+    setNotice({ kind: "pending", text: "Saved — sending to Discord…" });
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const rows: Array<{ id: string; channelId: string; messageId: string | null }> =
+          source === "reaction" ? await api.getReactionRolePanels(guildId) : await api.getRolePanels(guildId);
+        const row = rows.find((r) => r.id === id);
+        if (!row) return setNotice(null);
+        if (row.messageId) {
+          refresh();
+          return setNotice({ kind: "ok", text: `${verb} in Discord ✓ — the message is live in ${channelLabel(row.channelId)}.` });
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
+    setNotice({
+      kind: "warn",
+      text: "Saved, but it hasn't reached Discord yet. Check that Reaction Roles is enabled and the bot can view, send messages and add reactions in that channel.",
+    });
+  }
 
   function refresh() {
     api.getReactionRolePanels(guildId).then(setReactionPanels);
@@ -426,8 +452,10 @@ function PanelsTab({ guildId }: { guildId: string }) {
       } else {
         await api.updateRolePanel(guildId, editing.id, toApiPayload(form) as never);
       }
+      const done = editing;
       setEditing(null);
       refresh();
+      void watchPosting(done.source, done.id, "Updated");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save panel");
     }
@@ -440,11 +468,13 @@ function PanelsTab({ guildId }: { guildId: string }) {
     setCreating(true);
     try {
       const payload = toApiPayload(draft);
-      if (draft.layout === "REACTIONS") await api.addReactionRolePanel(guildId, payload as never);
-      else await api.addRolePanel(guildId, payload as never);
+      const source = draft.layout === "REACTIONS" ? "reaction" : "panel";
+      const created: { id: string } =
+        source === "reaction" ? await api.addReactionRolePanel(guildId, payload as never) : await api.addRolePanel(guildId, payload as never);
       setDraft(EMPTY_DRAFT);
       setTab("active");
       refresh();
+      void watchPosting(source, created.id, "Posted");
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Failed to create panel");
     } finally {
@@ -462,6 +492,27 @@ function PanelsTab({ guildId }: { guildId: string }) {
 
   return (
     <div>
+      {notice && (
+        <div
+          className={`max-w-lg mb-4 flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5 text-sm ${
+            notice.kind === "ok"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : notice.kind === "warn"
+              ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+              : "border-neon-blue/30 bg-neon-blue/10 text-neon-blue"
+          }`}
+        >
+          <span>
+            {notice.kind === "pending" && <span className="inline-block animate-spin mr-2">⟳</span>}
+            {notice.text}
+          </span>
+          {notice.kind !== "pending" && (
+            <button onClick={() => setNotice(null)} className="text-xs opacity-70 hover:opacity-100 shrink-0">
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex gap-1 mb-4">
         <button
           onClick={() => setTab("active")}

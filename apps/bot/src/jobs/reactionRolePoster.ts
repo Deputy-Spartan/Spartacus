@@ -17,7 +17,7 @@ const DEFAULT_DESCRIPTION = "React below to get a role.";
 // actual role add/remove on click lives in modules/community/reactionRoles.ts
 // and matches purely on messageId+emoji, so it didn't need to change here.
 export function startReactionRolePosterJob(client: Client) {
-  cron.schedule("* * * * *", async () => {
+  cron.schedule("*/5 * * * * *", async () => {
     let loggedThisTick = 0;
     const pending = await prisma.reactionRolePanel.findMany({
       where: { messageId: null },

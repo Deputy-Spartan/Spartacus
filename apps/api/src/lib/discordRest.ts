@@ -658,3 +658,18 @@ export async function getGuildRoles(guildId: string): Promise<DiscordRole[]> {
   roleCache.set(guildId, { data, expires: Date.now() + CACHE_TTL_MS });
   return data;
 }
+
+export interface DiscordGuildEmoji {
+  id: string;
+  name: string;
+  animated: boolean;
+}
+
+export async function getGuildEmojis(guildId: string): Promise<DiscordGuildEmoji[]> {
+  const res = await fetch(`${DISCORD_API}/guilds/${guildId}/emojis`, {
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+  });
+  if (!res.ok) throw new Error(`Discord emojis fetch failed: ${res.status}`);
+  const data = (await res.json()) as Array<{ id: string; name: string; animated?: boolean }>;
+  return data.map((e) => ({ id: e.id, name: e.name, animated: Boolean(e.animated) }));
+}

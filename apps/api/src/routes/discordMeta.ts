@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getGuildChannels, getGuildMember, getGuildRoles } from "../lib/discordRest";
+import { getGuildChannels, getGuildEmojis, getGuildMember, getGuildRoles } from "../lib/discordRest";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -55,6 +55,16 @@ router.get("/guilds/:guildId/discord/roles", requireAuth, requireGuildPermission
       .sort((a, b) => b.position - a.position)
       .map((r) => ({ id: r.id, name: r.name, color: r.color }))
   );
+});
+
+// Custom emojis this server owns, for the emoji picker on reaction panels.
+router.get("/guilds/:guildId/discord/emojis", requireAuth, requireGuildPermission, async (req, res) => {
+  try {
+    const emojis = await getGuildEmojis(req.params.guildId);
+    res.json(emojis.map((e) => ({ ...e, token: `<${e.animated ? "a" : ""}:${e.name}:${e.id}>` })));
+  } catch {
+    res.json([]);
+  }
 });
 
 // Batched member lookup for leaderboard-style lists — takes a comma-separated

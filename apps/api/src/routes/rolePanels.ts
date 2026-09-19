@@ -11,7 +11,7 @@ router.get("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission, 
 });
 
 router.post("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, channelId, description, layout, options, embedEnabled, embedColor, embedExtra } = req.body;
+  const { name, channelId, description, layout, options, embedEnabled, embedColor, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.rolePanel.create({
     data: {
       guildId: req.params.guildId,
@@ -23,13 +23,14 @@ router.post("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission,
       embedEnabled: Boolean(embedEnabled),
       embedColor: embedColor ?? undefined,
       embedExtra: embedExtra ?? Prisma.JsonNull,
+      savedEmbedId: savedEmbedId ?? null,
     },
   });
   res.status(201).json(row);
 });
 
 router.patch("/guilds/:guildId/role-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, description, layout, options, embedEnabled, embedColor, embedExtra } = req.body;
+  const { name, description, layout, options, embedEnabled, embedColor, embedExtra, savedEmbedId } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
   if (description !== undefined) data.description = description;
@@ -38,6 +39,7 @@ router.patch("/guilds/:guildId/role-panels/:id", requireAuth, requireGuildPermis
   if (embedEnabled !== undefined) data.embedEnabled = Boolean(embedEnabled);
   if (embedColor !== undefined) data.embedColor = embedColor;
   if (embedExtra !== undefined) data.embedExtra = embedExtra ?? Prisma.JsonNull;
+  if (savedEmbedId !== undefined) data.savedEmbedId = savedEmbedId;
   // Editing content invalidates the posted message so the poster job redraws it.
   if (Object.keys(data).length > 0) data.messageId = null;
   const row = await prisma.rolePanel.update({ where: { id: req.params.id }, data });

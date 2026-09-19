@@ -1,0 +1,1 @@
+ALTER TABLE "ReactionRole" ADD COLUMN "extraRoleIds" JSONB NOT NULL DEFAULT '[]', ADD COLUMN "channelIds" JSONB NOT NULL DEFAULT '[]';

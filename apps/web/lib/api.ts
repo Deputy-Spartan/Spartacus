@@ -523,6 +523,14 @@ export interface ReactionRoleOption {
   id: string;
   emoji: string;
   roleId: string;
+  extraRoleIds?: string[];
+  channelIds?: string[];
+}
+export interface DiscordEmojiOption {
+  id: string;
+  name: string;
+  animated: boolean;
+  token: string;
 }
 export interface ReactionRolePanelRow {
   id: string;
@@ -533,6 +541,7 @@ export interface ReactionRolePanelRow {
   embedEnabled: boolean;
   embedColor: string | null;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
   options: ReactionRoleOption[];
 }
 export interface ReactionRolePanelInput {
@@ -542,7 +551,8 @@ export interface ReactionRolePanelInput {
   embedEnabled?: boolean;
   embedColor?: string;
   embedExtra?: EmbedExtra;
-  options: Array<{ emoji: string; roleId: string }>;
+  savedEmbedId?: string | null;
+  options: Array<{ emoji: string; roleIds: string[]; channelIds: string[] }>;
 }
 
 export interface JoinRoleRow {
@@ -599,7 +609,9 @@ export interface TempChannelLobbyRow {
 export type RolePanelLayout = "BUTTONS" | "DROPDOWN";
 
 export interface RolePanelOption {
-  roleId: string;
+  roleId?: string; // legacy single-role shape
+  roleIds?: string[];
+  channelIds?: string[];
   label: string;
   emoji?: string;
 }
@@ -615,6 +627,7 @@ export interface RolePanelRow {
   embedEnabled: boolean;
   embedColor: string | null;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface AnnouncementRow {
@@ -1312,6 +1325,7 @@ export const api = {
     request(`/guilds/${guildId}/stream-subscriptions/${id}`, { method: "DELETE" }),
 
   getDiscordChannels: (guildId: string) => request<DiscordChannels>(`/guilds/${guildId}/discord/channels`),
+  getDiscordEmojis: (guildId: string) => request<DiscordEmojiOption[]>(`/guilds/${guildId}/discord/emojis`),
   getDiscordRoles: (guildId: string) => request<DiscordRoleOption[]>(`/guilds/${guildId}/discord/roles`),
   getDiscordMembers: (guildId: string, ids: string[]) =>
     request<DiscordMemberOption[]>(`/guilds/${guildId}/discord/members?ids=${ids.join(",")}`),

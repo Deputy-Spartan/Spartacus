@@ -5,7 +5,8 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
+import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -17,7 +18,6 @@ import {
   type DiscordChannelOption,
   type DiscordRoleOption,
 } from "../../../../lib/api";
-import type { EmbedExtra } from "../../../../lib/embedExtra";
 
 type PageTab = "panels" | "join-roles";
 type Layout = "REACTIONS" | "BUTTONS" | "DROPDOWN";
@@ -36,16 +36,20 @@ interface MergedPanel {
   messageId: string | null;
 }
 
+interface PanelOption {
+  emoji: string;
+  label: string;
+  roleIds: string[];
+  channelIds: string[];
+}
+
 interface PanelDraft {
   name: string;
   description: string;
   channelId: string | null;
   layout: Layout;
-  embedEnabled: boolean;
-  embedColor: string;
-  embedExtra: EmbedExtra;
-  reactionOptions: Array<{ emoji: string; roleId: string }>;
-  buttonOptions: Array<{ roleId: string; label: string; emoji?: string }>;
+  savedEmbedId: string | null;
+  options: PanelOption[];
 }
 
 const EMPTY_DRAFT: PanelDraft = {
@@ -53,11 +57,8 @@ const EMPTY_DRAFT: PanelDraft = {
   description: "",
   channelId: null,
   layout: "REACTIONS",
-  embedEnabled: false,
-  embedColor: "#5865F2",
-  embedExtra: {},
-  reactionOptions: [],
-  buttonOptions: [],
+  savedEmbedId: null,
+  options: [],
 };
 
 export default function ReactionRolesPage({ params }: { params: { guildId: string } }) {
@@ -110,11 +111,13 @@ function draftFromReactionPanel(p: ReactionRolePanelRow): PanelDraft {
     description: p.description ?? "",
     channelId: p.channelId,
     layout: "REACTIONS",
-    embedEnabled: p.embedEnabled,
-    embedColor: p.embedColor ?? "#5865F2",
-    embedExtra: p.embedExtra ?? {},
-    reactionOptions: p.options.map((o) => ({ emoji: o.emoji, roleId: o.roleId })),
-    buttonOptions: [],
+    savedEmbedId: p.savedEmbedId ?? null,
+    options: p.options.map((o) => ({
+      emoji: o.emoji,
+      label: "",
+      roleIds: [o.roleId, ...(o.extraRoleIds ?? [])].filter(Boolean),
+      channelIds: o.channelIds ?? [],
+    })),
   };
 }
 
@@ -124,13 +127,66 @@ function draftFromRolePanel(p: RolePanelRow): PanelDraft {
     description: p.description ?? "",
     channelId: p.channelId,
     layout: p.layout,
-    embedEnabled: p.embedEnabled,
-    embedColor: p.embedColor ?? "#5865F2",
-    embedExtra: p.embedExtra ?? {},
-    reactionOptions: [],
-    buttonOptions: p.options,
+    savedEmbedId: p.savedEmbedId ?? null,
+    options: p.options.map((o) => ({
+      emoji: o.emoji ?? "",
+      label: o.label,
+      roleIds: [...(o.roleIds ?? []), ...(o.roleId ? [o.roleId] : [])],
+      channelIds: o.channelIds ?? [],
+    })),
   };
 }
+
+// Chips for what is already chosen plus a dropdown to add another.
+function MultiPick({
+  label,
+  items,
+  chosen,
+  onChange,
+  prefix,
+}: {
+  label: string;
+  items: Array<{ id: string; name: string }>;
+  chosen: string[];
+  onChange: (ids: string[]) => void;
+  prefix: string;
+}) {
+  const nameOf = (id: string) => items.find((i) => i.id === id)?.name ?? id;
+  return (
+    <div className="mb-2">
+      <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1.5 mb-1.5">
+        {chosen.map((id) => (
+          <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-base-800 border border-white/10 text-neon-blue">
+            {prefix}
+            {nameOf(id)}
+            <button type="button" onClick={() => onChange(chosen.filter((c) => c !== id))} className="text-slate-500 hover:text-rose-400">
+              ×
+            </button>
+          </span>
+        ))}
+        {chosen.length === 0 && <span className="text-xs text-slate-600">None</span>}
+      </div>
+      <select
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2 text-sm"
+        value=""
+        onChange={(e) => e.target.value && onChange([...chosen, e.target.value])}
+      >
+        <option value="">Add…</option>
+        {items
+          .filter((i) => !chosen.includes(i.id))
+          .map((i) => (
+            <option key={i.id} value={i.id}>
+              {prefix}
+              {i.name}
+            </option>
+          ))}
+      </select>
+    </div>
+  );
+}
+
+const EMPTY_OPTION: PanelOption = { emoji: "", label: "", roleIds: [], channelIds: [] };
 
 function PanelFields({
   guildId,
@@ -141,39 +197,30 @@ function PanelFields({
   draft: PanelDraft;
   onChange: (patch: Partial<PanelDraft>) => void;
 }) {
-  const [pickRoleId, setPickRoleId] = useState<string | null>(null);
-  const [pickLabel, setPickLabel] = useState("");
-  const [pickEmoji, setPickEmoji] = useState("");
-  const [roleOptions, setRoleOptions] = useState<DiscordRoleOption[]>([]);
+  const [pick, setPick] = useState<PanelOption>(EMPTY_OPTION);
+  const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
+  const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
 
   useEffect(() => {
-    api.getDiscordRoles(guildId).then(setRoleOptions);
+    api.getDiscordRoles(guildId).then(setRoles);
+    api.getDiscordChannels(guildId).then((r) => setChannels([...r.textChannels, ...r.voiceChannels]));
   }, [guildId]);
 
-  function roleLabel(id: string): string {
-    return roleOptions.find((r) => r.id === id)?.name ?? id;
+  const reactions = draft.layout === "REACTIONS";
+  const canAdd =
+    (pick.roleIds.length > 0 || pick.channelIds.length > 0) &&
+    (reactions ? !!pick.emoji.trim() && !draft.options.some((o) => o.emoji === pick.emoji.trim()) : !!pick.label.trim());
+
+  function addOption() {
+    if (!canAdd) return;
+    onChange({ options: [...draft.options, { ...pick, emoji: pick.emoji.trim(), label: pick.label.trim() }] });
+    setPick(EMPTY_OPTION);
   }
 
-  function addReactionOption() {
-    if (!pickRoleId || !pickEmoji.trim()) return;
-    if (draft.reactionOptions.some((o) => o.emoji === pickEmoji.trim())) return;
-    onChange({ reactionOptions: [...draft.reactionOptions, { emoji: pickEmoji.trim(), roleId: pickRoleId }] });
-    setPickRoleId(null);
-    setPickEmoji("");
-  }
-  function removeReactionOption(emoji: string) {
-    onChange({ reactionOptions: draft.reactionOptions.filter((o) => o.emoji !== emoji) });
-  }
-
-  function addButtonOption() {
-    if (!pickRoleId || !pickLabel.trim()) return;
-    onChange({ buttonOptions: [...draft.buttonOptions, { roleId: pickRoleId, label: pickLabel.trim(), emoji: pickEmoji.trim() || undefined }] });
-    setPickRoleId(null);
-    setPickLabel("");
-    setPickEmoji("");
-  }
-  function removeButtonOption(roleId: string) {
-    onChange({ buttonOptions: draft.buttonOptions.filter((o) => o.roleId !== roleId) });
+  function summary(o: PanelOption): string {
+    const r = o.roleIds.map((id) => `@${roles.find((x) => x.id === id)?.name ?? id}`);
+    const c = o.channelIds.map((id) => `#${channels.find((x) => x.id === id)?.name ?? id}`);
+    return [...r, ...c].join(", ");
   }
 
   return (
@@ -193,10 +240,16 @@ function PanelFields({
       <textarea
         className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
         rows={2}
-        placeholder="Click below to get a role."
+        placeholder="Click below to get access."
         value={draft.description}
         onChange={(e) => onChange({ description: e.target.value })}
       />
+
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed</label>
+      <SavedEmbedPicker guildId={guildId} value={draft.savedEmbedId} onChange={(id) => onChange({ savedEmbedId: id })} />
+      <p className="text-xs text-slate-600 -mt-2 mb-4">
+        Build the message in the Embed Creator and save it, then pick it here. Without one, the panel posts a plain message using the name and description above.
+      </p>
 
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
         Post In Channel
@@ -211,115 +264,64 @@ function PanelFields({
         onChange={(e) => onChange({ layout: e.target.value as Layout })}
       >
         <option value="REACTIONS">Emoji reactions</option>
-        <option value="BUTTONS">Button grid (up to 5 roles)</option>
-        <option value="DROPDOWN">Dropdown (up to 25 roles, multi-select)</option>
+        <option value="BUTTONS">Button grid (up to 5)</option>
+        <option value="DROPDOWN">Dropdown (up to 25, multi-select)</option>
       </select>
       <p className="text-xs text-slate-600 mb-4">
-        {draft.layout === "REACTIONS"
-          ? "The bot posts the message and reacts to it with every emoji below — members react to get the role, un-react to remove it."
-          : "Members click a button or pick from the dropdown to toggle a role."}
+        {reactions
+          ? "The bot posts the message and reacts with every emoji below. Members react to get access and un-react to lose it."
+          : "Members click a button or pick from the dropdown to toggle access."}{" "}
+        Members get a private confirmation each time.
       </p>
 
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
-        <span className="text-sm text-slate-300">Post as an embed</span>
-        <input
-          type="checkbox"
-          className="h-5 w-9 accent-neon-blue"
-          checked={draft.embedEnabled}
-          onChange={(e) => onChange({ embedEnabled: e.target.checked })}
-        />
-      </div>
-
-      {draft.embedEnabled && (
-        <div className="mb-4">
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
-          <div className="flex items-center gap-2 mb-2">
-            <input
-              type="color"
-              className="h-9 w-12 rounded-lg border border-white/10 bg-base-950 cursor-pointer"
-              value={draft.embedColor}
-              onChange={(e) => onChange({ embedColor: e.target.value })}
-            />
-            <input
-              className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-              value={draft.embedColor}
-              onChange={(e) => onChange({ embedColor: e.target.value })}
-            />
-          </div>
-          <EmbedExtraFields guildId={guildId} value={draft.embedExtra} onChange={(v) => onChange({ embedExtra: v })} />
-        </div>
-      )}
-
-      {draft.layout === "REACTIONS" ? (
-        <>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-            Emoji → Role
-            <Required />
-          </label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {draft.reactionOptions.map((o) => (
-              <span key={o.emoji} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10">
-                {o.emoji} <span className="text-neon-blue">@{roleLabel(o.roleId)}</span>
-                <button onClick={() => removeReactionOption(o.emoji)} className="text-slate-500 hover:text-rose-400">
-                  ×
-                </button>
-              </span>
-            ))}
-            {draft.reactionOptions.length === 0 && <span className="text-xs text-slate-500">No mappings added yet.</span>}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-2 mb-4">
-            <input
-              className="w-20 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              placeholder="🎮"
-              value={pickEmoji}
-              onChange={(e) => setPickEmoji(e.target.value)}
-            />
-            <RoleSelect guildId={guildId} value={pickRoleId} onChange={setPickRoleId} />
-            <button onClick={addReactionOption} disabled={!pickRoleId || !pickEmoji.trim()} className="neon-button-sm disabled:opacity-50">
-              Add
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+        {reactions ? "Emoji → Access" : "Options"}
+        <Required />
+      </label>
+      <div className="space-y-1.5 mb-3">
+        {draft.options.map((o, i) => (
+          <div key={i} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-base-800 border border-white/10 text-sm">
+            <span className="min-w-0 truncate">
+              {o.emoji && <span className="mr-1.5">{o.emoji}</span>}
+              {!reactions && <span className="mr-1.5">{o.label}</span>}
+              <span className="text-neon-blue text-xs">{summary(o)}</span>
+            </span>
+            <button onClick={() => onChange({ options: draft.options.filter((_, j) => j !== i) })} className="text-slate-500 hover:text-rose-400 shrink-0">
+              ×
             </button>
           </div>
-        </>
-      ) : (
-        <>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-            Roles
-            <Required />
-          </label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {draft.buttonOptions.map((o) => (
-              <span key={o.roleId} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10">
-                {o.emoji ? `${o.emoji} ` : ""}
-                {o.label}
-                <button onClick={() => removeButtonOption(o.roleId)} className="text-slate-500 hover:text-rose-400">
-                  ×
-                </button>
-              </span>
-            ))}
-            {draft.buttonOptions.length === 0 && <span className="text-xs text-slate-500">No roles added yet.</span>}
+        ))}
+        {draft.options.length === 0 && <span className="text-xs text-slate-500">Nothing added yet.</span>}
+      </div>
+
+      <div className="rounded-lg border border-white/10 p-3 mb-4">
+        <div className={`grid grid-cols-1 ${reactions ? "" : "sm:grid-cols-2"} gap-2 mb-3`}>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Emoji{reactions ? "" : " (optional)"}</p>
+            <EmojiPicker guildId={guildId} value={pick.emoji} onChange={(emoji) => setPick({ ...pick, emoji })} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
-            <RoleSelect guildId={guildId} value={pickRoleId} onChange={setPickRoleId} />
-            <input
-              className="bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              placeholder="Button label"
-              value={pickLabel}
-              onChange={(e) => setPickLabel(e.target.value)}
-            />
-            <div className="flex gap-2">
+          {!reactions && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Label</p>
               <input
-                className="w-16 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                placeholder="🎮"
-                value={pickEmoji}
-                onChange={(e) => setPickEmoji(e.target.value)}
+                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                placeholder="Gamer"
+                value={pick.label}
+                onChange={(e) => setPick({ ...pick, label: e.target.value })}
               />
-              <button onClick={addButtonOption} disabled={!pickRoleId || !pickLabel.trim()} className="neon-button-sm disabled:opacity-50">
-                Add
-              </button>
             </div>
-          </div>
-        </>
-      )}
+          )}
+        </div>
+        <MultiPick label="Gives roles" prefix="@" items={roles} chosen={pick.roleIds} onChange={(roleIds) => setPick({ ...pick, roleIds })} />
+        <MultiPick label="Unlocks channels" prefix="#" items={channels} chosen={pick.channelIds} onChange={(channelIds) => setPick({ ...pick, channelIds })} />
+        <p className="text-xs text-slate-600 mb-3">
+          Pick roles, channels, or both. Channel access works by giving the member their own view permission, so hide the channel from @everyone and make sure the
+          bot can Manage Channels.
+        </p>
+        <button onClick={addOption} disabled={!canAdd} className="neon-button-sm disabled:opacity-50">
+          Add
+        </button>
+      </div>
     </>
   );
 }
@@ -393,10 +395,8 @@ function PanelsTab({ guildId }: { guildId: string }) {
         channelId: d.channelId ?? "",
         title: d.name,
         description: d.description,
-        embedEnabled: d.embedEnabled,
-        embedColor: d.embedColor,
-        embedExtra: d.embedExtra,
-        options: d.reactionOptions,
+        savedEmbedId: d.savedEmbedId,
+        options: d.options.map((o) => ({ emoji: o.emoji, roleIds: o.roleIds, channelIds: o.channelIds })),
       };
     }
     return {
@@ -404,18 +404,15 @@ function PanelsTab({ guildId }: { guildId: string }) {
       channelId: d.channelId ?? "",
       description: d.description,
       layout: d.layout,
-      options: d.buttonOptions,
-      embedEnabled: d.embedEnabled,
-      embedColor: d.embedColor,
-      embedExtra: d.embedExtra,
+      savedEmbedId: d.savedEmbedId,
+      options: d.options.map((o) => ({ label: o.label, emoji: o.emoji || undefined, roleIds: o.roleIds, channelIds: o.channelIds })),
     };
   }
 
   function validate(d: PanelDraft): string | null {
     if (!d.name.trim()) return "Enter a panel name.";
     if (!d.channelId) return "Pick a channel to post this panel in.";
-    if (d.layout === "REACTIONS" && d.reactionOptions.length === 0) return "Add at least one emoji/role mapping.";
-    if (d.layout !== "REACTIONS" && d.buttonOptions.length === 0) return "Add at least one role.";
+    if (d.options.length === 0) return "Add at least one option that gives a role or channel.";
     return null;
   }
 

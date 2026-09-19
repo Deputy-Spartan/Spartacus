@@ -479,6 +479,7 @@ model ReactionRolePanel {
   embedEnabled Boolean        @default(false)
   embedColor   String?
   embedExtra   Json?
+  savedEmbedId String? // shared Embed Creator preset used as the message body, resolved live at post time
   createdAt    DateTime       @default(now())
   options      ReactionRole[]
 
@@ -494,7 +495,12 @@ model ReactionRole {
   channelId String
   messageId String?
   emoji     String
+  // roleId is the first role granted ("" when the option only grants channel
+  // access); extraRoleIds/channelIds hold any further roles and the channels
+  // this reaction unlocks for the member (a per-member view permission).
   roleId    String
+  extraRoleIds Json @default("[]")
+  channelIds   Json @default("[]")
 
   @@unique([messageId, emoji])
   @@index([guildId])
@@ -1489,6 +1495,7 @@ model RolePanel {
   embedEnabled Boolean         @default(false)
   embedColor   String?
   embedExtra   Json? // author/thumbnail/image/footer/fields — same shape as ReactionRolePanel.embedExtra, kept in sync for UI parity
+  savedEmbedId String? // shared Embed Creator preset used as the message body, resolved live at post time
 
   @@index([guildId])
 }

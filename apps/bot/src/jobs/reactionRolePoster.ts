@@ -5,6 +5,8 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { applyEmbedExtra } from "../lib/embedExtra";
+import { describeAccess } from "../lib/accessGrants";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 const DEFAULT_DESCRIPTION = "React below to get a role.";
 
@@ -33,7 +35,15 @@ export function startReactionRolePosterJob(client: Client) {
       const listing = panel.options.map((o) => `${o.emoji} — <@&${o.roleId}>`).join("\n");
       const description = [panel.description || DEFAULT_DESCRIPTION, "", listing].join("\n");
 
-      const payload = panel.embedEnabled
+      // A saved embed from the Embed Creator library is the whole message body
+      // (the bot still reacts with every emoji below); its own buttons are
+      // dropped since reaction panels carry no components.
+      const savedEmbed = await resolveSavedEmbed(panel.savedEmbedId);
+      const savedPayload = savedEmbed ? await buildSavedEmbedPayload(panel.guildId, savedEmbed) : null;
+
+      const payload = savedPayload
+        ? { content: savedPayload.content, embeds: savedPayload.embeds }
+        : panel.embedEnabled
         ? {
             embeds: [
               applyEmbedExtra(

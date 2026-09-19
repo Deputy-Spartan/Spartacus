@@ -521,6 +521,8 @@ export interface AntiRaidConfig {
   autoLockdown: boolean;
 }
 
+export type NotifyMode = "PRIVATE" | "DM" | "NONE";
+
 export interface ReactionRoleOption {
   id: string;
   emoji: string;
@@ -544,6 +546,7 @@ export interface ReactionRolePanelRow {
   embedColor: string | null;
   embedExtra?: EmbedExtra;
   savedEmbedId?: string | null;
+  notifyMode?: NotifyMode;
   options: ReactionRoleOption[];
 }
 export interface ReactionRolePanelInput {
@@ -554,6 +557,7 @@ export interface ReactionRolePanelInput {
   embedColor?: string;
   embedExtra?: EmbedExtra;
   savedEmbedId?: string | null;
+  notifyMode?: NotifyMode;
   options: Array<{ emoji: string; roleIds: string[]; channelIds: string[] }>;
 }
 
@@ -630,6 +634,7 @@ export interface RolePanelRow {
   embedColor: string | null;
   embedExtra?: EmbedExtra;
   savedEmbedId?: string | null;
+  notifyMode?: NotifyMode;
 }
 
 export interface AnnouncementRow {

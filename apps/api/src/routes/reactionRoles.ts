@@ -33,6 +33,10 @@ function cleanOptions(options: OptionInput[] | undefined): CleanOption[] | undef
   return options.map(cleanOption).filter((o): o is CleanOption => o !== null).slice(0, 20);
 }
 
+function cleanNotify(v: unknown): string | undefined {
+  return v === "PRIVATE" || v === "DM" || v === "NONE" ? v : undefined;
+}
+
 // Resolves ":name:" shortcodes etc. on every option; returns the first error.
 async function resolveEmojis(guildId: string, opts: CleanOption[]): Promise<string | null> {
   for (const o of opts) {
@@ -58,7 +62,7 @@ router.get("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPer
 
 router.post("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
-  const { channelId, title, description, embedEnabled, embedColor, embedExtra, savedEmbedId, options } = req.body as {
+  const { channelId, title, description, embedEnabled, embedColor, embedExtra, savedEmbedId, notifyMode, options } = req.body as {
     channelId: string;
     title?: string;
     description?: string;
@@ -66,6 +70,7 @@ router.post("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPe
     embedColor?: string;
     embedExtra?: Prisma.InputJsonValue;
     savedEmbedId?: string | null;
+    notifyMode?: string;
     options?: OptionInput[];
   };
 
@@ -90,6 +95,7 @@ router.post("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPe
       embedColor: embedColor || null,
       embedExtra: (embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       savedEmbedId: savedEmbedId ?? null,
+      notifyMode: cleanNotify(notifyMode) ?? "PRIVATE",
       options: {
         create: clean.map((o) => ({ guildId, channelId, ...toRow(o) })),
       },
@@ -106,7 +112,7 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
     return res.status(404).json({ error: "Reaction role panel not found" });
   }
 
-  const { channelId, title, description, embedEnabled, embedColor, embedExtra, savedEmbedId, options } = req.body as {
+  const { channelId, title, description, embedEnabled, embedColor, embedExtra, savedEmbedId, notifyMode, options } = req.body as {
     channelId?: string;
     title?: string;
     description?: string;
@@ -114,6 +120,7 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
     embedColor?: string;
     embedExtra?: Prisma.InputJsonValue;
     savedEmbedId?: string | null;
+    notifyMode?: string;
     options?: OptionInput[];
   };
 
@@ -151,6 +158,7 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
         embedColor: embedColor !== undefined ? embedColor || null : undefined,
         embedExtra: embedExtra !== undefined ? ((embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue) : undefined,
         savedEmbedId: savedEmbedId !== undefined ? savedEmbedId : undefined,
+        notifyMode: cleanNotify(notifyMode),
         messageId: null,
         options: clean
           ? { create: clean.map((o) => ({ guildId, channelId: nextChannelId, ...toRow(o) })) }

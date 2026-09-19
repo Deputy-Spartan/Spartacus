@@ -1,4 +1,4 @@
-import { GuildMember, PermissionsBitField } from "discord.js";
+import { Guild, GuildMember, PermissionsBitField } from "discord.js";
 
 // What one reaction / button / dropdown choice hands out: any mix of roles and
 // per-member channel access.
@@ -67,4 +67,13 @@ export async function revokeAccess(member: GuildMember, target: AccessTarget): P
 
 export function describeAccess(target: AccessTarget): string {
   return [...target.roleIds.map((r) => `<@&${r}>`), ...target.channelIds.map((c) => `<#${c}>`)].join(", ");
+}
+
+// DMs can't resolve <@&id> / <#id> mentions (they show as "@unknown-role"),
+// so anything sent outside the server spells the names out.
+export function describeAccessNames(guild: Guild, target: AccessTarget): string {
+  return [
+    ...target.roleIds.map((r) => `@${guild.roles.cache.get(r)?.name ?? "role"}`),
+    ...target.channelIds.map((c) => `#${guild.channels.cache.get(c)?.name ?? "channel"}`),
+  ].join(", ");
 }

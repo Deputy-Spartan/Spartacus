@@ -17,6 +17,7 @@ import {
   type JoinRoleRow,
   type DiscordChannelOption,
   type DiscordRoleOption,
+  type NotifyMode,
 } from "../../../../lib/api";
 
 type PageTab = "panels" | "join-roles";
@@ -49,6 +50,7 @@ interface PanelDraft {
   channelId: string | null;
   layout: Layout;
   savedEmbedId: string | null;
+  notifyMode: NotifyMode;
   options: PanelOption[];
 }
 
@@ -58,6 +60,7 @@ const EMPTY_DRAFT: PanelDraft = {
   channelId: null,
   layout: "REACTIONS",
   savedEmbedId: null,
+  notifyMode: "PRIVATE",
   options: [],
 };
 
@@ -112,6 +115,7 @@ function draftFromReactionPanel(p: ReactionRolePanelRow): PanelDraft {
     channelId: p.channelId,
     layout: "REACTIONS",
     savedEmbedId: p.savedEmbedId ?? null,
+    notifyMode: p.notifyMode ?? "PRIVATE",
     options: p.options.map((o) => ({
       emoji: o.emoji,
       label: "",
@@ -128,6 +132,7 @@ function draftFromRolePanel(p: RolePanelRow): PanelDraft {
     channelId: p.channelId,
     layout: p.layout,
     savedEmbedId: p.savedEmbedId ?? null,
+    notifyMode: p.notifyMode ?? "PRIVATE",
     options: p.options.map((o) => ({
       emoji: o.emoji ?? "",
       label: o.label,
@@ -270,7 +275,22 @@ function PanelFields({
         {reactions
           ? "The bot posts the message and reacts with every emoji below. Members react to get access and un-react to lose it."
           : "Members click a button or pick from the dropdown to toggle access."}{" "}
-        Members get a private confirmation each time.
+      </p>
+
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Confirmation Message</label>
+      <select
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+        value={draft.notifyMode}
+        onChange={(e) => onChange({ notifyMode: e.target.value as NotifyMode })}
+      >
+        <option value="PRIVATE">{reactions ? "Short message in the channel (deletes itself)" : "Hidden message — only they see it, with Dismiss"}</option>
+        <option value="DM">Direct message</option>
+        <option value="NONE">None</option>
+      </select>
+      <p className="text-xs text-slate-600 mb-4">
+        {reactions
+          ? "Discord can only show hidden messages for button and dropdown clicks, not reactions. For reactions the closest option is a note that removes itself after a few seconds."
+          : "Sent to the member each time they gain or lose access."}
       </p>
 
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -421,6 +441,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
         title: d.name,
         description: d.description,
         savedEmbedId: d.savedEmbedId,
+      notifyMode: d.notifyMode,
         options: d.options.map((o) => ({ emoji: o.emoji, roleIds: o.roleIds, channelIds: o.channelIds })),
       };
     }
@@ -430,6 +451,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
       description: d.description,
       layout: d.layout,
       savedEmbedId: d.savedEmbedId,
+      notifyMode: d.notifyMode,
       options: d.options.map((o) => ({ label: o.label, emoji: o.emoji || undefined, roleIds: o.roleIds, channelIds: o.channelIds })),
     };
   }

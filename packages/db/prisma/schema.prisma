@@ -480,6 +480,7 @@ model ReactionRolePanel {
   embedColor   String?
   embedExtra   Json?
   savedEmbedId String? // shared Embed Creator preset used as the message body, resolved live at post time
+  notifyMode String @default("PRIVATE") // PRIVATE (hidden reply / short-lived message) | DM | NONE
   createdAt    DateTime       @default(now())
   options      ReactionRole[]
 
@@ -1496,6 +1497,7 @@ model RolePanel {
   embedColor   String?
   embedExtra   Json? // author/thumbnail/image/footer/fields — same shape as ReactionRolePanel.embedExtra, kept in sync for UI parity
   savedEmbedId String? // shared Embed Creator preset used as the message body, resolved live at post time
+  notifyMode String @default("PRIVATE")
 
   @@index([guildId])
 }

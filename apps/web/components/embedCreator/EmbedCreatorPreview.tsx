@@ -12,12 +12,23 @@ function esc(s: string | undefined): string {
 // ships raw markdown text to Discord, which renders it for real. This just
 // approximates bold/italic/underline/strike/code/spoiler so the preview
 // looks close to what members will actually see.
-function mdToHtml(s: string | undefined): string {
+interface MentionNames {
+  roles: Record<string, string>;
+  channels: Record<string, string>;
+}
+
+const MENTION_STYLE = "background:rgba(88,101,242,.3);color:#c9cdfb;border-radius:3px;padding:0 2px;";
+
+function mdToHtml(s: string | undefined, names?: MentionNames): string {
   if (!s) return "";
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
+    .replace(/&lt;(a?):(w+):(d+)&gt;/g, (_m, a, n, id) => `<img src="https://cdn.discordapp.com/emojis/${id}.${a ? "gif" : "png"}?size=32" alt=":${n}:" title=":${n}:" style="display:inline;height:1.25em;width:1.25em;vertical-align:-0.3em;" />`)
+    .replace(/&lt;@&amp;(d+)&gt;/g, (_m, id) => `<span style="${MENTION_STYLE}">@${names?.roles[id] ?? "role"}</span>`)
+    .replace(/&lt;#(d+)&gt;/g, (_m, id) => `<span style="${MENTION_STYLE}">#${names?.channels[id] ?? "channel"}</span>`)
+    .replace(/&lt;@!?(d+)&gt;/g, `<span style="${MENTION_STYLE}">@user</span>`)
     .replace(/\|\|(.+?)\|\|/g, '<span style="background:#202225;color:#202225;border-radius:3px;">$1</span>')
     .replace(/~~(.+?)~~/g, "<s>$1</s>")
     .replace(/__(.+?)__/g, "<u>$1</u>")
@@ -38,6 +49,18 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
   const usesWebhookProfile = state.deliveryMode === "webhook" && (state.profileName || state.profileAvatar);
   const displayName = usesWebhookProfile && state.profileName ? state.profileName : "Spartacus";
   const avatarUrl = usesWebhookProfile && state.profileAvatar ? state.profileAvatar : botAvatar;
+
+  const [names, setNames] = useState<MentionNames>({ roles: {}, channels: {} });
+  useEffect(() => {
+    Promise.all([api.getDiscordRoles(guildId), api.getDiscordChannels(guildId)])
+      .then(([roles, ch]) =>
+        setNames({
+          roles: Object.fromEntries(roles.map((r) => [r.id, r.name])),
+          channels: Object.fromEntries([...ch.textChannels, ...ch.voiceChannels].map((c) => [c.id, c.name])),
+        })
+      )
+      .catch(() => null);
+  }, [guildId]);
 
   const hasAnything = state.content.trim() || state.embeds.some(hasEmbedContent) || state.components.some((r) => r.type);
   if (!hasAnything) {
@@ -61,7 +84,7 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
           </div>
 
           {state.content && (
-            <p className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(state.content) }} />
+            <p className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(state.content, names) }} />
           )}
 
           {state.embeds.filter(hasEmbedContent).map((em) => (
@@ -82,7 +105,7 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
                   </div>
                 )}
                 {em.title && <p className="text-[#f2f3f5] font-semibold text-sm mb-1" dangerouslySetInnerHTML={{ __html: mdToHtml(em.title) }} />}
-                {em.description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(em.description) }} />}
+                {em.description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(em.description, names) }} />}
                 {em.fields.filter((f) => f.name || f.value).length > 0 && (
                   <div className={`grid gap-2 mt-2 ${em.fields.some((f) => f.inline) ? "grid-cols-3" : "grid-cols-1"}`}>
                     {em.fields
@@ -90,7 +113,7 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
                       .map((f, i) => (
                         <div key={i} className={f.inline ? "" : "col-span-3"}>
                           <p className="text-[#f2f3f5] text-xs font-semibold" dangerouslySetInnerHTML={{ __html: mdToHtml(f.name || "Field") }} />
-                          <p className="text-[#dbdee1] text-xs whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(f.value) }} />
+                          <p className="text-[#dbdee1] text-xs whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(f.value, names) }} />
                         </div>
                       ))}
                   </div>

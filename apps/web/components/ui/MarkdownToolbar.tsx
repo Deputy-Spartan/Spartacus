@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type RefObject } from "react";
-import { api, type DiscordChannelOption } from "../../lib/api";
+import { api, type DiscordChannelOption, type DiscordRoleOption } from "../../lib/api";
 import { ServerEmojiGrid } from "./EmojiPicker";
 
 interface MarkdownToolbarProps {
@@ -29,9 +29,14 @@ const WRAP_BUTTONS = [
 export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: MarkdownToolbarProps) {
   const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
 
   useEffect(() => {
     api.getDiscordChannels(guildId).then((result) => setChannels([...result.textChannels, ...result.voiceChannels]));
+  }, [guildId]);
+
+  useEffect(() => {
+    api.getDiscordRoles(guildId).then(setRoles);
   }, [guildId]);
 
   function applyWrap(before: string, after: string) {
@@ -48,7 +53,7 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
     });
   }
 
-  function insertAtCursor(text: string) {
+  function insertAtCursor(text: string, refocus = true) {
     const el = textareaRef.current;
     if (!el) return;
     const start = el.selectionStart;
@@ -56,7 +61,7 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
     const next = value.slice(0, start) + text + value.slice(end);
     onChange(next);
     requestAnimationFrame(() => {
-      el.focus();
+      if (refocus) el.focus(); // skipped for emoji taps so a phone keyboard does not pop up each time
       el.setSelectionRange(start + text.length, start + text.length);
     });
   }
@@ -91,6 +96,22 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
         ))}
       </select>
 
+      <select
+        title="Insert role mention"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) insertAtCursor(`<@&${e.target.value}>`);
+        }}
+        className="h-7 bg-base-800 border border-white/10 rounded text-xs text-slate-300 px-1 max-w-[140px]"
+      >
+        <option value="">@role…</option>
+        {roles.map((r) => (
+          <option key={r.id} value={r.id}>
+            @{r.name}
+          </option>
+        ))}
+      </select>
+
       <button
         type="button"
         title="Insert a server emoji"
@@ -102,11 +123,11 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
 
       {emojiOpen && (
         <div className="basis-full rounded-lg border border-white/10 bg-base-900 p-3 max-h-48 overflow-y-auto">
+          <p className="text-[11px] text-slate-500 mb-1.5">Tap as many as you like — each is added at your cursor.</p>
           <ServerEmojiGrid
             guildId={guildId}
             onPick={(e) => {
-              insertAtCursor(e.token);
-              setEmojiOpen(false);
+              insertAtCursor(e.token, false);
             }}
           />
         </div>

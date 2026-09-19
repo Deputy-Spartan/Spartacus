@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { MarkdownToolbar } from "../ui/MarkdownToolbar";
+import { MentionTextarea } from "../ui/MentionTextarea";
 import type { EmbedCreatorEmbed, EmbedCreatorField } from "../../lib/api";
 
 const COLOR_PRESETS = ["#7B99BC", "#5E7FA6", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1", "#5865F2"];
@@ -125,13 +125,12 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
             <label className="text-[11px] text-slate-500 block mb-1.5">
               Description <span className="text-slate-600 font-mono">{(embed.description ?? "").length}/4096</span>
             </label>
-            <MarkdownToolbar guildId={guildId} textareaRef={descRef} value={embed.description ?? ""} onChange={(v) => set("description", v)} />
-            <textarea
-              ref={descRef}
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 mb-3"
+            <MentionTextarea
+              guildId={guildId}
               value={embed.description ?? ""}
+              onChange={(v) => set("description", v)}
+              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 mb-3"
               maxLength={4096}
-              onChange={(e) => set("description", e.target.value)}
               placeholder="Embed body text — supports markdown"
             />
 

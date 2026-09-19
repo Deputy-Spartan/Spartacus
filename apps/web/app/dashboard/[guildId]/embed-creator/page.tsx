@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
+import { MentionTextarea } from "../../../../components/ui/MentionTextarea";
 import { FormError } from "../../../../components/ui/FormError";
 import { EmbedCard } from "../../../../components/embedCreator/EmbedCard";
 import { ComponentRowEditor } from "../../../../components/embedCreator/ComponentRowEditor";
@@ -460,13 +460,12 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                   <p className="font-medium">Message</p>
                   <span className="text-[11px] text-slate-600 font-mono">{state.content.length}/2000</span>
                 </div>
-                <MarkdownToolbar guildId={guildId} textareaRef={contentRef} value={state.content} onChange={(v) => setState((s) => ({ ...s, content: v }))} />
-                <textarea
-                  ref={contentRef}
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20"
+                <MentionTextarea
+                  guildId={guildId}
                   value={state.content}
+                  onChange={(v) => setState((s) => ({ ...s, content: v }))}
+                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20"
                   maxLength={2000}
-                  onChange={(e) => setState((s) => ({ ...s, content: e.target.value }))}
                   placeholder="Optional text above the embed(s)"
                 />
               </NeonCard>

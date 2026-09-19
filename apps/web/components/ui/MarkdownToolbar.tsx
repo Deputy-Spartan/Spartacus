@@ -9,6 +9,9 @@ interface MarkdownToolbarProps {
   textareaRef: RefObject<HTMLTextAreaElement>;
   value: string;
   onChange: (next: string) => void;
+  // when true, emojis/roles are inserted as friendly ":name:" / "@name" (the
+  // caller converts them back to Discord codes) instead of raw codes
+  aliased?: boolean;
 }
 
 const WRAP_BUTTONS = [
@@ -26,7 +29,7 @@ const WRAP_BUTTONS = [
 // wraps the current textarea selection, or inserts at the cursor if
 // nothing's selected. Also inserts real channel mentions (<#id>), which
 // render as clickable channel links in Discord.
-export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: MarkdownToolbarProps) {
+export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased }: MarkdownToolbarProps) {
   const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
@@ -100,7 +103,10 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
         title="Insert role mention"
         value=""
         onChange={(e) => {
-          if (e.target.value) insertAtCursor(`<@&${e.target.value}>`);
+          if (e.target.value) {
+            const role = roles.find((r) => r.id === e.target.value);
+            insertAtCursor(aliased && role ? `@${role.name}` : `<@&${e.target.value}>`);
+          }
         }}
         className="h-7 bg-base-800 border border-white/10 rounded text-xs text-slate-300 px-1 max-w-[140px]"
       >
@@ -127,7 +133,7 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
           <ServerEmojiGrid
             guildId={guildId}
             onPick={(e) => {
-              insertAtCursor(e.token, false);
+              insertAtCursor(aliased ? `:${e.name}:` : e.token, false);
             }}
           />
         </div>

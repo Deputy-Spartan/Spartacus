@@ -12,6 +12,7 @@ import {
   parseMessageLink,
   parseWebhookUrl,
 } from "../lib/discordRest";
+import { syncPresetUsage } from "../lib/embedSync";
 import { buildMessagePayload, type BuilderEmbed, type BuilderComponentRow } from "../lib/embedCreatorPayload";
 
 const router = Router();
@@ -57,7 +58,8 @@ router.post("/guilds/:guildId/embed-creator/presets", requireAuth, requireGuildP
     create: { guildId: req.params.guildId, name: name.trim(), data: data as object },
     update: { data: data as object },
   });
-  res.status(201).json(row);
+  const sync = await syncPresetUsage(req.params.guildId, row.id).catch(() => ({ updated: 0, failed: 0, places: [] as string[] }));
+  res.status(201).json({ ...row, sync });
 });
 
 router.delete("/guilds/:guildId/embed-creator/presets/:id", requireAuth, requireGuildPermission, async (req, res) => {

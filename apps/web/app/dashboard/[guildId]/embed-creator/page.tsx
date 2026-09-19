@@ -193,7 +193,14 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
     const saved = await api.saveEmbedCreatorPreset(guildId, editingPreset.name, state);
     setEditingPreset(saved);
     api.getEmbedCreatorPresets(guildId).then(setPresets);
-    showToast(`✅ "${editingPreset.name}" updated — live everywhere it's used.`);
+    const sync = saved.sync;
+    showToast(
+      sync && sync.updated > 0
+        ? `✅ "${editingPreset.name}" updated — pushed to ${sync.updated} live message${sync.updated === 1 ? "" : "s"} in Discord: ${sync.places.join(", ")}.${sync.failed ? ` ${sync.failed} could not be edited (deleted or no access).` : ""}`
+        : sync && sync.failed > 0
+        ? `"${editingPreset.name}" saved, but ${sync.failed} posted message${sync.failed === 1 ? "" : "s"} could not be edited (deleted or no access).`
+        : `✅ "${editingPreset.name}" updated — anywhere it's used will show the new version.`
+    );
   }
 
   // "Save as New" (from the Create tab) makes a brand new preset, then drops

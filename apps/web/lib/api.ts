@@ -368,6 +368,8 @@ export interface EmbedCreatorPresetRow {
   lastSentWebhookUrl: string | null;
   lastSentMessageId: string | null;
   createdAt: string;
+  // present on the save response: which live Discord messages were refreshed
+  sync?: { updated: number; failed: number; places: string[] };
 }
 export interface EmbedCreatorSendInput {
   mode: "bot" | "webhook";

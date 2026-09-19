@@ -58,7 +58,7 @@ router.post("/guilds/:guildId/embed-creator/presets", requireAuth, requireGuildP
     create: { guildId: req.params.guildId, name: name.trim(), data: data as object },
     update: { data: data as object },
   });
-  const sync = await syncPresetUsage(req.params.guildId, row.id).catch(() => ({ updated: 0, failed: 0, places: [] as string[] }));
+  const sync = await syncPresetUsage(req.params.guildId, row.id).catch(() => ({ updated: 0, failed: 0, places: [] as string[], failures: [] as string[] }));
   res.status(201).json({ ...row, sync });
 });
 

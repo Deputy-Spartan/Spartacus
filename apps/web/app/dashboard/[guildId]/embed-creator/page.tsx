@@ -196,9 +196,9 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
     const sync = saved.sync;
     showToast(
       sync && sync.updated > 0
-        ? `✅ "${editingPreset.name}" updated — pushed to ${sync.updated} live message${sync.updated === 1 ? "" : "s"} in Discord: ${sync.places.join(", ")}.${sync.failed ? ` ${sync.failed} could not be edited (deleted or no access).` : ""}`
+        ? `✅ "${editingPreset.name}" updated — pushed to ${sync.updated} live message${sync.updated === 1 ? "" : "s"} in Discord: ${sync.places.join(", ")}.${sync.failures?.length ? ` Couldn't edit: ${sync.failures.join("; ")}.` : ""}`
         : sync && sync.failed > 0
-        ? `"${editingPreset.name}" saved, but ${sync.failed} posted message${sync.failed === 1 ? "" : "s"} could not be edited (deleted or no access).`
+        ? `"${editingPreset.name}" saved, but couldn't edit: ${(sync.failures ?? []).join("; ") || `${sync.failed} posted message(s)`}.`
         : `✅ "${editingPreset.name}" updated — anywhere it's used will show the new version.`
     );
   }

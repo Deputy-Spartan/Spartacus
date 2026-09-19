@@ -1,6 +1,6 @@
 import { ButtonInteraction, StringSelectMenuInteraction } from "discord.js";
 import { prisma } from "../../lib/prisma";
-import { describeAccess, describeAccessNames, grantAccess, memberHasAccess, normalizeOption, revokeAccess, type PanelOption } from "../../lib/accessGrants";
+import { accessMessage, grantAccess, memberHasAccess, normalizeOption, revokeAccess, type PanelOption } from "../../lib/accessGrants";
 
 // Options are addressed by position ("o0", "o1"…) in button ids and dropdown
 // values; older posted messages still carry a bare role id, so fall back to
@@ -43,15 +43,13 @@ export async function handleRolePanelButton(interaction: ButtonInteraction, pane
   if (!member) return;
 
   const mode = panel!.notifyMode;
-  const summary = describeAccess(option);
-  const names = describeAccessNames(interaction.guild, option);
   try {
     if (memberHasAccess(member, option)) {
       await revokeAccess(member, option);
-      await respond(interaction, mode, `➖ Removed your access to ${summary}.`, `➖ Removed your access to ${names}.`);
+      await respond(interaction, mode, accessMessage(option, false), accessMessage(option, false, interaction.guild));
     } else {
       await grantAccess(member, option);
-      await respond(interaction, mode, `➕ You now have access to ${summary}.`, `➕ You now have access to ${names}.`);
+      await respond(interaction, mode, accessMessage(option, true), accessMessage(option, true, interaction.guild));
     }
   } catch {
     await respond(interaction, mode, "⚠️ I couldn't change that — check my role is above it and I can manage channels.");
@@ -73,21 +71,20 @@ export async function handleRolePanelSelect(interaction: StringSelectMenuInterac
   const { options, notifyMode } = panel;
   const selected = new Set(interaction.values.map((v) => findOption(options, v)).filter((o): o is PanelOption => !!o));
 
-  const added: string[] = [];
-  const removed: string[] = [];
+  const lines: string[] = [];
+  const dm = notifyMode === "DM";
 
   for (const option of options) {
     const has = memberHasAccess(member, option);
     const should = selected.has(option);
     if (should && !has) {
       await grantAccess(member, option).catch(() => null);
-      added.push(notifyMode === "DM" ? describeAccessNames(interaction.guild, option) : describeAccess(option));
+      lines.push(accessMessage(option, true, dm ? interaction.guild : undefined));
     } else if (!should && has) {
       await revokeAccess(member, option).catch(() => null);
-      removed.push(notifyMode === "DM" ? describeAccessNames(interaction.guild, option) : describeAccess(option));
+      lines.push(accessMessage(option, false, dm ? interaction.guild : undefined));
     }
   }
 
-  const parts = [added.length ? `➕ ${added.join(", ")}` : null, removed.length ? `➖ ${removed.join(", ")}` : null].filter(Boolean);
-  await respond(interaction, notifyMode, parts.length ? `Updated your access: ${parts.join("  ")}` : "No changes made.");
+  await respond(interaction, notifyMode, lines.length ? lines.join("\n") : "No changes made.");
 }

@@ -1,7 +1,7 @@
 import { Events, Guild, MessageReaction, PartialMessageReaction, User, PartialUser } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
-import { describeAccessNames, emojiKeyOf, grantAccess, revokeAccess, type AccessTarget } from "../../lib/accessGrants";
+import { accessMessage, emojiKeyOf, grantAccess, revokeAccess, type AccessTarget } from "../../lib/accessGrants";
 
 function emojiKey(reaction: MessageReaction | PartialMessageReaction): string {
   return reaction.emoji.id ?? reaction.emoji.name ?? "";
@@ -25,16 +25,15 @@ async function findTarget(reaction: MessageReaction | PartialMessageReaction): P
 // hidden message. PRIVATE posts a short-lived note in the channel that
 // deletes itself; DM sends a direct message (names spelled out, since mentions
 // don't resolve in DMs); NONE stays silent.
-async function notify(reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser, guild: Guild, mode: string, text: (names: string) => string, target: AccessTarget) {
+async function notify(reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser, guild: Guild, mode: string, text: (dm: boolean) => string) {
   if (mode === "NONE") return;
-  const names = describeAccessNames(guild, target);
   if (mode === "DM") {
-    await user.send(`**${guild.name}** — ${text(names)}`).catch(() => null);
+    await user.send(`**${guild.name}** — ${text(true)}`).catch(() => null);
     return;
   }
   const channel = reaction.message.channel;
   if (!("send" in channel)) return;
-  const sent = await channel.send({ content: `<@${user.id}> ${text(names)}`, allowedMentions: { parse: [] } }).catch(() => null);
+  const sent = await channel.send({ content: `<@${user.id}> ${text(false)}`, allowedMentions: { parse: [] } }).catch(() => null);
   if (sent) setTimeout(() => void sent.delete().catch(() => null), 6000);
 }
 
@@ -51,9 +50,9 @@ export async function onReactionAdd(reaction: MessageReaction | PartialMessageRe
   if (!member || !guild) return;
   try {
     await grantAccess(member, target);
-    await notify(reaction, user, guild, notifyMode, (n) => `➕ You now have access to ${n}.`, target);
+    await notify(reaction, user, guild, notifyMode, (dm) => accessMessage(target, true, dm ? guild : undefined));
   } catch {
-    await notify(reaction, user, guild, notifyMode, () => "⚠️ I couldn't give you that — an admin needs to check my permissions.", target);
+    await notify(reaction, user, guild, notifyMode, () => "⚠️ I couldn't give you that — an admin needs to check my permissions.");
   }
 }
 
@@ -70,8 +69,8 @@ export async function onReactionRemove(reaction: MessageReaction | PartialMessag
   if (!member || !guild) return;
   try {
     await revokeAccess(member, target);
-    await notify(reaction, user, guild, notifyMode, (n) => `➖ Removed your access to ${n}.`, target);
+    await notify(reaction, user, guild, notifyMode, (dm) => accessMessage(target, false, dm ? guild : undefined));
   } catch {
-    await notify(reaction, user, guild, notifyMode, () => "⚠️ I couldn't remove that — an admin needs to check my permissions.", target);
+    await notify(reaction, user, guild, notifyMode, () => "⚠️ I couldn't remove that — an admin needs to check my permissions.");
   }
 }

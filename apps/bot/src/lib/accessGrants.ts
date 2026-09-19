@@ -77,3 +77,16 @@ export function describeAccessNames(guild: Guild, target: AccessTarget): string 
     ...target.channelIds.map((c) => `#${guild.channels.cache.get(c)?.name ?? "channel"}`),
   ].join(", ");
 }
+
+// "You now have the @Champ role." / "You no longer have the @Champ role."
+// Channel grants read "access to #name". Pass a guild to spell names out
+// (DMs) instead of using clickable mentions.
+export function accessMessage(target: AccessTarget, gained: boolean, guild?: Guild): string {
+  const roles = guild ? target.roleIds.map((r) => `@${guild.roles.cache.get(r)?.name ?? "role"}`) : target.roleIds.map((r) => `<@&${r}>`);
+  const chans = guild ? target.channelIds.map((c) => `#${guild.channels.cache.get(c)?.name ?? "channel"}`) : target.channelIds.map((c) => `<#${c}>`);
+  const parts = [
+    roles.length ? `the ${roles.join(", ")} role${roles.length > 1 ? "s" : ""}` : null,
+    chans.length ? `access to ${chans.join(", ")}` : null,
+  ].filter(Boolean);
+  return `${gained ? "✅ You now have" : "➖ You no longer have"} ${parts.join(" and ")}.`;
+}

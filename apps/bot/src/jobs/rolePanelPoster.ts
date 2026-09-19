@@ -56,15 +56,21 @@ export function startRolePanelPosterJob(client: Client) {
                   }))
                 )
             )
-          : new ActionRowBuilder<ButtonBuilder>().addComponents(
-              options.slice(0, 5).map((o, i) => {
-                const button = new ButtonBuilder().setCustomId(`rolepanel:${panel.id}:o${i}`).setLabel(o.label || "Option").setStyle(ButtonStyle.Secondary);
-                if (o.emoji) button.setEmoji(o.emoji);
-                return button;
-              })
-            );
+          : undefined;
+      // Up to 5 rows of 5 buttons; a button can be just an emoji.
+      const buttons = options.slice(0, 25).map((o, i) => {
+        const button = new ButtonBuilder().setCustomId(`rolepanel:${panel.id}:o${i}`).setStyle(ButtonStyle.Secondary);
+        if (o.label) button.setLabel(o.label);
+        if (o.emoji) button.setEmoji(o.emoji);
+        if (!o.label && !o.emoji) button.setLabel("Option");
+        return button;
+      });
+      const rows =
+        panel.layout === "DROPDOWN"
+          ? [component!]
+          : Array.from({ length: Math.ceil(buttons.length / 5) }, (_, r) => new ActionRowBuilder<ButtonBuilder>().addComponents(buttons.slice(r * 5, r * 5 + 5)));
 
-      const message = await channel.send({ embeds, components: [component] }).catch((err) => {
+      const message = await channel.send({ embeds, components: rows }).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, panel.guildId); loggedThisTick++; }
         return null;
       });

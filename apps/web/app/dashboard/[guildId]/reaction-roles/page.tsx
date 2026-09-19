@@ -214,7 +214,11 @@ function PanelFields({
   const reactions = draft.layout === "REACTIONS";
   const canAdd =
     (pick.roleIds.length > 0 || pick.channelIds.length > 0) &&
-    (reactions ? !!pick.emoji.trim() && !draft.options.some((o) => o.emoji === pick.emoji.trim()) : !!pick.label.trim());
+    (reactions
+      ? !!pick.emoji.trim() && !draft.options.some((o) => o.emoji === pick.emoji.trim())
+      : draft.layout === "DROPDOWN"
+      ? !!pick.label.trim()
+      : !!pick.label.trim() || !!pick.emoji.trim());
 
   function addOption() {
     if (!canAdd) return;
@@ -268,7 +272,7 @@ function PanelFields({
         onChange={(e) => onChange({ layout: e.target.value as Layout })}
       >
         <option value="REACTIONS">Emoji reactions</option>
-        <option value="BUTTONS">Button grid (up to 5)</option>
+        <option value="BUTTONS">Button grid (up to 25, emoji-only works)</option>
         <option value="DROPDOWN">Dropdown (up to 25, multi-select)</option>
       </select>
       <p className="text-xs text-slate-600 mb-4">
@@ -283,13 +287,13 @@ function PanelFields({
         value={draft.notifyMode}
         onChange={(e) => onChange({ notifyMode: e.target.value as NotifyMode })}
       >
-        <option value="PRIVATE">{reactions ? "Short message in the channel (deletes itself)" : "Hidden message — only they see it, with Dismiss"}</option>
+        <option value="PRIVATE">{reactions ? "Short note in the channel (everyone sees it briefly)" : "Hidden message — only they see it, with Dismiss"}</option>
         <option value="DM">Direct message</option>
         <option value="NONE">None</option>
       </select>
       <p className="text-xs text-slate-600 mb-4">
         {reactions
-          ? "Discord can only show hidden messages for button and dropdown clicks, not reactions. For reactions the closest option is a note that removes itself after a few seconds."
+          ? "Discord can only show hidden messages for button and dropdown clicks, not reactions. For reactions the closest option is a note that removes itself after a few seconds, but everyone can see it while it is up. For a message only the member sees, switch the layout to Button grid."
           : "Sent to the member each time they gain or lose access."}
       </p>
 
@@ -321,7 +325,7 @@ function PanelFields({
           </div>
           {!reactions && (
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Label</p>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Label{draft.layout === "BUTTONS" ? " (optional with an emoji)" : ""}</p>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
                 placeholder="Gamer"

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 import { api, type DiscordChannelOption } from "../../lib/api";
+import { ServerEmojiGrid } from "./EmojiPicker";
 
 interface MarkdownToolbarProps {
   guildId: string;
@@ -27,6 +28,7 @@ const WRAP_BUTTONS = [
 // render as clickable channel links in Discord.
 export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: MarkdownToolbarProps) {
   const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
+  const [emojiOpen, setEmojiOpen] = useState(false);
 
   useEffect(() => {
     api.getDiscordChannels(guildId).then((result) => setChannels([...result.textChannels, ...result.voiceChannels]));
@@ -60,7 +62,7 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1 mb-1.5">
+    <div className="flex flex-wrap items-center gap-1 mb-1.5 relative">
       {WRAP_BUTTONS.map((b) => (
         <button
           key={b.title}
@@ -88,6 +90,27 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange }: Markd
           </option>
         ))}
       </select>
+
+      <button
+        type="button"
+        title="Insert a server emoji"
+        onClick={() => setEmojiOpen(!emojiOpen)}
+        className="w-7 h-7 flex items-center justify-center rounded bg-base-800 border border-white/10 text-sm hover:border-neon-blue/40"
+      >
+        😀
+      </button>
+
+      {emojiOpen && (
+        <div className="basis-full rounded-lg border border-white/10 bg-base-900 p-3 max-h-48 overflow-y-auto">
+          <ServerEmojiGrid
+            guildId={guildId}
+            onPick={(e) => {
+              insertAtCursor(e.token);
+              setEmojiOpen(false);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

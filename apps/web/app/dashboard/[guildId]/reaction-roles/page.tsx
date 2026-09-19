@@ -245,9 +245,8 @@ function PanelFields({
         onChange={(e) => onChange({ description: e.target.value })}
       />
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed</label>
       <SavedEmbedPicker guildId={guildId} value={draft.savedEmbedId} onChange={(id) => onChange({ savedEmbedId: id })} />
-      <p className="text-xs text-slate-600 -mt-2 mb-4">
+      <p className="text-xs text-slate-600 mb-4">
         Build the message in the Embed Creator and save it, then pick it here. Without one, the panel posts a plain message using the name and description above.
       </p>
 

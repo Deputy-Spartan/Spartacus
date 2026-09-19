@@ -22,7 +22,7 @@ async function loadPanel(panelId: string): Promise<{ options: PanelOption[]; not
 // defer silently first.
 async function respond(interaction: ButtonInteraction | StringSelectMenuInteraction, mode: string, text: string, dmText?: string) {
   if (mode === "PRIVATE") {
-    await interaction.reply({ content: text, ephemeral: true });
+    await interaction.reply({ content: text, ephemeral: true, allowedMentions: { parse: [] } });
     return;
   }
   await interaction.deferUpdate().catch(() => null);

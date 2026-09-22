@@ -16,9 +16,17 @@ async function replyAndAutoDelete(message: Message, content: string) {
   if (sent) setTimeout(() => sent.delete().catch(() => null), AUTO_DELETE_MS);
 }
 
-async function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceLabel: string, note: string) {
+// A temp voice channel is usually gone within minutes of the announcement —
+// once deleted, a plain <#id> mention permanently reads "#unknown" to anyone
+// who opens the message later. Naming it in the text itself survives that;
+// the mention stays too, so it is still clickable while the channel is live.
+function voiceLabel(channel: { id: string; name: string }): string {
+  return `**${channel.name}** (<#${channel.id}>)`;
+}
+
+async function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceText: string, note: string) {
   const ping = buildLfgPingLine(cfg, senderMention);
-  const tokens = { user: senderMention, voice: voiceLabel, message: note || "—" };
+  const tokens = { user: senderMention, voice: voiceText, message: note || "—" };
 
   if (cfg.savedEmbedId) {
     const saved = await resolveSavedEmbed(cfg.savedEmbedId);
@@ -55,14 +63,14 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
   }
 
   const member = await interaction.guild?.members.fetch(interaction.user.id).catch(() => null);
-  const voiceChannelId = member?.voice.channelId;
-  if (!voiceChannelId) {
+  const voiceChannel = member?.voice.channel;
+  if (!voiceChannel) {
     await interaction.reply({ content: cfg.errorMessage, ephemeral: true });
     return;
   }
 
   const note = interaction.options.getString("message") ?? "";
-  const payload = await buildAnnouncement(cfg, `${interaction.user}`, `<#${voiceChannelId}>`, note);
+  const payload = await buildAnnouncement(cfg, `${interaction.user}`, voiceLabel(voiceChannel), note);
   await interaction.reply(payload);
 }
 
@@ -73,14 +81,14 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommand, note: 
     return;
   }
 
-  const voiceChannelId = message.member?.voice.channelId;
-  if (!voiceChannelId) {
+  const voiceChannel = message.member?.voice.channel;
+  if (!voiceChannel) {
     await replyAndAutoDelete(message, cfg.errorMessage);
     return;
   }
 
   if (!isSendableChannel(message.channel)) return;
-  const payload = await buildAnnouncement(cfg, `${message.author}`, `<#${voiceChannelId}>`, note);
+  const payload = await buildAnnouncement(cfg, `${message.author}`, voiceLabel(voiceChannel), note);
   await message.channel.send(payload);
 }
 

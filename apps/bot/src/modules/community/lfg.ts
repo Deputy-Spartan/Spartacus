@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, EmbedBuilder, Message, ColorResolvable } from "discord.js";
+import { ChatInputCommandInteraction, EmbedBuilder, Message, ColorResolvable, VoiceBasedChannel } from "discord.js";
 import type { LfgCommand, LfgCategory } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -23,7 +23,16 @@ async function replyAndAutoDelete(message: Message, content: string) {
 // who opens the message later. Naming it in the text itself survives that;
 // the mention stays too, so it is still clickable while the channel is live.
 function voiceLabel(channel: { id: string; name: string }): string {
-  return `**${channel.name}** (<#${channel.id}>)`;
+  return `${channel.name} (<#${channel.id}>)`;
+}
+
+// A real invite link straight to the voice channel — pasted as its own line,
+// Discord unfurls this into its native voice-channel card with a "Join
+// Voice" button, so members can hop in without opening the channel first.
+// Requires the bot to have Create Invite there; silently skipped without it.
+async function joinVoiceInvite(channel: VoiceBasedChannel): Promise<string | null> {
+  const invite = await channel.createInvite({ maxAge: 3600, maxUses: 0, unique: false, reason: "LFG announcement" }).catch(() => null);
+  return invite?.url ?? null;
 }
 
 // A category only overrides which channel it must be run in, who gets
@@ -100,6 +109,8 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
 
   const note = interaction.options.getString("message") ?? "";
   const payload = await buildAnnouncement(cfg, eff, `${interaction.user}`, voiceLabel(voiceChannel), note);
+  const invite = await joinVoiceInvite(voiceChannel);
+  if (invite) payload.content = [payload.content, invite].filter(Boolean).join("\n");
   await interaction.reply(payload);
 }
 
@@ -133,6 +144,8 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommandWithCate
 
   if (!isSendableChannel(message.channel)) return;
   const payload = await buildAnnouncement(cfg, eff, `${message.author}`, voiceLabel(voiceChannel), note);
+  const invite = await joinVoiceInvite(voiceChannel);
+  if (invite) payload.content = [payload.content, invite].filter(Boolean).join("\n");
   await message.channel.send(payload);
 }
 

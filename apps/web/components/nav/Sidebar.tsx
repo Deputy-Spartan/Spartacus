@@ -1,9 +1,68 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBotAvatar } from "../../lib/useBotAvatar";
+import { api, type ModuleState } from "../../lib/api";
+
+// Maps each nav item's href to the ModuleKey that gates it, so the sidebar
+// can show a live enabled/disabled dot next to every module. A handful of
+// pages (Overview, Modules, Owner-only settings, Server Partnerships) have
+// no on/off toggle of their own and are left out — no entry, no dot.
+const NAV_MODULE_KEYS: Record<string, string> = {
+  "/moderation": "MODERATION",
+  "/cases": "MODERATION",
+  "/reports": "PLAYER_REPORTS",
+  "/mod-digest": "MOD_DIGEST",
+  "/warn-escalation": "WARN_ESCALATION",
+  "/appeals": "BAN_APPEALS",
+  "/ai-moderation": "AI_MODERATION",
+  "/anti-raid": "ANTI_RAID",
+  "/anti-nuke": "ANTI_NUKE",
+  "/server-backup": "SERVER_BACKUP",
+  "/verification": "VERIFICATION",
+  "/rules-gate": "RULES_GATE",
+  "/honeypot": "HONEYPOT",
+  "/perm-watch": "PERM_WATCH",
+  "/welcome": "WELCOME",
+  "/reaction-roles": "REACTION_ROLES",
+  "/sticky-messages": "STICKY_MESSAGES",
+  "/starboard": "STARBOARD",
+  "/temp-channels": "TEMP_CHANNELS",
+  "/ai-chat": "AI_CHAT",
+  "/birthdays": "BIRTHDAYS",
+  "/member-milestones": "MEMBER_MILESTONES",
+  "/confessions": "CONFESSIONS",
+  "/events": "EVENTS",
+  "/lfg": "LFG",
+  "/embed-creator": "EMBED_CREATOR",
+  "/announcements": "ANNOUNCEMENTS",
+  "/giveaways": "GIVEAWAYS",
+  "/stream-alerts": "STREAM_ALERTS",
+  "/commands": "CUSTOM_COMMANDS",
+  "/weekly-recap": "WEEKLY_RECAP",
+  "/bump-reminder": "BUMP_REMINDER",
+  "/suggestion-analytics": "SUGGESTION_ANALYTICS",
+  "/leveling": "LEVELING",
+  "/level-roles": "LEVELING",
+  "/prestige": "PRESTIGE",
+  "/voice-activity": "VOICE_ACTIVITY",
+  "/achievements": "ACHIEVEMENTS",
+  "/growth-analytics": "GROWTH_ANALYTICS",
+  "/economy/settings": "ECONOMY",
+  "/economy/earning": "ECONOMY",
+  "/economy/leaderboard": "ECONOMY",
+  "/economy/analytics": "ECONOMY",
+  "/counting-game": "COUNTING_GAME",
+  "/tickets": "TICKETS",
+  "/applications": "APPLICATIONS",
+  "/channel-locks": "CHANNEL_LOCKS",
+  "/slow-mode": "SLOW_MODE",
+  "/stat-channels": "STAT_CHANNELS",
+  "/status-channel": "STATUS_CHANNEL",
+  "/server-templates": "SERVER_TEMPLATES",
+};
 
 export const NAV_SECTIONS = [
   {
@@ -126,6 +185,25 @@ export function Sidebar({
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
+  const [modules, setModules] = useState<Record<string, ModuleState> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    function load() {
+      api.getModules(guildId).then((m) => {
+        if (!cancelled) setModules(m);
+      });
+    }
+    load();
+    // Toggling a module elsewhere on the page doesn't re-render the sidebar
+    // on its own — a light poll keeps the dots honest without wiring up a
+    // dedicated event for every page that has an enable/disable switch.
+    const interval = setInterval(load, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [guildId]);
 
   const allSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
@@ -230,6 +308,8 @@ export function Sidebar({
                   {section.items.map((item) => {
                     const href = `/dashboard/${guildId}${item.href}`;
                     const active = pathname === href;
+                    const moduleKey = NAV_MODULE_KEYS[item.href];
+                    const enabled = moduleKey ? (modules?.[moduleKey]?.enabled ?? false) : null;
                     return (
                       <Link
                         key={item.href}
@@ -245,7 +325,13 @@ export function Sidebar({
                         ].join(" ")}
                       >
                         <span>{item.icon}</span>
-                        <span>{item.label}</span>
+                        <span className="flex-1 min-w-0 truncate">{item.label}</span>
+                        {enabled !== null && (
+                          <span
+                            className={`h-2 w-2 rounded-full shrink-0 ${enabled ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]" : "bg-rose-500"}`}
+                            title={enabled ? "Enabled" : "Disabled"}
+                          />
+                        )}
                       </Link>
                     );
                   })}

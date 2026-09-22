@@ -15,6 +15,14 @@ const DEBOUNCE_MS = 1500;
 const pendingTimers = new Map<string, NodeJS.Timeout>();
 const inFlight = new Set<string>(); // channelId currently mid-repost, guards against overlap with a fresh debounce firing
 
+// The DB's `lastMessageId` isn't updated until just after `channel.send()`
+// resolves, but the gateway's own MESSAGE_CREATE for that very message can
+// reach execute() before that write lands — without this, execute() reads
+// the still-stale id, doesn't recognize the repost as its own, and queues
+// another repost, which repeats forever (the "sticky spams itself" bug).
+// This is set synchronously the instant send() resolves, closing that gap.
+const justPosted = new Set<string>();
+
 // Runs alongside the other messageCreate handler (automod/XP/custom
 // commands) — discord.js supports multiple listeners on the same event,
 // so this stays a separate, focused module rather than one giant handler.
@@ -28,7 +36,10 @@ export async function execute(message: Message) {
   // Only skip the sticky's own repost — everything else, including another
   // message this same bot sends (LFG posts, ticket panels, etc.), should
   // still push the sticky back down to the bottom.
-  if (message.id === sticky.lastMessageId) return;
+  if (justPosted.has(message.id) || message.id === sticky.lastMessageId) {
+    justPosted.delete(message.id);
+    return;
+  }
   if (!isSendableChannel(message.channel)) return;
 
   const channel = message.channel;
@@ -60,7 +71,9 @@ async function repost(channelId: string, channel: Message["channel"]) {
     const saved = await resolveSavedEmbed(sticky.savedEmbedId);
     const posted = await channel.send(await buildStickyPayload(sticky, { savedEmbed: saved, guildId: sticky.guildId })).catch(() => null);
     if (posted) {
+      justPosted.add(posted.id); // set before the await below so execute() never sees a stale lastMessageId for this id
       await prisma.stickyMessage.update({ where: { id: sticky.id }, data: { lastMessageId: posted.id } });
+      setTimeout(() => justPosted.delete(posted.id), 30_000); // safety net if execute() never sees it (channel desync, etc.)
     }
   } finally {
     inFlight.delete(channelId);

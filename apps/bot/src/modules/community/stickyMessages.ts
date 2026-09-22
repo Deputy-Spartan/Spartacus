@@ -19,15 +19,16 @@ const inFlight = new Set<string>(); // channelId currently mid-repost, guards ag
 // commands) — discord.js supports multiple listeners on the same event,
 // so this stays a separate, focused module rather than one giant handler.
 export async function execute(message: Message) {
-  // Only skip the bot's own messages (its own repost of this very sticky) —
-  // other bots/apps posting in the channel (e.g. a stats bot's slash command
-  // reply) should still push the sticky back down to the bottom.
-  if (message.author.id === message.client.user?.id || !message.guildId) return;
+  if (!message.guildId) return;
   const enabled = await isModuleEnabled(message.guildId, "STICKY_MESSAGES");
   if (!enabled) return;
 
   const sticky = await prisma.stickyMessage.findUnique({ where: { channelId: message.channelId } });
   if (!sticky) return;
+  // Only skip the sticky's own repost — everything else, including another
+  // message this same bot sends (LFG posts, ticket panels, etc.), should
+  // still push the sticky back down to the bottom.
+  if (message.id === sticky.lastMessageId) return;
   if (!isSendableChannel(message.channel)) return;
 
   const channel = message.channel;

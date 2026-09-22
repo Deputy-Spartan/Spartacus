@@ -160,7 +160,7 @@ const EMPTY_CATEGORY: LfgCategoryInput = { name: "", channelId: "", roleId: null
 // picked from a dropdown when someone runs the slash command, each with its
 // own channel and, optionally, its own role ping and announcement text.
 // Only shown once the command already exists, since a category belongs to it.
-function CategoriesEditor({ guildId, commandId, categories, onChange }: { guildId: string; commandId: string; categories: LfgCategoryRow[]; onChange: () => void }) {
+function CategoriesEditor({ guildId, commandId, commandChannelId, categories, onChange }: { guildId: string; commandId: string; commandChannelId: string; categories: LfgCategoryRow[]; onChange: () => void }) {
   const [adding, setAdding] = useState<LfgCategoryInput | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: LfgCategoryInput } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -270,6 +270,7 @@ function CategoriesEditor({ guildId, commandId, categories, onChange }: { guildI
             value={adding.name}
             onChange={(e) => setAdding({ ...adding, name: e.target.value })}
           />
+          <p className="text-xs text-slate-600 -mt-1">Starts on the command's own channel — change it only if this category should post somewhere else.</p>
           <ChannelSelect guildId={guildId} value={adding.channelId || null} onChange={(id) => setAdding({ ...adding, channelId: id ?? "" })} kind="text" placeholder="Channel this category posts in…" />
           <RoleSelect guildId={guildId} value={adding.roleId ?? null} onChange={(id) => setAdding({ ...adding, roleId: id })} placeholder="No role ping (use command's)" />
           <textarea
@@ -294,7 +295,7 @@ function CategoriesEditor({ guildId, commandId, categories, onChange }: { guildI
           </div>
         </div>
       ) : (
-        <button onClick={() => setAdding(EMPTY_CATEGORY)} className="text-xs text-neon-blue hover:text-neon-purple">
+        <button onClick={() => setAdding({ ...EMPTY_CATEGORY, channelId: commandChannelId })} className="text-xs text-neon-blue hover:text-neon-purple">
           + Add Category
         </button>
       )}
@@ -474,7 +475,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
                       {saving ? "Saving…" : "Save Changes"}
                     </button>
                     <FormError message={error} />
-                    <CategoriesEditor guildId={guildId} commandId={row.id} categories={row.categories} onChange={refresh} />
+                    <CategoriesEditor guildId={guildId} commandId={row.id} commandChannelId={row.channelId} categories={row.categories} onChange={refresh} />
                   </div>
                 )}
               </NeonCard>

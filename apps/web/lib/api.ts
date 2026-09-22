@@ -264,6 +264,21 @@ export interface CommandToggleRow {
 
 export type LfgMode = "plain" | "embed";
 
+export interface LfgCategoryRow {
+  id: string;
+  name: string;
+  channelId: string;
+  roleId: string | null;
+  message: string | null;
+  sortOrder: number;
+}
+export interface LfgCategoryInput {
+  name: string;
+  channelId: string;
+  roleId?: string | null;
+  message?: string | null;
+}
+
 export interface LfgCommandRow {
   id: string;
   trigger: string;
@@ -281,6 +296,7 @@ export interface LfgCommandRow {
   savedEmbedId?: string | null;
   errorMessage: string;
   wrongChannelMessage: string;
+  categories: LfgCategoryRow[];
 }
 export interface LfgCommandInput {
   trigger: string;
@@ -1292,6 +1308,12 @@ export const api = {
     request<LfgCommandRow>(`/guilds/${guildId}/lfg-commands/${id}`, { method: "PUT", body: JSON.stringify(input) }),
   deleteLfgCommand: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/lfg-commands/${id}`, { method: "DELETE" }),
+  addLfgCategory: (guildId: string, commandId: string, input: LfgCategoryInput) =>
+    request<LfgCategoryRow[]>(`/guilds/${guildId}/lfg-commands/${commandId}/categories`, { method: "POST", body: JSON.stringify(input) }),
+  updateLfgCategory: (guildId: string, commandId: string, categoryId: string, input: Partial<LfgCategoryInput>) =>
+    request<LfgCategoryRow[]>(`/guilds/${guildId}/lfg-commands/${commandId}/categories/${categoryId}`, { method: "PUT", body: JSON.stringify(input) }),
+  deleteLfgCategory: (guildId: string, commandId: string, categoryId: string) =>
+    request<LfgCategoryRow[]>(`/guilds/${guildId}/lfg-commands/${commandId}/categories/${categoryId}`, { method: "DELETE" }),
 
   getEmbedCreatorPresets: (guildId: string) => request<EmbedCreatorPresetRow[]>(`/guilds/${guildId}/embed-creator/presets`),
   saveEmbedCreatorPreset: (guildId: string, name: string, data: EmbedCreatorState) =>

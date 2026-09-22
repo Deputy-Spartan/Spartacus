@@ -156,6 +156,7 @@ export async function execute(interaction: Interaction) {
     // custom commands above) but live in their own table.
     const lfg = await prisma.lfgCommand.findUnique({
       where: { guildId_trigger: { guildId: interaction.guildId, trigger: interaction.commandName } },
+      include: { categories: true },
     });
     if (!lfg) return;
 

@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { Prisma, prisma } from "@spartacus/db";
+import { Prisma, prisma, type LfgCategory } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
-import { createGuildApplicationCommand, deleteGuildApplicationCommand } from "../lib/discordRest";
+import { createGuildApplicationCommand, deleteGuildApplicationCommand, type AppCommandOption } from "../lib/discordRest";
 
 const router = Router();
 
@@ -27,16 +27,57 @@ interface LfgBody {
   wrongChannelMessage?: string;
 }
 
-// Slash command definition is identical regardless of mode — the optional
-// "message" option is what lets someone type /trigger message:"need 2 more"
-// and have that text show up in the announcement the same way trailing text
-// after "!trigger" does for the prefix version.
-function commandOptions() {
-  return [{ type: 3, name: "message", description: "Optional note shown in the announcement", required: false }];
+interface CategoryBody {
+  name: string;
+  channelId: string;
+  roleId?: string | null;
+  message?: string | null;
+  sortOrder?: number;
+}
+
+// Slash command definition depends on the command's own categories — when
+// there are any, picking one is required (Discord requires required options
+// before optional ones, so "category" always comes first). Choice values are
+// category ids rather than names so renaming a category later doesn't break
+// anything already posted or cached client-side.
+function commandOptions(categories: Pick<LfgCategory, "id" | "name">[]): AppCommandOption[] {
+  const opts: AppCommandOption[] = [];
+  if (categories.length) {
+    opts.push({
+      type: 3,
+      name: "category",
+      description: "Which playlist or queue this is for",
+      required: true,
+      choices: categories.slice(0, 25).map((c) => ({ name: c.name.slice(0, 100), value: c.id })),
+    });
+  }
+  opts.push({ type: 3, name: "message", description: "Optional note shown in the announcement", required: false });
+  return opts;
+}
+
+// Re-registers the /trigger command with Discord using its current
+// categories as choices, and stores the new command id. Called any time a
+// category is added, edited, removed or reordered, since the choice list is
+// baked into the command definition at registration time.
+async function reregisterCommand(guildId: string, cmd: { id: string; trigger: string; description: string; discordCommandId: string | null }) {
+  const categories = await prisma.lfgCategory.findMany({ where: { lfgCommandId: cmd.id }, orderBy: { sortOrder: "asc" } });
+  if (cmd.discordCommandId) await deleteGuildApplicationCommand(guildId, cmd.discordCommandId);
+  const result = await createGuildApplicationCommand(guildId, {
+    name: cmd.trigger,
+    description: cmd.description,
+    options: commandOptions(categories),
+  });
+  if ("error" in result) return { error: result.error };
+  await prisma.lfgCommand.update({ where: { id: cmd.id }, data: { discordCommandId: result.id } });
+  return { categories };
 }
 
 router.get("/guilds/:guildId/lfg-commands", requireAuth, requireGuildPermission, async (req, res) => {
-  const rows = await prisma.lfgCommand.findMany({ where: { guildId: req.params.guildId }, orderBy: { trigger: "asc" } });
+  const rows = await prisma.lfgCommand.findMany({
+    where: { guildId: req.params.guildId },
+    include: { categories: { orderBy: { sortOrder: "asc" } } },
+    orderBy: { trigger: "asc" },
+  });
   res.json(rows);
 });
 
@@ -63,7 +104,7 @@ router.post("/guilds/:guildId/lfg-commands", requireAuth, requireGuildPermission
   const result = await createGuildApplicationCommand(guildId, {
     name: trigger,
     description: body.description?.trim() || "Post that you're looking for a group.",
-    options: commandOptions(),
+    options: commandOptions([]),
   });
   if ("error" in result) {
     return res.status(502).json({ error: `Discord rejected this command: ${result.error}` });
@@ -89,6 +130,7 @@ router.post("/guilds/:guildId/lfg-commands", requireAuth, requireGuildPermission
       errorMessage: body.errorMessage?.trim() || "You need to be in a voice channel to use this command.",
       wrongChannelMessage: body.wrongChannelMessage?.trim() || "This command can only be used in {channel}.",
     },
+    include: { categories: true },
   });
   res.status(201).json(row);
 });
@@ -124,11 +166,12 @@ router.put("/guilds/:guildId/lfg-commands/:id", requireAuth, requireGuildPermiss
   // but re-registering keeps the description in sync too.
   let discordCommandId = existing.discordCommandId;
   if (trigger !== existing.trigger || (body.description !== undefined && body.description !== existing.description)) {
+    const categories = await prisma.lfgCategory.findMany({ where: { lfgCommandId: id }, orderBy: { sortOrder: "asc" } });
     if (existing.discordCommandId) await deleteGuildApplicationCommand(guildId, existing.discordCommandId);
     const result = await createGuildApplicationCommand(guildId, {
       name: trigger,
       description: body.description?.trim() || existing.description,
-      options: commandOptions(),
+      options: commandOptions(categories),
     });
     if ("error" in result) {
       return res.status(502).json({ error: `Discord rejected this command: ${result.error}` });
@@ -156,6 +199,7 @@ router.put("/guilds/:guildId/lfg-commands/:id", requireAuth, requireGuildPermiss
       errorMessage: body.errorMessage?.trim() || undefined,
       wrongChannelMessage: body.wrongChannelMessage?.trim() || undefined,
     },
+    include: { categories: { orderBy: { sortOrder: "asc" } } },
   });
   res.json(row);
 });
@@ -168,8 +212,80 @@ router.delete("/guilds/:guildId/lfg-commands/:id", requireAuth, requireGuildPerm
   if (existing.discordCommandId) {
     await deleteGuildApplicationCommand(req.params.guildId, existing.discordCommandId);
   }
-  await prisma.lfgCommand.delete({ where: { id: req.params.id } });
+  await prisma.lfgCommand.delete({ where: { id: req.params.id } }); // cascades to its categories
   res.status(204).send();
+});
+
+// ---- Categories (playlists/queues within one LFG command) ----
+
+router.post("/guilds/:guildId/lfg-commands/:id/categories", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId, id } = req.params;
+  const cmd = await prisma.lfgCommand.findUnique({ where: { id } });
+  if (!cmd || cmd.guildId !== guildId) return res.status(404).json({ error: "LFG command not found" });
+
+  const body = req.body as CategoryBody;
+  const name = (body.name || "").trim();
+  if (!name) return res.status(400).json({ error: "Enter a name for this category." });
+  if (!body.channelId) return res.status(400).json({ error: "Pick a channel for this category." });
+
+  const dup = await prisma.lfgCategory.findUnique({ where: { lfgCommandId_name: { lfgCommandId: id, name } } });
+  if (dup) return res.status(409).json({ error: `A category named "${name}" already exists on this command.` });
+
+  const count = await prisma.lfgCategory.count({ where: { lfgCommandId: id } });
+  if (count >= 25) return res.status(400).json({ error: "A command can have at most 25 categories (Discord's own limit on choices)." });
+
+  await prisma.lfgCategory.create({
+    data: { lfgCommandId: id, guildId, name, channelId: body.channelId, roleId: body.roleId || null, message: body.message || null, sortOrder: count },
+  });
+
+  const sync = await reregisterCommand(guildId, cmd);
+  if ("error" in sync) return res.status(502).json({ error: `Discord rejected this command: ${sync.error}` });
+  res.status(201).json(sync.categories);
+});
+
+router.put("/guilds/:guildId/lfg-commands/:id/categories/:categoryId", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId, id, categoryId } = req.params;
+  const cmd = await prisma.lfgCommand.findUnique({ where: { id } });
+  if (!cmd || cmd.guildId !== guildId) return res.status(404).json({ error: "LFG command not found" });
+  const existing = await prisma.lfgCategory.findUnique({ where: { id: categoryId } });
+  if (!existing || existing.lfgCommandId !== id) return res.status(404).json({ error: "Category not found" });
+
+  const body = req.body as Partial<CategoryBody>;
+  const name = body.name !== undefined ? body.name.trim() : existing.name;
+  if (!name) return res.status(400).json({ error: "Enter a name for this category." });
+
+  if (name !== existing.name) {
+    const dup = await prisma.lfgCategory.findUnique({ where: { lfgCommandId_name: { lfgCommandId: id, name } } });
+    if (dup) return res.status(409).json({ error: `A category named "${name}" already exists on this command.` });
+  }
+
+  await prisma.lfgCategory.update({
+    where: { id: categoryId },
+    data: {
+      name,
+      channelId: body.channelId || existing.channelId,
+      roleId: body.roleId !== undefined ? body.roleId || null : undefined,
+      message: body.message !== undefined ? body.message || null : undefined,
+    },
+  });
+
+  // Renaming changes the choice label shown in Discord, so always resync.
+  const sync = await reregisterCommand(guildId, cmd);
+  if ("error" in sync) return res.status(502).json({ error: `Discord rejected this command: ${sync.error}` });
+  res.json(sync.categories);
+});
+
+router.delete("/guilds/:guildId/lfg-commands/:id/categories/:categoryId", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId, id, categoryId } = req.params;
+  const cmd = await prisma.lfgCommand.findUnique({ where: { id } });
+  if (!cmd || cmd.guildId !== guildId) return res.status(404).json({ error: "LFG command not found" });
+  const existing = await prisma.lfgCategory.findUnique({ where: { id: categoryId } });
+  if (!existing || existing.lfgCommandId !== id) return res.status(404).json({ error: "Category not found" });
+
+  await prisma.lfgCategory.delete({ where: { id: categoryId } });
+  const sync = await reregisterCommand(guildId, cmd);
+  if ("error" in sync) return res.status(502).json({ error: `Discord rejected this command: ${sync.error}` });
+  res.status(200).json(sync.categories);
 });
 
 export default router;

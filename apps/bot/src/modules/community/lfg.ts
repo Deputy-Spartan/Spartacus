@@ -1,10 +1,12 @@
 import { ChatInputCommandInteraction, EmbedBuilder, Message, ColorResolvable } from "discord.js";
-import type { LfgCommand } from "@spartacus/db";
+import type { LfgCommand, LfgCategory } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { applyEmbedExtra } from "../../lib/embedExtra";
 import { substituteLfgTokens, buildLfgPingLine } from "../../lib/lfg";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
+
+export type LfgCommandWithCategories = LfgCommand & { categories: LfgCategory[] };
 
 // Regular (non-interaction) messages can't be truly ephemeral — this is the
 // standard workaround: reply normally, then delete it a few seconds later,
@@ -24,8 +26,28 @@ function voiceLabel(channel: { id: string; name: string }): string {
   return `**${channel.name}** (<#${channel.id}>)`;
 }
 
-async function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceText: string, note: string) {
-  const ping = buildLfgPingLine(cfg, senderMention);
+// A category only overrides which channel it must be run in, who gets
+// pinged, and the plain-text template — the embed/saved-embed always comes
+// from the parent command, so all of a command's playlists share one look.
+interface EffectiveLfg {
+  channelId: string;
+  roleId: string | null;
+  includeSender: boolean;
+  message: string | null;
+}
+
+function effective(cfg: LfgCommandWithCategories, category: LfgCategory | null): EffectiveLfg {
+  if (!category) return { channelId: cfg.channelId, roleId: cfg.roleId, includeSender: cfg.includeSender, message: cfg.message };
+  return {
+    channelId: category.channelId,
+    roleId: category.roleId ?? cfg.roleId,
+    includeSender: cfg.includeSender,
+    message: category.message ?? cfg.message,
+  };
+}
+
+async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMention: string, voiceText: string, note: string) {
+  const ping = buildLfgPingLine(eff, senderMention);
   const tokens = { user: senderMention, voice: voiceText, message: note || "—" };
 
   if (cfg.savedEmbedId) {
@@ -44,19 +66,26 @@ async function buildAnnouncement(cfg: LfgCommand, senderMention: string, voiceTe
     return { content: ping || undefined, embeds: [embed] };
   }
 
-  const text = substituteLfgTokens(cfg.message || "{user} is looking for a group in {voice}! {message}", tokens);
+  const text = substituteLfgTokens(eff.message || "{user} is looking for a group in {voice}! {message}", tokens);
   return { content: [ping, text].filter(Boolean).join(" ") };
 }
 
 // ---- Slash command path (/​trigger) ----
-export async function handleLfgInteraction(interaction: ChatInputCommandInteraction, cfg: LfgCommand) {
+export async function handleLfgInteraction(interaction: ChatInputCommandInteraction, cfg: LfgCommandWithCategories) {
   if (!cfg.enabled) {
     await interaction.reply({ content: "⚠️ This command is currently disabled for this server.", ephemeral: true });
     return;
   }
-  if (interaction.channelId !== cfg.channelId) {
+
+  // Discord requires picking one of these when the command has any — the
+  // slash command was registered with the option marked required in that case.
+  const categoryId = interaction.options.getString("category");
+  const category = categoryId ? cfg.categories.find((c) => c.id === categoryId) ?? null : null;
+  const eff = effective(cfg, category);
+
+  if (interaction.channelId !== eff.channelId) {
     await interaction.reply({
-      content: cfg.wrongChannelMessage.replace("{channel}", `<#${cfg.channelId}>`),
+      content: cfg.wrongChannelMessage.replace("{channel}", `<#${eff.channelId}>`),
       ephemeral: true,
     });
     return;
@@ -70,14 +99,29 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
   }
 
   const note = interaction.options.getString("message") ?? "";
-  const payload = await buildAnnouncement(cfg, `${interaction.user}`, voiceLabel(voiceChannel), note);
+  const payload = await buildAnnouncement(cfg, eff, `${interaction.user}`, voiceLabel(voiceChannel), note);
   await interaction.reply(payload);
 }
 
 // ---- Prefix path (!trigger [note...]) ----
-export async function handleLfgMessage(message: Message, cfg: LfgCommand, note: string) {
-  if (message.channelId !== cfg.channelId) {
-    await replyAndAutoDelete(message, cfg.wrongChannelMessage.replace("{channel}", `<#${cfg.channelId}>`));
+// No slash-style option here, so a category is picked by leading word: e.g.
+// "!lfg ranked need 2 more" matches the "Ranked" category by name and the
+// rest becomes the note. No match (or no categories at all) just uses the
+// command's own defaults, with the whole line as the note.
+export async function handleLfgMessage(message: Message, cfg: LfgCommandWithCategories, note: string) {
+  let category: LfgCategory | null = null;
+  if (cfg.categories.length) {
+    const [firstWord, ...rest] = note.split(/\s+/);
+    const match = cfg.categories.find((c) => c.name.toLowerCase() === firstWord?.toLowerCase());
+    if (match) {
+      category = match;
+      note = rest.join(" ");
+    }
+  }
+  const eff = effective(cfg, category);
+
+  if (message.channelId !== eff.channelId) {
+    await replyAndAutoDelete(message, cfg.wrongChannelMessage.replace("{channel}", `<#${eff.channelId}>`));
     return;
   }
 
@@ -88,10 +132,10 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommand, note: 
   }
 
   if (!isSendableChannel(message.channel)) return;
-  const payload = await buildAnnouncement(cfg, `${message.author}`, voiceLabel(voiceChannel), note);
+  const payload = await buildAnnouncement(cfg, eff, `${message.author}`, voiceLabel(voiceChannel), note);
   await message.channel.send(payload);
 }
 
-export async function findLfgCommandByTrigger(guildId: string, trigger: string): Promise<LfgCommand | null> {
-  return prisma.lfgCommand.findUnique({ where: { guildId_trigger: { guildId, trigger } } });
+export async function findLfgCommandByTrigger(guildId: string, trigger: string): Promise<LfgCommandWithCategories | null> {
+  return prisma.lfgCommand.findUnique({ where: { guildId_trigger: { guildId, trigger } }, include: { categories: true } });
 }

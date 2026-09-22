@@ -11,7 +11,7 @@ import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExampl
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { api, type LfgCommandRow, type LfgCommandInput } from "../../../../lib/api";
+import { api, type LfgCommandRow, type LfgCommandInput, type LfgCategoryRow, type LfgCategoryInput } from "../../../../lib/api";
 
 type Tab = "active" | "create";
 
@@ -154,6 +154,155 @@ function LfgFields({
   );
 }
 
+const EMPTY_CATEGORY: LfgCategoryInput = { name: "", channelId: "", roleId: null, message: null };
+
+// Playlists/queues for one command (e.g. "Ranked", "Standard", "Custom") —
+// picked from a dropdown when someone runs the slash command, each with its
+// own channel and, optionally, its own role ping and announcement text.
+// Only shown once the command already exists, since a category belongs to it.
+function CategoriesEditor({ guildId, commandId, categories, onChange }: { guildId: string; commandId: string; categories: LfgCategoryRow[]; onChange: () => void }) {
+  const [adding, setAdding] = useState<LfgCategoryInput | null>(null);
+  const [editing, setEditing] = useState<{ id: string; value: LfgCategoryInput } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function add() {
+    if (!adding) return;
+    if (!adding.name.trim()) return setError("Enter a name for this category.");
+    if (!adding.channelId) return setError("Pick a channel for this category.");
+    setBusy(true);
+    setError(null);
+    try {
+      await api.addLfgCategory(guildId, commandId, { ...adding, name: adding.name.trim() });
+      setAdding(null);
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add category");
+    }
+    setBusy(false);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    if (!editing.value.name.trim()) return setError("Enter a name for this category.");
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateLfgCategory(guildId, commandId, editing.id, { ...editing.value, name: editing.value.name.trim() });
+      setEditing(null);
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save category");
+    }
+    setBusy(false);
+  }
+
+  async function remove(id: string) {
+    setBusy(true);
+    await api.deleteLfgCategory(guildId, commandId, id);
+    if (editing?.id === id) setEditing(null);
+    onChange();
+    setBusy(false);
+  }
+
+  return (
+    <div className="mb-4 pb-4 border-b border-white/5">
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Categories (optional)</label>
+      <p className="text-xs text-slate-600 mb-3">
+        Add playlists like "Ranked" or "Standard" and members pick one from a dropdown when they run the command — each can post in its own channel and
+        ping its own role. Leave empty to keep this a single command with no picker.
+      </p>
+
+      <div className="space-y-2 mb-3">
+        {categories.map((c) => (
+          <div key={c.id} className="rounded-lg border border-white/10 bg-base-950 p-3">
+            {editing?.id === c.id ? (
+              <div className="space-y-2">
+                <input
+                  className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-sm"
+                  placeholder="Ranked"
+                  value={editing.value.name}
+                  onChange={(e) => setEditing({ ...editing, value: { ...editing.value, name: e.target.value } })}
+                />
+                <ChannelSelect guildId={guildId} value={editing.value.channelId || null} onChange={(id) => setEditing({ ...editing, value: { ...editing.value, channelId: id ?? "" } })} kind="text" />
+                <RoleSelect guildId={guildId} value={editing.value.roleId ?? null} onChange={(id) => setEditing({ ...editing, value: { ...editing.value, roleId: id } })} placeholder="No role ping (use command's)" />
+                <textarea
+                  className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-sm min-h-16 font-mono"
+                  placeholder="Leave blank to use the command's own announcement message"
+                  value={editing.value.message ?? ""}
+                  onChange={(e) => setEditing({ ...editing, value: { ...editing.value, message: e.target.value } })}
+                />
+                <div className="flex gap-2">
+                  <button onClick={saveEdit} disabled={busy} className="neon-button-sm disabled:opacity-50">
+                    Save
+                  </button>
+                  <button onClick={() => setEditing(null)} className="text-xs text-slate-500 hover:text-slate-300 px-2">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{c.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{c.roleId ? "pings its own role" : "uses command's role"} · {c.message ? "custom message" : "uses command's message"}</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button onClick={() => setEditing({ id: c.id, value: { name: c.name, channelId: c.channelId, roleId: c.roleId, message: c.message } })} className="text-xs text-slate-500 hover:text-neon-blue">
+                    Edit
+                  </button>
+                  <button onClick={() => remove(c.id)} disabled={busy} className="text-xs text-slate-500 hover:text-rose-400">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {categories.length === 0 && !adding && <p className="text-xs text-slate-600">No categories — this command posts straight to its own channel.</p>}
+      </div>
+
+      {adding ? (
+        <div className="rounded-lg border border-white/10 bg-base-950 p-3 space-y-2">
+          <input
+            className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-sm"
+            placeholder="Category name, e.g. Ranked"
+            value={adding.name}
+            onChange={(e) => setAdding({ ...adding, name: e.target.value })}
+          />
+          <ChannelSelect guildId={guildId} value={adding.channelId || null} onChange={(id) => setAdding({ ...adding, channelId: id ?? "" })} kind="text" placeholder="Channel this category posts in…" />
+          <RoleSelect guildId={guildId} value={adding.roleId ?? null} onChange={(id) => setAdding({ ...adding, roleId: id })} placeholder="No role ping (use command's)" />
+          <textarea
+            className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-sm min-h-16 font-mono"
+            placeholder="Leave blank to use the command's own announcement message"
+            value={adding.message ?? ""}
+            onChange={(e) => setAdding({ ...adding, message: e.target.value })}
+          />
+          <div className="flex gap-2">
+            <button onClick={add} disabled={busy} className="neon-button-sm disabled:opacity-50">
+              Add Category
+            </button>
+            <button
+              onClick={() => {
+                setAdding(null);
+                setError(null);
+              }}
+              className="text-xs text-slate-500 hover:text-slate-300 px-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(EMPTY_CATEGORY)} className="text-xs text-neon-blue hover:text-neon-purple">
+          + Add Category
+        </button>
+      )}
+      <FormError message={error} />
+    </div>
+  );
+}
+
 export default function LfgPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
   const confirm = useConfirm();
@@ -252,7 +401,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
         guildId={guildId}
         moduleKey="LFG"
         title="LFG — Looking For Group"
-        description="Members run !trigger or /trigger while in a voice channel to post an announcement pinging a role (and themselves). Each command is locked to one channel — create as many commands as you want, each with its own channel."
+        description="Members run !trigger or /trigger while in a voice channel to post an announcement pinging a role (and themselves). Each command is locked to one channel — create as many commands as you want, each with its own channel. Add categories to one command to let members pick a playlist (e.g. Ranked vs. Standard) that posts to its own channel and role."
       />
 
       <div className="flex gap-1 mb-5 border-b border-white/5">
@@ -303,7 +452,10 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
                       !{row.trigger} <span className="text-slate-600">/ /{row.trigger}</span>
                       {!row.enabled && <span className="ml-2 text-[10px] uppercase text-slate-500">Disabled</span>}
                     </p>
-                    <p className="text-xs text-slate-500 truncate">locked to a channel · {row.roleId ? "pings a role" : "no role ping"}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      locked to a channel · {row.roleId ? "pings a role" : "no role ping"}
+                      {row.categories.length > 0 ? ` · ${row.categories.length} categor${row.categories.length === 1 ? "y" : "ies"}` : ""}
+                    </p>
                   </button>
                   <div className="flex items-center gap-3 shrink-0">
                     <button onClick={() => (editingId === row.id ? setEditingId(null) : openEdit(row))} className="text-xs text-slate-500 hover:text-neon-blue">
@@ -318,10 +470,11 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
                 {editingId === row.id && (
                   <div className="mt-4 pt-4 border-t border-white/5">
                     <LfgFields guildId={guildId} value={form} onChange={(patch) => setForm({ ...form, ...patch })} />
-                    <button onClick={saveEdit} disabled={saving} className="neon-button disabled:opacity-50">
+                    <button onClick={saveEdit} disabled={saving} className="neon-button disabled:opacity-50 mb-4">
                       {saving ? "Saving…" : "Save Changes"}
                     </button>
                     <FormError message={error} />
+                    <CategoriesEditor guildId={guildId} commandId={row.id} categories={row.categories} onChange={refresh} />
                   </div>
                 )}
               </NeonCard>

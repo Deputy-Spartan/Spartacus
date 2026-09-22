@@ -1420,9 +1420,29 @@ model LfgCommand {
   wrongChannelMessage String   @default("This command can only be used in {channel}.")
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  categories          LfgCategory[]
 
   @@unique([guildId, trigger])
   @@unique([guildId, channelId])
+}
+
+// A playlist/queue choice on one LfgCommand (e.g. "Ranked", "Standard",
+// "Custom") — picked via a slash-command option, each with its own channel
+// and, optionally, its own role ping and announcement text. Anything left
+// blank falls back to the parent command's own setting.
+model LfgCategory {
+  id         String     @id @default(cuid())
+  lfgCommand LfgCommand @relation(fields: [lfgCommandId], references: [id], onDelete: Cascade)
+  lfgCommandId String
+  guildId    String
+  name       String
+  channelId  String
+  roleId     String?
+  message    String?
+  sortOrder  Int        @default(0)
+  createdAt  DateTime   @default(now())
+
+  @@unique([lfgCommandId, name])
 }
 
 // ---- Embed Creator ----

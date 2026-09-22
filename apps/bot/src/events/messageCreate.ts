@@ -107,7 +107,7 @@ export async function execute(message: Message) {
     const words = message.content.slice(1).trim().split(/\s+/);
     const word = (words.shift() || "").toLowerCase();
     if (word) {
-      const lfg = await prisma.lfgCommand.findUnique({ where: { guildId_trigger: { guildId: message.guildId, trigger: word } } });
+      const lfg = await prisma.lfgCommand.findUnique({ where: { guildId_trigger: { guildId: message.guildId, trigger: word } }, include: { categories: true } });
       if (lfg && lfg.enabled) {
         const { handleLfgMessage } = await import("../modules/community/lfg");
         await handleLfgMessage(message, lfg, words.join(" "));

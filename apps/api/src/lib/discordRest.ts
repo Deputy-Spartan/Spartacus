@@ -442,11 +442,12 @@ export async function getGuildCounts(guildId: string): Promise<GuildCounts | nul
   return { memberCount: data.approximate_member_count ?? 0, boostCount: data.premium_subscription_count ?? 0 };
 }
 
-interface AppCommandOption {
+export interface AppCommandOption {
   type: number; // 6 = USER
   name: string;
   description: string;
   required?: boolean;
+  choices?: Array<{ name: string; value: string | number }>;
 }
 
 interface AppCommandDef {

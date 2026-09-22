@@ -154,13 +154,13 @@ function LfgFields({
   );
 }
 
-const EMPTY_CATEGORY: LfgCategoryInput = { name: "", channelId: "", roleId: null, message: null };
+const EMPTY_CATEGORY: LfgCategoryInput = { name: "", roleId: null, message: null };
 
 // Playlists/queues for one command (e.g. "Ranked", "Standard", "Custom") —
 // picked from a dropdown when someone runs the slash command, each with its
 // own channel and, optionally, its own role ping and announcement text.
 // Only shown once the command already exists, since a category belongs to it.
-function CategoriesEditor({ guildId, commandId, commandChannelId, categories, onChange }: { guildId: string; commandId: string; commandChannelId: string; categories: LfgCategoryRow[]; onChange: () => void }) {
+function CategoriesEditor({ guildId, commandId, categories, onChange }: { guildId: string; commandId: string; categories: LfgCategoryRow[]; onChange: () => void }) {
   const [adding, setAdding] = useState<LfgCategoryInput | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: LfgCategoryInput } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +169,6 @@ function CategoriesEditor({ guildId, commandId, commandChannelId, categories, on
   async function add() {
     if (!adding) return;
     if (!adding.name.trim()) return setError("Enter a name for this category.");
-    if (!adding.channelId) return setError("Pick a channel for this category.");
     setBusy(true);
     setError(null);
     try {
@@ -209,8 +208,8 @@ function CategoriesEditor({ guildId, commandId, commandChannelId, categories, on
     <div className="mb-4 pb-4 border-b border-white/5">
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Categories (optional)</label>
       <p className="text-xs text-slate-600 mb-3">
-        Add playlists like "Ranked" or "Standard" and members pick one from a dropdown when they run the command — each can post in its own channel and
-        ping its own role. Leave empty to keep this a single command with no picker.
+        Add playlists like "Ranked" or "Standard" and members pick one from a dropdown when they run the command — all post to this command's own
+        channel, but each can ping its own role and use its own announcement text. Leave empty to keep this a single command with no picker.
       </p>
 
       <div className="space-y-2 mb-3">
@@ -224,7 +223,6 @@ function CategoriesEditor({ guildId, commandId, commandChannelId, categories, on
                   value={editing.value.name}
                   onChange={(e) => setEditing({ ...editing, value: { ...editing.value, name: e.target.value } })}
                 />
-                <ChannelSelect guildId={guildId} value={editing.value.channelId || null} onChange={(id) => setEditing({ ...editing, value: { ...editing.value, channelId: id ?? "" } })} kind="text" />
                 <RoleSelect guildId={guildId} value={editing.value.roleId ?? null} onChange={(id) => setEditing({ ...editing, value: { ...editing.value, roleId: id } })} placeholder="No role ping (use command's)" />
                 <textarea
                   className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-sm min-h-16 font-mono"
@@ -248,7 +246,7 @@ function CategoriesEditor({ guildId, commandId, commandChannelId, categories, on
                   <p className="text-xs text-slate-500 truncate">{c.roleId ? "pings its own role" : "uses command's role"} · {c.message ? "custom message" : "uses command's message"}</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => setEditing({ id: c.id, value: { name: c.name, channelId: c.channelId, roleId: c.roleId, message: c.message } })} className="text-xs text-slate-500 hover:text-neon-blue">
+                  <button onClick={() => setEditing({ id: c.id, value: { name: c.name, roleId: c.roleId, message: c.message } })} className="text-xs text-slate-500 hover:text-neon-blue">
                     Edit
                   </button>
                   <button onClick={() => remove(c.id)} disabled={busy} className="text-xs text-slate-500 hover:text-rose-400">
@@ -270,8 +268,6 @@ function CategoriesEditor({ guildId, commandId, commandChannelId, categories, on
             value={adding.name}
             onChange={(e) => setAdding({ ...adding, name: e.target.value })}
           />
-          <p className="text-xs text-slate-600 -mt-1">Starts on the command's own channel — change it only if this category should post somewhere else.</p>
-          <ChannelSelect guildId={guildId} value={adding.channelId || null} onChange={(id) => setAdding({ ...adding, channelId: id ?? "" })} kind="text" placeholder="Channel this category posts in…" />
           <RoleSelect guildId={guildId} value={adding.roleId ?? null} onChange={(id) => setAdding({ ...adding, roleId: id })} placeholder="No role ping (use command's)" />
           <textarea
             className="w-full bg-base-900 border border-white/10 rounded-lg p-2 text-sm min-h-16 font-mono"
@@ -295,7 +291,7 @@ function CategoriesEditor({ guildId, commandId, commandChannelId, categories, on
           </div>
         </div>
       ) : (
-        <button onClick={() => setAdding({ ...EMPTY_CATEGORY, channelId: commandChannelId })} className="text-xs text-neon-blue hover:text-neon-purple">
+        <button onClick={() => setAdding(EMPTY_CATEGORY)} className="text-xs text-neon-blue hover:text-neon-purple">
           + Add Category
         </button>
       )}
@@ -475,7 +471,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
                       {saving ? "Saving…" : "Save Changes"}
                     </button>
                     <FormError message={error} />
-                    <CategoriesEditor guildId={guildId} commandId={row.id} commandChannelId={row.channelId} categories={row.categories} onChange={refresh} />
+                    <CategoriesEditor guildId={guildId} commandId={row.id} categories={row.categories} onChange={refresh} />
                   </div>
                 )}
               </NeonCard>

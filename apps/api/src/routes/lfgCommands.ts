@@ -27,9 +27,10 @@ interface LfgBody {
   wrongChannelMessage?: string;
 }
 
+// A category always posts to its parent command's own channel — there is no
+// per-category channel override, so channelId is never read from the body.
 interface CategoryBody {
   name: string;
-  channelId: string;
   roleId?: string | null;
   message?: string | null;
   sortOrder?: number;
@@ -201,6 +202,14 @@ router.put("/guilds/:guildId/lfg-commands/:id", requireAuth, requireGuildPermiss
     },
     include: { categories: { orderBy: { sortOrder: "asc" } } },
   });
+
+  // Categories always follow the command's own channel — keep them in sync
+  // if it just changed.
+  if (channelId !== existing.channelId) {
+    await prisma.lfgCategory.updateMany({ where: { lfgCommandId: id }, data: { channelId } });
+    row.categories = row.categories.map((c) => ({ ...c, channelId }));
+  }
+
   res.json(row);
 });
 
@@ -226,7 +235,6 @@ router.post("/guilds/:guildId/lfg-commands/:id/categories", requireAuth, require
   const body = req.body as CategoryBody;
   const name = (body.name || "").trim();
   if (!name) return res.status(400).json({ error: "Enter a name for this category." });
-  if (!body.channelId) return res.status(400).json({ error: "Pick a channel for this category." });
 
   const dup = await prisma.lfgCategory.findUnique({ where: { lfgCommandId_name: { lfgCommandId: id, name } } });
   if (dup) return res.status(409).json({ error: `A category named "${name}" already exists on this command.` });
@@ -235,7 +243,7 @@ router.post("/guilds/:guildId/lfg-commands/:id/categories", requireAuth, require
   if (count >= 25) return res.status(400).json({ error: "A command can have at most 25 categories (Discord's own limit on choices)." });
 
   await prisma.lfgCategory.create({
-    data: { lfgCommandId: id, guildId, name, channelId: body.channelId, roleId: body.roleId || null, message: body.message || null, sortOrder: count },
+    data: { lfgCommandId: id, guildId, name, channelId: cmd.channelId, roleId: body.roleId || null, message: body.message || null, sortOrder: count },
   });
 
   const sync = await reregisterCommand(guildId, cmd);
@@ -263,7 +271,7 @@ router.put("/guilds/:guildId/lfg-commands/:id/categories/:categoryId", requireAu
     where: { id: categoryId },
     data: {
       name,
-      channelId: body.channelId || existing.channelId,
+      channelId: cmd.channelId, // keeps following the command if its own channel ever changes
       roleId: body.roleId !== undefined ? body.roleId || null : undefined,
       message: body.message !== undefined ? body.message || null : undefined,
     },

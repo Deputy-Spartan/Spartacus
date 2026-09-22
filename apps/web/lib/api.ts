@@ -274,7 +274,6 @@ export interface LfgCategoryRow {
 }
 export interface LfgCategoryInput {
   name: string;
-  channelId: string;
   roleId?: string | null;
   message?: string | null;
 }

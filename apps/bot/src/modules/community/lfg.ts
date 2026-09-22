@@ -46,9 +46,11 @@ interface EffectiveLfg {
 }
 
 function effective(cfg: LfgCommandWithCategories, category: LfgCategory | null): EffectiveLfg {
+  // A category never has its own channel — it always posts alongside the
+  // command itself, so channelId comes from cfg regardless of category.
   if (!category) return { channelId: cfg.channelId, roleId: cfg.roleId, includeSender: cfg.includeSender, message: cfg.message };
   return {
-    channelId: category.channelId,
+    channelId: cfg.channelId,
     roleId: category.roleId ?? cfg.roleId,
     includeSender: cfg.includeSender,
     message: category.message ?? cfg.message,

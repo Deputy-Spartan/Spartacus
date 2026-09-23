@@ -1,18 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type WelcomeConfig } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
+const WELCOME_TOKENS = [
+  { token: "{user}", description: "Mentions the member who joined or left" },
+  { token: "{server}", description: "The server's name" },
+];
+
 export default function WelcomePage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<WelcomeConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const welcomeRef = useRef<HTMLTextAreaElement>(null);
+  const goodbyeRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api.getWelcome(params.guildId).then(setConfig);
@@ -58,17 +66,21 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Welcome Message</label>
           <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 mb-4 focus:outline-none focus:ring-1 focus:ring-neon-blue"
+            ref={welcomeRef}
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 focus:outline-none focus:ring-1 focus:ring-neon-blue"
             value={config.welcomeText}
             onChange={(e) => setConfig({ ...config, welcomeText: e.target.value })}
           />
+          <PlaceholderExamples items={WELCOME_TOKENS} inputRef={welcomeRef} value={config.welcomeText} onChange={(v) => setConfig({ ...config, welcomeText: v })} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Goodbye Message</label>
           <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 mb-4 focus:outline-none focus:ring-1 focus:ring-neon-blue"
+            ref={goodbyeRef}
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 focus:outline-none focus:ring-1 focus:ring-neon-blue"
             value={config.goodbyeText}
             onChange={(e) => setConfig({ ...config, goodbyeText: e.target.value })}
           />
+          <PlaceholderExamples items={WELCOME_TOKENS} inputRef={goodbyeRef} value={config.goodbyeText} onChange={(v) => setConfig({ ...config, goodbyeText: v })} />
 
           <SavedEmbedPicker
             guildId={params.guildId}

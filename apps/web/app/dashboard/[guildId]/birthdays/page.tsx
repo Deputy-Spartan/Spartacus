@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 
@@ -14,8 +15,11 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
 ];
 
+const BIRTHDAY_TOKENS = [{ token: "{user}", description: "Mentions everyone whose birthday is today" }];
+
 export default function BirthdaysPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
+  const messageRef = useRef<HTMLTextAreaElement>(null);
   const [config, setConfig] = useState<BirthdayConfigRow | null>(null);
   const [birthdays, setBirthdays] = useState<BirthdayRow[]>([]);
 
@@ -59,12 +63,14 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Fallback Message</label>
           <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-2"
+            ref={messageRef}
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
             rows={2}
             value={config.embedMessage ?? ""}
             onChange={(e) => persist({ ...config, embedMessage: e.target.value })}
           />
-          <p className="text-xs text-slate-600 mb-4">Use {"{user}"} to mention everyone whose birthday is today. Sent as plain text when no saved embed is picked below.</p>
+          <PlaceholderExamples items={BIRTHDAY_TOKENS} inputRef={messageRef} value={config.embedMessage ?? ""} onChange={(v) => persist({ ...config, embedMessage: v })} />
+          <p className="text-xs text-slate-600 -mt-2 mb-4">Sent as plain text when no saved embed is picked below.</p>
 
           <SavedEmbedPicker guildId={params.guildId} value={config.savedEmbedId ?? null} onChange={(id) => persist({ ...config, savedEmbedId: id })} />
         </NeonCard>

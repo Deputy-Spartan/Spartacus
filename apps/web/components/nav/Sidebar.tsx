@@ -176,6 +176,7 @@ const OWNER_NAV_SECTION = {
   items: [
     { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
     { href: "/owner-panel", label: "Access Control", icon: "🔑" },
+    { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],
 };
 
@@ -229,23 +230,29 @@ export function Sidebar({
   // Not searching: categories collapse to one row each (icon + name), linking
   // to that category's own card grid — browsing a category's individual
   // pages happens there, not by expanding a list in the sidebar itself.
+  // Owner Only is small (owner-exclusive tools, not real "modules") and
+  // stays a regular expandable section instead of folding into that grid.
   const categoryRows = useMemo(
     () =>
-      baseSections.slice(1).map((s) => ({
-        href: s.section === "Owner Only" ? "/bot-customization" : `/modules?section=${encodeURIComponent(s.section as string)}`,
-        label: s.section as string,
-        icon: s.items[0]?.icon ?? "🧩",
-        owner: s.section === "Owner Only",
-      })),
+      baseSections
+        .slice(1)
+        .filter((s) => s.section !== "Owner Only")
+        .map((s) => ({
+          href: `/modules?section=${encodeURIComponent(s.section as string)}`,
+          label: s.section as string,
+          icon: s.items[0]?.icon ?? "🧩",
+        })),
     [baseSections]
   );
+  const ownerSection = useMemo(() => baseSections.find((s) => s.section === "Owner Only"), [baseSections]);
 
   const browseSections = useMemo(() => {
     const sections: Array<{ section: string | null; items: typeof allItems }> = [baseSections[0]];
     if (pinnedItems.length > 0) sections.push({ section: "Pinned", items: pinnedItems });
     sections.push({ section: "Categories", items: categoryRows });
+    if (ownerSection) sections.push(ownerSection);
     return sections;
-  }, [baseSections, pinnedItems, categoryRows]);
+  }, [baseSections, pinnedItems, categoryRows, ownerSection]);
 
   // Searching needs real pages to match against, not category names — swap
   // in the full per-page list (pinned items excluded from their category,

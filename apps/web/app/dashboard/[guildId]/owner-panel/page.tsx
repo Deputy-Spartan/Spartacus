@@ -4,126 +4,10 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type AccessAuditEntryRow, type AccessRequestRow, type DashboardAccessRow, type ChangelogEntryRow } from "../../../../lib/api";
+import { api, type AccessAuditEntryRow, type AccessRequestRow, type DashboardAccessRow } from "../../../../lib/api";
 import { useOwnerGuard } from "../../../../lib/useOwnerGuard";
 
-type Tab = "active" | "grant" | "audit" | "changelog";
-
-// The owner's "What's New" feed — posted here once, shown on every server's
-// Overview page and the bell badge in the header, since it isn't scoped to
-// this one guild.
-function ChangelogTab() {
-  const confirm = useConfirm();
-  const [entries, setEntries] = useState<ChangelogEntryRow[] | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function refresh() {
-    api.getChangelog().then(setEntries);
-  }
-  useEffect(refresh, []);
-
-  function startEdit(entry: ChangelogEntryRow) {
-    setEditingId(entry.id);
-    setTitle(entry.title);
-    setDescription(entry.description);
-    setError(null);
-  }
-  function startNew() {
-    setEditingId(null);
-    setTitle("");
-    setDescription("");
-    setError(null);
-  }
-
-  async function submit() {
-    if (!title.trim() || !description.trim()) return setError("Enter a title and description.");
-    setPosting(true);
-    setError(null);
-    try {
-      if (editingId) await api.updateChangelogEntry(editingId, { title, description });
-      else await api.addChangelogEntry(title, description);
-      startNew();
-      refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save");
-    }
-    setPosting(false);
-  }
-
-  async function remove(id: string) {
-    if (!(await confirm("Delete this update? It disappears from every server's Overview page immediately."))) return;
-    await api.deleteChangelogEntry(id);
-    if (editingId === id) startNew();
-    refresh();
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-      <NeonCard>
-        <p className="font-medium mb-1">{editingId ? "Edit Update" : "Post an Update"}</p>
-        <p className="text-xs text-slate-500 mb-3">
-          Shows on the "What's new" card on every server's Overview page, and lights up the 🔔 in the header for anyone who hasn't seen it yet.
-        </p>
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Title</label>
-        <input
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-          placeholder="LFG categories & the emoji picker"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Description</label>
-        <textarea
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-24 mb-4"
-          placeholder="What changed, in a sentence or two."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
-        <div className="flex gap-2">
-          <button onClick={submit} disabled={posting} className="neon-button disabled:opacity-50">
-            {posting ? "Saving…" : editingId ? "Save Changes" : "Post Update"}
-          </button>
-          {editingId && (
-            <button onClick={startNew} className="text-xs text-slate-500 hover:text-slate-300 px-3">
-              Cancel
-            </button>
-          )}
-        </div>
-        <FormError message={error} />
-      </NeonCard>
-
-      <NeonCard>
-        <p className="font-medium mb-3">Posted Updates</p>
-        {entries === null && <p className="text-sm text-slate-500">Loading…</p>}
-        {entries?.length === 0 && <p className="text-sm text-slate-500">Nothing posted yet.</p>}
-        <div className="divide-y divide-white/5">
-          {entries?.map((entry) => (
-            <div key={entry.id} className="py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{entry.title}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{entry.description}</p>
-                  <p className="text-[11px] text-slate-600 mt-1">{new Date(entry.createdAt).toLocaleString()}</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => startEdit(entry)} className="text-xs text-slate-500 hover:text-neon-blue">
-                    Edit
-                  </button>
-                  <button onClick={() => remove(entry.id)} className="text-xs text-slate-500 hover:text-rose-400">
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </NeonCard>
-    </div>
-  );
-}
+type Tab = "active" | "grant" | "audit";
 
 export default function OwnerPanelPage({ params }: { params: { guildId: string } }) {
   const ownerAccess = useOwnerGuard(params.guildId);
@@ -277,18 +161,7 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
         >
           Audit Log
         </button>
-        <button
-          onClick={() => setTab("changelog")}
-          className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "changelog" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
-          ].join(" ")}
-        >
-          What's New
-        </button>
       </div>
-
-      {tab === "changelog" && <ChangelogTab />}
 
       {tab === "active" && (
         <>

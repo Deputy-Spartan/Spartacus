@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api } from "../../../../lib/api";
 import { downloadCsv } from "../../../../lib/csv";
+import { useMemberNames } from "../../../../lib/useMemberNames";
 
 interface CaseRow {
   caseNumber: number;
@@ -17,6 +18,7 @@ interface CaseRow {
 
 export default function CasesPage({ params }: { params: { guildId: string } }) {
   const [cases, setCases] = useState<CaseRow[]>([]);
+  const { displayName } = useMemberNames(params.guildId, cases.flatMap((c) => [c.userId, c.moderatorId]));
 
   useEffect(() => {
     api.getCases(params.guildId).then(setCases);
@@ -66,7 +68,7 @@ export default function CasesPage({ params }: { params: { guildId: string } }) {
                 <span className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                User {c.userId} · by {c.moderatorId} {c.reason ? `— ${c.reason}` : ""}
+                {displayName(c.userId)} · by {displayName(c.moderatorId)} {c.reason ? `— ${c.reason}` : ""}
               </p>
             </div>
           ))}

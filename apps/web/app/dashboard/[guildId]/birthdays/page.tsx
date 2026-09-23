@@ -10,6 +10,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
+import { useMemberNames } from "../../../../lib/useMemberNames";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
@@ -22,6 +23,7 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
   const messageRef = useRef<HTMLTextAreaElement>(null);
   const [config, setConfig] = useState<BirthdayConfigRow | null>(null);
   const [birthdays, setBirthdays] = useState<BirthdayRow[]>([]);
+  const { displayName } = useMemberNames(params.guildId, birthdays.map((b) => b.userId));
 
   function refresh() {
     api.getBirthdayConfig(params.guildId).then(setConfig);
@@ -123,7 +125,7 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
               {birthdays.map((b) => (
                 <div key={b.id} className="flex items-center justify-between py-2 text-sm">
                   <span>
-                    {b.userId} — {MONTHS[b.month - 1]} {b.day}
+                    {displayName(b.userId)} — {MONTHS[b.month - 1]} {b.day}
                   </span>
                   <button onClick={() => remove(b.userId)} className="text-slate-500 hover:text-rose-400 text-xs">
                     Remove

@@ -15,8 +15,10 @@ import {
   type CustomAchievementRow,
   type CustomAchievementInput,
   type CustomAchievementTrigger,
+  type DiscordChannelOption,
 } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
+import { useMemberNames } from "../../../../lib/useMemberNames";
 
 const ACHIEVEMENT_LABELS: Record<string, string> = {
   FIRST_MESSAGE: "First Message",
@@ -169,16 +171,25 @@ function CustomAchievements({ guildId }: { guildId: string }) {
 export default function AchievementsPage({ params }: { params: { guildId: string } }) {
   const [rows, setRows] = useState<AchievementRow[] | null>(null);
   const [customLabels, setCustomLabels] = useState<Record<string, string>>({});
+  const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
+  const { displayName } = useMemberNames(params.guildId, (rows ?? []).map((r) => r.userId));
 
   useEffect(() => {
     api.getAchievements(params.guildId).then(setRows);
     api.getCustomAchievements(params.guildId).then((list) => setCustomLabels(Object.fromEntries(list.map((c) => [c.id, `${c.emoji} ${c.name}`]))));
+    api.getDiscordChannels(params.guildId).then((r) => setChannels([...r.textChannels, ...r.voiceChannels]));
   }, [params.guildId]);
 
   function labelFor(type: string): string {
     if (ACHIEVEMENT_LABELS[type]) return ACHIEVEMENT_LABELS[type];
     if (type.startsWith("CUSTOM:")) return customLabels[type.slice(7)] ?? "Custom achievement (deleted)";
     return type;
+  }
+
+  function channelLabel(channelId: string | null): string {
+    if (!channelId) return "not posted";
+    const c = channels.find((ch) => ch.id === channelId);
+    return c ? `#${c.name}` : "deleted channel";
   }
 
   return (
@@ -200,7 +211,10 @@ export default function AchievementsPage({ params }: { params: { guildId: string
         <div className="divide-y divide-white/5">
           {rows?.map((r) => (
             <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-              <span className="text-slate-300 truncate flex-1">{r.userId}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-slate-300 truncate">{displayName(r.userId)}</p>
+                <p className="text-xs text-slate-600 truncate">{channelLabel(r.channelId)}</p>
+              </div>
               <span className="text-neon-blue shrink-0">{labelFor(r.type)}</span>
               <span className="text-xs text-slate-600 shrink-0">{new Date(r.awardedAt).toLocaleString()}</span>
             </div>

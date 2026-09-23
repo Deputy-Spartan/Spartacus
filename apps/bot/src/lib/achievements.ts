@@ -19,8 +19,11 @@ export async function awardAchievement(
   const enabled = await isModuleEnabled(guildId, "ACHIEVEMENTS");
   if (!enabled) return false;
 
+  const settings = await prisma.achievementSettings.findUnique({ where: { guildId } });
+  const channelId = settings?.channelId || fallbackChannelId || null;
+
   try {
-    await prisma.achievement.create({ data: { guildId, userId, type } });
+    await prisma.achievement.create({ data: { guildId, userId, type, channelId } });
   } catch (err: unknown) {
     // P2002 = unique constraint violation — this achievement was already
     // awarded to this user in this guild. Cheaper than a SELECT-then-insert
@@ -31,8 +34,6 @@ export async function awardAchievement(
     throw err;
   }
 
-  const settings = await prisma.achievementSettings.findUnique({ where: { guildId } });
-  const channelId = settings?.channelId || fallbackChannelId;
   if (channelId) {
     const channel = await client.channels.fetch(channelId).catch(() => null);
     if (channel && isSendableChannel(channel)) {

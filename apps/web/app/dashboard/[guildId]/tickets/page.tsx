@@ -11,6 +11,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { useMemberNames } from "../../../../lib/useMemberNames";
 import {
   api,
   type DiscordChannelOption,
@@ -636,6 +637,8 @@ function TranscriptsTab({ guildId }: { guildId: string }) {
   const [destChannelId, setDestChannelId] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const withTranscriptsIds = tickets.filter((t) => t.transcriptUrl).map((t) => t.userId);
+  const { displayName } = useMemberNames(guildId, withTranscriptsIds);
 
   function refresh() {
     api.getTickets(guildId, { view: "all" }).then(setTickets);
@@ -733,7 +736,7 @@ function TranscriptsTab({ guildId }: { guildId: string }) {
                 <div>
                   <p className="font-medium">Ticket #{t.ticketNumber}</p>
                   <p className="text-xs text-slate-500">
-                    Opened by <code>{t.userId}</code> · {t.closedAt ? new Date(t.closedAt).toLocaleString() : "still open"}
+                    Opened by {displayName(t.userId)} · {t.closedAt ? new Date(t.closedAt).toLocaleString() : "still open"}
                   </p>
                 </div>
                 <a href={t.transcriptUrl ?? "#"} target="_blank" rel="noreferrer" className="text-xs text-neon-blue hover:underline">
@@ -759,6 +762,7 @@ function TicketsTab({ guildId }: { guildId: string }) {
   const [types, setTypes] = useState<TicketTypeRow[]>([]);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const { displayName } = useMemberNames(guildId, tickets.flatMap((t) => [t.userId, t.claimedById]).filter((id): id is string => !!id));
 
   function refresh() {
     api.getTicketCounts(guildId).then(setCounts);
@@ -841,7 +845,7 @@ function TicketsTab({ guildId }: { guildId: string }) {
                       <span className="text-xs text-slate-500">({t.status.toLowerCase()})</span>
                     </p>
                     <p className="text-xs text-slate-500 truncate">
-                      Opened by {t.userId} {t.claimedById ? `· claimed by ${t.claimedById}` : ""} {t.closeReason ? `· "${t.closeReason}"` : ""}
+                      Opened by {displayName(t.userId)} {t.claimedById ? `· claimed by ${displayName(t.claimedById)}` : ""} {t.closeReason ? `· "${t.closeReason}"` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
@@ -1158,6 +1162,7 @@ function AnalyticsTab({ guildId }: { guildId: string }) {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<TicketAnalytics | null>(null);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const { displayName } = useMemberNames(guildId, (data?.staffLeaderboard ?? []).map((s) => s.userId));
 
   useEffect(() => {
     api.getTicketAnalytics(guildId, days).then(setData);
@@ -1251,7 +1256,7 @@ function AnalyticsTab({ guildId }: { guildId: string }) {
               {data.staffLeaderboard.map((s, i) => (
                 <div key={s.userId} className="flex items-center justify-between text-sm">
                   <span>
-                    {i + 1}. {s.userId}
+                    {i + 1}. {displayName(s.userId)}
                   </span>
                   <span className="text-slate-400">{s.count} closed</span>
                 </div>

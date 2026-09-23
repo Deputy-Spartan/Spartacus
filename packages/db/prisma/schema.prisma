@@ -1812,6 +1812,7 @@ model Achievement {
   guildId   String
   userId    String
   type      String // FIRST_MESSAGE | LEVEL_10 | LEVEL_25 | LEVEL_50 | STREAK_7 | STREAK_30 | VOICE_10H | VOICE_50H | CUSTOM:<CustomAchievement.id>
+  channelId String? // where it was announced (the configured channel, or wherever it was earned) — null if nothing was sendable
   awardedAt DateTime @default(now())
 
   @@unique([guildId, userId, type])

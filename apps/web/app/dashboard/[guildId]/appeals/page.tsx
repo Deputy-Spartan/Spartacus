@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type AppealRow, type AppealSettingsRow } from "../../../../lib/api";
+import { useMemberNames } from "../../../../lib/useMemberNames";
 
 const STATUS_STYLES: Record<AppealRow["status"], string> = {
   PENDING: "bg-amber-500/20 text-amber-300",
@@ -15,6 +16,10 @@ const STATUS_STYLES: Record<AppealRow["status"], string> = {
 export default function AppealsPage({ params }: { params: { guildId: string } }) {
   const [settings, setSettings] = useState<AppealSettingsRow | null>(null);
   const [rows, setRows] = useState<AppealRow[] | null>(null);
+  const { displayName } = useMemberNames(
+    params.guildId,
+    (rows ?? []).flatMap((r) => [r.userId, r.resolvedBy]).filter((id): id is string => !!id)
+  );
 
   useEffect(() => {
     api.getAppealSettings(params.guildId).then(setSettings);
@@ -59,11 +64,11 @@ export default function AppealsPage({ params }: { params: { guildId: string } })
             <div key={r.id} className="py-3">
               <div className="flex items-center gap-2 mb-1">
                 <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_STYLES[r.status]}`}>{r.status}</span>
-                <span className="text-sm text-slate-300">User {r.userId}</span>
+                <span className="text-sm text-slate-300">{displayName(r.userId)}</span>
                 <span className="text-xs text-slate-600 ml-auto">{new Date(r.createdAt).toLocaleString()}</span>
               </div>
               <p className="text-sm text-slate-400">{r.reason}</p>
-              {r.resolvedBy && <p className="text-xs text-slate-600 mt-1">Resolved by {r.resolvedBy}</p>}
+              {r.resolvedBy && <p className="text-xs text-slate-600 mt-1">Resolved by {displayName(r.resolvedBy)}</p>}
             </div>
           ))}
         </div>

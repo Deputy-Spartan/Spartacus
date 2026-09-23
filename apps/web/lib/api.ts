@@ -1152,6 +1152,7 @@ export interface AchievementRow {
   id: string;
   userId: string;
   type: string;
+  channelId: string | null;
   awardedAt: string;
 }
 

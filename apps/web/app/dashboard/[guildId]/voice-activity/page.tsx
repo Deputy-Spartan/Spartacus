@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type VoiceActivityRow } from "../../../../lib/api";
+import { useMemberNames } from "../../../../lib/useMemberNames";
 
 function formatMinutes(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);
@@ -19,6 +20,7 @@ export default function VoiceActivityPage({ params }: { params: { guildId: strin
   }, [params.guildId]);
 
   const top20 = rows?.slice(0, 20) ?? [];
+  const { displayName } = useMemberNames(params.guildId, top20.map((r) => r.userId));
 
   return (
     <div>
@@ -37,7 +39,7 @@ export default function VoiceActivityPage({ params }: { params: { guildId: strin
           {top20.map((r, i) => (
             <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
               <span className="text-slate-500 w-6 shrink-0">#{i + 1}</span>
-              <span className="text-slate-300 truncate flex-1">{r.userId}</span>
+              <span className="text-slate-300 truncate flex-1">{displayName(r.userId)}</span>
               <span className="text-neon-blue font-medium shrink-0">{formatMinutes(r.totalMinutes)}</span>
             </div>
           ))}

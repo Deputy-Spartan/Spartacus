@@ -1712,6 +1712,25 @@ model PinnedModule {
   @@index([guildId, userId])
 }
 
+// A site-wide "what's new" post the owner writes once from the dashboard —
+// shows on every server's Overview page (not scoped to one Guild), so every
+// admin using the bot sees the same announcement.
+model ChangelogEntry {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+// Tracks the newest ChangelogEntry each dashboard user has seen, so the
+// unread bell badge and the Overview card both know what's new to THEM —
+// keyed by Discord user id, so it follows their account across devices.
+model ChangelogSeen {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  lastSeenAt DateTime @default(now())
+}
+
 model DashboardAuditEntry {
   id        String   @id @default(cuid())
   guild     Guild    @relation(fields: [guildId], references: [id])

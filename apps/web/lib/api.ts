@@ -1162,6 +1162,13 @@ export interface LevelingSettingsRow {
   levelUpMessage: string;
 }
 
+export interface ChangelogEntryRow {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+}
+
 export interface AchievementSettingsRow {
   guildId: string;
   channelId: string | null;
@@ -1656,6 +1663,15 @@ export const api = {
 
   getVoiceActivity: (guildId: string) => request<VoiceActivityRow[]>(`/guilds/${guildId}/voice-activity`),
   getAchievements: (guildId: string) => request<AchievementRow[]>(`/guilds/${guildId}/achievements`),
+  getChangelog: () => request<ChangelogEntryRow[]>(`/changelog`),
+  getChangelogUnseenCount: () => request<{ count: number }>(`/changelog/unseen-count`),
+  markChangelogSeen: () => request<{ userId: string }>(`/changelog/mark-seen`, { method: "POST" }),
+  addChangelogEntry: (title: string, description: string) =>
+    request<ChangelogEntryRow>(`/changelog`, { method: "POST", body: JSON.stringify({ title, description }) }),
+  updateChangelogEntry: (id: string, input: Partial<{ title: string; description: string }>) =>
+    request<ChangelogEntryRow>(`/changelog/${id}`, { method: "PATCH", body: JSON.stringify(input) }),
+  deleteChangelogEntry: (id: string) => request(`/changelog/${id}`, { method: "DELETE" }),
+
   getAchievementSettings: (guildId: string) => request<AchievementSettingsRow>(`/guilds/${guildId}/achievement-settings`),
   setAchievementSettings: (guildId: string, input: Partial<AchievementSettingsRow>) =>
     request<AchievementSettingsRow>(`/guilds/${guildId}/achievement-settings`, { method: "PATCH", body: JSON.stringify(input) }),

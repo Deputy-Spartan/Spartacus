@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BotStatusBadge } from "./BotStatusBadge";
 import { clearToken } from "../../lib/api";
+import { useChangelogUnseenCount } from "../../lib/useChangelogUnseen";
 
 interface Guild {
   id: string;
@@ -23,6 +25,7 @@ interface TopHeaderProps {
 export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick, sidebarOpen }: TopHeaderProps) {
   const router = useRouter();
   const installedGuilds = guilds.filter((g) => g.botInstalled);
+  const unseenChangelog = useChangelogUnseenCount();
 
   function logout() {
     clearToken();
@@ -55,6 +58,18 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         <BotStatusBadge />
+        <Link
+          href={`/dashboard/${activeGuildId}`}
+          title={unseenChangelog > 0 ? `${unseenChangelog} new update${unseenChangelog === 1 ? "" : "s"}` : "What's new"}
+          className="relative shrink-0 text-slate-400 hover:text-neon-blue text-lg leading-none p-1"
+        >
+          🔔
+          {unseenChangelog > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+              {unseenChangelog > 9 ? "9+" : unseenChangelog}
+            </span>
+          )}
+        </Link>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("spartacus:open-command-palette"))}
           className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 hover:text-neon-blue border border-white/10 rounded-lg px-2.5 py-1.5 transition-colors"

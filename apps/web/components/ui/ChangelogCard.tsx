@@ -2,35 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "./NeonCard";
-import { CHANGELOG, LATEST_CHANGELOG_ID } from "../../lib/changelog";
+import { api, type ChangelogEntryRow } from "../../lib/api";
 
-const DISMISS_KEY = "spartacus_changelog_dismissed";
-
-// Dismissed per-browser, not per-account — reappears automatically once
-// LATEST_CHANGELOG_ID moves past whatever the viewer last dismissed, so a
-// new feature always gets seen at least once without needing a real
-// notification system.
+// Owner-authored posts (Owner Panel → What's New), shown here to every
+// server's dashboard. "Seen" is tracked server-side per account, so
+// dismissing on one device clears the bell badge everywhere else too.
 export function ChangelogCard() {
-  const [dismissed, setDismissed] = useState(true); // default hidden until we've checked localStorage, avoids a flash
+  const [entries, setEntries] = useState<ChangelogEntryRow[] | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    try {
-      setDismissed(localStorage.getItem(DISMISS_KEY) === LATEST_CHANGELOG_ID);
-    } catch {
-      setDismissed(false);
-    }
+    api.getChangelog().then(setEntries);
   }, []);
 
   function dismiss() {
     setDismissed(true);
-    try {
-      localStorage.setItem(DISMISS_KEY, LATEST_CHANGELOG_ID);
-    } catch {
-      // localStorage unavailable — worst case it shows again next visit, harmless
-    }
+    api.markChangelogSeen().then(() => window.dispatchEvent(new Event("spartacus:changelog-seen")));
   }
 
-  if (dismissed || CHANGELOG.length === 0) return null;
+  if (dismissed || !entries || entries.length === 0) return null;
 
   return (
     <NeonCard className="mb-4">
@@ -41,8 +31,8 @@ export function ChangelogCard() {
         </button>
       </div>
       <div className="space-y-3">
-        {CHANGELOG.slice(0, 3).map((entry) => (
-          <div key={entry.date + entry.title}>
+        {entries.slice(0, 3).map((entry) => (
+          <div key={entry.id}>
             <p className="text-sm font-medium text-slate-200">{entry.title}</p>
             <p className="text-xs text-slate-500 mt-0.5">{entry.description}</p>
           </div>

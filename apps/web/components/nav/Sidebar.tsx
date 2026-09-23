@@ -65,6 +65,14 @@ export const NAV_MODULE_KEYS: Record<string, string> = {
   "/server-templates": "SERVER_TEMPLATES",
 };
 
+// Reverse of NAV_MODULE_KEYS — first href that gates a given ModuleKey wins,
+// for anywhere that only has the key (e.g. Overview's Enabled Modules list)
+// and needs somewhere to link a module to.
+export const MODULE_KEY_TO_HREF: Record<string, string> = {};
+for (const [href, key] of Object.entries(NAV_MODULE_KEYS)) {
+  if (!(key in MODULE_KEY_TO_HREF)) MODULE_KEY_TO_HREF[key] = href;
+}
+
 export const NAV_SECTIONS = [
   {
     section: null,

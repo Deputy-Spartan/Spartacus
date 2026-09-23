@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { NeonCard } from "../../../components/ui/NeonCard";
 import { ChangelogCard } from "../../../components/ui/ChangelogCard";
+import { MODULE_KEY_TO_HREF } from "../../../components/nav/Sidebar";
 import { MODULE_KEYS, MODULE_LABELS, type ModuleKey } from "@spartacus/shared";
 import { api, type DashboardActivityEntry, type ModuleState } from "../../../lib/api";
 import { useBotStatus } from "../../../lib/useBotStatus";
@@ -117,11 +118,19 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
             <p className="text-sm text-slate-500">Nothing is turned on yet — head to Modules to get started.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {enabledKeys.map((k) => (
-                <span key={k} className="px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10 text-slate-300">
-                  {MODULE_LABELS[k]}
-                </span>
-              ))}
+              {enabledKeys.map((k) => {
+                const href = MODULE_KEY_TO_HREF[k];
+                const className = "px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10 text-slate-300 transition-colors";
+                return href ? (
+                  <Link key={k} href={`/dashboard/${params.guildId}${href}`} className={`${className} hover:border-neon-blue/40 hover:text-neon-blue`}>
+                    {MODULE_LABELS[k]}
+                  </Link>
+                ) : (
+                  <span key={k} className={className}>
+                    {MODULE_LABELS[k]}
+                  </span>
+                );
+              })}
             </div>
           )}
         </NeonCard>

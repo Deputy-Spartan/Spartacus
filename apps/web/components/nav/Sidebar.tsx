@@ -219,7 +219,14 @@ export function Sidebar({
   const allSections = useMemo(() => {
     const pinnedItems = allItems.filter((item) => isPinned(item.href));
     if (pinnedItems.length === 0) return baseSections;
-    return [baseSections[0], { section: "Pinned", items: pinnedItems }, ...baseSections.slice(1)];
+    // A pinned item only needs to appear once — drop it from its original
+    // category now that it's up top, or pinning just adds a duplicate
+    // instead of cutting clutter.
+    const rest = baseSections
+      .slice(1)
+      .map((s) => ({ ...s, items: s.items.filter((item) => !isPinned(item.href)) }))
+      .filter((s) => s.items.length > 0); // everything in this category got pinned — nothing left to show
+    return [baseSections[0], { section: "Pinned", items: pinnedItems }, ...rest];
   }, [baseSections, allItems, isPinned]);
 
   const filtered = useMemo(() => {

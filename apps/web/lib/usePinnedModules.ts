@@ -1,58 +1,47 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { api } from "./api";
 
-// Which sidebar pages this browser has pinned, per server. A per-viewer
-// convenience (like a remembered tab), so it's plain localStorage — never
-// synced, never read back by Claude, and safe to come back empty (private
-// window, cleared site data, etc).
-function storageKey(guildId: string): string {
-  return `spartacus-pinned:${guildId}`;
-}
-
-function read(guildId: string): string[] {
-  try {
-    const raw = localStorage.getItem(storageKey(guildId));
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-// localStorage's own "storage" event only fires in OTHER tabs, not the one
-// that wrote it — this custom event is how the sidebar and the Modules grid
-// (different components, same tab) stay in sync when a pin toggles.
+// Which sidebar pages this account has pinned, per server — stored on the
+// backend against the logged-in Discord user id, so it follows the account
+// to any device, not just this browser.
+//
+// A tiny in-memory cache + event bus keeps the sidebar and the Modules grid
+// (two separate hook instances, same tab) showing the same pins the instant
+// either one changes something, without both re-fetching on every render.
+const cache = new Map<string, string[]>();
 const EVENT = "spartacus-pins-changed";
 
+function dispatch(guildId: string, pinned: string[]) {
+  cache.set(guildId, pinned);
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: { guildId, pinned } }));
+}
+
 export function usePinnedModules(guildId: string) {
-  const [pinned, setPinned] = useState<string[]>([]);
+  const [pinned, setPinned] = useState<string[]>(() => cache.get(guildId) ?? []);
 
   useEffect(() => {
-    setPinned(read(guildId));
-    function onChange() {
-      setPinned(read(guildId));
+    const cached = cache.get(guildId);
+    if (cached) setPinned(cached);
+    else api.getPinnedModules(guildId).then((rows) => dispatch(guildId, rows));
+
+    function onChange(e: Event) {
+      const detail = (e as CustomEvent<{ guildId: string; pinned: string[] }>).detail;
+      if (detail.guildId === guildId) setPinned(detail.pinned);
     }
     window.addEventListener(EVENT, onChange);
-    window.addEventListener("storage", onChange);
-    return () => {
-      window.removeEventListener(EVENT, onChange);
-      window.removeEventListener("storage", onChange);
-    };
+    return () => window.removeEventListener(EVENT, onChange);
   }, [guildId]);
 
   const isPinned = useCallback((href: string) => pinned.includes(href), [pinned]);
 
   const togglePin = useCallback(
     (href: string) => {
-      const next = pinned.includes(href) ? pinned.filter((h) => h !== href) : [...pinned, href];
-      try {
-        localStorage.setItem(storageKey(guildId), JSON.stringify(next));
-      } catch {
-        /* private window / storage blocked — pin just won't survive a reload */
-      }
-      setPinned(next);
-      window.dispatchEvent(new Event(EVENT));
+      const willPin = !pinned.includes(href);
+      const optimistic = willPin ? [...pinned, href] : pinned.filter((h) => h !== href);
+      dispatch(guildId, optimistic);
+      api.setPinnedModule(guildId, href, willPin).then((rows) => dispatch(guildId, rows)).catch(() => dispatch(guildId, pinned)); // roll back on failure
     },
     [guildId, pinned]
   );

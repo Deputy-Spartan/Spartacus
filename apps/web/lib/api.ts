@@ -1385,6 +1385,9 @@ export const api = {
     request(`/guilds/${guildId}/stream-subscriptions/${id}`, { method: "DELETE" }),
 
   getDiscordChannels: (guildId: string) => request<DiscordChannels>(`/guilds/${guildId}/discord/channels`),
+  getPinnedModules: (guildId: string) => request<string[]>(`/guilds/${guildId}/pinned-modules`),
+  setPinnedModule: (guildId: string, href: string, pinned: boolean) =>
+    request<string[]>(`/guilds/${guildId}/pinned-modules/${encodeURIComponent(href)}`, { method: "PUT", body: JSON.stringify({ pinned }) }),
   getDiscordEmojis: (guildId: string) => request<DiscordEmojiOption[]>(`/guilds/${guildId}/discord/emojis`),
   getDiscordRoles: (guildId: string) => request<DiscordRoleOption[]>(`/guilds/${guildId}/discord/roles`),
   getDiscordMembers: (guildId: string, ids: string[]) =>

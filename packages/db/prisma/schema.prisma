@@ -82,6 +82,7 @@ model Guild {
   eventTemplates    EventTemplate[]
   eventSettings     EventSettings?
   dashboardAuditEntries DashboardAuditEntry[]
+  pinnedModules     PinnedModule[]
   rolePanels        RolePanel[]
   announcements     Announcement[]
   autoPurgeConfigs  AutoPurgeConfig[]
@@ -1695,6 +1696,21 @@ model ApplicationSettings {
 }
 
 // ---- Dashboard Activity ----
+
+// A dashboard user's pinned sidebar links for one server — synced to
+// their account (keyed by Discord user id) rather than the browser, so it
+// follows them between devices the way the rest of the dashboard does.
+model PinnedModule {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  userId    String
+  href      String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId, href])
+  @@index([guildId, userId])
+}
 
 model DashboardAuditEntry {
   id        String   @id @default(cuid())

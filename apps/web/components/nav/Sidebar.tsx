@@ -216,32 +216,53 @@ export function Sidebar({
   // look up an item's label/icon regardless of which category it lives in.
   const allItems = useMemo(() => baseSections.flatMap((s) => s.items), [baseSections]);
 
-  const allSections = useMemo(() => {
-    const pinnedItems = allItems.filter((item) => isPinned(item.href));
-    if (pinnedItems.length === 0) return baseSections;
-    // A pinned item only needs to appear once — drop it from its original
-    // category now that it's up top, or pinning just adds a duplicate
-    // instead of cutting clutter.
+  const pinnedItems = useMemo(() => allItems.filter((item) => isPinned(item.href)), [allItems, isPinned]);
+
+  // Not searching: categories collapse to one row each (icon + name), linking
+  // to that category's own card grid — browsing a category's individual
+  // pages happens there, not by expanding a list in the sidebar itself.
+  const categoryRows = useMemo(
+    () =>
+      baseSections.slice(1).map((s) => ({
+        href: s.section === "Owner Only" ? "/bot-customization" : `/modules?section=${encodeURIComponent(s.section as string)}`,
+        label: s.section as string,
+        icon: s.items[0]?.icon ?? "🧩",
+        owner: s.section === "Owner Only",
+      })),
+    [baseSections]
+  );
+
+  const browseSections = useMemo(() => {
+    const sections: Array<{ section: string | null; items: typeof allItems }> = [baseSections[0]];
+    if (pinnedItems.length > 0) sections.push({ section: "Pinned", items: pinnedItems });
+    sections.push({ section: "Categories", items: categoryRows });
+    return sections;
+  }, [baseSections, pinnedItems, categoryRows]);
+
+  // Searching needs real pages to match against, not category names — swap
+  // in the full per-page list (pinned items excluded from their category,
+  // same as the unfiltered view) only while there's a query.
+  const searchSections = useMemo(() => {
     const rest = baseSections
       .slice(1)
       .map((s) => ({ ...s, items: s.items.filter((item) => !isPinned(item.href)) }))
-      .filter((s) => s.items.length > 0); // everything in this category got pinned — nothing left to show
-    return [baseSections[0], { section: "Pinned", items: pinnedItems }, ...rest];
-  }, [baseSections, allItems, isPinned]);
+      .filter((s) => s.items.length > 0);
+    return [baseSections[0], ...(pinnedItems.length > 0 ? [{ section: "Pinned", items: pinnedItems }] : []), ...rest];
+  }, [baseSections, pinnedItems, isPinned]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allSections;
-    return allSections
+    if (!q) return browseSections;
+    return searchSections
       .map((section) => ({
         ...section,
         items: section.items.filter((item) => item.label.toLowerCase().includes(q)),
       }))
       .filter((section) => section.items.length > 0);
-  }, [query, allSections]);
+  }, [query, browseSections, searchSections]);
 
   const searching = query.trim().length > 0;
-  const sectionKeys = useMemo(() => allSections.filter((s) => s.section).map((s) => s.section as string), [allSections]);
+  const sectionKeys = useMemo(() => browseSections.filter((s) => s.section).map((s) => s.section as string), [browseSections]);
   const allCollapsed = sectionKeys.length > 0 && sectionKeys.every((k) => collapsed[k]);
 
   function toggleSection(key: string) {
@@ -324,7 +345,32 @@ export function Sidebar({
               )}
               {!isCollapsed && (
                 <div className="space-y-1">
-                  {section.items.map((item) => {
+                  {section.section === "Categories"
+                    ? section.items.map((cat) => {
+                        const rawHref = cat.href as string;
+                        const href = `/dashboard/${guildId}${rawHref}`;
+                        // Both the plain path and its filtered ?section= variant count as "on this category".
+                        const active = pathname + (typeof window !== "undefined" ? window.location.search : "") === href || pathname === href.split("?")[0];
+                        return (
+                          <Link
+                            key={rawHref}
+                            href={href}
+                            onClick={onNavigate}
+                            className={[
+                              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                              active
+                                ? "bg-base-800 text-neon-blue shadow-glow-blue"
+                                : (cat as { owner?: boolean }).owner
+                                  ? "text-purple-300 hover:text-purple-100 hover:bg-base-800/60"
+                                  : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
+                            ].join(" ")}
+                          >
+                            <span>{cat.icon}</span>
+                            <span className="flex-1 min-w-0 truncate">{cat.label}</span>
+                          </Link>
+                        );
+                      })
+                    : section.items.map((item) => {
                     const href = `/dashboard/${guildId}${item.href}`;
                     const active = pathname === href;
                     const moduleKey = NAV_MODULE_KEYS[item.href];

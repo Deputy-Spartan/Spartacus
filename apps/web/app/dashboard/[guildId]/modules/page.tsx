@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { NAV_SECTIONS, NAV_MODULE_KEYS } from "../../../../components/nav/Sidebar";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
@@ -11,12 +12,15 @@ import Link from "next/link";
 // Every card here mirrors a real sidebar link — same grouping, same order —
 // so this page reads as "the sidebar, laid out as a grid" rather than a
 // second, different module list to keep in sync by hand.
-const GRID_SECTIONS = NAV_SECTIONS.filter((s) => s.section && s.section !== "Owner Only");
+const ALL_GRID_SECTIONS = NAV_SECTIONS.filter((s) => s.section && s.section !== "Owner Only");
 
-export default function ModulesPage({ params }: { params: { guildId: string } }) {
-  const guildId = params.guildId;
+function ModulesContent({ guildId }: { guildId: string }) {
   const [state, setState] = useState<Record<string, ModuleState> | null>(null);
   const { isPinned, togglePin } = usePinnedModules(guildId);
+  // A sidebar category link (e.g. "Moderation") opens straight to its own
+  // grid via ?section=; the plain "Modules" link shows every category.
+  const sectionFilter = useSearchParams().get("section");
+  const GRID_SECTIONS = sectionFilter ? ALL_GRID_SECTIONS.filter((s) => s.section === sectionFilter) : ALL_GRID_SECTIONS;
 
   useEffect(() => {
     api.getModules(guildId).then(setState);
@@ -31,13 +35,23 @@ export default function ModulesPage({ params }: { params: { guildId: string } })
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Modules</h1>
-      <p className="text-slate-400 mb-6">Browse every part of Spartacus by category, see what's on at a glance, and pin your daily ones to the top of the sidebar.</p>
+      {sectionFilter && (
+        <Link href={`/dashboard/${guildId}/modules`} className="text-xs text-neon-blue hover:text-neon-purple mb-3 inline-block">
+          ← All Categories
+        </Link>
+      )}
+      <h1 className="text-2xl font-bold mb-1">{sectionFilter ?? "Modules"}</h1>
+      <p className="text-slate-400 mb-6">
+        {sectionFilter
+          ? "See what's on at a glance, and pin your daily ones to the top of the sidebar."
+          : "Browse every part of Spartacus by category, see what's on at a glance, and pin your daily ones to the top of the sidebar."}
+      </p>
+      {GRID_SECTIONS.length === 0 && <p className="text-sm text-slate-500">No category matches "{sectionFilter}".</p>}
 
       <div className="space-y-8">
         {GRID_SECTIONS.map((section) => (
           <div key={section.section}>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{section.section}</h2>
+            {!sectionFilter && <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{section.section}</h2>}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {section.items.map((item) => {
                 const moduleKey = NAV_MODULE_KEYS[item.href];
@@ -81,5 +95,13 @@ export default function ModulesPage({ params }: { params: { guildId: string } })
         ))}
       </div>
     </div>
+  );
+}
+
+export default function ModulesPage({ params }: { params: { guildId: string } }) {
+  return (
+    <Suspense fallback={<p className="text-slate-500 text-sm">Loading…</p>}>
+      <ModulesContent guildId={params.guildId} />
+    </Suspense>
   );
 }

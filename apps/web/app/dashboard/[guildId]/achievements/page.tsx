@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ChannelOverrideField } from "../../../../components/ui/ChannelOverrideField";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -51,10 +51,13 @@ function AnnouncementSettings({ guildId }: { guildId: string }) {
   return (
     <NeonCard className="max-w-lg mb-5">
       <p className="font-medium mb-1">Achievement Announcements</p>
-      <p className="text-xs text-slate-500 mb-3">
-        Pick a channel so every achievement — built-in or custom — always posts there, instead of wherever it happened to be earned.
-      </p>
-      <ChannelSelect guildId={guildId} value={settings.channelId} onChange={(id) => setSettings({ ...settings, channelId: id })} kind="text" placeholder="Whatever channel triggered it" />
+      <ChannelOverrideField
+        guildId={guildId}
+        value={settings.channelId}
+        onChange={(id) => setSettings({ ...settings, channelId: id })}
+        label="Post to a specific channel"
+        fallbackNote="Off — achievements post in whatever channel the action that earned them happened in."
+      />
       <SaveStatus status={autoSave} />
     </NeonCard>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { ChannelOverrideField } from "../../../../components/ui/ChannelOverrideField";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
@@ -32,9 +32,13 @@ function LevelUpSettings({ guildId }: { guildId: string }) {
   return (
     <NeonCard className="max-w-lg mb-5">
       <p className="font-medium mb-1">Level-Up Announcements</p>
-      <p className="text-xs text-slate-500 mb-3">Pick a channel so level-ups always post there — otherwise the bot posts in whatever channel the message happened in.</p>
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
-      <ChannelSelect guildId={guildId} value={settings.channelId} onChange={(id) => setSettings({ ...settings, channelId: id })} kind="text" placeholder="Whatever channel triggered it" />
+      <ChannelOverrideField
+        guildId={guildId}
+        value={settings.channelId}
+        onChange={(id) => setSettings({ ...settings, channelId: id })}
+        label="Post to a specific channel"
+        fallbackNote="Off — level-ups post in whatever channel the message that triggered them was sent in."
+      />
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
       <textarea
         ref={messageRef}

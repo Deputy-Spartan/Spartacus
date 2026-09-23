@@ -30,4 +30,28 @@ router.get(
   }
 );
 
+// Where level-up announcements post — without this, the bot posts in
+// whatever channel the XP-earning message happened to be sent in.
+router.get("/guilds/:guildId/leveling-settings", requireAuth, requireGuildPermission, async (req, res) => {
+  const row = await prisma.levelingSettings.findUnique({ where: { guildId: req.params.guildId } });
+  res.json(row ?? { guildId: req.params.guildId, channelId: null, levelUpMessage: "🎉 {user} just reached **Level {level}**!" });
+});
+
+router.patch("/guilds/:guildId/leveling-settings", requireAuth, requireGuildPermission, async (req, res) => {
+  const { channelId, levelUpMessage } = req.body as { channelId?: string | null; levelUpMessage?: string };
+  const row = await prisma.levelingSettings.upsert({
+    where: { guildId: req.params.guildId },
+    create: {
+      guildId: req.params.guildId,
+      channelId: channelId || null,
+      levelUpMessage: levelUpMessage?.trim() || "🎉 {user} just reached **Level {level}**!",
+    },
+    update: {
+      channelId: channelId !== undefined ? channelId || null : undefined,
+      levelUpMessage: levelUpMessage !== undefined ? levelUpMessage.trim() || "🎉 {user} just reached **Level {level}**!" : undefined,
+    },
+  });
+  res.json(row);
+});
+
 export default router;

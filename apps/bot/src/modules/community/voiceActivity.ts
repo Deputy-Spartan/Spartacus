@@ -1,7 +1,7 @@
 import { Events, VoiceState } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
-import { awardAchievement } from "../../lib/achievements";
+import { awardAchievement, checkCustomAchievements } from "../../lib/achievements";
 
 export const name = Events.VoiceStateUpdate;
 
@@ -74,6 +74,7 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
         if (prevTotal < VOICE_50H_MINUTES && activity.totalMinutes >= VOICE_50H_MINUTES) {
           await awardAchievement(newState.client, guildId, member.id, "VOICE_50H", "50 Hours in Voice", oldState.channelId ?? undefined);
         }
+        await checkCustomAchievements(newState.client, guildId, member.id, "VOICE_HOURS", Math.floor(activity.totalMinutes / 60), oldState.channelId ?? undefined);
       }
     }
   }

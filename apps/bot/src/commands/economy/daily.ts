@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import { claimDaily, getConfig } from "../../lib/economy";
-import { awardAchievement } from "../../lib/achievements";
+import { awardAchievement, checkCustomAchievements } from "../../lib/achievements";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -34,6 +34,7 @@ const command: CommandModule = {
     if (result.streak >= 30) {
       await awardAchievement(interaction.client, guildId, userId, "STREAK_30", "30-Day Streak", interaction.channelId ?? undefined);
     }
+    await checkCustomAchievements(interaction.client, guildId, userId, "DAILY_STREAK", result.streak, interaction.channelId ?? undefined);
   },
 };
 

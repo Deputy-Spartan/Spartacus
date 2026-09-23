@@ -3,13 +3,11 @@ import { prisma } from "./prisma";
 import { isModuleEnabled } from "./moduleGate";
 import { isSendableChannel } from "./channels";
 
-// No dedicated "achievement announcement channel" field exists anywhere in
-// the schema (WelcomeConfig.channelId is welcome/goodbye-only, LevelRole has
-// no channel at all). Rather than invent new schema (explicitly out of
-// scope for this task), we just announce into the channel the triggering
-// event happened in, passed by the caller as `fallbackChannelId`. If the
-// caller has no channel context (e.g. a cron-driven trigger), pass
-// undefined and the award still records silently — no message sent.
+// A configured Achievement Announcements channel always wins; without one,
+// this falls back to wherever the triggering event happened (a message, a
+// voice disconnect, etc.), passed in by the caller as `fallbackChannelId`.
+// If neither exists (e.g. a cron-driven trigger with no channel context),
+// the award still records silently — no message sent.
 export async function awardAchievement(
   client: Client,
   guildId: string,
@@ -33,8 +31,10 @@ export async function awardAchievement(
     throw err;
   }
 
-  if (fallbackChannelId) {
-    const channel = await client.channels.fetch(fallbackChannelId).catch(() => null);
+  const settings = await prisma.achievementSettings.findUnique({ where: { guildId } });
+  const channelId = settings?.channelId || fallbackChannelId;
+  if (channelId) {
+    const channel = await client.channels.fetch(channelId).catch(() => null);
     if (channel && isSendableChannel(channel)) {
       const embed = new EmbedBuilder()
         .setColor(0xffd700)
@@ -44,4 +44,24 @@ export async function awardAchievement(
   }
 
   return true;
+}
+
+// Custom, server-defined achievements riding the same built-in triggers
+// (level reached, hours in voice, daily-claim streak) but at whatever
+// threshold the admin picked — checked alongside the hardcoded milestones
+// wherever those already fire.
+export async function checkCustomAchievements(
+  client: Client,
+  guildId: string,
+  userId: string,
+  triggerType: "LEVEL" | "VOICE_HOURS" | "DAILY_STREAK",
+  currentValue: number,
+  fallbackChannelId?: string
+): Promise<void> {
+  const matches = await prisma.customAchievement.findMany({
+    where: { guildId, triggerType, threshold: { lte: currentValue } },
+  });
+  for (const a of matches) {
+    await awardAchievement(client, guildId, userId, `CUSTOM:${a.id}`, `${a.emoji} ${a.name}`, fallbackChannelId);
+  }
 }

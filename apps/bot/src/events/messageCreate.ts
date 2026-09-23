@@ -10,7 +10,7 @@ import { resolveSavedEmbed } from "../lib/savedEmbedRender";
 import { isSendableChannel } from "../lib/channels";
 import { awardMessageEarnings } from "../lib/economy";
 import { checkCountingMessage } from "../modules/games/countingGame";
-import { awardAchievement } from "../lib/achievements";
+import { awardAchievement, checkCustomAchievements } from "../lib/achievements";
 import { isOwner } from "../lib/owner";
 
 export const name = Events.MessageCreate;
@@ -63,8 +63,15 @@ export async function execute(message: Message) {
     if (!blacklisted) {
       const result = await awardMessageXp(message.guildId, message.author.id);
       if (result?.leveledUp) {
-        if (isSendableChannel(message.channel)) {
-          await message.channel.send(`🎉 ${message.author} just reached **Level ${result.level}**!`).catch(() => null);
+        const levelSettings = await prisma.levelingSettings.findUnique({ where: { guildId: message.guildId } });
+        const announceChannel = levelSettings?.channelId
+          ? await message.guild?.channels.fetch(levelSettings.channelId).catch(() => null)
+          : message.channel;
+        if (announceChannel && isSendableChannel(announceChannel)) {
+          const text = (levelSettings?.levelUpMessage || "🎉 {user} just reached **Level {level}**!")
+            .replace(/{user}/g, `${message.author}`)
+            .replace(/{level}/g, String(result.level));
+          await announceChannel.send(text).catch(() => null);
         }
         await grantLevelRoles(message.guild, message.author.id, result.level);
 
@@ -77,6 +84,7 @@ export async function execute(message: Message) {
         if (result.level >= 50) {
           await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_50", "Level 50", message.channelId);
         }
+        await checkCustomAchievements(message.client, message.guildId, message.author.id, "LEVEL", result.level, message.channelId);
       }
     }
   }

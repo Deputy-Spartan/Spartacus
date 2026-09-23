@@ -51,6 +51,7 @@ model Guild {
   economyBalances   EconomyBalance[]
   economyTransactions EconomyTransaction[]
   levelRoles        LevelRole[]
+  levelingSettings  LevelingSettings?
   xpBlacklist       XpBlacklistEntry[]
   countingGameConfig CountingGameConfig?
   invites           InviteStat[]
@@ -72,6 +73,8 @@ model Guild {
   voiceActivity     VoiceActivity[]
   weeklyRecapSettings WeeklyRecapSettings?
   achievements      Achievement[]
+  achievementSettings AchievementSettings?
+  customAchievements CustomAchievement[]
   aiConfig          AiConfig?
   serverBackups     ServerBackup[]
   buttonPresets     ButtonPreset[]
@@ -976,6 +979,16 @@ model LevelRole {
   @@unique([guildId, level])
 }
 
+// Where level-up announcements post — without this, the bot just posts in
+// whatever channel the XP-earning message happened to be sent in.
+model LevelingSettings {
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String  @unique
+  channelId      String?
+  levelUpMessage String  @default("🎉 {user} just reached **Level {level}**!")
+}
+
 enum XpBlacklistType {
   CHANNEL
   ROLE
@@ -1798,9 +1811,34 @@ model Achievement {
   guild     Guild    @relation(fields: [guildId], references: [id])
   guildId   String
   userId    String
-  type      String // FIRST_MESSAGE | LEVEL_10 | LEVEL_25 | LEVEL_50 | STREAK_7 | STREAK_30 | VOICE_10H | VOICE_50H
+  type      String // FIRST_MESSAGE | LEVEL_10 | LEVEL_25 | LEVEL_50 | STREAK_7 | STREAK_30 | VOICE_10H | VOICE_50H | CUSTOM:<CustomAchievement.id>
   awardedAt DateTime @default(now())
 
   @@unique([guildId, userId, type])
   @@index([guildId, userId])
+}
+
+// Where achievement announcements post — without this, the bot posts in
+// whatever channel the triggering action happened in.
+model AchievementSettings {
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+}
+
+// Server-defined achievements on top of the built-in ones (First Message,
+// Level 10/25/50, 7/30-day streak, 10h/50h in voice) — same triggers, but
+// any threshold the admin wants, e.g. Level 5 or 100 hours in voice.
+model CustomAchievement {
+  id          String   @id @default(cuid())
+  guild       Guild    @relation(fields: [guildId], references: [id])
+  guildId     String
+  name        String
+  emoji       String   @default("🏆")
+  triggerType String // LEVEL | VOICE_HOURS | DAILY_STREAK
+  threshold   Int
+  createdAt   DateTime @default(now())
+
+  @@index([guildId, triggerType])
 }

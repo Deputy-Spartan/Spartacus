@@ -1155,6 +1155,34 @@ export interface AchievementRow {
   awardedAt: string;
 }
 
+export interface LevelingSettingsRow {
+  guildId: string;
+  channelId: string | null;
+  levelUpMessage: string;
+}
+
+export interface AchievementSettingsRow {
+  guildId: string;
+  channelId: string | null;
+}
+
+export type CustomAchievementTrigger = "LEVEL" | "VOICE_HOURS" | "DAILY_STREAK";
+
+export interface CustomAchievementRow {
+  id: string;
+  name: string;
+  emoji: string;
+  triggerType: CustomAchievementTrigger;
+  threshold: number;
+  createdAt: string;
+}
+export interface CustomAchievementInput {
+  name: string;
+  emoji?: string;
+  triggerType: CustomAchievementTrigger;
+  threshold: number;
+}
+
 export interface CurrentUser {
   id: string;
   username: string;
@@ -1327,6 +1355,9 @@ export const api = {
     request<{ ok: boolean }>(`/guilds/${guildId}/embed-creator/update`, { method: "PATCH", body: JSON.stringify(input) }),
 
   getLeaderboard: (guildId: string) => request<LeaderboardRow[]>(`/guilds/${guildId}/leaderboard`),
+  getLevelingSettings: (guildId: string) => request<LevelingSettingsRow>(`/guilds/${guildId}/leveling-settings`),
+  setLevelingSettings: (guildId: string, input: Partial<LevelingSettingsRow>) =>
+    request<LevelingSettingsRow>(`/guilds/${guildId}/leveling-settings`, { method: "PATCH", body: JSON.stringify(input) }),
 
   getCommands: (guildId: string) => request<CustomCommand[]>(`/guilds/${guildId}/commands`),
   addCommand: (guildId: string, trigger: string, body: Omit<CustomCommand, "id" | "trigger">) =>
@@ -1621,6 +1652,13 @@ export const api = {
 
   getVoiceActivity: (guildId: string) => request<VoiceActivityRow[]>(`/guilds/${guildId}/voice-activity`),
   getAchievements: (guildId: string) => request<AchievementRow[]>(`/guilds/${guildId}/achievements`),
+  getAchievementSettings: (guildId: string) => request<AchievementSettingsRow>(`/guilds/${guildId}/achievement-settings`),
+  setAchievementSettings: (guildId: string, input: Partial<AchievementSettingsRow>) =>
+    request<AchievementSettingsRow>(`/guilds/${guildId}/achievement-settings`, { method: "PATCH", body: JSON.stringify(input) }),
+  getCustomAchievements: (guildId: string) => request<CustomAchievementRow[]>(`/guilds/${guildId}/custom-achievements`),
+  addCustomAchievement: (guildId: string, input: CustomAchievementInput) =>
+    request<CustomAchievementRow>(`/guilds/${guildId}/custom-achievements`, { method: "POST", body: JSON.stringify(input) }),
+  deleteCustomAchievement: (guildId: string, id: string) => request(`/guilds/${guildId}/custom-achievements/${id}`, { method: "DELETE" }),
 
   getBotConfig: () => request<BotConfigRow>("/bot-config"),
   setBotConfig: (input: BotConfigInput) =>

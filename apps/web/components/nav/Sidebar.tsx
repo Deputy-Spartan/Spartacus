@@ -5,12 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api, type ModuleState } from "../../lib/api";
+import { usePinnedModules } from "../../lib/usePinnedModules";
 
 // Maps each nav item's href to the ModuleKey that gates it, so the sidebar
 // can show a live enabled/disabled dot next to every module. A handful of
 // pages (Overview, Modules, Owner-only settings, Server Partnerships) have
 // no on/off toggle of their own and are left out — no entry, no dot.
-const NAV_MODULE_KEYS: Record<string, string> = {
+export const NAV_MODULE_KEYS: Record<string, string> = {
   "/moderation": "MODERATION",
   "/cases": "MODERATION",
   "/reports": "PLAYER_REPORTS",
@@ -186,6 +187,7 @@ export function Sidebar({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
   const [modules, setModules] = useState<Record<string, ModuleState> | null>(null);
+  const { isPinned, togglePin } = usePinnedModules(guildId);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,10 +207,20 @@ export function Sidebar({
     };
   }, [guildId]);
 
-  const allSections = useMemo(
+  const baseSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
     [isOwner]
   );
+
+  // Every pinnable item, in one flat list, so the Pinned group below can
+  // look up an item's label/icon regardless of which category it lives in.
+  const allItems = useMemo(() => baseSections.flatMap((s) => s.items), [baseSections]);
+
+  const allSections = useMemo(() => {
+    const pinnedItems = allItems.filter((item) => isPinned(item.href));
+    if (pinnedItems.length === 0) return baseSections;
+    return [baseSections[0], { section: "Pinned", items: pinnedItems }, ...baseSections.slice(1)];
+  }, [baseSections, allItems, isPinned]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -310,13 +322,12 @@ export function Sidebar({
                     const active = pathname === href;
                     const moduleKey = NAV_MODULE_KEYS[item.href];
                     const enabled = moduleKey ? (modules?.[moduleKey]?.enabled ?? false) : null;
+                    const pinned = isPinned(item.href);
                     return (
-                      <Link
-                        key={item.href}
-                        href={href}
-                        onClick={onNavigate}
+                      <div
+                        key={`${section.section ?? "top"}:${item.href}`}
                         className={[
-                          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                          "group flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
                           active
                             ? "bg-base-800 text-neon-blue shadow-glow-blue"
                             : section.section === "Owner Only"
@@ -324,15 +335,27 @@ export function Sidebar({
                               : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
                         ].join(" ")}
                       >
-                        <span>{item.icon}</span>
-                        <span className="flex-1 min-w-0 truncate">{item.label}</span>
-                        {enabled !== null && (
-                          <span
-                            className={`h-2 w-2 rounded-full shrink-0 ${enabled ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]" : "bg-rose-500"}`}
-                            title={enabled ? "Enabled" : "Disabled"}
-                          />
-                        )}
-                      </Link>
+                        <Link href={href} onClick={onNavigate} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
+                          <span>{item.icon}</span>
+                          <span className="flex-1 min-w-0 truncate">{item.label}</span>
+                          {enabled !== null && (
+                            <span
+                              className={`h-2 w-2 rounded-full shrink-0 ${enabled ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]" : "bg-rose-500"}`}
+                              title={enabled ? "Enabled" : "Disabled"}
+                            />
+                          )}
+                        </Link>
+                        <button
+                          onClick={() => togglePin(item.href)}
+                          title={pinned ? "Unpin" : "Pin to top"}
+                          className={[
+                            "shrink-0 w-6 h-6 flex items-center justify-center rounded transition-opacity text-xs",
+                            pinned ? "opacity-100 text-neon-blue" : "opacity-0 group-hover:opacity-100 text-slate-600 hover:text-slate-300",
+                          ].join(" ")}
+                        >
+                          📌
+                        </button>
+                      </div>
                     );
                   })}
                 </div>

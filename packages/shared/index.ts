@@ -1,2 +1,2 @@
 export * from "./moduleKeys";
-export * from "./moduleCategories";
+export * from "./navItems";

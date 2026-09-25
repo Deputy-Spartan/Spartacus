@@ -7,16 +7,16 @@ import {
   Guild,
   Message,
 } from "discord.js";
-import { MODULE_KEYS, MODULE_LABELS, getModuleCategory, slugifyModuleLabel, VOICE_MODULE_KEYS } from "@spartacus/shared";
+import { NAV_SECTIONS, slugifyModuleLabel, VOICE_MODULE_KEYS } from "@spartacus/shared";
 import { isOwner } from "../../lib/owner";
 
-// Scaffolds one category + one channel per dashboard module, derived live
-// from MODULE_KEYS/MODULE_LABELS (packages/shared/moduleKeys.ts) — the same
-// list the dashboard's own sidebar and module toggles are built from — so
-// this can never drift out of sync with what's actually on the dashboard
-// the way a hand-maintained channel list could. Every run computes a full
-// plan (what's missing, what's misplaced, what's stale) and asks for
-// confirmation before touching anything.
+// Scaffolds one category per dashboard sidebar section and one channel per
+// page in it, derived live from NAV_SECTIONS (packages/shared/navItems.ts) —
+// the exact same list the dashboard's own sidebar is built from — so this
+// can never drift out of sync with what's actually on the dashboard the way
+// two hand-maintained copies eventually did. Every run computes a full plan
+// (what's missing, what's misplaced, what's stale) and asks for confirmation
+// before touching anything.
 //
 // Deliberately NOT a registered slash command — a slash command shows up in
 // Discord's autocomplete for anyone with Administrator in any server this
@@ -48,17 +48,17 @@ const EXTRA_VOICE_CATEGORY: CategorySpec = {
 };
 
 function buildLayout(): CategorySpec[] {
-  const byCategory = new Map<string, ChannelSpec[]>();
-  for (const key of MODULE_KEYS) {
-    const category = getModuleCategory(key);
-    const channel: ChannelSpec = {
-      name: slugifyModuleLabel(MODULE_LABELS[key]),
-      type: VOICE_MODULE_KEYS.has(key) ? "voice" : "text",
-    };
-    if (!byCategory.has(category)) byCategory.set(category, []);
-    byCategory.get(category)!.push(channel);
-  }
-  const layout = [...byCategory.entries()].map(([name, channels]) => ({ name, channels }));
+  // Skip the top ungrouped items (Overview/Modules/Errors) and Owner Only —
+  // neither represents a per-server feature worth a test channel.
+  const layout = NAV_SECTIONS.filter((s) => s.section).map((section) => ({
+    name: section.section as string,
+    channels: section.items.map(
+      (item): ChannelSpec => ({
+        name: slugifyModuleLabel(item.label),
+        type: item.moduleKey && VOICE_MODULE_KEYS.has(item.moduleKey) ? "voice" : "text",
+      })
+    ),
+  }));
   layout.push(EXTRA_VOICE_CATEGORY);
   return layout;
 }

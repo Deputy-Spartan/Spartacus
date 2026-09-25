@@ -91,9 +91,14 @@ import embedCreatorRouter from "./routes/embedCreator";
 
 const app = express();
 
+// Trailing-slash-tolerant: NEXTAUTH_URL="https://spartc.us/" vs the browser's
+// actual Origin header "https://spartc.us" (no path) would otherwise silently
+// fail CORS — no console error a user would think to look for, just every
+// request after login failing and bouncing back to the login screen.
+const allowedOrigin = (process.env.NEXTAUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 app.use(
   cors({
-    origin: process.env.NEXTAUTH_URL ?? "http://localhost:3000",
+    origin: allowedOrigin,
     credentials: true,
   })
 );

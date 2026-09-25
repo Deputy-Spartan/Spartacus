@@ -1,10 +1,12 @@
 services:
-  # Bot + API merged into one free web service — the practical shape for a
-  # 512MB free-tier host. Render builds this from the root Dockerfile.
+  # Bot + API merged into one web service. Runs on Starter (not free) so it
+  # never spins down for inactivity — free-tier spin-down was taking the bot
+  # offline, and free-tier's shared outbound IP was getting rate-limited by
+  # Discord's Cloudflare (a static IP add-on requires a paid plan too).
   - type: web
     name: spartacus-api
     runtime: docker
-    plan: free
+    plan: starter
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:

@@ -34,7 +34,15 @@ router.get("/auth/discord/callback", async (req, res) => {
     }),
   });
 
-  if (!tokenRes.ok) return res.status(401).send("Discord token exchange failed");
+  if (!tokenRes.ok) {
+    const detail = await tokenRes.text().catch(() => "");
+    console.error("[auth] Discord token exchange failed:", tokenRes.status, detail);
+    // Discord's own error names are safe to show back — "invalid_grant" (code
+    // already used or expired) is by far the most common, usually from a
+    // double navigation, a slow switch back from the Discord app, or a
+    // reloaded/back-navigated callback page reusing a spent one-time code.
+    return res.status(401).send(`Discord token exchange failed: ${detail || tokenRes.status}`);
+  }
   const tokenJson = (await tokenRes.json()) as { access_token: string };
 
   const [userRes, guildsRes] = await Promise.all([

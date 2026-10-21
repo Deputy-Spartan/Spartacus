@@ -11,6 +11,7 @@ import {
   type BaseMessageOptions,
 } from "discord.js";
 import { prisma, createActionCustomId, type EmbedActionConfig, type EmbedSelectOption } from "@spartacus/db";
+import { applyTokens } from "./applyTokens";
 
 // Every embed-producing feature (Welcome, Custom Commands, Announcements,
 // Sticky Messages, Birthdays, Custom Slash Commands, Giveaways, LFG) can
@@ -87,16 +88,25 @@ function hasAction(action?: EmbedActionConfig): boolean {
   return !!action && action.type !== "none";
 }
 
-export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedData): Promise<BaseMessageOptions> {
+// `tokens` (e.g. {"{user}": "<@123>", "{server}": "My Server"}) are applied
+// to every text field below — content, author name, title, description,
+// field name/value, footer text, button labels — before building anything.
+// Without this, a feature whose config supports tokens (Welcome's {user}/
+// {server}, LFG's {user}/{voice}/{message}, etc.) would silently post them
+// literally, unexpanded, whenever that config points at a saved embed
+// instead of its own inline embed fields.
+export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedData, tokens?: Record<string, string>): Promise<BaseMessageOptions> {
+  const t = (s: string | undefined) => (s && tokens ? applyTokens(s, tokens) : s);
+
   const embeds = (data.embeds || [])
     .map((em) => {
       const hasContent = em.title || em.description || (em.fields && em.fields.length) || em.imageUrl || em.thumbnailUrl || em.authorName;
       if (!hasContent) return null;
       const embed = new EmbedBuilder();
-      if (em.authorName) embed.setAuthor({ name: em.authorName, iconURL: em.authorIconUrl || undefined, url: em.authorUrl || undefined });
-      if (em.title) embed.setTitle(em.title.slice(0, 256));
+      if (em.authorName) embed.setAuthor({ name: t(em.authorName)!, iconURL: em.authorIconUrl || undefined, url: em.authorUrl || undefined });
+      if (em.title) embed.setTitle(t(em.title)!.slice(0, 256));
       if (em.titleUrl) embed.setURL(em.titleUrl);
-      if (em.description) embed.setDescription(em.description.slice(0, 4096));
+      if (em.description) embed.setDescription(t(em.description)!.slice(0, 4096));
       if (em.color) embed.setColor(em.color as `#${string}`);
       if (em.thumbnailUrl) embed.setThumbnail(em.thumbnailUrl);
       if (em.imageUrl) embed.setImage(em.imageUrl);
@@ -105,10 +115,10 @@ export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedDa
           em.fields
             .filter((f) => f.name || f.value)
             .slice(0, 25)
-            .map((f) => ({ name: (f.name || "​").slice(0, 256), value: (f.value || "​").slice(0, 1024), inline: !!f.inline }))
+            .map((f) => ({ name: (t(f.name) || "​").slice(0, 256), value: (t(f.value) || "​").slice(0, 1024), inline: !!f.inline }))
         );
       }
-      if (em.footerText || em.footerIconUrl) embed.setFooter({ text: (em.footerText || "​").slice(0, 2048), iconURL: em.footerIconUrl || undefined });
+      if (em.footerText || em.footerIconUrl) embed.setFooter({ text: (t(em.footerText) || "​").slice(0, 2048), iconURL: em.footerIconUrl || undefined });
       if (em.timestamp) embed.setTimestamp(new Date());
       return embed;
     })
@@ -120,11 +130,11 @@ export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedDa
       const buttons: ButtonBuilder[] = [];
       for (const it of (row.items || []).slice(0, 5)) {
         if (it.kind === "link") {
-          buttons.push(new ButtonBuilder().setLabel((it.label || "Link").slice(0, 80)).setStyle(ButtonStyle.Link).setURL(it.url || "https://discord.com"));
+          buttons.push(new ButtonBuilder().setLabel((t(it.label) || "Link").slice(0, 80)).setStyle(ButtonStyle.Link).setURL(it.url || "https://discord.com"));
           continue;
         }
         const customId = hasAction(it.action) ? await createActionCustomId(prisma, guildId, "button", it.action) : `ecnoop:${randomId()}`;
-        buttons.push(new ButtonBuilder().setLabel((it.label || "Button").slice(0, 80)).setStyle(BUTTON_STYLES[it.style || "primary"]).setCustomId(customId));
+        buttons.push(new ButtonBuilder().setLabel((t(it.label) || "Button").slice(0, 80)).setStyle(BUTTON_STYLES[it.style || "primary"]).setCustomId(customId));
       }
       components.push(new ActionRowBuilder<ButtonBuilder>().addComponents(buttons));
       continue;
@@ -178,5 +188,5 @@ export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedDa
     );
   }
 
-  return { content: data.content || "", embeds, components };
+  return { content: t(data.content) || "", embeds, components };
 }

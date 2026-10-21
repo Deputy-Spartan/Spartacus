@@ -6,7 +6,17 @@ import { resolveSavedEmbed } from "../lib/savedEmbedRender";
 
 export const name = Events.GuildMemberRemove;
 
+// Same reasoning as the join side (see guildMemberAdd.ts) — dedupes a
+// double-delivered leave event rather than posting the goodbye twice.
+const recentlyFarewelled = new Set<string>();
+const DEDUPE_MS = 15_000;
+
 export async function execute(member: GuildMember | PartialGuildMember) {
+  const dedupeKey = `${member.guild.id}:${member.id}`;
+  if (recentlyFarewelled.has(dedupeKey)) return;
+  recentlyFarewelled.add(dedupeKey);
+  setTimeout(() => recentlyFarewelled.delete(dedupeKey), DEDUPE_MS);
+
   const enabled = await isModuleEnabled(member.guild.id, "WELCOME");
   if (!enabled) return;
 
@@ -16,9 +26,10 @@ export async function execute(member: GuildMember | PartialGuildMember) {
   const channel = await member.guild.channels.fetch(config.channelId).catch(() => null);
   if (!channel?.isTextBased()) return;
 
+  const tokens = { "{user}": member.user.username, "{server}": member.guild.name };
   const text = (config.goodbyeText ?? "{user} has left {server}.")
-    .replace("{user}", member.user.username)
-    .replace("{server}", member.guild.name);
+    .replace("{user}", tokens["{user}"])
+    .replace("{server}", tokens["{server}"]);
 
   const saved = await resolveSavedEmbed(config.savedEmbedId);
   const payload = await buildStickyPayload(
@@ -31,7 +42,7 @@ export async function execute(member: GuildMember | PartialGuildMember) {
       buttons: config.buttons,
       embedExtra: config.embedExtra,
     },
-    { savedEmbed: saved, guildId: member.guild.id }
+    { savedEmbed: saved, guildId: member.guild.id, tokens }
   );
 
   await channel.send(payload);

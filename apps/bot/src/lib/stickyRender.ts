@@ -24,9 +24,9 @@ export interface StickyMessageLike {
 // four instead of each needing its own branch.
 export async function buildStickyPayload(
   sticky: StickyMessageLike,
-  options?: { thumbnailUrl?: string; savedEmbed?: SavedEmbedData | null; guildId?: string }
+  options?: { thumbnailUrl?: string; savedEmbed?: SavedEmbedData | null; guildId?: string; tokens?: Record<string, string> }
 ): Promise<BaseMessageOptions> {
-  if (options?.savedEmbed && options.guildId) return buildSavedEmbedPayload(options.guildId, options.savedEmbed);
+  if (options?.savedEmbed && options.guildId) return buildSavedEmbedPayload(options.guildId, options.savedEmbed, options.tokens);
 
   const buttons = Array.isArray(sticky.buttons) ? (sticky.buttons as StickyButton[]) : [];
 

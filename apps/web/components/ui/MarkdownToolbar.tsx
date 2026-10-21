@@ -114,91 +114,78 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased
     });
   }
 
+  const btn = "w-7 h-7 shrink-0 flex items-center justify-center rounded bg-base-800 border border-white/10 text-slate-300 hover:text-neon-blue hover:border-neon-blue/40 text-xs transition-colors";
+  const select = "h-7 flex-1 min-w-0 bg-base-800 border border-white/10 rounded text-xs text-slate-300 px-1.5";
+
+  // Three fixed rows — styling, structure, mentions — each wrapped on its
+  // own line regardless of container width, instead of one long flex-wrap
+  // strip reflowing unpredictably into ragged rows depending on how narrow
+  // the field is. Every icon button is the same fixed square, so whichever
+  // rows a row does wrap onto (a very narrow field), it still stays aligned.
   return (
-    <div className="flex flex-wrap items-center gap-1 mb-1.5 relative">
-      {WRAP_BUTTONS.map((b) => (
-        <button
-          key={b.title}
-          type="button"
-          title={b.title}
-          onClick={() => applyWrap(b.before, b.after)}
-          className={`w-7 h-7 flex items-center justify-center rounded bg-base-800 border border-white/10 text-slate-300 hover:text-neon-blue hover:border-neon-blue/40 text-xs ${b.className}`}
-        >
-          {b.label}
-        </button>
-      ))}
-
-      <span className="w-px h-5 bg-white/10 mx-0.5" />
-
-      {LINE_BUTTONS.map((b) => (
-        <button
-          key={b.title}
-          type="button"
-          title={b.title}
-          onClick={() => insertLinePrefix(b.prefix)}
-          className={`h-7 px-1.5 flex items-center justify-center rounded bg-base-800 border border-white/10 text-slate-300 hover:text-neon-blue hover:border-neon-blue/40 text-xs whitespace-nowrap ${b.className}`}
-        >
-          {b.label}
-        </button>
-      ))}
-
-      <button
-        type="button"
-        title="Insert a link"
-        onClick={() => void insertLink()}
-        className="h-7 px-1.5 flex items-center justify-center rounded bg-base-800 border border-white/10 text-slate-300 hover:text-neon-blue hover:border-neon-blue/40 text-xs"
-      >
-        🔗
-      </button>
-
-      <span className="w-px h-5 bg-white/10 mx-0.5" />
-
-      <select
-        title="Insert channel mention"
-        value=""
-        onChange={(e) => {
-          if (e.target.value) insertAtCursor(`<#${e.target.value}>`);
-        }}
-        className="h-7 bg-base-800 border border-white/10 rounded text-xs text-slate-300 px-1 max-w-[140px]"
-      >
-        <option value="">#channel…</option>
-        {channels.map((c) => (
-          <option key={c.id} value={c.id}>
-            #{c.name}
-          </option>
+    <div className="mb-1.5 relative space-y-1">
+      <div className="flex flex-wrap items-center gap-1">
+        {WRAP_BUTTONS.map((b) => (
+          <button key={b.title} type="button" title={b.title} onClick={() => applyWrap(b.before, b.after)} className={`${btn} ${b.className}`}>
+            {b.label}
+          </button>
         ))}
-      </select>
+      </div>
 
-      <select
-        title="Insert role mention"
-        value=""
-        onChange={(e) => {
-          if (e.target.value) {
-            const role = roles.find((r) => r.id === e.target.value);
-            insertAtCursor(aliased && role ? `@${role.name}` : `<@&${e.target.value}>`);
-          }
-        }}
-        className="h-7 bg-base-800 border border-white/10 rounded text-xs text-slate-300 px-1 max-w-[140px]"
-      >
-        <option value="">@role…</option>
-        {roles.map((r) => (
-          <option key={r.id} value={r.id}>
-            @{r.name}
-          </option>
+      <div className="flex flex-wrap items-center gap-1">
+        {LINE_BUTTONS.map((b) => (
+          <button key={b.title} type="button" title={b.title} onClick={() => insertLinePrefix(b.prefix)} className={`${btn} ${b.className}`}>
+            {b.label}
+          </button>
         ))}
-      </select>
+        <button type="button" title="Insert a link" onClick={() => void insertLink()} className={btn}>
+          🔗
+        </button>
+      </div>
 
-      <button
-        type="button"
-        title="Insert a server emoji"
-        onClick={() => setEmojiOpen(!emojiOpen)}
-        className="w-7 h-7 flex items-center justify-center rounded bg-base-800 border border-white/10 text-sm hover:border-neon-blue/40"
-      >
-        😀
-      </button>
+      <div className="flex items-center gap-1">
+        <select
+          title="Insert channel mention"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) insertAtCursor(`<#${e.target.value}>`);
+          }}
+          className={select}
+        >
+          <option value="">#channel…</option>
+          {channels.map((c) => (
+            <option key={c.id} value={c.id}>
+              #{c.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          title="Insert role mention"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) {
+              const role = roles.find((r) => r.id === e.target.value);
+              insertAtCursor(aliased && role ? `@${role.name}` : `<@&${e.target.value}>`);
+            }
+          }}
+          className={select}
+        >
+          <option value="">@role…</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              @{r.name}
+            </option>
+          ))}
+        </select>
+
+        <button type="button" title="Insert a server emoji" onClick={() => setEmojiOpen(!emojiOpen)} className={`${btn} text-sm`}>
+          😀
+        </button>
+      </div>
 
       {emojiOpen && (
-        <div className="basis-full rounded-lg border border-white/10 bg-base-900 p-3 max-h-48 overflow-y-auto">
+        <div className="rounded-lg border border-white/10 bg-base-900 p-3 max-h-48 overflow-y-auto">
           <p className="text-[11px] text-slate-500 mb-1.5">Tap as many as you like — each is added at your cursor.</p>
           <ServerEmojiGrid
             guildId={guildId}

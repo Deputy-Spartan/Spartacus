@@ -225,6 +225,7 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
                         maxLength={1024}
                         onChange={(v) => updateField(i, { value: v })}
                         placeholder="Field value — supports markdown"
+                        toolbarPosition="bottom"
                       />
                     </div>
                   </div>

@@ -47,23 +47,38 @@ interface MentionTextareaProps {
   maxLength?: number;
   placeholder?: string;
   className?: string;
+  // Narrow usages (the embed field-value box, squeezed into half a grid
+  // row) want the typing area visible first, with the toolbar — which
+  // wraps onto 2-3 rows at that width — tucked below it instead of pushing
+  // the box itself down. Defaults to "top" everywhere else.
+  toolbarPosition?: "top" | "bottom";
 }
 
-export function MentionTextarea({ guildId, value, onChange, maxLength, placeholder, className }: MentionTextareaProps) {
+export function MentionTextarea({ guildId, value, onChange, maxLength, placeholder, className, toolbarPosition = "top" }: MentionTextareaProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const { toDisplay, fromDisplay } = useMentionAliases(guildId);
 
-  return (
+  const toolbar = <MarkdownToolbar guildId={guildId} textareaRef={ref} value={toDisplay(value)} onChange={(d) => onChange(fromDisplay(d))} aliased />;
+  const textarea = (
+    <textarea
+      ref={ref}
+      className={className}
+      value={toDisplay(value)}
+      maxLength={maxLength}
+      onChange={(e) => onChange(fromDisplay(e.target.value))}
+      placeholder={placeholder}
+    />
+  );
+
+  return toolbarPosition === "bottom" ? (
     <>
-      <MarkdownToolbar guildId={guildId} textareaRef={ref} value={toDisplay(value)} onChange={(d) => onChange(fromDisplay(d))} aliased />
-      <textarea
-        ref={ref}
-        className={className}
-        value={toDisplay(value)}
-        maxLength={maxLength}
-        onChange={(e) => onChange(fromDisplay(e.target.value))}
-        placeholder={placeholder}
-      />
+      {textarea}
+      <div className="mt-1.5">{toolbar}</div>
+    </>
+  ) : (
+    <>
+      {toolbar}
+      {textarea}
     </>
   );
 }

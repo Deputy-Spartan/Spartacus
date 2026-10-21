@@ -1,4 +1,4 @@
-import { Events, Message } from "discord.js";
+import { Client, Events, Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
@@ -53,6 +53,22 @@ export async function execute(message: Message) {
       void repost(message.channelId, channel);
     }, DEBOUNCE_MS)
   );
+}
+
+// Used by the dashboard's "Resend Now" button (see apps/api's sticky-messages
+// route) so a manual resend goes through the exact same delete+send+guard
+// logic as the automatic repost above, instead of posting via a raw Discord
+// REST call the `justPosted`/`inFlight` guards above have no way to see —
+// that mismatch was the root cause of the sticky occasionally double-posting.
+export async function forceRepost(client: Client, stickyId: string): Promise<{ ok: boolean; error?: string }> {
+  const sticky = await prisma.stickyMessage.findUnique({ where: { id: stickyId } });
+  if (!sticky) return { ok: false, error: "Sticky message not found" };
+
+  const channel = await client.channels.fetch(sticky.channelId).catch(() => null);
+  if (!isSendableChannel(channel)) return { ok: false, error: "Channel is not postable" };
+
+  await repost(sticky.channelId, channel);
+  return { ok: true };
 }
 
 async function repost(channelId: string, channel: Message["channel"]) {

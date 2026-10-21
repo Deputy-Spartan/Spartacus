@@ -8,6 +8,7 @@ import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { MentionTextarea } from "../../../../components/ui/MentionTextarea";
 import { FormError } from "../../../../components/ui/FormError";
+import { usePrompt } from "../../../../components/ui/ConfirmDialog";
 import { EmbedCard } from "../../../../components/embedCreator/EmbedCard";
 import { ComponentRowEditor } from "../../../../components/embedCreator/ComponentRowEditor";
 import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
@@ -46,6 +47,7 @@ function emptyState(): EmbedCreatorState {
 
 export default function EmbedCreatorPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
+  const prompt = usePrompt();
   const [pageTab, setPageTab] = useState<PageTab>("saved");
   const [state, setState] = useState<EmbedCreatorState>(emptyState());
   const [editingMessage, setEditingMessage] = useState<{ channelId: string; messageId: string; channelLabel: string } | null>(null);
@@ -212,7 +214,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
   // the user into the Saved Embeds tab already editing it, so the flow reads
   // as "create it, then it lives in your saved library."
   async function handleSaveAsNew() {
-    const name = prompt("Name this embed:");
+    const name = await prompt("Name this embed:");
     if (!name || !name.trim()) return;
     setError(null);
     const saved = await api.saveEmbedCreatorPreset(guildId, name.trim(), state);

@@ -11,6 +11,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { logError } from "@spartacus/db";
+import { setBotClient } from "./lib/botClient";
 
 import healthRouter from "./routes/health";
 import activityRouter from "./routes/activity";
@@ -204,7 +205,10 @@ app.listen(port, () => {
 // instead (keeps the bot's discord.js cache memory isolated from API
 // request-handling memory, if your host gives you two free services).
 if (process.env.RUN_BOT_INLINE !== "false") {
-  import("@spartacus/bot").then(({ startBot }) => startBot());
+  import("@spartacus/bot").then(({ startBot }) => {
+    const client = startBot();
+    setBotClient(client);
+  });
 }
 
 // Deliberately started here, not inside the bot process — this needs to

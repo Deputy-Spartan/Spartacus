@@ -2,8 +2,7 @@ import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
-import { buildRestMessagePayload, deleteChannelMessage, postChannelMessage } from "../lib/discordRest";
-import { buildMessagePayload } from "../lib/embedCreatorPayload";
+import { getBotClient } from "../lib/botClient";
 
 const router = Router();
 
@@ -70,40 +69,25 @@ router.put("/guilds/:guildId/sticky-messages/:id", requireAuth, requireGuildPerm
   res.json(row);
 });
 
-// Manually reposts the sticky right now — deletes the old message (if it
-// still exists) and posts a fresh one, in case it got deleted some other
-// way (manual delete, another bot's purge, etc.) and the channel has gone
-// quiet since so the normal on-message repost hasn't fired.
+// Manually reposts the sticky right now — same delete-old/post-new logic
+// the bot runs automatically, just triggered on demand. Goes through the
+// bot's own gateway client (apps/bot's forceStickyRepost) rather than a
+// separate Discord REST call, so this can't race with — and double-post
+// against — the bot's own duplicate-post guards.
 router.post("/guilds/:guildId/sticky-messages/:id/resend", requireAuth, requireGuildPermission, async (req, res) => {
   const sticky = await prisma.stickyMessage.findUnique({ where: { id: req.params.id } });
   if (!sticky || sticky.guildId !== req.params.guildId) {
     return res.status(404).json({ error: "Sticky message not found" });
   }
 
-  if (sticky.lastMessageId) {
-    await deleteChannelMessage(sticky.channelId, sticky.lastMessageId);
+  const client = getBotClient();
+  if (!client) {
+    return res.status(503).json({ error: "The bot isn't connected right now — try again in a moment." });
   }
 
-  let payload: Record<string, unknown>;
-  if (sticky.savedEmbedId) {
-    const preset = await prisma.embedCreatorPreset.findUnique({ where: { id: sticky.savedEmbedId } });
-    payload = preset ? await buildMessagePayload(req.params.guildId, preset.data as Parameters<typeof buildMessagePayload>[1]) : {};
-  } else {
-    payload = buildRestMessagePayload({
-      content: sticky.content,
-      embedEnabled: sticky.embedEnabled,
-      embedTitle: sticky.embedTitle ?? undefined,
-      embedDescription: sticky.embedDescription ?? sticky.content,
-      embedColor: sticky.embedColor ?? undefined,
-      buttons: Array.isArray(sticky.buttons) ? (sticky.buttons as Array<{ label: string; url: string }>) : [],
-      embedExtra: sticky.embedExtra,
-    });
-  }
-
-  const result = await postChannelMessage(sticky.channelId, payload);
-  if (result.error) return res.status(502).json({ error: result.error });
-
-  if (result.id) await prisma.stickyMessage.update({ where: { id: sticky.id }, data: { lastMessageId: result.id } });
+  const { forceStickyRepost } = await import("@spartacus/bot");
+  const result = await forceStickyRepost(client, sticky.id);
+  if (!result.ok) return res.status(502).json({ error: result.error ?? "Failed to resend sticky message" });
 
   res.json({ ok: true });
 });

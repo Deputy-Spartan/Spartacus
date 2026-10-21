@@ -86,7 +86,7 @@ router.post("/guilds/:guildId/lfg-commands", requireAuth, requireGuildPermission
   const { guildId } = req.params;
   const body = req.body as LfgBody;
   const trigger = (body.trigger || "").trim().toLowerCase();
-  const mode = MODES.has(body.mode || "") ? (body.mode as string) : "plain";
+  const mode = MODES.has(body.mode || "") ? (body.mode as string) : "embed";
 
   if (!TRIGGER_PATTERN.test(trigger)) {
     return res.status(400).json({ error: "Trigger must be lowercase letters, numbers, - or _, 1-32 characters." });
@@ -123,9 +123,13 @@ router.post("/guilds/:guildId/lfg-commands", requireAuth, requireGuildPermission
       enabled: body.enabled ?? true,
       mode,
       message: body.message ?? null,
-      embedTitle: body.embedTitle ?? null,
-      embedDescription: body.embedDescription ?? null,
-      embedColor: body.embedColor ?? null,
+      // Falls back to a real default (not null) when mode is "embed" — an
+      // embed with no title or description posts as just a bare color bar,
+      // which reads as broken rather than merely plain.
+      embedTitle: body.embedTitle ?? (mode === "embed" ? "🎮 Looking for a Group" : null),
+      embedDescription:
+        body.embedDescription ?? (mode === "embed" ? "{user} is queuing up in **{voice}** — join the call and hop in!\n\n{message}" : null),
+      embedColor: body.embedColor ?? (mode === "embed" ? "#00E5FF" : null),
       embedExtra: (body.embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       savedEmbedId: body.savedEmbedId ?? null,
       errorMessage: body.errorMessage?.trim() || "You need to be in a voice channel to use this command.",

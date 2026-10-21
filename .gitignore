@@ -8,3 +8,4 @@ dist/
 
 # Local dev log scratch files
 apps/*/.devlog.txt
+scratchpad/

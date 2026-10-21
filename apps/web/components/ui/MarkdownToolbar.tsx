@@ -3,6 +3,7 @@
 import { useEffect, useState, type RefObject } from "react";
 import { api, type DiscordChannelOption, type DiscordRoleOption } from "../../lib/api";
 import { ServerEmojiGrid } from "./EmojiPicker";
+import { usePrompt } from "./ConfirmDialog";
 
 interface MarkdownToolbarProps {
   guildId: string;
@@ -19,10 +20,21 @@ const WRAP_BUTTONS = [
   { label: "I", title: "Italic", before: "*", after: "*", className: "italic" },
   { label: "U", title: "Underline", before: "__", after: "__", className: "underline" },
   { label: "S", title: "Strikethrough", before: "~~", after: "~~", className: "line-through" },
-  { label: "❝", title: "Quote", before: "> ", after: "", className: "" },
   { label: "◇", title: "Spoiler", before: "||", after: "||", className: "" },
   { label: "<>", title: "Inline code", before: "`", after: "`", className: "font-mono text-xs" },
   { label: "{ }", title: "Code block", before: "```\n", after: "\n```", className: "font-mono text-xs" },
+];
+
+// Block-level markdown — these go at the start of a line rather than
+// wrapping a selection, so they get their own insertion logic below.
+const LINE_BUTTONS = [
+  { label: "H1", title: "Header", prefix: "# ", className: "font-bold" },
+  { label: "H2", title: "Subheader", prefix: "## ", className: "font-bold text-[11px]" },
+  { label: "H3", title: "Small header", prefix: "### ", className: "font-bold text-[10px]" },
+  { label: "❝", title: "Quote this line", prefix: "> ", className: "" },
+  { label: "❝❝", title: "Quote the rest of the message", prefix: ">>> ", className: "" },
+  { label: "•", title: "Bulleted list item", prefix: "- ", className: "" },
+  { label: "1.", title: "Numbered list item", prefix: "1. ", className: "" },
 ];
 
 // Everything Discord's own message composer supports formatting-wise —
@@ -33,6 +45,7 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased
   const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
+  const prompt = usePrompt();
 
   useEffect(() => {
     api.getDiscordChannels(guildId).then((result) => setChannels([...result.textChannels, ...result.voiceChannels]));
@@ -69,6 +82,38 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased
     });
   }
 
+  // Headers/quotes/lists are "start of this line" markdown, not a wrap
+  // around a selection — find the current line's start and insert there.
+  function insertLinePrefix(prefix: string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const pos = el.selectionStart;
+    const lineStart = value.lastIndexOf("\n", pos - 1) + 1;
+    const next = value.slice(0, lineStart) + prefix + value.slice(lineStart);
+    onChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(pos + prefix.length, pos + prefix.length);
+    });
+  }
+
+  async function insertLink() {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const linkText = value.slice(start, end) || "link text";
+    const url = await prompt("Link URL:", "https://");
+    if (!url) return;
+    const text = `[${linkText}](${url})`;
+    const next = value.slice(0, start) + text + value.slice(end);
+    onChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(start + text.length, start + text.length);
+    });
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-1 mb-1.5 relative">
       {WRAP_BUTTONS.map((b) => (
@@ -82,6 +127,31 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased
           {b.label}
         </button>
       ))}
+
+      <span className="w-px h-5 bg-white/10 mx-0.5" />
+
+      {LINE_BUTTONS.map((b) => (
+        <button
+          key={b.title}
+          type="button"
+          title={b.title}
+          onClick={() => insertLinePrefix(b.prefix)}
+          className={`h-7 px-1.5 flex items-center justify-center rounded bg-base-800 border border-white/10 text-slate-300 hover:text-neon-blue hover:border-neon-blue/40 text-xs whitespace-nowrap ${b.className}`}
+        >
+          {b.label}
+        </button>
+      ))}
+
+      <button
+        type="button"
+        title="Insert a link"
+        onClick={() => void insertLink()}
+        className="h-7 px-1.5 flex items-center justify-center rounded bg-base-800 border border-white/10 text-slate-300 hover:text-neon-blue hover:border-neon-blue/40 text-xs"
+      >
+        🔗
+      </button>
+
+      <span className="w-px h-5 bg-white/10 mx-0.5" />
 
       <select
         title="Insert channel mention"

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { MentionTextarea } from "../ui/MentionTextarea";
+import { StyleToggleInput } from "../ui/StyleToggleInput";
 import type { EmbedCreatorEmbed, EmbedCreatorField } from "../../lib/api";
 
 const COLOR_PRESETS = ["#7B99BC", "#5E7FA6", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1", "#5865F2"];
@@ -83,6 +84,7 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
                   onChange={(e) => set("authorName", e.target.value)}
                   placeholder="e.g. Spartacus Updates"
                 />
+                <p className="text-[10px] text-slate-600 mt-1">Discord shows this as plain text — markdown doesn't render here.</p>
               </div>
               <div>
                 <label className="text-[11px] text-slate-500 block mb-1.5">Icon URL</label>
@@ -101,13 +103,15 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-[11px] text-slate-500 block mb-1.5">
-                  Title <span className="text-slate-600 font-mono">{(embed.title ?? "").length}/256</span>
+                  Title{" "}
+                  <span className={`font-mono ${(embed.title ?? "").length > 256 ? "text-rose-400" : "text-slate-600"}`}>
+                    {(embed.title ?? "").length}/256
+                  </span>
                 </label>
-                <input
+                <StyleToggleInput
                   className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
                   value={embed.title ?? ""}
-                  maxLength={256}
-                  onChange={(e) => set("title", e.target.value)}
+                  onChange={(v) => set("title", v)}
                   placeholder="Embed title"
                 />
               </div>
@@ -199,20 +203,30 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
               {embed.fields.map((f, i) => (
                 <div key={i} className="bg-base-950 border border-white/10 rounded-lg p-2.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-                    <input
-                      className="bg-base-900 border border-white/10 rounded p-1.5 text-xs"
-                      placeholder="Field name"
-                      maxLength={256}
-                      value={f.name}
-                      onChange={(e) => updateField(i, { name: e.target.value })}
-                    />
-                    <textarea
-                      className="bg-base-900 border border-white/10 rounded p-1.5 text-xs min-h-[38px]"
-                      placeholder="Field value"
-                      maxLength={1024}
-                      value={f.value}
-                      onChange={(e) => updateField(i, { value: e.target.value })}
-                    />
+                    <div>
+                      <label className="text-[10px] text-slate-600 block mb-1">
+                        Field name <span className={f.name.length > 256 ? "text-rose-400" : ""}>{f.name.length}/256</span>
+                      </label>
+                      <StyleToggleInput
+                        className="w-full bg-base-900 border border-white/10 rounded p-1.5 text-xs"
+                        value={f.name}
+                        onChange={(v) => updateField(i, { name: v })}
+                        placeholder="Field name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-slate-600 block mb-1">
+                        Field value <span className={f.value.length > 1024 ? "text-rose-400" : ""}>{f.value.length}/1024</span>
+                      </label>
+                      <MentionTextarea
+                        guildId={guildId}
+                        className="w-full bg-base-900 border border-white/10 rounded p-1.5 text-xs min-h-[38px]"
+                        value={f.value}
+                        maxLength={1024}
+                        onChange={(v) => updateField(i, { value: v })}
+                        placeholder="Field value — supports markdown"
+                      />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -243,6 +257,7 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
                   onChange={(e) => set("footerText", e.target.value)}
                   placeholder="Optional"
                 />
+                <p className="text-[10px] text-slate-600 mt-1">Discord shows this as plain text — markdown doesn't render here.</p>
               </div>
               <div>
                 <label className="text-[11px] text-slate-500 block mb-1.5">Footer Icon URL</label>

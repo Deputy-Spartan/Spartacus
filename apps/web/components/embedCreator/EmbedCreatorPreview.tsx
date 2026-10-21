@@ -21,14 +21,41 @@ const MENTION_STYLE = "background:rgba(88,101,242,.3);color:#c9cdfb;border-radiu
 
 function mdToHtml(s: string | undefined, names?: MentionNames): string {
   if (!s) return "";
-  return s
+  let out = s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/&lt;(a?):(\w+):(\d+)&gt;/g, (_m, a, n, id) => `<img src="https://cdn.discordapp.com/emojis/${id}.${a ? "gif" : "png"}?size=32" alt=":${n}:" title=":${n}:" style="display:inline;height:1.25em;width:1.25em;vertical-align:-0.3em;" />`)
     .replace(/&lt;@&amp;(\d+)&gt;/g, (_m, id) => `<span style="${MENTION_STYLE}">@${names?.roles[id] ?? "role"}</span>`)
     .replace(/&lt;#(\d+)&gt;/g, (_m, id) => `<span style="${MENTION_STYLE}">#${names?.channels[id] ?? "channel"}</span>`)
-    .replace(/&lt;@!?(\d+)&gt;/g, `<span style="${MENTION_STYLE}">@user</span>`)
+    .replace(/&lt;@!?(\d+)&gt;/g, `<span style="${MENTION_STYLE}">@user</span>`);
+
+  // Block-level constructs first, while the text is still plain (no HTML
+  // tags yet to confuse "start of line" matching) — code fences before
+  // anything else so header/quote/list syntax inside a code block is left
+  // untouched rather than being (wrongly) converted too.
+  out = out.replace(
+    /```([\s\S]*?)```/g,
+    (_m, code) => `<pre style="background:#1e1f22;padding:8px 10px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;font-family:monospace;font-size:12px;margin:4px 0;">${code.trim()}</pre>`
+  );
+
+  const QUOTE_STYLE = "border-left:4px solid #4e5058;padding-left:8px;margin:2px 0;color:#9aa0a6;";
+  if (/^&gt;&gt;&gt; /m.test(out)) {
+    // ">>> " swallows every line after it, not just the one it's on.
+    out = out.replace(/^&gt;&gt;&gt; ([\s\S]*)$/m, (_m, rest) => `<div style="${QUOTE_STYLE}">${rest}</div>`);
+  } else {
+    out = out.replace(/^&gt; (.*)$/gm, `<div style="${QUOTE_STYLE}">$1</div>`);
+  }
+
+  out = out
+    .replace(/^### (.+)$/gm, '<div style="font-weight:700;font-size:1em;margin:3px 0;">$1</div>')
+    .replace(/^## (.+)$/gm, '<div style="font-weight:700;font-size:1.15em;margin:3px 0;">$1</div>')
+    .replace(/^# (.+)$/gm, '<div style="font-weight:700;font-size:1.3em;margin:3px 0;">$1</div>')
+    .replace(/^- (.+)$/gm, '<div style="padding-left:1em;">• $1</div>')
+    .replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:1em;">$1. $2</div>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" style="color:#00a8fc;text-decoration:underline;">$1</a>');
+
+  return out
     .replace(/\|\|(.+?)\|\|/g, '<span style="background:#202225;color:#202225;border-radius:3px;">$1</span>')
     .replace(/~~(.+?)~~/g, "<s>$1</s>")
     .replace(/__(.+?)__/g, "<u>$1</u>")
@@ -84,7 +111,7 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
           </div>
 
           {state.content && (
-            <p className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(state.content, names) }} />
+            <div className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(state.content, names) }} />
           )}
 
           {state.embeds.filter(hasEmbedContent).map((em) => (
@@ -105,7 +132,7 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
                   </div>
                 )}
                 {em.title && <p className="text-[#f2f3f5] font-semibold text-sm mb-1" dangerouslySetInnerHTML={{ __html: mdToHtml(em.title) }} />}
-                {em.description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(em.description, names) }} />}
+                {em.description && <div className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(em.description, names) }} />}
                 {em.fields.filter((f) => f.name || f.value).length > 0 && (
                   <div className={`grid gap-2 mt-2 ${em.fields.some((f) => f.inline) ? "grid-cols-3" : "grid-cols-1"}`}>
                     {em.fields
@@ -113,7 +140,7 @@ export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state
                       .map((f, i) => (
                         <div key={i} className={f.inline ? "" : "col-span-3"}>
                           <p className="text-[#f2f3f5] text-xs font-semibold" dangerouslySetInnerHTML={{ __html: mdToHtml(f.name || "Field") }} />
-                          <p className="text-[#dbdee1] text-xs whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(f.value, names) }} />
+                          <div className="text-[#dbdee1] text-xs whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(f.value, names) }} />
                         </div>
                       ))}
                   </div>

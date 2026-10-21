@@ -146,9 +146,6 @@ export function Sidebar({
           <span className="text-3xl">⚡</span>
         )}
         <span className="spartacus-wave inline-block text-2xl font-bold">Spartacus</span>
-        <button onClick={onClose} className="ml-auto text-slate-500 hover:text-slate-200 text-xl" aria-label="Hide sidebar" title="Hide sidebar">
-          ✕
-        </button>
       </div>
 
       <div className="px-3 pb-3 shrink-0">

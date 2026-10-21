@@ -15,13 +15,18 @@ const DEBOUNCE_MS = 1500;
 const pendingTimers = new Map<string, NodeJS.Timeout>();
 const inFlight = new Set<string>(); // channelId currently mid-repost, guards against overlap with a fresh debounce firing
 
-// The DB's `lastMessageId` isn't updated until just after `channel.send()`
-// resolves, but the gateway's own MESSAGE_CREATE for that very message can
-// reach execute() before that write lands — without this, execute() reads
-// the still-stale id, doesn't recognize the repost as its own, and queues
-// another repost, which repeats forever (the "sticky spams itself" bug).
-// This is set synchronously the instant send() resolves, closing that gap.
-const justPosted = new Set<string>();
+// Suppresses the bot's own messages in a channel for a few seconds right
+// after *we* post into it — set synchronously before the delete+send even
+// starts, not after. An ID-matching guard set only after send() resolves
+// (the previous approach here) is a real race under load: on a busy channel
+// — another feature posting its own messages too, DB latency under load,
+// whatever — the gateway's MESSAGE_CREATE for our own new message can beat
+// that guard into place, and execute() then treats its own repost as "a new
+// message landed here," queues another repost, and the sticky spams itself.
+// A time window set *before* sending closes that race unconditionally: it's
+// already active by the time any echo could possibly arrive.
+const REPOST_SUPPRESS_MS = 5000;
+const suppressUntil = new Map<string, number>();
 
 // Runs alongside the other messageCreate handler (automod/XP/custom
 // commands) — discord.js supports multiple listeners on the same event,
@@ -33,12 +38,14 @@ export async function execute(message: Message) {
 
   const sticky = await prisma.stickyMessage.findUnique({ where: { channelId: message.channelId } });
   if (!sticky) return;
-  // Only skip the sticky's own repost — everything else, including another
-  // message this same bot sends (LFG posts, ticket panels, etc.), should
-  // still push the sticky back down to the bottom.
-  if (justPosted.has(message.id) || message.id === sticky.lastMessageId) {
-    justPosted.delete(message.id);
-    return;
+
+  // Only the bot's own messages can ever be the sticky's own echo — a real
+  // member's message always falls through to the debounce below regardless
+  // of this window.
+  const isOwnMessage = message.author.id === message.client.user?.id;
+  if (isOwnMessage) {
+    const until = suppressUntil.get(message.channelId) ?? 0;
+    if (Date.now() < until || message.id === sticky.lastMessageId) return;
   }
   if (!isSendableChannel(message.channel)) return;
 
@@ -58,8 +65,7 @@ export async function execute(message: Message) {
 // Used by the dashboard's "Resend Now" button (see apps/api's sticky-messages
 // route) so a manual resend goes through the exact same delete+send+guard
 // logic as the automatic repost above, instead of posting via a raw Discord
-// REST call the `justPosted`/`inFlight` guards above have no way to see —
-// that mismatch was the root cause of the sticky occasionally double-posting.
+// REST call the `suppressUntil`/`inFlight` guards above have no way to see.
 export async function forceRepost(client: Client, stickyId: string): Promise<{ ok: boolean; error?: string }> {
   const sticky = await prisma.stickyMessage.findUnique({ where: { id: stickyId } });
   if (!sticky) return { ok: false, error: "Sticky message not found" };
@@ -75,6 +81,11 @@ async function repost(channelId: string, channel: Message["channel"]) {
   if (inFlight.has(channelId)) return; // a repost is already running for this channel; the debounce will catch anything newer
   inFlight.add(channelId);
 
+  // Set before anything Discord-facing even starts — by the time delete()
+  // and send() run (and any echo of either could reach the gateway),
+  // suppression is already in effect. No race to lose.
+  suppressUntil.set(channelId, Date.now() + REPOST_SUPPRESS_MS);
+
   try {
     const sticky = await prisma.stickyMessage.findUnique({ where: { channelId } });
     if (!sticky || !isSendableChannel(channel)) return;
@@ -87,9 +98,10 @@ async function repost(channelId: string, channel: Message["channel"]) {
     const saved = await resolveSavedEmbed(sticky.savedEmbedId);
     const posted = await channel.send(await buildStickyPayload(sticky, { savedEmbed: saved, guildId: sticky.guildId })).catch(() => null);
     if (posted) {
-      justPosted.add(posted.id); // set before the await below so execute() never sees a stale lastMessageId for this id
+      // Extend the window to cover the DB write too, then let the real
+      // lastMessageId check in execute() take over once this expires.
+      suppressUntil.set(channelId, Date.now() + REPOST_SUPPRESS_MS);
       await prisma.stickyMessage.update({ where: { id: sticky.id }, data: { lastMessageId: posted.id } });
-      setTimeout(() => justPosted.delete(posted.id), 30_000); // safety net if execute() never sees it (channel desync, etc.)
     }
   } finally {
     inFlight.delete(channelId);

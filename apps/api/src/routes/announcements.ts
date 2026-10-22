@@ -11,10 +11,6 @@ router.get("/guilds/:guildId/announcements", requireAuth, requireGuildPermission
   res.json(rows);
 });
 
-// Composing and saving an announcement only ever queues it — there is no
-// edit/update route. Getting it wrong means deleting the queued row and
-// composing a fresh one, not patching this one in place; the one thing you
-// can do to a queued row besides delete it is publish it (see below).
 router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermission, async (req, res) => {
   const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.announcement.create({
@@ -32,6 +28,34 @@ router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermissio
     },
   });
   res.status(201).json(row);
+});
+
+// Only a queued (unsent) announcement can be edited — including clearing
+// or changing its schedule. Once it's published there's a real Discord
+// message out there; editing this row afterward couldn't do anything to
+// it, so that's rejected rather than silently updating a row nobody will
+// ever see reflected anywhere.
+router.patch("/guilds/:guildId/announcements/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const existing = await prisma.announcement.findUnique({ where: { id: req.params.id } });
+  if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Not found" });
+  if (existing.sentAt) return res.status(400).json({ error: "This announcement already published and can't be edited. Use Resend instead." });
+
+  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
+  const row = await prisma.announcement.update({
+    where: { id: req.params.id },
+    data: {
+      channelId,
+      content,
+      embedEnabled: Boolean(embedEnabled),
+      embedTitle,
+      embedColor,
+      buttons: buttons ?? [],
+      scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+      embedExtra: embedExtra ?? Prisma.JsonNull,
+      savedEmbedId: savedEmbedId ?? null,
+    },
+  });
+  res.json(row);
 });
 
 // Sends a queued announcement right now, through the bot's own live client

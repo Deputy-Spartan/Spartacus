@@ -25,6 +25,20 @@ const EMPTY: AnnouncementInput = {
   savedEmbedId: null,
 };
 
+function rowToInput(r: AnnouncementRow): AnnouncementInput {
+  return {
+    channelId: r.channelId,
+    content: r.content ?? "",
+    embedEnabled: r.embedEnabled,
+    embedTitle: r.embedTitle ?? "",
+    embedColor: r.embedColor ?? "#00E5FF",
+    buttons: r.buttons,
+    scheduledFor: r.scheduledFor,
+    embedExtra: r.embedExtra ?? {},
+    savedEmbedId: r.savedEmbedId ?? null,
+  };
+}
+
 export default function AnnouncementsPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("active");
@@ -32,6 +46,8 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [form, setForm] = useState<AnnouncementInput>(EMPTY);
   const [scheduleLocal, setScheduleLocal] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +67,36 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   function resetForm() {
     setForm(EMPTY);
     setScheduleLocal("");
+    setEditingId(null);
+    setResending(false);
     setError(null);
   }
 
-  // Composing and saving only ever creates a new queued announcement —
-  // there is no edit/update here by design (see the banner above the form).
-  async function saveToQueue() {
+  // Only a queued row can be opened for editing — Discord already has the
+  // live message for a sent one, so there'd be nothing for an edit here to
+  // actually change. Resend (below) is the equivalent for sent history.
+  function openEdit(r: AnnouncementRow) {
+    setEditingId(r.id);
+    setResending(false);
+    setForm(rowToInput(r));
+    setScheduleLocal(r.scheduledFor ? r.scheduledFor.slice(0, 16) : "");
+    setError(null);
+    setTab("create");
+  }
+
+  // Loads a past (already-sent) announcement's content into the compose
+  // form as a starting point for a brand-new queued announcement — it
+  // never touches the original sent row, which stays exactly as it was.
+  function openResend(r: AnnouncementRow) {
+    setEditingId(null);
+    setResending(true);
+    setForm(rowToInput(r));
+    setScheduleLocal("");
+    setError(null);
+    setTab("create");
+  }
+
+  async function save() {
     if (!form.channelId || (!form.content && !form.savedEmbedId)) {
       setError("Select a channel and enter a message or pick a saved embed before saving.");
       return;
@@ -65,19 +105,20 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
     setSaving(true);
     const body = { ...form, scheduledFor: scheduleLocal ? new Date(scheduleLocal).toISOString() : null };
     try {
-      await api.addAnnouncement(params.guildId, body);
+      if (editingId) await api.updateAnnouncement(params.guildId, editingId, body);
+      else await api.addAnnouncement(params.guildId, body);
       resetForm();
       setTab("active");
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to queue this announcement.");
+      setError(e instanceof Error ? e.message : "Failed to save this announcement.");
     } finally {
       setSaving(false);
     }
   }
 
   async function publish(r: AnnouncementRow) {
-    if (!(await confirm(`Publish this to ${channelLabel(r.channelId)} right now? This can't be undone or edited afterward.`, { confirmLabel: "Publish" })))
+    if (!(await confirm(`Publish this to ${channelLabel(r.channelId)} right now? Once sent it can't be edited.`, { confirmLabel: "Publish" })))
       return;
     setPublishingId(r.id);
     try {
@@ -93,8 +134,12 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   async function remove(id: string) {
     if (!(await confirm("Remove this announcement? If it hasn't published yet, it never will."))) return;
     await api.deleteAnnouncement(params.guildId, id);
+    if (editingId === id) resetForm();
     refresh();
   }
+
+  const queued = rows.filter((r) => !r.sentAt);
+  const sent = rows.filter((r) => r.sentAt);
 
   return (
     <div>
@@ -107,10 +152,9 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
 
       <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 mb-5">
         <p className="text-xs text-amber-300">
-          <strong>Announcements aren't saved as reusable templates.</strong> Saving one only queues it — it can't be edited or updated
-          afterward. If something's wrong, delete the queued copy and compose a fresh one. Publishing (manually or on schedule) is the
-          one final step. Want to reuse a design across multiple announcements? Build it in Embed Creator and pick it below as a
-          starting point instead.
+          A queued announcement — including its schedule — can be edited or removed anytime before it publishes.{" "}
+          <strong>Once published it's final and can't be edited</strong>; find it under Recently Sent and use{" "}
+          <strong>Resend</strong> to send it (or a tweaked copy of it) again as a new announcement.
         </p>
       </div>
 
@@ -138,55 +182,101 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
         </button>
       </div>
 
-      {tab === "active" &&
-        (rows.length === 0 ? (
-          <NeonCard>
-            <div className="text-center py-10">
-              <p className="text-sm text-slate-400 mb-1">No announcements yet.</p>
-              <p className="text-xs text-slate-600 mb-4">Compose one, queue it, and publish it whenever you're ready — or schedule it.</p>
-              <button onClick={() => setTab("create")} className="neon-button-sm">
-                + Compose New
-              </button>
-            </div>
-          </NeonCard>
-        ) : (
-          <NeonCard>
-            <div className="divide-y divide-white/5">
-              {rows.map((r) => (
-                <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate">{r.embedTitle || r.content || "(embed only)"}</p>
-                    <p className="text-xs text-slate-500">
-                      {channelLabel(r.channelId)} ·{" "}
-                      {r.sentAt
-                        ? `published ${new Date(r.sentAt).toLocaleString()}`
-                        : r.scheduledFor
-                          ? `publishes ${new Date(r.scheduledFor).toLocaleString()}`
-                          : "queued — not scheduled"}
-                    </p>
-                  </div>
-                  {!r.sentAt && (
-                    <button
-                      onClick={() => publish(r)}
-                      disabled={publishingId === r.id}
-                      className="text-neon-blue hover:underline text-xs shrink-0 disabled:opacity-50"
-                    >
-                      {publishingId === r.id ? "Publishing…" : "Publish Now"}
-                    </button>
-                  )}
-                  <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
-                    Remove
+      {tab === "active" && (
+        <div className="space-y-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Queued</p>
+            {queued.length === 0 ? (
+              <NeonCard>
+                <div className="text-center py-10">
+                  <p className="text-sm text-slate-400 mb-1">Nothing queued.</p>
+                  <p className="text-xs text-slate-600 mb-4">Compose one, queue it, and publish it whenever you're ready — or schedule it.</p>
+                  <button onClick={() => setTab("create")} className="neon-button-sm">
+                    + Compose New
                   </button>
                 </div>
-              ))}
-            </div>
-          </NeonCard>
-        ))}
+              </NeonCard>
+            ) : (
+              <NeonCard>
+                <div className="divide-y divide-white/5">
+                  {queued.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate">{r.embedTitle || r.content || "(embed only)"}</p>
+                        <p className="text-xs text-slate-500">
+                          {channelLabel(r.channelId)} ·{" "}
+                          {r.scheduledFor ? `publishes ${new Date(r.scheduledFor).toLocaleString()}` : "no schedule — publish manually"}
+                        </p>
+                      </div>
+                      <button onClick={() => openEdit(r)} className="text-slate-500 hover:text-neon-blue text-xs shrink-0">
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => publish(r)}
+                        disabled={publishingId === r.id}
+                        className="text-neon-blue hover:underline text-xs shrink-0 disabled:opacity-50"
+                      >
+                        {publishingId === r.id ? "Publishing…" : "Publish Now"}
+                      </button>
+                      <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </NeonCard>
+            )}
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Recently Sent</p>
+            {sent.length === 0 ? (
+              <NeonCard>
+                <p className="text-sm text-slate-500 py-4 text-center">Nothing published yet — it'll show up here once something is.</p>
+              </NeonCard>
+            ) : (
+              <NeonCard>
+                <div className="divide-y divide-white/5">
+                  {sent.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate">{r.embedTitle || r.content || "(embed only)"}</p>
+                        <p className="text-xs text-slate-500">
+                          {channelLabel(r.channelId)} · published {new Date(r.sentAt as string).toLocaleString()}
+                        </p>
+                      </div>
+                      <button onClick={() => openResend(r)} className="text-neon-blue hover:underline text-xs shrink-0">
+                        Resend
+                      </button>
+                      <button onClick={() => remove(r.id)} className="text-slate-600 hover:text-rose-400 text-xs shrink-0">
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </NeonCard>
+            )}
+          </div>
+        </div>
+      )}
 
       {tab === "create" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <NeonCard>
-            <p className="font-medium mb-3">New Announcement</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-medium">{editingId ? "Edit Queued Announcement" : resending ? "Resend as New Announcement" : "New Announcement"}</p>
+              {(editingId || resending) && (
+                <button
+                  onClick={() => {
+                    resetForm();
+                    setTab("active");
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-300"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
               Channel
@@ -220,12 +310,12 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             />
             <p className="text-xs text-slate-600 mb-4">
               {scheduleLocal
-                ? "Publishes automatically at this time — no need to come back and click Publish."
-                : "Leave blank to just queue it — you'll publish it yourself from the Queued & Sent tab whenever you're ready."}
+                ? "Publishes automatically at this time — no need to come back and click Publish. You can change or clear this anytime before then."
+                : "Leave blank to just queue it — you'll publish it yourself from the Queued tab whenever you're ready."}
             </p>
 
-            <button onClick={saveToQueue} disabled={!form.channelId || saving} className="neon-button disabled:opacity-50">
-              {saving ? "Saving…" : scheduleLocal ? "Queue for Scheduled Time" : "Save to Queue"}
+            <button onClick={save} disabled={!form.channelId || saving} className="neon-button disabled:opacity-50">
+              {saving ? "Saving…" : editingId ? "Save Changes" : scheduleLocal ? "Queue for Scheduled Time" : "Save to Queue"}
             </button>
             <FormError message={error} />
           </NeonCard>

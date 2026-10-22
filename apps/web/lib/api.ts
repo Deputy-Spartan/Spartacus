@@ -1449,8 +1449,8 @@ export const api = {
   getAnnouncements: (guildId: string) => request<AnnouncementRow[]>(`/guilds/${guildId}/announcements`),
   addAnnouncement: (guildId: string, body: AnnouncementInput) =>
     request<AnnouncementRow>(`/guilds/${guildId}/announcements`, { method: "POST", body: JSON.stringify(body) }),
-  updateAnnouncement: (guildId: string, id: string, body: AnnouncementInput) =>
-    request<AnnouncementRow>(`/guilds/${guildId}/announcements/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  publishAnnouncement: (guildId: string, id: string) =>
+    request<{ ok: true }>(`/guilds/${guildId}/announcements/${id}/publish`, { method: "POST" }),
   deleteAnnouncement: (guildId: string, id: string) => request(`/guilds/${guildId}/announcements/${id}`, { method: "DELETE" }),
 
   getAutoPurgeConfigs: (guildId: string) => request<AutoPurgeConfigRow[]>(`/guilds/${guildId}/auto-purge`),

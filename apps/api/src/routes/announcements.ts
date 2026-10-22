@@ -2,8 +2,7 @@ import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
-import { buildRestMessagePayload, editChannelMessage } from "../lib/discordRest";
-import { buildMessagePayload } from "../lib/embedCreatorPayload";
+import { getBotClient } from "../lib/botClient";
 
 const router = Router();
 
@@ -12,6 +11,10 @@ router.get("/guilds/:guildId/announcements", requireAuth, requireGuildPermission
   res.json(rows);
 });
 
+// Composing and saving an announcement only ever queues it — there is no
+// edit/update route. Getting it wrong means deleting the queued row and
+// composing a fresh one, not patching this one in place; the one thing you
+// can do to a queued row besides delete it is publish it (see below).
 router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermission, async (req, res) => {
   const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.announcement.create({
@@ -31,50 +34,24 @@ router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermissio
   res.status(201).json(row);
 });
 
-// Editing an announcement that hasn't sent yet just updates the queued row —
-// the poster job (apps/bot/src/jobs/announcementPoster.ts) will pick up the
-// new content when it's due. One that already sent gets its live Discord
-// message edited in place via REST instead, using whichever messageId the
-// poster job recorded when it originally sent it.
-router.patch("/guilds/:guildId/announcements/:id", requireAuth, requireGuildPermission, async (req, res) => {
+// Sends a queued announcement right now, through the bot's own live client
+// (apps/bot's publishAnnouncement) rather than a separate raw REST call —
+// same reasoning as the sticky-message "Resend Now" fix: going through the
+// bot avoids a second, unguarded code path for something that sends a
+// message. A scheduled announcement reaches Discord the same way, just
+// triggered by the bot's own cron tick instead of this button.
+router.post("/guilds/:guildId/announcements/:id/publish", requireAuth, requireGuildPermission, async (req, res) => {
   const existing = await prisma.announcement.findUnique({ where: { id: req.params.id } });
   if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Not found" });
 
-  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
-  const data: Prisma.AnnouncementUpdateInput = {
-    channelId,
-    content,
-    embedEnabled: Boolean(embedEnabled),
-    embedTitle,
-    embedColor,
-    buttons: buttons ?? [],
-    scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-    embedExtra: embedExtra ?? Prisma.JsonNull,
-    savedEmbedId: savedEmbedId ?? null,
-  };
+  const client = getBotClient();
+  if (!client) return res.status(503).json({ error: "The bot isn't connected right now — try again in a moment." });
 
-  const row = await prisma.announcement.update({ where: { id: req.params.id }, data });
+  const { publishAnnouncement } = await import("@spartacus/bot");
+  const result = await publishAnnouncement(client, existing.id);
+  if (!result.ok) return res.status(502).json({ error: result.error ?? "Failed to publish this announcement" });
 
-  if (existing.sentAt && existing.messageId) {
-    const payload = row.savedEmbedId
-      ? await buildMessagePayload(req.params.guildId, (await prisma.embedCreatorPreset.findUnique({ where: { id: row.savedEmbedId } }))?.data as Parameters<
-          typeof buildMessagePayload
-        >[1])
-      : buildRestMessagePayload({
-          content: row.content ?? "",
-          embedEnabled: row.embedEnabled,
-          embedTitle: row.embedTitle ?? undefined,
-          embedDescription: row.content ?? undefined,
-          embedColor: row.embedColor ?? undefined,
-          buttons: Array.isArray(row.buttons) ? (row.buttons as Array<{ label: string; url: string }>) : [],
-          embedExtra: row.embedExtra,
-        });
-
-    const result = await editChannelMessage(existing.channelId, existing.messageId, payload);
-    if (result.error) return res.status(502).json({ error: `Saved, but couldn't update the live message: ${result.error}` });
-  }
-
-  res.json(row);
+  res.json({ ok: true });
 });
 
 router.delete("/guilds/:guildId/announcements/:id", requireAuth, requireGuildPermission, async (req, res) => {

@@ -129,6 +129,10 @@ export { commands } from "./commands";
 // a separate raw REST call that the bot's in-memory duplicate-post guards
 // (justPosted/inFlight) have no way to see.
 export { forceRepost as forceStickyRepost } from "./modules/community/stickyMessages";
+// Re-exported so apps/api's "Publish Now" button can send a queued
+// announcement through the bot's own live gateway client instead of a
+// separate raw REST call.
+export { publishAnnouncement } from "./jobs/announcementPoster";
 
 export function startBot() {
   const client = new Client({

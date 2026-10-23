@@ -6,10 +6,12 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { EMPTY_EMBED_EXTRA, type EmbedExtra } from "../../../../lib/embedExtra";
 import {
   api,
   type ReactionRolePanelRow,
@@ -19,6 +21,8 @@ import {
   type DiscordRoleOption,
   type NotifyMode,
 } from "../../../../lib/api";
+
+const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
 
 type PageTab = "panels" | "join-roles";
 type Layout = "REACTIONS" | "BUTTONS" | "DROPDOWN";
@@ -49,7 +53,9 @@ interface PanelDraft {
   description: string;
   channelId: string | null;
   layout: Layout;
-  savedEmbedId: string | null;
+  embedEnabled: boolean;
+  embedColor: string;
+  embedExtra: EmbedExtra;
   notifyMode: NotifyMode;
   options: PanelOption[];
 }
@@ -59,7 +65,9 @@ const EMPTY_DRAFT: PanelDraft = {
   description: "",
   channelId: null,
   layout: "REACTIONS",
-  savedEmbedId: null,
+  embedEnabled: false,
+  embedColor: "#5865F2",
+  embedExtra: EMPTY_EMBED_EXTRA,
   notifyMode: "PRIVATE",
   options: [],
 };
@@ -114,7 +122,9 @@ function draftFromReactionPanel(p: ReactionRolePanelRow): PanelDraft {
     description: p.description ?? "",
     channelId: p.channelId,
     layout: "REACTIONS",
-    savedEmbedId: p.savedEmbedId ?? null,
+    embedEnabled: p.embedEnabled,
+    embedColor: p.embedColor ?? "#5865F2",
+    embedExtra: p.embedExtra ?? EMPTY_EMBED_EXTRA,
     notifyMode: p.notifyMode ?? "PRIVATE",
     options: p.options.map((o) => ({
       emoji: o.emoji,
@@ -131,7 +141,9 @@ function draftFromRolePanel(p: RolePanelRow): PanelDraft {
     description: p.description ?? "",
     channelId: p.channelId,
     layout: p.layout,
-    savedEmbedId: p.savedEmbedId ?? null,
+    embedEnabled: p.embedEnabled,
+    embedColor: p.embedColor ?? "#5865F2",
+    embedExtra: p.embedExtra ?? EMPTY_EMBED_EXTRA,
     notifyMode: p.notifyMode ?? "PRIVATE",
     options: p.options.map((o) => ({
       emoji: o.emoji ?? "",
@@ -254,10 +266,47 @@ function PanelFields({
         onChange={(e) => onChange({ description: e.target.value })}
       />
 
-      <SavedEmbedPicker guildId={guildId} value={draft.savedEmbedId} onChange={(id) => onChange({ savedEmbedId: id })} />
-      <p className="text-xs text-slate-600 mb-4">
-        Build the message in the Embed Creator and save it, then pick it here. Without one, the panel posts a plain message using the name and description above.
-      </p>
+      <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
+        <div>
+          <p className="text-sm font-medium">Build an Embed</p>
+          <p className="text-xs text-slate-500">Wraps the name/description above in a colored embed card instead of a plain message.</p>
+        </div>
+        <ToggleSwitch enabled={draft.embedEnabled} onChange={(v) => onChange({ embedEnabled: v })} label="Build an embed" />
+      </div>
+
+      {draft.embedEnabled && (
+        <>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="color"
+              className="h-9 w-11 rounded-lg border border-white/10 bg-base-950 cursor-pointer shrink-0"
+              value={draft.embedColor}
+              onChange={(e) => onChange({ embedColor: e.target.value })}
+            />
+            <input
+              className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
+              value={draft.embedColor}
+              onChange={(e) => onChange({ embedColor: e.target.value })}
+            />
+          </div>
+          <div className="flex gap-1.5 mb-4">
+            {COLOR_PRESETS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                title={c}
+                onClick={() => onChange({ embedColor: c })}
+                className="w-[18px] h-[18px] rounded border border-white/10 hover:scale-110 transition-transform"
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+
+          <EmbedExtraFields guildId={guildId} value={draft.embedExtra} onChange={(v) => onChange({ embedExtra: v })} />
+          <div className="mb-1" />
+        </>
+      )}
 
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
         Post In Channel
@@ -439,13 +488,19 @@ function PanelsTab({ guildId }: { guildId: string }) {
   }
 
   function toApiPayload(d: PanelDraft) {
+    // savedEmbedId is always cleared on save — the inline builder above
+    // replaces it as the message source, so any legacy saved-embed link on
+    // an older panel is dropped the next time it's edited.
     if (d.layout === "REACTIONS") {
       return {
         channelId: d.channelId ?? "",
         title: d.name,
         description: d.description,
-        savedEmbedId: d.savedEmbedId,
-      notifyMode: d.notifyMode,
+        embedEnabled: d.embedEnabled,
+        embedColor: d.embedColor,
+        embedExtra: d.embedExtra,
+        savedEmbedId: null,
+        notifyMode: d.notifyMode,
         options: d.options.map((o) => ({ emoji: o.emoji, roleIds: o.roleIds, channelIds: o.channelIds })),
       };
     }
@@ -454,7 +509,10 @@ function PanelsTab({ guildId }: { guildId: string }) {
       channelId: d.channelId ?? "",
       description: d.description,
       layout: d.layout,
-      savedEmbedId: d.savedEmbedId,
+      embedEnabled: d.embedEnabled,
+      embedColor: d.embedColor,
+      embedExtra: d.embedExtra,
+      savedEmbedId: null,
       notifyMode: d.notifyMode,
       options: d.options.map((o) => ({ label: o.label, emoji: o.emoji || undefined, roleIds: o.roleIds, channelIds: o.channelIds })),
     };

@@ -822,6 +822,12 @@ export interface SupportTicketRow {
   flow?: { label: string };
 }
 
+export interface SupportSettingsRow {
+  guildId: string;
+  introMessage: string | null;
+  noFlowsMessage: string | null;
+}
+
 export type TicketPanelLayout = "BUTTONS" | "DROPDOWN";
 
 export interface TicketPanelRow {
@@ -1538,6 +1544,10 @@ export const api = {
 
   getSupportTickets: (guildId: string, status?: string) =>
     request<SupportTicketRow[]>(`/guilds/${guildId}/support-tickets${status ? `?status=${status}` : ""}`),
+
+  getSupportSettings: (guildId: string) => request<SupportSettingsRow>(`/guilds/${guildId}/support-settings`),
+  setSupportSettings: (guildId: string, body: Partial<SupportSettingsRow>) =>
+    request<SupportSettingsRow>(`/guilds/${guildId}/support-settings`, { method: "PUT", body: JSON.stringify(body) }),
 
   getApplications: (guildId: string, status?: ApplicationStatus) =>
     request<ApplicationRow[]>(`/guilds/${guildId}/applications${status ? `?status=${status}` : ""}`),

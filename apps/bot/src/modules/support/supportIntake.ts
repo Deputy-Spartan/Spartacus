@@ -138,7 +138,19 @@ export async function execute(message: Message) {
     if (!enabled) continue;
 
     const flows = await prisma.supportFlow.findMany({ where: { guildId: guild.id, enabled: true }, orderBy: { sortOrder: "asc" } });
-    if (flows.length === 0) continue;
+    const settings = await prisma.supportSettings.findUnique({ where: { guildId: guild.id } });
+
+    if (flows.length === 0) {
+      const noFlows = (settings?.noFlowsMessage || "⚠️ Support requests aren't set up yet — an admin needs to add a category first.")
+        .replace(/{server}/g, guild.name)
+        .replace(/{user}/g, message.author.username);
+      await message.reply(noFlows).catch(() => null);
+      return;
+    }
+
+    const intro = (settings?.introMessage || "👋 Hey! What do you need help with in **{server}**?")
+      .replace(/{server}/g, guild.name)
+      .replace(/{user}/g, message.author.username);
 
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
     for (let i = 0; i < flows.length && i < 25; i += 5) {
@@ -151,9 +163,7 @@ export async function execute(message: Message) {
       );
     }
 
-    await message
-      .reply({ content: `👋 Hey! What do you need help with in **${guild.name}**?`, components: rows })
-      .catch(() => null);
+    await message.reply({ content: intro, components: rows }).catch(() => null);
     return;
   }
 }

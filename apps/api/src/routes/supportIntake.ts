@@ -99,4 +99,27 @@ router.get("/guilds/:guildId/support-tickets", requireAuth, requireGuildPermissi
   res.json(rows);
 });
 
+// ---- Settings (the opening DM, sent before a flow is picked) ----
+
+const DEFAULT_SETTINGS = {
+  introMessage: null as string | null,
+  noFlowsMessage: null as string | null,
+};
+
+router.get("/guilds/:guildId/support-settings", requireAuth, requireGuildPermission, async (req, res) => {
+  const config = await prisma.supportSettings.findUnique({ where: { guildId: req.params.guildId } });
+  res.json(config ?? { guildId: req.params.guildId, ...DEFAULT_SETTINGS });
+});
+
+router.put("/guilds/:guildId/support-settings", requireAuth, requireGuildPermission, async (req, res) => {
+  const { introMessage, noFlowsMessage } = req.body;
+  const data = { introMessage: introMessage ?? null, noFlowsMessage: noFlowsMessage ?? null };
+  const row = await prisma.supportSettings.upsert({
+    where: { guildId: req.params.guildId },
+    create: { guildId: req.params.guildId, ...data },
+    update: data,
+  });
+  res.json(row);
+});
+
 export default router;

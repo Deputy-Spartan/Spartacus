@@ -105,6 +105,7 @@ model Guild {
   embedComponentActions EmbedComponentAction[]
   supportFlows      SupportFlow[]
   supportTickets    SupportTicket[]
+  supportSettings   SupportSettings?
   createdAt         DateTime             @default(now())
 }
 
@@ -1700,6 +1701,16 @@ model ApplicationSettings {
   guildId        String  @unique
   logChannelId   String?
   supportRoleIds Json    @default("[]")
+}
+
+// Guild-wide text for the Support DM Intake module — the one message that
+// isn't per-flow, since it's sent before the member has picked a flow.
+model SupportSettings {
+  id           String  @id @default(cuid())
+  guild        Guild   @relation(fields: [guildId], references: [id])
+  guildId      String  @unique
+  introMessage String?
+  noFlowsMessage String?
 }
 
 // ---- Dashboard Activity ----

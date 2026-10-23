@@ -14,15 +14,17 @@ import {
   type SupportFlowRow,
   type SupportQuestionMode,
   type SupportQuestionRow,
+  type SupportSettingsRow,
   type SupportTicketRow,
   type SupportTicketStatus,
 } from "../../../../lib/api";
 
-type Tab = "flows" | "tickets";
+type Tab = "flows" | "tickets" | "settings";
 
 const TABS: Array<{ key: Tab; label: string; icon: string }> = [
   { key: "flows", label: "DM Categories", icon: "📨" },
   { key: "tickets", label: "Tickets", icon: "🎟️" },
+  { key: "settings", label: "Settings", icon: "⚙️" },
 ];
 
 const COLOR_PRESETS = ["#5865F2", "#22c55e", "#ef4444", "#f59e0b", "#a855f7", "#00e5ff"];
@@ -77,6 +79,7 @@ export default function SupportIntakePage({ params }: { params: { guildId: strin
 
       {tab === "flows" && <FlowsTab guildId={params.guildId} />}
       {tab === "tickets" && <TicketsTab guildId={params.guildId} />}
+      {tab === "settings" && <SettingsTab guildId={params.guildId} />}
     </div>
   );
 }
@@ -510,6 +513,83 @@ function TicketsTab({ guildId }: { guildId: string }) {
           </div>
         )}
       </NeonCard>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+function SettingsTab({ guildId }: { guildId: string }) {
+  const [settings, setSettings] = useState<SupportSettingsRow | null>(null);
+  const [intro, setIntro] = useState("");
+  const [noFlows, setNoFlows] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.getSupportSettings(guildId).then((s) => {
+      setSettings(s);
+      setIntro(s.introMessage ?? "");
+      setNoFlows(s.noFlowsMessage ?? "");
+    });
+  }, [guildId]);
+
+  async function save() {
+    const next = await api.setSupportSettings(guildId, { introMessage: intro || null, noFlowsMessage: noFlows || null });
+    setSettings(next);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  if (!settings) return <p className="text-slate-400">Loading…</p>;
+
+  const introPlaceholder = "👋 Hey! What do you need help with in **{server}**?";
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <p className="text-sm text-slate-400">
+        These two messages are guild-wide, not per-category — they're sent before the member has picked a category, so there's nothing to personalize per
+        flow yet.
+      </p>
+
+      <NeonCard>
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Opening Message</label>
+        <p className="text-xs text-slate-500 mb-2">
+          Sent the moment a member DMs the bot for the first time, right above the category buttons. Use <code className="text-neon-blue">{"{server}"}</code>{" "}
+          and <code className="text-neon-blue">{"{user}"}</code> to personalize it.
+        </p>
+        <textarea
+          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+          rows={3}
+          value={intro}
+          onChange={(e) => setIntro(e.target.value)}
+          placeholder={introPlaceholder}
+        />
+        <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
+      </NeonCard>
+
+      <NeonCard>
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">No Categories Configured Message</label>
+        <p className="text-xs text-slate-500 mb-2">
+          Sent instead of the category buttons if the module is enabled but no categories have been created yet (or none are enabled).
+        </p>
+        <textarea
+          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+          rows={2}
+          value={noFlows}
+          onChange={(e) => setNoFlows(e.target.value)}
+          placeholder="⚠️ Support requests aren't set up yet — an admin needs to add a category first."
+        />
+        <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
+      </NeonCard>
+
+      <div className="flex items-center gap-3">
+        <button onClick={save} className="neon-button">
+          Save Settings
+        </button>
+        {saved && <span className="text-xs text-emerald-400">Saved ✓</span>}
+      </div>
     </div>
   );
 }

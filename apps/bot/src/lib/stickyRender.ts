@@ -50,5 +50,11 @@ export async function buildStickyPayload(
   if (options?.thumbnailUrl) embed.setThumbnail(options.thumbnailUrl);
   applyEmbedExtra(embed, sticky.embedExtra);
 
-  return { content: "", embeds: [embed], components };
+  // A plain message alongside an embed is completely normal Discord
+  // behavior (it's what shows as the text line above the card) — only
+  // drop it from `content` when it's the exact text already reused as the
+  // embed's description, so that case doesn't show the same text twice.
+  const plainContent = sticky.content && sticky.content !== sticky.embedDescription ? sticky.content : "";
+
+  return { content: plainContent, embeds: [embed], components };
 }

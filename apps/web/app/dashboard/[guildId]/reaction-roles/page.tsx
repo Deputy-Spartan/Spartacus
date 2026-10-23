@@ -12,6 +12,8 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { EMPTY_EMBED_EXTRA, type EmbedExtra } from "../../../../lib/embedExtra";
+import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
+import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import {
   api,
   type ReactionRolePanelRow,
@@ -245,7 +247,8 @@ function PanelFields({
   }
 
   return (
-    <>
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+      <div className="min-w-0">
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
         Panel Name
         <Required />
@@ -394,7 +397,105 @@ function PanelFields({
           Add
         </button>
       </div>
-    </>
+      </div>
+
+      <div className="lg:sticky lg:top-4">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          Live preview
+        </p>
+        <RolePanelPreview draft={draft} roles={roles} />
+      </div>
+    </div>
+  );
+}
+
+// Mimics Discord's own dark theme (not the dashboard's neon theme) so what
+// you see here is what actually shows up in Discord. Button/Dropdown
+// layouts always post as an embed regardless of the toggle (same as the
+// bot's own poster jobs) — only Reactions can be plain content.
+function RolePanelPreview({ draft, roles }: { draft: PanelDraft; roles: DiscordRoleOption[] }) {
+  const avatarUrl = useBotAvatar();
+  const reactions = draft.layout === "REACTIONS";
+  const asEmbed = !reactions || draft.embedEnabled;
+
+  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
+
+  const listing = reactions
+    ? draft.options.map((o) => `${o.emoji || "❓"} — ${o.roleIds.map((id) => `@${roleName(id)}`).join(", ") || "(no roles)"}`).join("\n")
+    : "";
+
+  const description = reactions
+    ? [draft.description || "React below to get a role.", listing].filter(Boolean).join("\n\n")
+    : draft.description || "Click below to pick your roles.";
+
+  const color = draft.embedEnabled ? draft.embedColor : reactions ? "#5865f2" : "#3b82f6";
+  const hasAnything = draft.name || draft.description || draft.options.length > 0;
+
+  return (
+    <div className="rounded-lg bg-[#313338] p-4 font-sans">
+      <div className="flex gap-3">
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+        ) : (
+          <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient flex items-center justify-center text-sm font-bold text-base-950">S</div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
+            <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
+            <span className="text-[#949ba4] text-xs">Today at 12:00 PM</span>
+          </div>
+
+          {!hasAnything && <p className="text-[#949ba4] text-sm italic mt-1">Nothing to preview yet.</p>}
+
+          {asEmbed ? (
+            <div className="mt-2 rounded bg-[#2b2d31] border-l-4 p-3" style={{ borderColor: color }}>
+              <EmbedExtraThumbnail embedExtra={draft.embedExtra} />
+              <EmbedExtraAuthor embedExtra={draft.embedExtra} />
+              {draft.name && <p className="text-[#f2f3f5] font-semibold text-sm mb-1">{draft.name}</p>}
+              {description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words">{description}</p>}
+              <EmbedExtraFieldsPreview embedExtra={draft.embedExtra} />
+              <EmbedExtraImage embedExtra={draft.embedExtra} />
+              <EmbedExtraFooter embedExtra={draft.embedExtra} />
+            </div>
+          ) : (
+            <>
+              {draft.name && <p className="text-[#f2f3f5] font-semibold text-sm mt-1.5">{draft.name}</p>}
+              {description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words mt-0.5">{description}</p>}
+            </>
+          )}
+
+          {reactions && draft.options.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {draft.options.map((o, i) => (
+                <div key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-[10px] px-2 py-0.5 text-sm text-[#dbdee1]">
+                  {o.emoji || "❓"} 1
+                </div>
+              ))}
+            </div>
+          )}
+
+          {draft.layout === "BUTTONS" && draft.options.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {draft.options.map((o, i) => (
+                <div key={i} className="bg-[#4e5058] text-[#f2f3f5] text-sm px-3 py-1.5 rounded flex items-center gap-1.5">
+                  {o.emoji && <span>{o.emoji}</span>}
+                  {o.label && <span>{o.label}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {draft.layout === "DROPDOWN" && (
+            <div className="mt-2 bg-[#2b2d31] border border-[#3f4248] rounded-lg px-3 py-2 text-sm text-[#949ba4] max-w-xs">
+              Select your roles… ▾
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -632,7 +733,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
             </div>
           </NeonCard>
         ) : (
-          <div className="space-y-3 max-w-lg">
+          <div className="space-y-3 max-w-5xl">
             {merged.map((m) => (
               <NeonCard key={`${m.source}:${m.id}`}>
                 <div className="flex items-center justify-between gap-3">
@@ -669,7 +770,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
         ))}
 
       {tab === "create" && (
-        <NeonCard className="max-w-lg">
+        <NeonCard className="max-w-5xl">
           <p className="font-medium mb-3">New Panel</p>
           <PanelFields guildId={guildId} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
           <button onClick={createPanel} disabled={creating} className="neon-button disabled:opacity-50">

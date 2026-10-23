@@ -784,6 +784,44 @@ export interface ApplicationSettingsRow {
   supportRoleIds: string[];
 }
 
+export type SupportQuestionMode = "TEXT" | "CHOICE";
+
+export interface SupportQuestionRow {
+  id: string;
+  flowId: string;
+  prompt: string;
+  mode: SupportQuestionMode;
+  choices: string[];
+  sortOrder: number;
+}
+
+export interface SupportFlowRow {
+  id: string;
+  guildId: string;
+  label: string;
+  color: string | null;
+  categoryId: string | null;
+  roleId: string | null;
+  enabled: boolean;
+  sortOrder: number;
+  questions: SupportQuestionRow[];
+}
+
+export type SupportTicketStatus = "DRAFT" | "OPEN" | "CLAIMED" | "CLOSED";
+
+export interface SupportTicketRow {
+  id: string;
+  flowId: string;
+  userId: string;
+  channelId: string | null;
+  answers: Array<{ prompt: string; answer: string }>;
+  status: SupportTicketStatus;
+  claimedById: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  flow?: { label: string };
+}
+
 export type TicketPanelLayout = "BUTTONS" | "DROPDOWN";
 
 export interface TicketPanelRow {
@@ -1481,6 +1519,25 @@ export const api = {
   updateApplicationType: (guildId: string, id: string, body: Partial<ApplicationTypeRow>) =>
     request<ApplicationTypeRow>(`/guilds/${guildId}/application-types/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteApplicationType: (guildId: string, id: string) => request(`/guilds/${guildId}/application-types/${id}`, { method: "DELETE" }),
+
+  getSupportFlows: (guildId: string) => request<SupportFlowRow[]>(`/guilds/${guildId}/support-flows`),
+  addSupportFlow: (guildId: string, body: Partial<SupportFlowRow>) =>
+    request<SupportFlowRow>(`/guilds/${guildId}/support-flows`, { method: "POST", body: JSON.stringify(body) }),
+  updateSupportFlow: (guildId: string, id: string, body: Partial<SupportFlowRow>) =>
+    request<SupportFlowRow>(`/guilds/${guildId}/support-flows/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteSupportFlow: (guildId: string, id: string) => request(`/guilds/${guildId}/support-flows/${id}`, { method: "DELETE" }),
+
+  addSupportQuestion: (guildId: string, flowId: string, body: Partial<SupportQuestionRow>) =>
+    request<SupportQuestionRow>(`/guilds/${guildId}/support-flows/${flowId}/questions`, { method: "POST", body: JSON.stringify(body) }),
+  updateSupportQuestion: (guildId: string, flowId: string, id: string, body: Partial<SupportQuestionRow>) =>
+    request<SupportQuestionRow>(`/guilds/${guildId}/support-flows/${flowId}/questions/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteSupportQuestion: (guildId: string, flowId: string, id: string) =>
+    request(`/guilds/${guildId}/support-flows/${flowId}/questions/${id}`, { method: "DELETE" }),
+  reorderSupportQuestions: (guildId: string, flowId: string, ids: string[]) =>
+    request(`/guilds/${guildId}/support-flows/${flowId}/questions/order`, { method: "PUT", body: JSON.stringify({ ids }) }),
+
+  getSupportTickets: (guildId: string, status?: string) =>
+    request<SupportTicketRow[]>(`/guilds/${guildId}/support-tickets${status ? `?status=${status}` : ""}`),
 
   getApplications: (guildId: string, status?: ApplicationStatus) =>
     request<ApplicationRow[]>(`/guilds/${guildId}/applications${status ? `?status=${status}` : ""}`),

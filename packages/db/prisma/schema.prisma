@@ -103,6 +103,8 @@ model Guild {
   lfgCommands       LfgCommand[]
   embedCreatorPresets EmbedCreatorPreset[]
   embedComponentActions EmbedComponentAction[]
+  supportFlows      SupportFlow[]
+  supportTickets    SupportTicket[]
   createdAt         DateTime             @default(now())
 }
 
@@ -165,6 +167,7 @@ enum ModuleKey {
   REMINDERS
   LFG
   EMBED_CREATOR
+  SUPPORT_INTAKE
 }
 
 model GrowthSnapshot {
@@ -1881,4 +1884,71 @@ model CustomAchievement {
   createdAt   DateTime @default(now())
 
   @@index([guildId, triggerType])
+}
+
+// ---- Support Intake (Support → Support Intake) ----
+// A DM-based front door into the ticket system: a member DMs the bot,
+// picks one of these flows, answers its question chain (one at a time),
+// and a private ticket channel is created from the answers — same
+// claim/close shape as the regular Tickets module, just triggered from a
+// DM conversation instead of a panel button in a guild channel.
+
+model SupportFlow {
+  id          String   @id @default(cuid())
+  guild       Guild    @relation(fields: [guildId], references: [id])
+  guildId     String
+  label       String // button text shown in the DM, e.g. "🐛 Bug Report"
+  color       String? @default("#5865F2")
+  categoryId  String? // Discord category the ticket channel is created under
+  roleId      String? // support role pinged when a ticket opens
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  questions   SupportQuestion[]
+  tickets     SupportTicket[]
+  createdAt   DateTime @default(now())
+
+  @@index([guildId])
+}
+
+enum SupportQuestionMode {
+  TEXT
+  CHOICE
+}
+
+model SupportQuestion {
+  id        String              @id @default(cuid())
+  flow      SupportFlow         @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flowId    String
+  prompt    String
+  mode      SupportQuestionMode @default(TEXT)
+  choices   Json                @default("[]") // string[] — only read when mode = CHOICE
+  sortOrder Int                 @default(0)
+
+  @@index([flowId])
+}
+
+enum SupportTicketStatus {
+  DRAFT // mid-conversation in the DM, no channel yet
+  OPEN
+  CLAIMED
+  CLOSED
+}
+
+model SupportTicket {
+  id           String              @id @default(cuid())
+  guild        Guild               @relation(fields: [guildId], references: [id])
+  guildId      String
+  flow         SupportFlow         @relation(fields: [flowId], references: [id])
+  flowId       String
+  userId       String // the member's Discord user id (the DM side)
+  channelId    String? // set once the question chain finishes and the ticket channel is created
+  questionIndex Int                @default(0) // which question in the flow they're currently answering
+  answers      Json                @default("[]") // [{ prompt, answer }, ...] in question order
+  status       SupportTicketStatus @default(DRAFT)
+  claimedById  String?
+  createdAt    DateTime            @default(now())
+  closedAt     DateTime?
+
+  @@index([guildId, status])
+  @@index([userId, status])
 }

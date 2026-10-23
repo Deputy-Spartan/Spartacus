@@ -36,6 +36,22 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // Support DM Intake's flow-picker and question-answer buttons live in a
+  // DM (no guildId), so they're handled here, before the guild-only gate.
+  if (interaction.isButton() && interaction.customId.startsWith("suppintake:flow:")) {
+    const flowId = interaction.customId.split(":")[2];
+    const { handleFlowSelect } = await import("../modules/support/supportIntake");
+    await handleFlowSelect(interaction, flowId);
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId.startsWith("suppintake:choice:")) {
+    const parts = interaction.customId.split(":");
+    const { handleChoiceAnswer } = await import("../modules/support/supportIntake");
+    await handleChoiceAnswer(interaction, parts[2], parts[3]);
+    return;
+  }
+
   // Embed Creator's plain buttons and every select-menu type ship with no
   // action behind them yet (same real limitation Discohook itself has) —
   // this answers with a clear message instead of Discord's own bare
@@ -301,6 +317,18 @@ export async function execute(interaction: Interaction) {
     var ticketParts = interaction.customId.split(":");
     const { handleTicketControl } = await import("../modules/tickets/tickets");
     await handleTicketControl(interaction, ticketParts[1], ticketParts[2] as "claim" | "close");
+    return;
+  }
+
+  if (interaction.customId.startsWith("suppintake:ticket:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "SUPPORT_INTAKE");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Support DM Intake is disabled for this server.", ephemeral: true });
+      return;
+    }
+    var suppTicketParts = interaction.customId.split(":");
+    const { handleTicketControl: handleSuppTicketControl } = await import("../modules/support/supportIntake");
+    await handleSuppTicketControl(interaction, suppTicketParts[2], suppTicketParts[3] as "claim" | "close");
     return;
   }
 

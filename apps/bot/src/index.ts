@@ -50,6 +50,7 @@ import * as bumpReminder from "./modules/community/bumpReminder";
 import * as rolePersistence from "./modules/community/rolePersistence";
 import * as inviteTracking from "./modules/community/inviteTracking";
 import * as modmail from "./modules/modmail/modmail";
+import * as supportIntake from "./modules/support/supportIntake";
 import * as applications from "./modules/community/applications";
 import * as channelLocks from "./modules/utility/channelLocks";
 import * as aiChat from "./modules/community/aiChat";
@@ -215,6 +216,8 @@ export function startBot() {
   client.on(Events.MessageCreate, modmail.execute); // DM-only, filters guild messages internally
   client.on(Events.MessageCreate, modmail.handleStaffReply); // guild-only, filters DMs internally
   client.on(Events.MessageCreate, applications.execute); // DM-only, advances an in-progress application draft
+  client.on(Events.MessageCreate, supportIntake.execute); // DM-only, flow picker + question chain + DM->ticket relay
+  client.on(Events.MessageCreate, supportIntake.handleStaffMessage); // guild-only, ticket channel -> DM relay
   client.on(aiChat.name, aiChat.execute);
   client.on(aiModeration.name, aiModeration.execute);
 

@@ -101,6 +101,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/tickets", label: "Tickets", icon: "🎟️", moduleKey: "TICKETS" },
       { href: "/applications", label: "Applications", icon: "📝", moduleKey: "APPLICATIONS" },
+      { href: "/support-intake", label: "Support DM", icon: "📨", moduleKey: "SUPPORT_INTAKE" },
     ],
   },
   {

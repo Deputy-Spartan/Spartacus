@@ -56,6 +56,7 @@ export const MODULE_KEYS = [
   "REMINDERS",
   "LFG",
   "EMBED_CREATOR",
+  "SUPPORT_INTAKE",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -118,6 +119,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   REMINDERS: "Reminders",
   LFG: "Looking For Group",
   EMBED_CREATOR: "Embed Creator",
+  SUPPORT_INTAKE: "Support DM Intake",
 };
 
 export const SIGNUP_ROLES = [

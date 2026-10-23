@@ -809,12 +809,20 @@ export interface SupportFlowRow {
 
 export type SupportTicketStatus = "DRAFT" | "OPEN" | "CLAIMED" | "CLOSED";
 
+export interface SupportTranscriptEntry {
+  from: "member" | "staff" | "system";
+  authorTag: string;
+  content: string;
+  at: string;
+}
+
 export interface SupportTicketRow {
   id: string;
   flowId: string;
   userId: string;
   channelId: string | null;
   answers: Array<{ prompt: string; answer: string }>;
+  transcript: SupportTranscriptEntry[];
   status: SupportTicketStatus;
   claimedById: string | null;
   createdAt: string;

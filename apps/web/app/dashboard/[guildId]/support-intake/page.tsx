@@ -446,10 +446,36 @@ function QuestionRow({
 // Tickets
 // ---------------------------------------------------------------------------
 
+const STATUS_STYLES: Record<SupportTicketStatus, string> = {
+  DRAFT: "bg-slate-500/10 border-slate-500/30 text-slate-400",
+  OPEN: "bg-neon-blue/10 border-neon-blue/40 text-neon-blue",
+  CLAIMED: "bg-amber-500/10 border-amber-500/40 text-amber-400",
+  CLOSED: "bg-slate-600/10 border-slate-600/30 text-slate-500",
+};
+
+function StatusPill({ status }: { status: SupportTicketStatus }) {
+  return (
+    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-medium border capitalize ${STATUS_STYLES[status]}`}>
+      {status.toLowerCase()}
+    </span>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
 function TicketsTab({ guildId }: { guildId: string }) {
   const [view, setView] = useState<SupportTicketStatus | "ALL">("OPEN");
   const [rows, setRows] = useState<SupportTicketRow[]>([]);
-  const { displayName } = useMemberNames(guildId, rows.map((r) => r.userId));
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { displayName } = useMemberNames(guildId, rows.flatMap((r) => [r.userId, r.claimedById].filter(Boolean) as string[]));
 
   function refresh() {
     api.getSupportTickets(guildId, view === "ALL" ? undefined : view).then(setRows);
@@ -458,17 +484,19 @@ function TicketsTab({ guildId }: { guildId: string }) {
 
   const openCount = rows.filter((r) => r.status === "OPEN").length;
   const claimedCount = rows.filter((r) => r.status === "CLAIMED").length;
+  const closedCount = rows.filter((r) => r.status === "CLOSED").length;
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400">
         Tickets opened from the DM intake flow. Claim/Close happens via the buttons on the ticket's channel in Discord — this list is read-only visibility
-        for staff.
+        for staff, with a full transcript kept even after the channel is deleted on close.
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard label="Open" value={openCount} />
         <StatCard label="Claimed" value={claimedCount} />
+        <StatCard label="Closed" value={closedCount} />
         <StatCard label="Total Shown" value={rows.length} />
       </div>
 
@@ -476,7 +504,10 @@ function TicketsTab({ guildId }: { guildId: string }) {
         {(["OPEN", "CLAIMED", "CLOSED", "ALL"] as const).map((v) => (
           <button
             key={v}
-            onClick={() => setView(v)}
+            onClick={() => {
+              setView(v);
+              setExpandedId(null);
+            }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors capitalize ${
               view === v ? "bg-base-800 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400 hover:text-slate-200"
             }`}
@@ -486,33 +517,90 @@ function TicketsTab({ guildId }: { guildId: string }) {
         ))}
       </div>
 
-      <NeonCard>
-        {rows.length === 0 ? (
+      {rows.length === 0 ? (
+        <NeonCard>
           <EmptyState
             icon="🎟️"
             title={`No ${view === "ALL" ? "" : view.toLowerCase()} tickets`}
             desc="Tickets land here once a member finishes a question chain in their DM."
           />
-        ) : (
-          <div className="divide-y divide-white/5">
-            {rows.map((t) => (
-              <div key={t.id} className="py-3 text-sm">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-medium">
-                    {displayName(t.userId)} {t.flow ? `· ${t.flow.label}` : ""}
-                  </span>
-                  <span className="text-xs text-slate-500">{t.status.toLowerCase()}</span>
+        </NeonCard>
+      ) : (
+        <div className="space-y-2.5">
+          {rows.map((t) => (
+            <NeonCard key={t.id} className="!p-0 overflow-hidden">
+              <button
+                onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-medium truncate">{displayName(t.userId)}</span>
+                    {t.flow && <span className="text-xs text-slate-500 truncate">· {t.flow.label}</span>}
+                    <StatusPill status={t.status} />
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {timeAgo(t.createdAt)}
+                    {t.claimedById ? ` · claimed by ${displayName(t.claimedById)}` : ""}
+                    {t.transcript.length > 0 ? ` · ${t.transcript.length} message(s)` : ""}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  {new Date(t.createdAt).toLocaleString()}
-                  {t.channelId ? ` · channel ${t.channelId}` : ""}
-                  {t.claimedById ? ` · claimed by ${displayName(t.claimedById)}` : ""}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </NeonCard>
+                <span className="text-slate-500 text-xs shrink-0">{expandedId === t.id ? "Hide ▲" : "View ▼"}</span>
+              </button>
+
+              {expandedId === t.id && (
+                <div className="border-t border-white/5 px-4 py-3">
+                  {t.answers.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">Intake answers</p>
+                      <div className="space-y-1.5">
+                        {t.answers.map((a, i) => (
+                          <div key={i} className="bg-base-950 border border-white/10 rounded-lg px-3 py-2 text-xs">
+                            <p className="text-slate-500 mb-0.5">{a.prompt}</p>
+                            <p className="text-slate-200">{a.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">Transcript</p>
+                  {t.transcript.length === 0 ? (
+                    <p className="text-xs text-slate-500">No messages relayed yet.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+                      {t.transcript.map((entry, i) => (
+                        <div
+                          key={i}
+                          className={`rounded-lg px-3 py-2 text-xs ${
+                            entry.from === "system"
+                              ? "bg-base-950/60 border border-white/5 text-slate-500 italic"
+                              : entry.from === "staff"
+                              ? "bg-neon-blue/5 border border-neon-blue/15"
+                              : "bg-base-800 border border-white/10"
+                          }`}
+                        >
+                          {entry.from !== "system" && (
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className={entry.from === "staff" ? "text-neon-blue font-medium" : "text-slate-300 font-medium"}>
+                                {entry.from === "staff" ? "Staff" : displayName(t.userId)}
+                              </span>
+                              <span className="text-slate-600">{new Date(entry.at).toLocaleString()}</span>
+                            </div>
+                          )}
+                          <p className="whitespace-pre-wrap break-words text-slate-200">{entry.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {t.channelId && t.status !== "CLOSED" && <p className="text-xs text-slate-600 mt-3">Channel ID: {t.channelId}</p>}
+                </div>
+              )}
+            </NeonCard>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

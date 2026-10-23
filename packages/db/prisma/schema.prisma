@@ -1955,6 +1955,7 @@ model SupportTicket {
   channelId    String? // set once the question chain finishes and the ticket channel is created
   questionIndex Int                @default(0) // which question in the flow they're currently answering
   answers      Json                @default("[]") // [{ prompt, answer }, ...] in question order
+  transcript   Json                @default("[]") // [{ from: "member"|"staff"|"system", authorTag, content, at }, ...] appended live so it survives the channel being deleted on close
   status       SupportTicketStatus @default(DRAFT)
   claimedById  String?
   createdAt    DateTime            @default(now())

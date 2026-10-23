@@ -13,6 +13,7 @@ import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 import type { SupportQuestion } from "@spartacus/db";
+import type { Prisma } from "@prisma/client";
 
 export const name = Events.MessageCreate;
 
@@ -45,6 +46,24 @@ async function askQuestion(message: Message | null, userSend: (payload: unknown)
   } else {
     await userSend({ content: prefix });
   }
+}
+
+interface TranscriptEntry {
+  from: "member" | "staff" | "system";
+  authorTag: string;
+  content: string;
+  at: string;
+}
+
+// Appended live at every relay/lifecycle point rather than fetched from the
+// channel at close time, since the ticket channel gets deleted a few
+// seconds after closing — this is the only copy of the conversation left.
+async function appendTranscript(ticketId: string, entry: Omit<TranscriptEntry, "at">) {
+  const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
+  if (!ticket) return;
+  const transcript = Array.isArray(ticket.transcript) ? (ticket.transcript as unknown as TranscriptEntry[]) : [];
+  transcript.push({ ...entry, at: new Date().toISOString() });
+  await prisma.supportTicket.update({ where: { id: ticketId }, data: { transcript: transcript as unknown as Prisma.InputJsonValue } }).catch(() => null);
 }
 
 function ticketControlRow(ticketId: string) {
@@ -89,7 +108,18 @@ async function finalizeTicket(client: Message["client"], ticketId: string) {
     components: [ticketControlRow(ticket.id)],
   });
 
-  await prisma.supportTicket.update({ where: { id: ticket.id }, data: { status: "OPEN", channelId: channel.id } });
+  const qaLines = answers.map((a, i) => `${i + 1}. ${a.prompt}\n→ ${a.answer || "(no answer)"}`).join("\n\n");
+  await prisma.supportTicket.update({
+    where: { id: ticket.id },
+    data: {
+      status: "OPEN",
+      channelId: channel.id,
+      transcript: [
+        { from: "system", authorTag: "Spartacus", content: `Ticket opened — ${flow.label}`, at: new Date().toISOString() },
+        ...(qaLines ? [{ from: "system" as const, authorTag: "Intake Q&A", content: qaLines, at: new Date().toISOString() }] : []),
+      ] as unknown as Prisma.InputJsonValue,
+    },
+  });
 
   await user
     ?.send(`✅ Thanks — I've opened a support ticket for your **${flow.label}** request. A staff member will reply here in this DM once they pick it up.`)
@@ -120,6 +150,7 @@ export async function execute(message: Message) {
         ],
       });
       await message.react("📨").catch(() => null);
+      await appendTranscript(openTicket.id, { from: "member", authorTag: message.author.tag, content: message.content || "(no text content)" });
     }
     return;
   }
@@ -291,12 +322,14 @@ export async function handleTicketControl(interaction: ButtonInteraction, ticket
   if (action === "claim") {
     await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: "CLAIMED", claimedById: interaction.user.id } });
     await interaction.reply(`🙋 Ticket claimed by <@${interaction.user.id}>.`);
+    await appendTranscript(ticketId, { from: "system", authorTag: "Spartacus", content: `Claimed by ${interaction.user.tag}` });
     const user = await interaction.client.users.fetch(ticket.userId).catch(() => null);
     await user?.send("🙋 A staff member has picked up your support ticket.").catch(() => null);
     return;
   }
 
   await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: "CLOSED", closedAt: new Date() } });
+  await appendTranscript(ticketId, { from: "system", authorTag: "Spartacus", content: `Closed by ${interaction.user.tag}` });
   await interaction.reply("🔒 Closing this ticket in 5 seconds…");
 
   const user = await interaction.client.users.fetch(ticket.userId).catch(() => null);
@@ -322,4 +355,5 @@ export async function handleStaffMessage(message: Message) {
     ?.send(`**Staff:** ${message.content}`)
     .then(() => message.react("✅"))
     .catch(() => message.react("❌"));
+  await appendTranscript(ticket.id, { from: "staff", authorTag: message.author.tag, content: message.content });
 }

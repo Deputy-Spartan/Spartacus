@@ -5,13 +5,19 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
+import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
+import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { parseEmbedExtra, EMPTY_EMBED_EXTRA } from "../../../../lib/embedExtra";
 import { api, type AnnouncementInput, type AnnouncementRow, type DiscordChannelOption } from "../../../../lib/api";
 
 type Tab = "active" | "create";
+
+const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
 
 const EMPTY: AnnouncementInput = {
   channelId: "",
@@ -21,7 +27,7 @@ const EMPTY: AnnouncementInput = {
   embedColor: "#00E5FF",
   buttons: [],
   scheduledFor: null,
-  embedExtra: {},
+  embedExtra: EMPTY_EMBED_EXTRA,
   savedEmbedId: null,
 };
 
@@ -34,7 +40,7 @@ function rowToInput(r: AnnouncementRow): AnnouncementInput {
     embedColor: r.embedColor ?? "#00E5FF",
     buttons: r.buttons,
     scheduledFor: r.scheduledFor,
-    embedExtra: r.embedExtra ?? {},
+    embedExtra: parseEmbedExtra(r.embedExtra),
     savedEmbedId: r.savedEmbedId ?? null,
   };
 }
@@ -97,8 +103,9 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   }
 
   async function save() {
-    if (!form.channelId || (!form.content && !form.savedEmbedId)) {
-      setError("Select a channel and enter a message or pick a saved embed before saving.");
+    const hasEmbedContent = form.embedEnabled && (form.content.trim() || form.embedTitle.trim());
+    if (!form.channelId || !(form.content.trim() || form.savedEmbedId || hasEmbedContent)) {
+      setError("Select a channel and enter a message, build an embed, or pick a saved embed before saving.");
       return;
     }
     setError(null);
@@ -147,7 +154,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
         guildId={params.guildId}
         moduleKey="ANNOUNCEMENTS"
         title="Announcements"
-        description="Compose a message or embed, queue it, then publish it when you're ready."
+        description="Compose a message or build an embed, queue it, then publish it when you're ready."
       />
 
       <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 mb-5">
@@ -293,24 +300,95 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
               rows={3}
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
+              placeholder={form.embedEnabled ? "Also used as the embed's description" : undefined}
             />
+
+            <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Build an Embed</p>
+                <p className="text-xs text-slate-500">Add a title, color, and rich fields around your message above.</p>
+              </div>
+              <ToggleSwitch enabled={form.embedEnabled} onChange={(v) => setForm({ ...form, embedEnabled: v })} label="Build an embed" />
+            </div>
+
+            {form.embedEnabled && (
+              <>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Title</label>
+                <input
+                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
+                  value={form.embedTitle}
+                  onChange={(e) => setForm({ ...form, embedTitle: e.target.value })}
+                  placeholder="Optional"
+                />
+
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="color"
+                    className="h-9 w-11 rounded-lg border border-white/10 bg-base-950 cursor-pointer shrink-0"
+                    value={form.embedColor}
+                    onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
+                  />
+                  <input
+                    className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
+                    value={form.embedColor}
+                    onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
+                  />
+                </div>
+                <div className="flex gap-1.5 mb-4">
+                  {COLOR_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      title={c}
+                      onClick={() => setForm({ ...form, embedColor: c })}
+                      className="w-[18px] h-[18px] rounded border border-white/10 hover:scale-110 transition-transform"
+                      style={{ background: c }}
+                    />
+                  ))}
+                </div>
+
+                <EmbedExtraFields
+                  guildId={params.guildId}
+                  value={form.embedExtra ?? EMPTY_EMBED_EXTRA}
+                  onChange={(v) => setForm({ ...form, embedExtra: v })}
+                />
+              </>
+            )}
+
+            <div className="mt-4 mb-4">
+              <ButtonsEditor guildId={params.guildId} buttons={form.buttons} onChange={(next) => setForm({ ...form, buttons: next })} />
+            </div>
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a saved embed instead (optional)</label>
             <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
             <p className="text-xs text-slate-600 -mt-3 mb-4">
-              Picking one here only uses it as this announcement's content — it doesn't save this announcement as a template.
+              Picking one here uses it as this announcement's content instead of the embed built above — it doesn't save this
+              announcement as a template.
             </p>
 
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
-            <input
-              type="datetime-local"
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-2"
-              value={scheduleLocal}
-              onChange={(e) => setScheduleLocal(e.target.value)}
-            />
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="datetime-local"
+                className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                value={scheduleLocal}
+                onChange={(e) => setScheduleLocal(e.target.value)}
+              />
+              {scheduleLocal && (
+                <button
+                  type="button"
+                  onClick={() => setScheduleLocal("")}
+                  className="text-xs text-slate-500 hover:text-rose-400 px-2 py-2.5 shrink-0"
+                  title="Clear schedule"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <p className="text-xs text-slate-600 mb-4">
               {scheduleLocal
-                ? "Publishes automatically at this time — no need to come back and click Publish. You can change or clear this anytime before then."
+                ? "Publishes automatically at this time — no need to come back and click Publish. Clear it anytime before then to publish manually instead."
                 : "Leave blank to just queue it — you'll publish it yourself from the Queued tab whenever you're ready."}
             </p>
 
@@ -324,12 +402,12 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             <p className="font-medium mb-3">Preview</p>
             <StickyPreview
               content={form.content}
-              embedEnabled={false}
-              embedTitle=""
+              embedEnabled={form.embedEnabled}
+              embedTitle={form.embedTitle}
               embedDescription={form.content}
-              embedColor=""
+              embedColor={form.embedColor}
               buttons={form.buttons}
-              embedExtra={{}}
+              embedExtra={form.embedExtra ?? EMPTY_EMBED_EXTRA}
             />
             {form.savedEmbedId && <p className="text-xs text-slate-500 mt-2">Preview reflects the saved embed once published.</p>}
           </NeonCard>

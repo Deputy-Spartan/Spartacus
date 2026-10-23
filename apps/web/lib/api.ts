@@ -834,6 +834,10 @@ export interface SupportSettingsRow {
   guildId: string;
   introMessage: string | null;
   noFlowsMessage: string | null;
+  alreadyOpenMessage: string | null;
+  ticketOpenedMessage: string | null;
+  ticketClaimedMessage: string | null;
+  ticketClosedMessage: string | null;
 }
 
 export type TicketPanelLayout = "BUTTONS" | "DROPDOWN";

@@ -17,6 +17,10 @@ import type { Prisma } from "@prisma/client";
 
 export const name = Events.MessageCreate;
 
+function applyTokens(text: string, tokens: Record<string, string>): string {
+  return Object.entries(tokens).reduce((t, [k, v]) => t.replace(new RegExp(`{${k}}`, "g"), v), text);
+}
+
 function choicesOf(question: { choices: unknown }): string[] {
   return Array.isArray(question.choices) ? (question.choices as string[]) : [];
 }
@@ -121,9 +125,13 @@ async function finalizeTicket(client: Message["client"], ticketId: string) {
     },
   });
 
-  await user
-    ?.send(`✅ Thanks — I've opened a support ticket for your **${flow.label}** request. A staff member will reply here in this DM once they pick it up.`)
-    .catch(() => null);
+  const settings = await prisma.supportSettings.findUnique({ where: { guildId: ticket.guildId } });
+  const openedMessage = applyTokens(
+    settings?.ticketOpenedMessage ||
+      "✅ Thanks — I've opened a support ticket for your **{category}** request. A staff member will reply here in this DM once they pick it up.",
+    { category: flow.label, server: guild.name, user: user?.username ?? ticket.userId }
+  );
+  await user?.send(openedMessage).catch(() => null);
 }
 
 // Sends either the "no categories configured" message or the flow-picker
@@ -323,7 +331,13 @@ export async function handleFlowSelect(interaction: ButtonInteraction, flowId: s
     where: { userId: interaction.user.id, status: { in: ["DRAFT", "OPEN", "CLAIMED"] } },
   });
   if (existing) {
-    await interaction.reply({ content: "You already have a support request in progress in your DMs — finish that one first.", ephemeral: true });
+    const settings = await prisma.supportSettings.findUnique({ where: { guildId: flow.guildId } });
+    const guild = await interaction.client.guilds.fetch(flow.guildId).catch(() => null);
+    const alreadyOpen = applyTokens(settings?.alreadyOpenMessage || "You already have a support request in progress in your DMs — finish that one first.", {
+      server: guild?.name ?? "this server",
+      user: interaction.user.username,
+    });
+    await interaction.reply({ content: alreadyOpen, ephemeral: true });
     return;
   }
 
@@ -369,12 +383,17 @@ export async function handleTicketControl(interaction: ButtonInteraction, ticket
     return;
   }
 
+  const settings = await prisma.supportSettings.findUnique({ where: { guildId: ticket.guildId } });
+
   if (action === "claim") {
     await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: "CLAIMED", claimedById: interaction.user.id } });
     await interaction.reply(`🙋 Ticket claimed by <@${interaction.user.id}>.`);
     await appendTranscript(ticketId, { from: "system", authorTag: "Spartacus", content: `Claimed by ${interaction.user.tag}` });
     const user = await interaction.client.users.fetch(ticket.userId).catch(() => null);
-    await user?.send("🙋 A staff member has picked up your support ticket.").catch(() => null);
+    const claimedMessage = applyTokens(settings?.ticketClaimedMessage || "🙋 A staff member has picked up your support ticket.", {
+      staff: interaction.user.username,
+    });
+    await user?.send(claimedMessage).catch(() => null);
     return;
   }
 
@@ -383,7 +402,10 @@ export async function handleTicketControl(interaction: ButtonInteraction, ticket
   await interaction.reply("🔒 Closing this ticket in 5 seconds…");
 
   const user = await interaction.client.users.fetch(ticket.userId).catch(() => null);
-  await user?.send("🔒 Your support ticket has been closed. DM me again if you need anything else.").catch(() => null);
+  const closedMessage = applyTokens(settings?.ticketClosedMessage || "🔒 Your support ticket has been closed. DM me again if you need anything else.", {
+    staff: interaction.user.username,
+  });
+  await user?.send(closedMessage).catch(() => null);
 
   setTimeout(() => interaction.channel?.delete().catch(() => null), 5000);
 }

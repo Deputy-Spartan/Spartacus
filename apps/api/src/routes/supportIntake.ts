@@ -99,11 +99,15 @@ router.get("/guilds/:guildId/support-tickets", requireAuth, requireGuildPermissi
   res.json(rows);
 });
 
-// ---- Settings (the opening DM, sent before a flow is picked) ----
+// ---- Settings (every DM reply the module sends, outside the per-category question chain itself) ----
 
 const DEFAULT_SETTINGS = {
   introMessage: null as string | null,
   noFlowsMessage: null as string | null,
+  alreadyOpenMessage: null as string | null,
+  ticketOpenedMessage: null as string | null,
+  ticketClaimedMessage: null as string | null,
+  ticketClosedMessage: null as string | null,
 };
 
 router.get("/guilds/:guildId/support-settings", requireAuth, requireGuildPermission, async (req, res) => {
@@ -112,8 +116,15 @@ router.get("/guilds/:guildId/support-settings", requireAuth, requireGuildPermiss
 });
 
 router.put("/guilds/:guildId/support-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { introMessage, noFlowsMessage } = req.body;
-  const data = { introMessage: introMessage ?? null, noFlowsMessage: noFlowsMessage ?? null };
+  const { introMessage, noFlowsMessage, alreadyOpenMessage, ticketOpenedMessage, ticketClaimedMessage, ticketClosedMessage } = req.body;
+  const data = {
+    introMessage: introMessage ?? null,
+    noFlowsMessage: noFlowsMessage ?? null,
+    alreadyOpenMessage: alreadyOpenMessage ?? null,
+    ticketOpenedMessage: ticketOpenedMessage ?? null,
+    ticketClaimedMessage: ticketClaimedMessage ?? null,
+    ticketClosedMessage: ticketClosedMessage ?? null,
+  };
   const row = await prisma.supportSettings.upsert({
     where: { guildId: req.params.guildId },
     create: { guildId: req.params.guildId, ...data },

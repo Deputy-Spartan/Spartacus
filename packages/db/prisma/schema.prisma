@@ -1712,6 +1712,10 @@ model SupportSettings {
   guildId      String  @unique
   introMessage String?
   noFlowsMessage String?
+  alreadyOpenMessage  String? // DM reply when they already have a request in progress (DRAFT/OPEN/CLAIMED)
+  ticketOpenedMessage String? // DM sent right after the question chain finishes and the ticket channel is created
+  ticketClaimedMessage String? // DM sent when a staff member claims their ticket
+  ticketClosedMessage String? // DM sent when their ticket is closed
 }
 
 // ---- Dashboard Activity ----

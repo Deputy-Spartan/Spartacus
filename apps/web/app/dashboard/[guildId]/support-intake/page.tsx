@@ -610,22 +610,74 @@ function TicketsTab({ guildId }: { guildId: string }) {
 // Settings
 // ---------------------------------------------------------------------------
 
+interface MessageFieldDef {
+  key: keyof SupportSettingsRow;
+  label: string;
+  hint: string;
+  placeholder: string;
+  rows?: number;
+}
+
+const MESSAGE_FIELDS: MessageFieldDef[] = [
+  {
+    key: "introMessage",
+    label: "Opening Message",
+    hint: "Sent once this server is the one being asked about — right above the category buttons.",
+    placeholder: "👋 Hey! What do you need help with in **{server}**?",
+    rows: 3,
+  },
+  {
+    key: "noFlowsMessage",
+    label: "No Categories Configured Message",
+    hint: "Sent instead of the category buttons if the module is enabled but no categories have been created yet (or none are enabled).",
+    placeholder: "⚠️ Support requests aren't set up yet — an admin needs to add a category first.",
+    rows: 2,
+  },
+  {
+    key: "alreadyOpenMessage",
+    label: "Already In Progress Message",
+    hint: "Shown when a member picks a category but already has a request in progress (mid-questions, or an open ticket) — they're told to finish that one first.",
+    placeholder: "You already have a support request in progress in your DMs — finish that one first.",
+    rows: 2,
+  },
+  {
+    key: "ticketOpenedMessage",
+    label: "Ticket Opened Message",
+    hint: "Sent the moment the question chain finishes and the ticket channel is created. Use {category} for the category name.",
+    placeholder: "✅ Thanks — I've opened a support ticket for your **{category}** request. A staff member will reply here in this DM once they pick it up.",
+    rows: 2,
+  },
+  {
+    key: "ticketClaimedMessage",
+    label: "Ticket Claimed Message",
+    hint: "Sent when a staff member clicks Claim on the ticket channel.",
+    placeholder: "🙋 A staff member has picked up your support ticket.",
+    rows: 2,
+  },
+  {
+    key: "ticketClosedMessage",
+    label: "Ticket Closed Message",
+    hint: "Sent when the ticket is closed, right before the channel is deleted.",
+    placeholder: "🔒 Your support ticket has been closed. DM me again if you need anything else.",
+    rows: 2,
+  },
+];
+
 function SettingsTab({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<SupportSettingsRow | null>(null);
-  const [intro, setIntro] = useState("");
-  const [noFlows, setNoFlows] = useState("");
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     api.getSupportSettings(guildId).then((s) => {
       setSettings(s);
-      setIntro(s.introMessage ?? "");
-      setNoFlows(s.noFlowsMessage ?? "");
+      setDraft(Object.fromEntries(MESSAGE_FIELDS.map((f) => [f.key, (s[f.key] as string | null) ?? ""])));
     });
   }, [guildId]);
 
   async function save() {
-    const next = await api.setSupportSettings(guildId, { introMessage: intro || null, noFlowsMessage: noFlows || null });
+    const payload = Object.fromEntries(MESSAGE_FIELDS.map((f) => [f.key, draft[f.key] || null]));
+    const next = await api.setSupportSettings(guildId, payload);
     setSettings(next);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -633,13 +685,13 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
   if (!settings) return <p className="text-slate-400">Loading…</p>;
 
-  const introPlaceholder = "👋 Hey! What do you need help with in **{server}**?";
-
   return (
     <div className="space-y-4 max-w-2xl">
       <p className="text-sm text-slate-400">
-        These two messages are guild-wide, not per-category — they're sent before the member has picked a category, so there's nothing to personalize per
-        flow yet.
+        Every reply this module sends outside of the category question chains themselves — customize each one for this server's tone, or leave any of
+        them blank to use the default wording shown as a placeholder. Use <code className="text-neon-blue">{"{server}"}</code> and{" "}
+        <code className="text-neon-blue">{"{user}"}</code> anywhere, plus <code className="text-neon-blue">{"{category}"}</code> on the Ticket Opened
+        message.
       </p>
 
       <div className="text-xs text-slate-500 bg-base-800/60 border border-white/5 rounded-lg px-3 py-2.5">
@@ -648,39 +700,23 @@ function SettingsTab({ guildId }: { guildId: string }) {
         <Link href={`/dashboard/${guildId}/bot-customization`} className="text-neon-blue hover:underline">
           Owner → Bot Customization
         </Link>
-        . The Opening Message below always plays right after, once this server has been chosen.
+        . Everything below always plays right after, once this server has been chosen.
       </div>
 
-      <NeonCard>
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Opening Message</label>
-        <p className="text-xs text-slate-500 mb-2">
-          Sent once this server is the one being asked about — right above the category buttons. Use <code className="text-neon-blue">{"{server}"}</code>{" "}
-          and <code className="text-neon-blue">{"{user}"}</code> to personalize it.
-        </p>
-        <textarea
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
-          rows={3}
-          value={intro}
-          onChange={(e) => setIntro(e.target.value)}
-          placeholder={introPlaceholder}
-        />
-        <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
-      </NeonCard>
-
-      <NeonCard>
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">No Categories Configured Message</label>
-        <p className="text-xs text-slate-500 mb-2">
-          Sent instead of the category buttons if the module is enabled but no categories have been created yet (or none are enabled).
-        </p>
-        <textarea
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
-          rows={2}
-          value={noFlows}
-          onChange={(e) => setNoFlows(e.target.value)}
-          placeholder="⚠️ Support requests aren't set up yet — an admin needs to add a category first."
-        />
-        <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
-      </NeonCard>
+      {MESSAGE_FIELDS.map((f) => (
+        <NeonCard key={f.key}>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">{f.label}</label>
+          <p className="text-xs text-slate-500 mb-2">{f.hint}</p>
+          <textarea
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+            rows={f.rows ?? 2}
+            value={draft[f.key] ?? ""}
+            onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+            placeholder={f.placeholder}
+          />
+          <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
+        </NeonCard>
+      ))}
 
       <div className="flex items-center gap-3">
         <button onClick={save} className="neon-button">

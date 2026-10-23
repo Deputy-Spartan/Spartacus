@@ -126,11 +126,46 @@ async function finalizeTicket(client: Message["client"], ticketId: string) {
     .catch(() => null);
 }
 
+// Sends either the "no categories configured" message or the flow-picker
+// buttons for one specific guild. Shared by the direct single-guild path in
+// execute() and the server-picker button handler below, so the per-guild
+// Settings messages behave identically regardless of how the member got here.
+async function sendFlowPicker(guild: { id: string; name: string }, username: string, send: (payload: unknown) => Promise<unknown>) {
+  const flows = await prisma.supportFlow.findMany({ where: { guildId: guild.id, enabled: true }, orderBy: { sortOrder: "asc" } });
+  const settings = await prisma.supportSettings.findUnique({ where: { guildId: guild.id } });
+
+  if (flows.length === 0) {
+    const noFlows = (settings?.noFlowsMessage || "⚠️ Support requests aren't set up yet — an admin needs to add a category first.")
+      .replace(/{server}/g, guild.name)
+      .replace(/{user}/g, username);
+    await send(noFlows).catch(() => null);
+    return;
+  }
+
+  const intro = (settings?.introMessage || "👋 Hey! What do you need help with in **{server}**?")
+    .replace(/{server}/g, guild.name)
+    .replace(/{user}/g, username);
+
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < flows.length && i < 25; i += 5) {
+    rows.push(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        flows.slice(i, i + 5).map((f) =>
+          new ButtonBuilder().setCustomId(`suppintake:flow:${f.id}`).setLabel(f.label.slice(0, 80)).setStyle(ButtonStyle.Primary)
+        )
+      )
+    );
+  }
+
+  await send({ content: intro, components: rows }).catch(() => null);
+}
+
 // Entry point for every member DM. Three states, checked in order:
 // an already-open ticket relays the message to its channel; a draft
-// mid-question-chain advances it; otherwise this looks for a guild that
-// has the module enabled and this user as a member, and shows the flow
-// picker — same guild-matching loop Modmail uses.
+// mid-question-chain advances it; otherwise this looks for every guild that
+// has the module enabled and this user as a member. One match goes straight
+// to the flow picker; more than one asks which server first, since a DM
+// carries no guild context of its own.
 export async function execute(message: Message) {
   if (message.author.bot || message.guild) return;
 
@@ -161,42 +196,56 @@ export async function execute(message: Message) {
     return;
   }
 
+  const matches: Array<{ id: string; name: string }> = [];
   for (const guild of message.client.guilds.cache.values()) {
     const isMember = await guild.members.fetch(message.author.id).catch(() => null);
     if (!isMember) continue;
-
     const enabled = await isModuleEnabled(guild.id, "SUPPORT_INTAKE");
     if (!enabled) continue;
+    matches.push({ id: guild.id, name: guild.name });
+  }
 
-    const flows = await prisma.supportFlow.findMany({ where: { guildId: guild.id, enabled: true }, orderBy: { sortOrder: "asc" } });
-    const settings = await prisma.supportSettings.findUnique({ where: { guildId: guild.id } });
+  if (matches.length === 0) return;
 
-    if (flows.length === 0) {
-      const noFlows = (settings?.noFlowsMessage || "⚠️ Support requests aren't set up yet — an admin needs to add a category first.")
-        .replace(/{server}/g, guild.name)
-        .replace(/{user}/g, message.author.username);
-      await message.reply(noFlows).catch(() => null);
-      return;
-    }
-
-    const intro = (settings?.introMessage || "👋 Hey! What do you need help with in **{server}**?")
-      .replace(/{server}/g, guild.name)
-      .replace(/{user}/g, message.author.username);
-
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-    for (let i = 0; i < flows.length && i < 25; i += 5) {
-      rows.push(
-        new ActionRowBuilder<ButtonBuilder>().addComponents(
-          flows.slice(i, i + 5).map((f) =>
-            new ButtonBuilder().setCustomId(`suppintake:flow:${f.id}`).setLabel(f.label.slice(0, 80)).setStyle(ButtonStyle.Primary)
-          )
-        )
-      );
-    }
-
-    await message.reply({ content: intro, components: rows }).catch(() => null);
+  if (matches.length === 1) {
+    await sendFlowPicker(matches[0], message.author.username, (payload) => message.reply(payload as never));
     return;
   }
+
+  // Shared across multiple mutual servers with the module enabled — a DM
+  // carries no guild context on its own, so ask which one first. This
+  // prompt is necessarily fixed wording (not editable per-guild): it's
+  // shown before any one server has been chosen, so no single server's
+  // Settings page could own it.
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  for (let i = 0; i < matches.length && i < 25; i += 5) {
+    rows.push(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        matches.slice(i, i + 5).map((g) =>
+          new ButtonBuilder().setCustomId(`suppintake:server:${g.id}`).setLabel(g.name.slice(0, 80)).setStyle(ButtonStyle.Secondary)
+        )
+      )
+    );
+  }
+  await message
+    .reply({ content: "👋 You're in a few servers I can help with — which one is this about?", components: rows })
+    .catch(() => null);
+}
+
+// DM button: picking which server, when the member shares more than one
+// with the module enabled. Hands off to the same flow picker used for the
+// single-server path.
+export async function handleServerSelect(interaction: ButtonInteraction, guildId: string) {
+  const guild = await interaction.client.guilds.fetch(guildId).catch(() => null);
+  const isMember = guild ? await guild.members.fetch(interaction.user.id).catch(() => null) : null;
+  const enabled = guild ? await isModuleEnabled(guild.id, "SUPPORT_INTAKE") : false;
+  if (!guild || !isMember || !enabled) {
+    await interaction.reply({ content: "That server isn't available anymore.", ephemeral: true });
+    return;
+  }
+
+  await interaction.update({ content: `**${guild.name}**`, components: [] }).catch(() => null);
+  await sendFlowPicker(guild, interaction.user.username, (payload) => interaction.followUp(payload as never));
 }
 
 async function advanceDraft(message: Message, ticketId: string) {

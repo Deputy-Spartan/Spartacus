@@ -52,6 +52,13 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && interaction.customId.startsWith("suppintake:server:")) {
+    const guildId = interaction.customId.split(":")[2];
+    const { handleServerSelect } = await import("../modules/support/supportIntake");
+    await handleServerSelect(interaction, guildId);
+    return;
+  }
+
   // Embed Creator's plain buttons and every select-menu type ship with no
   // action behind them yet (same real limitation Discohook itself has) —
   // this answers with a clear message instead of Discord's own bare

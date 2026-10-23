@@ -641,10 +641,16 @@ function SettingsTab({ guildId }: { guildId: string }) {
         flow yet.
       </p>
 
+      <div className="text-xs text-slate-500 bg-base-800/60 border border-white/5 rounded-lg px-3 py-2.5">
+        If a member shares more than one server with the bot where Support DM is enabled, they're asked which server first — that one prompt is fixed
+        wording (it's shown before any server's been picked, so no single server's settings can own it). The Opening Message below always plays right
+        after, once this server has been chosen.
+      </div>
+
       <NeonCard>
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Opening Message</label>
         <p className="text-xs text-slate-500 mb-2">
-          Sent the moment a member DMs the bot for the first time, right above the category buttons. Use <code className="text-neon-blue">{"{server}"}</code>{" "}
+          Sent once this server is the one being asked about — right above the category buttons. Use <code className="text-neon-blue">{"{server}"}</code>{" "}
           and <code className="text-neon-blue">{"{user}"}</code> to personalize it.
         </p>
         <textarea

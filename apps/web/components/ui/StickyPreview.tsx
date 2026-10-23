@@ -18,7 +18,7 @@ interface StickyPreviewProps {
 // Mimics Discord's own dark theme colors (not the dashboard's neon theme)
 // so what you see here is what actually shows up in Discord.
 export function StickyPreview({ content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra }: StickyPreviewProps) {
-  const hasContent = embedEnabled ? embedTitle || embedDescription || content : content;
+  const hasContent = content || (embedEnabled && (embedTitle || embedDescription || embedExtra?.authorName || embedExtra?.fields?.length));
   const avatarUrl = useBotAvatar();
 
   return (
@@ -40,9 +40,12 @@ export function StickyPreview({ content, embedEnabled, embedTitle, embedDescript
 
           {!hasContent && <p className="text-[#949ba4] text-sm italic mt-1">Nothing to preview yet.</p>}
 
-          {!embedEnabled && content && <p className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words">{content}</p>}
+          {/* The plain message is independent of the embed — it's the text
+              line Discord shows above the card, shown here whenever it's
+              set regardless of whether an embed is also being built. */}
+          {content && <p className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words">{content}</p>}
 
-          {embedEnabled && (embedTitle || embedDescription || content) && (
+          {embedEnabled && (embedTitle || embedDescription || embedExtra?.authorName || embedExtra?.fields?.length) && (
             <div
               className="mt-2 rounded bg-[#2b2d31] border-l-4 p-3 max-w-md"
               style={{ borderColor: embedColor || "#5865f2" }}
@@ -50,7 +53,7 @@ export function StickyPreview({ content, embedEnabled, embedTitle, embedDescript
               <EmbedExtraThumbnail embedExtra={embedExtra} />
               <EmbedExtraAuthor embedExtra={embedExtra} />
               {embedTitle && <p className="text-[#f2f3f5] font-semibold text-sm mb-1">{embedTitle}</p>}
-              <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words">{embedDescription || content}</p>
+              {embedDescription && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words">{embedDescription}</p>}
               <EmbedExtraFieldsPreview embedExtra={embedExtra} />
               <EmbedExtraImage embedExtra={embedExtra} />
               <EmbedExtraFooter embedExtra={embedExtra} />

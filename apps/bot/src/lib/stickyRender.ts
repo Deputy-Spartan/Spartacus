@@ -45,16 +45,17 @@ export async function buildStickyPayload(
 
   const embed = new EmbedBuilder();
   if (sticky.embedTitle) embed.setTitle(sticky.embedTitle);
-  embed.setDescription(sticky.embedDescription || sticky.content);
+  if (sticky.embedDescription) embed.setDescription(sticky.embedDescription);
   if (sticky.embedColor) embed.setColor(sticky.embedColor as `#${string}`);
   if (options?.thumbnailUrl) embed.setThumbnail(options.thumbnailUrl);
   applyEmbedExtra(embed, sticky.embedExtra);
 
-  // A plain message alongside an embed is completely normal Discord
-  // behavior (it's what shows as the text line above the card) — only
-  // drop it from `content` when it's the exact text already reused as the
-  // embed's description, so that case doesn't show the same text twice.
-  const plainContent = sticky.content && sticky.content !== sticky.embedDescription ? sticky.content : "";
-
-  return { content: plainContent, embeds: [embed], components };
+  // `content` is independent of the embed's own description — it's the
+  // plain text line Discord shows above the embed card, same as any bot
+  // message that sends both together. No fallback here: a feature that
+  // wants content to double as the embed's body (Welcome, for example)
+  // already passes the same string for both rather than relying on one
+  // silently filling in for the other, which previously risked showing
+  // the same text twice once content and embedDescription could differ.
+  return { content: sticky.content, embeds: [embed], components };
 }

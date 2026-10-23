@@ -8,6 +8,7 @@ interface EmbedExtraShape {
   authorUrl?: string;
   thumbnailUrl?: string;
   imageUrl?: string;
+  footerText?: string;
   footerIconUrl?: string;
   timestamp?: boolean;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
@@ -22,9 +23,8 @@ export function applyEmbedExtraRest(embed: Record<string, unknown>, raw: unknown
   }
   if (extra.thumbnailUrl) embed.thumbnail = { url: extra.thumbnailUrl };
   if (extra.imageUrl) embed.image = { url: extra.imageUrl };
-  if (extra.footerIconUrl) {
-    const currentFooter = (embed.footer as { text?: string } | undefined) ?? {};
-    embed.footer = { text: currentFooter.text ?? "​", icon_url: extra.footerIconUrl };
+  if (extra.footerText || extra.footerIconUrl) {
+    embed.footer = { text: extra.footerText || "​", icon_url: extra.footerIconUrl || undefined };
   }
   if (extra.timestamp) embed.timestamp = new Date().toISOString();
   if (Array.isArray(extra.fields) && extra.fields.length > 0) {

@@ -11,6 +11,7 @@ interface EmbedExtraShape {
   authorUrl?: string;
   thumbnailUrl?: string;
   imageUrl?: string;
+  footerText?: string;
   footerIconUrl?: string;
   timestamp?: boolean;
   fields?: Array<{ name: string; value: string; inline?: boolean }>;
@@ -25,9 +26,8 @@ export function applyEmbedExtra(embed: EmbedBuilder, raw: unknown): EmbedBuilder
   }
   if (extra.thumbnailUrl) embed.setThumbnail(extra.thumbnailUrl);
   if (extra.imageUrl) embed.setImage(extra.imageUrl);
-  if (extra.footerIconUrl) {
-    const currentFooter = embed.data.footer;
-    embed.setFooter({ text: currentFooter?.text ?? "​", iconURL: extra.footerIconUrl });
+  if (extra.footerText || extra.footerIconUrl) {
+    embed.setFooter({ text: extra.footerText || "​", iconURL: extra.footerIconUrl || undefined });
   }
   if (extra.timestamp) embed.setTimestamp(new Date());
   if (Array.isArray(extra.fields) && extra.fields.length > 0) {

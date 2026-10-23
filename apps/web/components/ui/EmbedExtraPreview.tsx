@@ -52,18 +52,18 @@ export function EmbedExtraFieldsPreview({ embedExtra }: { embedExtra?: EmbedExtr
 }
 
 export function EmbedExtraFooter({ embedExtra }: { embedExtra?: EmbedExtra }) {
-  if (!embedExtra?.footerIconUrl && !embedExtra?.timestamp) return null;
+  if (!embedExtra?.footerText && !embedExtra?.footerIconUrl && !embedExtra?.timestamp) return null;
   return (
     <div className="flex items-center gap-1.5 mt-2">
       {embedExtra.footerIconUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={embedExtra.footerIconUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
       )}
-      {embedExtra.timestamp && (
-        <span className="text-[#949ba4] text-[10px]">
-          Today at {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </span>
-      )}
+      <span className="text-[#949ba4] text-[10px]">
+        {embedExtra.footerText}
+        {embedExtra.footerText && embedExtra.timestamp ? " • " : ""}
+        {embedExtra.timestamp ? `Today at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+      </span>
     </div>
   );
 }

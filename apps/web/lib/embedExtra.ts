@@ -17,6 +17,7 @@ export interface EmbedExtra {
   authorUrl?: string;
   thumbnailUrl?: string;
   imageUrl?: string;
+  footerText?: string;
   footerIconUrl?: string;
   timestamp?: boolean;
   fields?: EmbedFieldEntry[];
@@ -36,6 +37,7 @@ export function parseEmbedExtra(value: unknown): EmbedExtra {
     authorUrl: typeof v.authorUrl === "string" ? v.authorUrl : undefined,
     thumbnailUrl: typeof v.thumbnailUrl === "string" ? v.thumbnailUrl : undefined,
     imageUrl: typeof v.imageUrl === "string" ? v.imageUrl : undefined,
+    footerText: typeof v.footerText === "string" ? v.footerText : undefined,
     footerIconUrl: typeof v.footerIconUrl === "string" ? v.footerIconUrl : undefined,
     timestamp: v.timestamp === true,
     fields: Array.isArray(v.fields)

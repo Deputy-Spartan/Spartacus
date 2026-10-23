@@ -17,7 +17,7 @@ interface EmbedExtraFieldsProps {
 // don't need it stay visually simple by default.
 export function EmbedExtraFields({ guildId, value, onChange }: EmbedExtraFieldsProps) {
   const [open, setOpen] = useState(
-    !!(value.authorName || value.thumbnailUrl || value.imageUrl || value.footerIconUrl || value.timestamp || value.fields?.length)
+    !!(value.authorName || value.thumbnailUrl || value.imageUrl || value.footerText || value.footerIconUrl || value.timestamp || value.fields?.length)
   );
 
   function set<K extends keyof EmbedExtra>(key: K, v: EmbedExtra[K]) {
@@ -81,7 +81,7 @@ export function EmbedExtraFields({ guildId, value, onChange }: EmbedExtraFieldsP
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] uppercase tracking-wide text-slate-500 block mb-1">Thumbnail</label>
               <ImageUrlField
@@ -98,6 +98,18 @@ export function EmbedExtraFields({ guildId, value, onChange }: EmbedExtraFieldsP
                 value={value.imageUrl ?? ""}
                 onChange={(v) => set("imageUrl", v || undefined)}
                 placeholder="Large image, full width — paste a link or upload"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="sm:col-span-2">
+              <label className="text-[10px] uppercase tracking-wide text-slate-500 block mb-1">Footer text</label>
+              <input
+                className="w-full bg-base-950 border border-white/10 rounded-lg p-2 text-xs"
+                value={value.footerText ?? ""}
+                onChange={(e) => set("footerText", e.target.value || undefined)}
+                placeholder="e.g. Spartacus · #general"
               />
             </div>
             <div>

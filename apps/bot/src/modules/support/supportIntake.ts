@@ -213,10 +213,13 @@ export async function execute(message: Message) {
   }
 
   // Shared across multiple mutual servers with the module enabled — a DM
-  // carries no guild context on its own, so ask which one first. This
-  // prompt is necessarily fixed wording (not editable per-guild): it's
-  // shown before any one server has been chosen, so no single server's
-  // Settings page could own it.
+  // carries no guild context on its own, so ask which one first. Not
+  // per-guild (no single server's Settings page could own a prompt shown
+  // before any one is picked) — it's an account-wide message on BotConfig,
+  // editable from Owner → Bot Customization instead.
+  const botConfig = await prisma.botConfig.findUnique({ where: { id: "singleton" } });
+  const pickerMessage = botConfig?.supportServerPickerMessage || "👋 You're in a few servers I can help with — which one is this about?";
+
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   for (let i = 0; i < matches.length && i < 25; i += 5) {
     rows.push(
@@ -227,9 +230,7 @@ export async function execute(message: Message) {
       )
     );
   }
-  await message
-    .reply({ content: "👋 You're in a few servers I can help with — which one is this about?", components: rows })
-    .catch(() => null);
+  await message.reply({ content: pickerMessage, components: rows }).catch(() => null);
 }
 
 // DM button: picking which server, when the member shares more than one

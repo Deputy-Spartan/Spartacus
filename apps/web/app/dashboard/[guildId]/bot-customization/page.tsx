@@ -30,6 +30,7 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
   const [statusType, setStatusType] = useState("online");
   const [activityType, setActivityType] = useState("PLAYING");
   const [activityText, setActivityText] = useState("");
+  const [serverPickerMessage, setServerPickerMessage] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarDataUri, setAvatarDataUri] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,7 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
       setActivityType(c.activityType);
       setActivityText(c.activityText ?? "");
       setAvatarPreview(c.avatarUrl);
+      setServerPickerMessage(c.supportServerPickerMessage ?? "");
     });
   }, []);
 
@@ -73,6 +75,7 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
       statusType,
       activityType,
       activityText,
+      supportServerPickerMessage: serverPickerMessage || null,
     });
     setSaving(false);
     if (result.errors.length > 0) {
@@ -198,6 +201,27 @@ export default function BotCustomizationPage({ params }: { params: { guildId: st
             placeholder="e.g. with 200 servers"
           />
           <p className="text-xs text-slate-600">Status/activity changes can take up to 30 seconds to appear in Discord.</p>
+        </NeonCard>
+
+        <NeonCard className="lg:col-span-2">
+          <p className="font-medium mb-1">Support DM — Server Picker Message</p>
+          <p className="text-xs text-slate-500 mb-4">
+            Sent when a member DMs the bot and shares more than one server with Support DM Intake enabled, before they've picked which one it's about.
+            It's account-wide (like everything else on this page) since it's shown before any single server is chosen — once they pick one, that
+            server's own Opening Message takes over, editable from{" "}
+            <Link href={`/dashboard/${params.guildId}/support-intake`} className="text-neon-blue hover:underline">
+              Support DM → Settings
+            </Link>
+            .
+          </p>
+          <textarea
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+            rows={2}
+            value={serverPickerMessage}
+            onChange={(e) => setServerPickerMessage(e.target.value)}
+            placeholder="👋 You're in a few servers I can help with — which one is this about?"
+          />
+          <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
         </NeonCard>
       </div>
 

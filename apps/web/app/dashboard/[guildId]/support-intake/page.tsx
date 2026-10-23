@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
@@ -642,9 +643,12 @@ function SettingsTab({ guildId }: { guildId: string }) {
       </p>
 
       <div className="text-xs text-slate-500 bg-base-800/60 border border-white/5 rounded-lg px-3 py-2.5">
-        If a member shares more than one server with the bot where Support DM is enabled, they're asked which server first — that one prompt is fixed
-        wording (it's shown before any server's been picked, so no single server's settings can own it). The Opening Message below always plays right
-        after, once this server has been chosen.
+        If a member shares more than one server with Support DM enabled, they're asked which server first. That prompt is account-wide — not something
+        this server's settings can own — and is edited from{" "}
+        <Link href={`/dashboard/${guildId}/bot-customization`} className="text-neon-blue hover:underline">
+          Owner → Bot Customization
+        </Link>
+        . The Opening Message below always plays right after, once this server has been chosen.
       </div>
 
       <NeonCard>

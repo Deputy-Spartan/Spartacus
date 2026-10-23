@@ -27,13 +27,24 @@ router.get("/bot-config", requireAuth, async (_req, res) => {
     activityText: row?.activityText ?? null,
     manualStatusOverride: row?.manualStatusOverride ?? null,
     manualStatusMessage: row?.manualStatusMessage ?? null,
+    supportServerPickerMessage: row?.supportServerPickerMessage ?? null,
   });
 });
 
 // Owner only — this is account-wide (every server the bot is in), not
 // something any approved server admin should be able to change.
 router.put("/bot-config", requireAuth, requireOwner, async (req, res) => {
-  const { username, avatarDataUri, description, statusType, activityType, activityText, manualStatusOverride, manualStatusMessage } = req.body as {
+  const {
+    username,
+    avatarDataUri,
+    description,
+    statusType,
+    activityType,
+    activityText,
+    manualStatusOverride,
+    manualStatusMessage,
+    supportServerPickerMessage,
+  } = req.body as {
     username?: string;
     avatarDataUri?: string;
     description?: string;
@@ -42,6 +53,7 @@ router.put("/bot-config", requireAuth, requireOwner, async (req, res) => {
     activityText?: string;
     manualStatusOverride?: string | null;
     manualStatusMessage?: string | null;
+    supportServerPickerMessage?: string | null;
   };
 
   const VALID_OVERRIDES = new Set(["ONLINE", "OFFLINE", "MAINTENANCE"]);
@@ -75,6 +87,7 @@ router.put("/bot-config", requireAuth, requireOwner, async (req, res) => {
       activityText: activityText ?? null,
       manualStatusOverride: manualStatusOverride ?? null,
       manualStatusMessage: manualStatusMessage ?? null,
+      supportServerPickerMessage: supportServerPickerMessage ?? null,
     },
     update: {
       ...(username !== undefined ? { username } : {}),
@@ -84,6 +97,7 @@ router.put("/bot-config", requireAuth, requireOwner, async (req, res) => {
       ...(activityText !== undefined ? { activityText } : {}),
       ...(manualStatusOverride !== undefined ? { manualStatusOverride } : {}),
       ...(manualStatusMessage !== undefined ? { manualStatusMessage } : {}),
+      ...(supportServerPickerMessage !== undefined ? { supportServerPickerMessage } : {}),
     },
   });
 

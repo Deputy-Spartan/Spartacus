@@ -1091,6 +1091,7 @@ export interface BotConfigRow {
   activityText: string | null;
   manualStatusOverride: "ONLINE" | "OFFLINE" | "MAINTENANCE" | null;
   manualStatusMessage: string | null;
+  supportServerPickerMessage: string | null;
 }
 export interface BotConfigInput {
   username?: string;
@@ -1101,6 +1102,7 @@ export interface BotConfigInput {
   activityText?: string;
   manualStatusOverride?: "ONLINE" | "OFFLINE" | "MAINTENANCE" | null;
   manualStatusMessage?: string | null;
+  supportServerPickerMessage?: string | null;
 }
 
 export interface BotStatusRow {

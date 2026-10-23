@@ -32,7 +32,7 @@ export async function publishAnnouncement(client: Client, announcementId: string
       content: announcement.content ?? "",
       embedEnabled: announcement.embedEnabled,
       embedTitle: announcement.embedTitle,
-      embedDescription: announcement.content,
+      embedDescription: announcement.embedDescription,
       embedColor: announcement.embedColor,
       buttons: announcement.buttons,
       embedExtra: announcement.embedExtra,

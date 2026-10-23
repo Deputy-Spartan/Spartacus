@@ -12,7 +12,7 @@ router.get("/guilds/:guildId/announcements", requireAuth, requireGuildPermission
 });
 
 router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
+  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.announcement.create({
     data: {
       guildId: req.params.guildId,
@@ -20,6 +20,7 @@ router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermissio
       content,
       embedEnabled: Boolean(embedEnabled),
       embedTitle,
+      embedDescription,
       embedColor,
       buttons: buttons ?? [],
       scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
@@ -40,7 +41,7 @@ router.patch("/guilds/:guildId/announcements/:id", requireAuth, requireGuildPerm
   if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Not found" });
   if (existing.sentAt) return res.status(400).json({ error: "This announcement already published and can't be edited. Use Resend instead." });
 
-  const { channelId, content, embedEnabled, embedTitle, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
+  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.announcement.update({
     where: { id: req.params.id },
     data: {
@@ -48,6 +49,7 @@ router.patch("/guilds/:guildId/announcements/:id", requireAuth, requireGuildPerm
       content,
       embedEnabled: Boolean(embedEnabled),
       embedTitle,
+      embedDescription,
       embedColor,
       buttons: buttons ?? [],
       scheduledFor: scheduledFor ? new Date(scheduledFor) : null,

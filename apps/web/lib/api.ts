@@ -658,6 +658,7 @@ export interface AnnouncementRow {
   content: string | null;
   embedEnabled: boolean;
   embedTitle: string | null;
+  embedDescription: string | null;
   embedColor: string | null;
   buttons: StickyButton[];
   scheduledFor: string | null;
@@ -672,6 +673,7 @@ export interface AnnouncementInput {
   content: string;
   embedEnabled: boolean;
   embedTitle: string;
+  embedDescription: string;
   embedColor: string;
   buttons: StickyButton[];
   scheduledFor: string | null;

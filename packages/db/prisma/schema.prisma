@@ -1539,21 +1539,25 @@ model RolePanel {
 // ---- Announcements ----
 
 model Announcement {
-  id           String    @id @default(cuid())
-  guild        Guild     @relation(fields: [guildId], references: [id])
-  guildId      String
-  channelId    String
-  content      String?
-  embedEnabled Boolean   @default(false)
-  embedTitle   String?
-  embedColor   String?   @default("#00E5FF")
-  buttons      Json      @default("[]")
-  embedExtra   Json?
-  savedEmbedId String?
-  scheduledFor DateTime?
-  sentAt       DateTime?
-  messageId    String? // the live Discord message, once sent — lets an edit after sending update it in place instead of only being possible before
-  createdAt    DateTime  @default(now())
+  id               String    @id @default(cuid())
+  guild            Guild     @relation(fields: [guildId], references: [id])
+  guildId          String
+  channelId        String
+  // Plain message content shown above the embed (if any) — optional on its
+  // own; an announcement just needs at least one of this, embedTitle,
+  // embedDescription, or savedEmbedId.
+  content          String?
+  embedEnabled     Boolean   @default(false)
+  embedTitle       String?
+  embedDescription String?
+  embedColor       String?   @default("#00E5FF")
+  buttons          Json      @default("[]")
+  embedExtra       Json?
+  savedEmbedId     String?
+  scheduledFor     DateTime?
+  sentAt           DateTime?
+  messageId        String? // the live Discord message, once sent
+  createdAt        DateTime  @default(now())
 
   @@index([guildId, sentAt])
 }

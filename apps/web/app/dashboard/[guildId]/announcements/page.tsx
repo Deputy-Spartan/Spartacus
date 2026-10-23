@@ -24,6 +24,7 @@ const EMPTY: AnnouncementInput = {
   content: "",
   embedEnabled: false,
   embedTitle: "",
+  embedDescription: "",
   embedColor: "#00E5FF",
   buttons: [],
   scheduledFor: null,
@@ -37,6 +38,7 @@ function rowToInput(r: AnnouncementRow): AnnouncementInput {
     content: r.content ?? "",
     embedEnabled: r.embedEnabled,
     embedTitle: r.embedTitle ?? "",
+    embedDescription: r.embedDescription ?? "",
     embedColor: r.embedColor ?? "#00E5FF",
     buttons: r.buttons,
     scheduledFor: r.scheduledFor,
@@ -103,7 +105,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   }
 
   async function save() {
-    const hasEmbedContent = form.embedEnabled && (form.content.trim() || form.embedTitle.trim());
+    const hasEmbedContent = form.embedEnabled && (form.embedTitle.trim() || form.embedDescription.trim());
     if (!form.channelId || !(form.content.trim() || form.savedEmbedId || hasEmbedContent)) {
       setError("Select a channel and enter a message, build an embed, or pick a saved embed before saving.");
       return;
@@ -209,7 +211,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                   {queued.map((r) => (
                     <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
                       <div className="min-w-0">
-                        <p className="truncate">{r.embedTitle || r.content || "(embed only)"}</p>
+                        <p className="truncate">{r.embedTitle || r.content || r.embedDescription || "(embed only)"}</p>
                         <p className="text-xs text-slate-500">
                           {channelLabel(r.channelId)} ·{" "}
                           {r.scheduledFor ? `publishes ${new Date(r.scheduledFor).toLocaleString()}` : "no schedule — publish manually"}
@@ -247,7 +249,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                   {sent.map((r) => (
                     <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
                       <div className="min-w-0">
-                        <p className="truncate">{r.embedTitle || r.content || "(embed only)"}</p>
+                        <p className="truncate">{r.embedTitle || r.content || r.embedDescription || "(embed only)"}</p>
                         <p className="text-xs text-slate-500">
                           {channelLabel(r.channelId)} · published {new Date(r.sentAt as string).toLocaleString()}
                         </p>
@@ -291,16 +293,13 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
             </label>
             <ChannelSelect guildId={params.guildId} value={form.channelId || null} onChange={(id) => setForm({ ...form, channelId: id })} />
 
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-              Message
-              <Required />
-            </label>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message (optional)</label>
             <textarea
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
               rows={3}
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
-              placeholder={form.embedEnabled ? "Also used as the embed's description" : undefined}
+              placeholder={form.embedEnabled ? "Plain text shown above the embed — not required" : "Not required if you build an embed or pick a saved embed below"}
             />
 
             <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
@@ -353,6 +352,15 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                   value={form.embedExtra ?? EMPTY_EMBED_EXTRA}
                   onChange={(v) => setForm({ ...form, embedExtra: v })}
                 />
+
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Embed Description</label>
+                <textarea
+                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
+                  rows={4}
+                  value={form.embedDescription}
+                  onChange={(e) => setForm({ ...form, embedDescription: e.target.value })}
+                  placeholder="The embed's own body text — separate from the plain message above"
+                />
               </>
             )}
 
@@ -404,7 +412,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
               content={form.content}
               embedEnabled={form.embedEnabled}
               embedTitle={form.embedTitle}
-              embedDescription={form.content}
+              embedDescription={form.embedDescription}
               embedColor={form.embedColor}
               buttons={form.buttons}
               embedExtra={form.embedExtra ?? EMPTY_EMBED_EXTRA}

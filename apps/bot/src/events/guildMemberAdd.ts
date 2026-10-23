@@ -49,5 +49,17 @@ export async function execute(member: GuildMember) {
     { thumbnailUrl: member.user.displayAvatarURL(), savedEmbed: saved, guildId: member.guild.id, tokens }
   );
 
+  // Discord never delivers a ping notification for a mention that only
+  // appears inside an embed — embed titles/descriptions/fields render
+  // mentions as inert text, visually and for notifications alike. Only a
+  // mention in the plain message `content` actually pings. Embed mode (or
+  // a saved embed) leaves `content` empty, so without this the new member
+  // would never actually get notified, no matter how the welcome text is
+  // configured. The embed still carries the full formatted message either
+  // way — this just makes sure the ping itself goes out alongside it.
+  if (!payload.content?.includes(tokens["{user}"])) {
+    payload.content = [tokens["{user}"], payload.content].filter(Boolean).join(" ");
+  }
+
   await channel.send(payload);
 }

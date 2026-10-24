@@ -351,6 +351,18 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("welcomewave:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "WELCOME");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Welcome & Goodbye is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const waveParts = interaction.customId.split(":");
+    const { handleWave } = await import("../events/guildMemberAdd");
+    await handleWave(interaction, waveParts[2]);
+    return;
+  }
+
   if (interaction.customId === "birthdaypanel") {
     const enabled = await isModuleEnabled(interaction.guildId, "BIRTHDAYS");
     if (!enabled) {

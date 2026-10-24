@@ -106,6 +106,7 @@ model Guild {
   supportFlows      SupportFlow[]
   supportTickets    SupportTicket[]
   supportSettings   SupportSettings?
+  welcomeGreetings  WelcomeGreeting[]
   createdAt         DateTime             @default(now())
 }
 
@@ -238,11 +239,31 @@ model WelcomeConfig {
   welcomeText  String?
   goodbyeText  String?
   embedColor   String? @default("#00E5FF")
-  embedEnabled Boolean @default(true)
+  embedEnabled Boolean @default(false)
   embedTitle   String?
   buttons      Json    @default("[]")
   embedExtra   Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
   savedEmbedId String? // when set, overrides embedTitle/embedExtra/etc. with an EmbedCreatorPreset's content at send time
+}
+
+// A pool of alternate join messages — when at least one is enabled, the bot
+// picks one at random per join instead of always using WelcomeConfig's
+// single welcomeText, each with its own "wave" button so another member can
+// publicly greet the new one. Tied to Guild directly (not WelcomeConfig)
+// since a guild can add greetings before ever saving the main Welcome
+// settings. Leaving the pool empty keeps the single welcomeText behavior
+// unchanged, so this is purely additive.
+model WelcomeGreeting {
+  id          String   @id @default(cuid())
+  guild       Guild    @relation(fields: [guildId], references: [id])
+  guildId     String
+  text        String
+  buttonLabel String   @default("👋 Wave to say hi!")
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([guildId])
 }
 
 model CustomCommand {

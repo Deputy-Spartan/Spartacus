@@ -22,7 +22,7 @@ router.get("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
       welcomeText: "Welcome to {server}, {user}!",
       goodbyeText: "{user} has left {server}.",
       embedColor: "#00E5FF",
-      embedEnabled: true,
+      embedEnabled: false,
       embedTitle: null,
       buttons: [],
     }
@@ -61,6 +61,40 @@ router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
   });
 
   res.json(config);
+});
+
+// ---- Greetings (random join-message pool with a wave button) ----
+
+router.get("/guilds/:guildId/welcome-greetings", requireAuth, requireGuildPermission, async (req, res) => {
+  const rows = await prisma.welcomeGreeting.findMany({ where: { guildId: req.params.guildId }, orderBy: { sortOrder: "asc" } });
+  res.json(rows);
+});
+
+router.post("/guilds/:guildId/welcome-greetings", requireAuth, requireGuildPermission, async (req, res) => {
+  const { text, buttonLabel } = req.body as { text?: string; buttonLabel?: string };
+  const count = await prisma.welcomeGreeting.count({ where: { guildId: req.params.guildId } });
+  const row = await prisma.welcomeGreeting.create({
+    data: {
+      guildId: req.params.guildId,
+      text: text || "Welcome to {server}, {user}!",
+      buttonLabel: buttonLabel || "👋 Wave to say hi!",
+      sortOrder: count,
+    },
+  });
+  res.status(201).json(row);
+});
+
+router.patch("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const fields = ["text", "buttonLabel", "enabled", "sortOrder"];
+  const data: Record<string, unknown> = {};
+  for (const f of fields) if (req.body[f] !== undefined) data[f] = req.body[f];
+  const row = await prisma.welcomeGreeting.update({ where: { id: req.params.id }, data });
+  res.json(row);
+});
+
+router.delete("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  await prisma.welcomeGreeting.delete({ where: { id: req.params.id } });
+  res.status(204).send();
 });
 
 export default router;

@@ -96,6 +96,14 @@ export interface WelcomeConfig {
   savedEmbedId?: string | null;
 }
 
+export interface WelcomeGreetingRow {
+  id: string;
+  text: string;
+  buttonLabel: string;
+  enabled: boolean;
+  sortOrder: number;
+}
+
 export interface AutomodConfig {
   bannedWordsEnabled: boolean;
   bannedWords: string[];
@@ -1317,6 +1325,13 @@ export const api = {
   getWelcome: (guildId: string) => request<WelcomeConfig>(`/guilds/${guildId}/welcome`),
   setWelcome: (guildId: string, config: Partial<WelcomeConfig>) =>
     request<WelcomeConfig>(`/guilds/${guildId}/welcome`, { method: "PUT", body: JSON.stringify(config) }),
+
+  getWelcomeGreetings: (guildId: string) => request<WelcomeGreetingRow[]>(`/guilds/${guildId}/welcome-greetings`),
+  addWelcomeGreeting: (guildId: string, body: Partial<WelcomeGreetingRow>) =>
+    request<WelcomeGreetingRow>(`/guilds/${guildId}/welcome-greetings`, { method: "POST", body: JSON.stringify(body) }),
+  updateWelcomeGreeting: (guildId: string, id: string, body: Partial<WelcomeGreetingRow>) =>
+    request<WelcomeGreetingRow>(`/guilds/${guildId}/welcome-greetings/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteWelcomeGreeting: (guildId: string, id: string) => request(`/guilds/${guildId}/welcome-greetings/${id}`, { method: "DELETE" }),
 
   getModeration: (guildId: string) =>
     request<{ enabled: boolean; config: AutomodConfig }>(`/guilds/${guildId}/moderation`),

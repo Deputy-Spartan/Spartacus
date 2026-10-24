@@ -1,4 +1,4 @@
-import { Events, GuildMember } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, Events, GuildMember } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildStickyPayload } from "../lib/stickyRender";
@@ -31,7 +31,14 @@ export async function execute(member: GuildMember) {
   if (!channel?.isTextBased()) return;
 
   const tokens = { "{user}": `<@${member.id}>`, "{server}": member.guild.name };
-  const text = (config.welcomeText ?? "Welcome to {server}, {user}!")
+
+  // A pool of alternate greetings (with their own wave button) takes over
+  // from the single welcomeText the moment at least one is enabled —
+  // picked at random per join. Empty pool keeps today's behavior exactly.
+  const greetings = await prisma.welcomeGreeting.findMany({ where: { guildId: member.guild.id, enabled: true } });
+  const greeting = greetings.length > 0 ? greetings[Math.floor(Math.random() * greetings.length)] : null;
+
+  const text = (greeting?.text ?? config.welcomeText ?? "Welcome to {server}, {user}!")
     .replace("{user}", tokens["{user}"])
     .replace("{server}", tokens["{server}"]);
 
@@ -63,5 +70,27 @@ export async function execute(member: GuildMember) {
     payload.content = [tokens["{user}"], payload.content].filter(Boolean).join(" ");
   }
 
+  if (greeting) {
+    const waveRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`welcomewave:${greeting.id}:${member.id}`)
+        .setLabel(greeting.buttonLabel.slice(0, 80))
+        .setStyle(ButtonStyle.Secondary)
+    );
+    payload.components = [...(payload.components ?? []), waveRow];
+  }
+
   await channel.send(payload);
+}
+
+// A member clicks a greeting's wave button to publicly welcome whoever just
+// joined — purely social, doesn't touch roles or settings, so any member
+// can use it (not just staff). Ephemeral reply only to avoid flooding the
+// welcome channel with one message per wave.
+export async function handleWave(interaction: ButtonInteraction, targetUserId: string) {
+  if (interaction.user.id === targetUserId) {
+    await interaction.reply({ content: "You can't wave at yourself! 😄", ephemeral: true });
+    return;
+  }
+  await interaction.reply({ content: `👋 You waved to welcome <@${targetUserId}>!`, ephemeral: true });
 }

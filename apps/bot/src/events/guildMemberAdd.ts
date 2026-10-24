@@ -38,7 +38,10 @@ export async function execute(member: GuildMember) {
   const saved = await resolveSavedEmbed(config.savedEmbedId);
   const payload = await buildStickyPayload(
     {
-      content: text,
+      // Embed mode carries the full text in the embed body below — content
+      // starts empty so it isn't shown a second time as a plain line above
+      // it. Plain mode has no embed, so content is the only copy.
+      content: config.embedEnabled ? "" : text,
       embedEnabled: config.embedEnabled,
       embedTitle: config.embedTitle,
       embedDescription: text,
@@ -53,10 +56,9 @@ export async function execute(member: GuildMember) {
   // appears inside an embed — embed titles/descriptions/fields render
   // mentions as inert text, visually and for notifications alike. Only a
   // mention in the plain message `content` actually pings. Embed mode (or
-  // a saved embed) leaves `content` empty, so without this the new member
-  // would never actually get notified, no matter how the welcome text is
-  // configured. The embed still carries the full formatted message either
-  // way — this just makes sure the ping itself goes out alongside it.
+  // a saved embed) leaves `content` empty, so this adds back just the bare
+  // mention — not the whole message a second time — so the new member
+  // still gets notified either way.
   if (!payload.content?.includes(tokens["{user}"])) {
     payload.content = [tokens["{user}"], payload.content].filter(Boolean).join(" ");
   }

@@ -34,7 +34,9 @@ export async function execute(member: GuildMember | PartialGuildMember) {
   const saved = await resolveSavedEmbed(config.savedEmbedId);
   const payload = await buildStickyPayload(
     {
-      content: text,
+      // Same reasoning as the join side — embed mode carries the text in
+      // the embed body, so content stays empty instead of repeating it.
+      content: config.embedEnabled ? "" : text,
       embedEnabled: config.embedEnabled,
       embedTitle: config.embedTitle,
       embedDescription: text,

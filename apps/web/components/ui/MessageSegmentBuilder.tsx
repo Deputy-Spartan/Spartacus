@@ -168,7 +168,12 @@ export function MessageSegmentBuilder({ value, onChange, tokens }: MessageSegmen
               />
             </button>
 
-            <button type="button" onClick={() => remove(i)} className="shrink-0 text-slate-500 hover:text-rose-400 text-sm px-1">
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              title="Remove block"
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-slate-400 text-base leading-none hover:text-white hover:bg-rose-500/20"
+            >
               ×
             </button>
           </div>

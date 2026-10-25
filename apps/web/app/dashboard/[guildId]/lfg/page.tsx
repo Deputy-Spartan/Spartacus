@@ -8,6 +8,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
+import { MessageSegmentBuilder, type SegmentToken } from "../../../../components/ui/MessageSegmentBuilder";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
@@ -15,13 +16,22 @@ import { api, type LfgCommandRow, type LfgCommandInput, type LfgCategoryRow, typ
 
 type Tab = "active" | "create";
 
-const MESSAGE_TOKENS = [
+const MESSAGE_SEGMENT_TOKENS: SegmentToken[] = [
+  { key: "members", label: "{members}" },
+  { key: "roleTag", label: "{roleTag}" },
+  { key: "voiceName", label: "{voiceName}" },
+  { key: "voice", label: "{voice}" },
+  { key: "user", label: "{user}" },
+  { key: "message", label: "{message}" },
+];
+
+const MESSAGE_TOKEN_DOCS = [
   { token: "{members}", description: "Mentions everyone currently in that voice channel, joined with +" },
   { token: "{roleTag}", description: "The ping role, formatted as \" <-- @role\" — empty if no role is set" },
   { token: "{voiceName}", description: "The voice channel's plain name (no mention)" },
   { token: "{voice}", description: "The voice channel's name plus a clickable mention" },
   { token: "{user}", description: "Mentions the member who ran the command" },
-  { token: "{message}", description: "Whatever the sender typed after the command — on its own line below if you don't include this token" },
+  { token: "{message}", description: "Whatever the sender typed after the command — on its own line below if you don't add this block" },
 ];
 
 const WRONG_CHANNEL_TOKENS = [{ token: "{channel}", description: "Mentions the locked channel this command is restricted to" }];
@@ -56,7 +66,6 @@ function LfgFields({
   value: LfgCommandInput;
   onChange: (patch: Partial<LfgCommandInput>) => void;
 }) {
-  const messageRef = useRef<HTMLTextAreaElement>(null);
   const wrongChannelRef = useRef<HTMLTextAreaElement>(null);
 
   return (
@@ -111,20 +120,22 @@ function LfgFields({
 
       <div className="mb-4">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Announcement Message</label>
-        <textarea
-          ref={messageRef}
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 font-mono"
-          value={value.message ?? ""}
-          onChange={(e) => onChange({ message: e.target.value })}
-          placeholder="Join {members}{roleTag} in {voiceName}"
-        />
-        <PlaceholderExamples items={MESSAGE_TOKENS} inputRef={messageRef} value={value.message ?? ""} onChange={(v) => onChange({ message: v })} />
-        <p className="text-xs text-slate-600 -mt-2">
-          Posted as plain text, then followed by a real invite link to the voice channel — Discord automatically turns that into its own native card
-          with a "Join Voice" button, so no embed is needed for that part. If what the sender typed after the command isn't referenced above via{" "}
-          <code className="text-slate-400">{"{message}"}</code>, it's shown on its own line underneath instead. Used when no saved embed is selected
-          above.
+        <p className="text-xs text-slate-600 mb-2">
+          Build the line from blocks — reorder with the arrows, toggle a block off to drop it, or edit the text ones. Posted as plain text, then
+          followed by a real invite link to the voice channel, which Discord automatically turns into its own native card with a "Join Voice" button.
+          Used when no saved embed is selected above.
         </p>
+        <MessageSegmentBuilder value={value.message ?? ""} onChange={(next) => onChange({ message: next })} tokens={MESSAGE_SEGMENT_TOKENS} />
+        <details className="mt-2">
+          <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">What each block means</summary>
+          <ul className="mt-1.5 space-y-1">
+            {MESSAGE_TOKEN_DOCS.map((t) => (
+              <li key={t.token} className="text-xs text-slate-600">
+                <code className="text-neon-blue">{t.token}</code> — {t.description}
+              </li>
+            ))}
+          </ul>
+        </details>
       </div>
 
       <div className="mb-4">
@@ -313,6 +324,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LfgCommandInput>(EMPTY);
   const [draft, setDraft] = useState<LfgCommandInput>(EMPTY);
+  const [draftKey, setDraftKey] = useState(0); // bumped on every fresh draft so the message builder's blocks reset too
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -382,6 +394,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
       const payload: LfgCommandInput = { ...draft, trigger: draft.trigger.trim().toLowerCase(), mode: "plain" };
       await api.createLfgCommand(guildId, payload);
       setDraft(EMPTY);
+      setDraftKey((k) => k + 1);
       setTab("active");
       refresh();
     } catch (e) {
@@ -419,6 +432,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
         <button
           onClick={() => {
             setDraft(EMPTY);
+            setDraftKey((k) => k + 1);
             setCreateError(null);
             setTab("create");
           }}
@@ -471,7 +485,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
 
                 {editingId === row.id && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <LfgFields guildId={guildId} value={form} onChange={(patch) => setForm({ ...form, ...patch })} />
+                    <LfgFields key={editingId} guildId={guildId} value={form} onChange={(patch) => setForm({ ...form, ...patch })} />
                     <button onClick={saveEdit} disabled={saving} className="neon-button disabled:opacity-50 mb-4">
                       {saving ? "Saving…" : "Save Changes"}
                     </button>
@@ -487,7 +501,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
       {tab === "create" && (
         <NeonCard>
           <p className="font-medium mb-3">New LFG Command</p>
-          <LfgFields guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+          <LfgFields key={draftKey} guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
           <button onClick={createCommand} disabled={creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Command"}
           </button>

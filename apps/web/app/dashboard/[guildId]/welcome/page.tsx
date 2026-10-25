@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
-import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
+import { MessageSegmentBuilder, type SegmentToken } from "../../../../components/ui/MessageSegmentBuilder";
 import { EMPTY_EMBED_EXTRA } from "../../../../lib/embedExtra";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type WelcomeConfig, type WelcomeGreetingRow } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
-const WELCOME_TOKENS = [
-  { token: "{user}", description: "Mentions the member who joined or left" },
-  { token: "{server}", description: "The server's name" },
+const WELCOME_SEGMENT_TOKENS: SegmentToken[] = [
+  { key: "user", label: "{user}" },
+  { key: "server", label: "{server}" },
 ];
 
 const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
@@ -27,8 +27,6 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
   const [tab, setTab] = useState<Tab>("message");
   const [config, setConfig] = useState<WelcomeConfig | null>(null);
   const [saving, setSaving] = useState(false);
-  const welcomeRef = useRef<HTMLTextAreaElement>(null);
-  const goodbyeRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api.getWelcome(params.guildId).then(setConfig);
@@ -99,27 +97,23 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
             placeholder="Select a channel…"
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Welcome Message</label>
-          <p className="text-xs text-slate-600 -mt-1 mb-2">
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Welcome Message</label>
+          <p className="text-xs text-slate-600 mb-2">
             Used on join whenever the Random Greetings tab has no enabled greetings — add one or more there to have the bot pick a different message (and
             show a wave button) each time instead of always using this one.
           </p>
-          <textarea
-            ref={welcomeRef}
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 focus:outline-none focus:ring-1 focus:ring-neon-blue"
+          <MessageSegmentBuilder
             value={config.welcomeText}
-            onChange={(e) => setConfig({ ...config, welcomeText: e.target.value })}
+            onChange={(next) => setConfig({ ...config, welcomeText: next })}
+            tokens={WELCOME_SEGMENT_TOKENS}
           />
-          <PlaceholderExamples items={WELCOME_TOKENS} inputRef={welcomeRef} value={config.welcomeText} onChange={(v) => setConfig({ ...config, welcomeText: v })} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Goodbye Message</label>
-          <textarea
-            ref={goodbyeRef}
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 focus:outline-none focus:ring-1 focus:ring-neon-blue"
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Goodbye Message</label>
+          <MessageSegmentBuilder
             value={config.goodbyeText}
-            onChange={(e) => setConfig({ ...config, goodbyeText: e.target.value })}
+            onChange={(next) => setConfig({ ...config, goodbyeText: next })}
+            tokens={WELCOME_SEGMENT_TOKENS}
           />
-          <PlaceholderExamples items={WELCOME_TOKENS} inputRef={goodbyeRef} value={config.goodbyeText} onChange={(v) => setConfig({ ...config, goodbyeText: v })} />
 
           <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5 mt-4">
             <div>

@@ -92,13 +92,14 @@ async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMenti
 
   // Plain mode's own template already carries real mentions ({members},
   // {roleTag}) that ping on their own, so no separate ping line is needed
-  // here. The note gets its own line below the main announcement, fenced as
-  // a code block so it reads as "what they typed" rather than more
-  // sentence — unless the template already places {message} itself, in
-  // which case it's left inline there (unfenced) instead of appearing twice.
+  // here. The note is always fenced as a code block — whether the template
+  // places {message} itself, or (with no {message} block) it's appended on
+  // its own line automatically — so it reads as "what they typed" rather
+  // than more sentence either way.
   const template = eff.message || DEFAULT_PLAIN_TEMPLATE;
-  let text = substituteLfgTokens(template, tokens);
-  if (note && !template.includes("{message}")) text = [text, "```\n" + note + "\n```"].join("\n");
+  const fencedMessage = note ? "```\n" + note + "\n```" : "";
+  let text = substituteLfgTokens(template, { ...tokens, message: fencedMessage });
+  if (note && !template.includes("{message}")) text = [text, fencedMessage].join("\n");
   return { content: text };
 }
 

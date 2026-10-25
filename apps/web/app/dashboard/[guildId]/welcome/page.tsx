@@ -212,17 +212,33 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
 const EMPTY_GREETING = { text: "Welcome to {server}, {user}!", buttonLabel: "👋 Wave to say hi!" };
 
+// Starting points, not a fixed library — each is added exactly as shown and
+// then fully editable like any other greeting. Covers a spread of tones
+// (plain, hype, chill, meme-y) so there's something close to every server's
+// voice to tweak rather than write from a blank box.
+const GREETING_SUGGESTIONS: Array<{ text: string; buttonLabel: string }> = [
+  { text: "Welcome to {server}, {user}! 🎉", buttonLabel: "👋 Wave to say hi!" },
+  { text: "{user} just landed in {server}. Make some noise!", buttonLabel: "📣 Hype them up" },
+  { text: "Everyone welcome {user} to {server} — glad you're here!", buttonLabel: "🤝 Say welcome" },
+  { text: "🚪 {user} walked into {server}... no cake, sorry.", buttonLabel: "🎂 Offer sympathy" },
+  { text: "A wild {user} appeared in {server}!", buttonLabel: "⚔️ Challenge them" },
+  { text: "{user}, welcome aboard {server}. Grab a seat and get comfy.", buttonLabel: "🛋️ Pull up a chair" },
+];
+
 function GreetingsTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
   const [rows, setRows] = useState<WelcomeGreetingRow[]>([]);
+  const [adding, setAdding] = useState<string | null>(null);
 
   function refresh() {
     api.getWelcomeGreetings(guildId).then(setRows);
   }
   useEffect(refresh, [guildId]);
 
-  async function add() {
-    await api.addWelcomeGreeting(guildId, EMPTY_GREETING);
+  async function add(preset?: { text: string; buttonLabel: string }) {
+    setAdding(preset?.text ?? "blank");
+    await api.addWelcomeGreeting(guildId, preset ?? EMPTY_GREETING);
+    setAdding(null);
     refresh();
   }
 
@@ -254,6 +270,23 @@ function GreetingsTab({ guildId }: { guildId: string }) {
             : `${enabledCount} of ${rows.length} enabled — one is picked at random on each join.`}
         </p>
       )}
+
+      <NeonCard className="!p-3.5">
+        <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Suggestions — click to add, then edit as you like</p>
+        <div className="flex flex-wrap gap-1.5">
+          {GREETING_SUGGESTIONS.map((s) => (
+            <button
+              key={s.text}
+              onClick={() => add(s)}
+              disabled={adding !== null}
+              title={s.text}
+              className="px-2.5 py-1.5 rounded-lg text-xs bg-base-950 border border-white/10 text-slate-300 hover:border-neon-blue/40 hover:text-neon-blue disabled:opacity-50 max-w-[220px] truncate"
+            >
+              {adding === s.text ? "Adding…" : s.text}
+            </button>
+          ))}
+        </div>
+      </NeonCard>
 
       <div className="space-y-2.5">
         {rows.map((row) => (
@@ -288,8 +321,8 @@ function GreetingsTab({ guildId }: { guildId: string }) {
         ))}
       </div>
 
-      <button onClick={add} className="neon-button-sm">
-        + Add greeting
+      <button onClick={() => add()} disabled={adding !== null} className="neon-button-sm disabled:opacity-50">
+        {adding === "blank" ? "Adding…" : "+ Add blank greeting"}
       </button>
     </div>
   );

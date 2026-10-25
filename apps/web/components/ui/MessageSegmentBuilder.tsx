@@ -163,7 +163,7 @@ export function MessageSegmentBuilder({ value, onChange, tokens }: MessageSegmen
             >
               <span
                 className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-transform ${
-                  seg.enabled ? "translate-x-[18px]" : "translate-x-[2px]"
+                  seg.enabled ? "translate-x-[16px]" : "translate-x-[2px]"
                 }`}
               />
             </button>
@@ -172,7 +172,7 @@ export function MessageSegmentBuilder({ value, onChange, tokens }: MessageSegmen
               type="button"
               onClick={() => remove(i)}
               title="Remove block"
-              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-slate-400 text-base leading-none hover:text-white hover:bg-rose-500/20"
+              className="shrink-0 ml-1 w-6 h-6 flex items-center justify-center rounded-md border border-white/10 bg-base-950 text-slate-400 text-base leading-none hover:text-white hover:border-rose-500/40 hover:bg-rose-500/20"
             >
               ×
             </button>

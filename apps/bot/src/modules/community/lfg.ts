@@ -57,9 +57,17 @@ function effective(cfg: LfgCommandWithCategories, category: LfgCategory | null):
   };
 }
 
-async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMention: string, voiceText: string, note: string) {
+const DEFAULT_PLAIN_TEMPLATE = "Join {members}{roleTag} in {voiceName}";
+
+async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMention: string, voiceChannel: VoiceBasedChannel, note: string) {
+  const members = [...voiceChannel.members.filter((m) => !m.user.bot).values()].map((m) => m.toString()).join(" + ") || senderMention;
+  const roleTag = eff.roleId ? ` <-- <@&${eff.roleId}>` : "";
+  const tokens = { user: senderMention, voice: voiceLabel(voiceChannel), voiceName: voiceChannel.name, members, roleTag, message: note || "—" };
+
+  // Embeds render mentions as inert text — no notification fires for a role
+  // or member mention that only appears inside one. The plain-text path
+  // below doesn't need this since its own content carries real mentions.
   const ping = buildLfgPingLine(eff, senderMention);
-  const tokens = { user: senderMention, voice: voiceText, message: note || "—" };
 
   if (cfg.savedEmbedId) {
     const saved = await resolveSavedEmbed(cfg.savedEmbedId);
@@ -77,8 +85,15 @@ async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMenti
     return { content: ping || undefined, embeds: [embed] };
   }
 
-  const text = substituteLfgTokens(eff.message || "{user} is looking for a group in {voice}! {message}", tokens);
-  return { content: [ping, text].filter(Boolean).join(" ") };
+  // Plain mode's own template already carries real mentions ({members},
+  // {roleTag}) that ping on their own, so no separate ping line is needed
+  // here. The note gets its own line below the main announcement — unless
+  // the template already places {message} itself, in which case it's left
+  // inline there instead of appearing twice.
+  const template = eff.message || DEFAULT_PLAIN_TEMPLATE;
+  let text = substituteLfgTokens(template, tokens);
+  if (note && !template.includes("{message}")) text = [text, note].join("\n");
+  return { content: text };
 }
 
 // ---- Slash command path (/​trigger) ----
@@ -110,7 +125,7 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
   }
 
   const note = interaction.options.getString("message") ?? "";
-  const payload = await buildAnnouncement(cfg, eff, `${interaction.user}`, voiceLabel(voiceChannel), note);
+  const payload = await buildAnnouncement(cfg, eff, `${interaction.user}`, voiceChannel, note);
   const invite = await joinVoiceInvite(voiceChannel);
   if (invite) payload.content = [payload.content, invite].filter(Boolean).join("\n");
   await interaction.reply(payload);
@@ -145,7 +160,7 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommandWithCate
   }
 
   if (!isSendableChannel(message.channel)) return;
-  const payload = await buildAnnouncement(cfg, eff, `${message.author}`, voiceLabel(voiceChannel), note);
+  const payload = await buildAnnouncement(cfg, eff, `${message.author}`, voiceChannel, note);
   const invite = await joinVoiceInvite(voiceChannel);
   if (invite) payload.content = [payload.content, invite].filter(Boolean).join("\n");
   await message.channel.send(payload);

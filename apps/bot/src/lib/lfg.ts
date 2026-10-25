@@ -5,11 +5,20 @@
 export interface LfgTokens {
   user: string;
   voice: string;
+  voiceName: string;
+  members: string;
+  roleTag: string;
   message: string;
 }
 
 export function substituteLfgTokens(template: string, tokens: LfgTokens): string {
-  return template.replace(/\{user\}/g, tokens.user).replace(/\{voice\}/g, tokens.voice).replace(/\{message\}/g, tokens.message);
+  return template
+    .replace(/\{user\}/g, tokens.user)
+    .replace(/\{voiceName\}/g, tokens.voiceName)
+    .replace(/\{voice\}/g, tokens.voice)
+    .replace(/\{members\}/g, tokens.members)
+    .replace(/\{roleTag\}/g, tokens.roleTag)
+    .replace(/\{message\}/g, tokens.message);
 }
 
 export function buildLfgPingLine(cfg: { roleId: string | null; includeSender: boolean }, senderMention: string): string {

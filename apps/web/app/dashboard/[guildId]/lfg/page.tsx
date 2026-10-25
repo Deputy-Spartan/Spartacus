@@ -16,9 +16,12 @@ import { api, type LfgCommandRow, type LfgCommandInput, type LfgCategoryRow, typ
 type Tab = "active" | "create";
 
 const MESSAGE_TOKENS = [
+  { token: "{members}", description: "Mentions everyone currently in that voice channel, joined with +" },
+  { token: "{roleTag}", description: "The ping role, formatted as \" <-- @role\" — empty if no role is set" },
+  { token: "{voiceName}", description: "The voice channel's plain name (no mention)" },
+  { token: "{voice}", description: "The voice channel's name plus a clickable mention" },
   { token: "{user}", description: "Mentions the member who ran the command" },
-  { token: "{voice}", description: "Mentions the voice channel they're currently in" },
-  { token: "{message}", description: "Whatever the sender typed after the command, shown to everyone" },
+  { token: "{message}", description: "Whatever the sender typed after the command — on its own line below if you don't include this token" },
 ];
 
 const WRONG_CHANNEL_TOKENS = [{ token: "{channel}", description: "Mentions the locked channel this command is restricted to" }];
@@ -30,8 +33,8 @@ const EMPTY: LfgCommandInput = {
   roleId: "",
   includeSender: true,
   enabled: true,
-  mode: "embed",
-  message: "{user} is looking for a group in {voice}! {message}",
+  mode: "plain",
+  message: "Join {members}{roleTag} in {voiceName}",
   embedTitle: "🎮 Looking for a Group",
   embedDescription: "{user} is queuing up in **{voice}** — join the call and hop in!\n\n{message}",
   embedColor: "#00E5FF",
@@ -113,12 +116,14 @@ function LfgFields({
           className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20 font-mono"
           value={value.message ?? ""}
           onChange={(e) => onChange({ message: e.target.value })}
-          placeholder="{user} is looking for a group in {voice}! {message}"
+          placeholder="Join {members}{roleTag} in {voiceName}"
         />
         <PlaceholderExamples items={MESSAGE_TOKENS} inputRef={messageRef} value={value.message ?? ""} onChange={(v) => onChange({ message: v })} />
         <p className="text-xs text-slate-600 -mt-2">
-          <code className="text-slate-400">{"{message}"}</code> is whatever the sender typed after the command, shown to everyone. Used when no saved
-          embed is selected above.
+          Posted as plain text, then followed by a real invite link to the voice channel — Discord automatically turns that into its own native card
+          with a "Join Voice" button, so no embed is needed for that part. If what the sender typed after the command isn't referenced above via{" "}
+          <code className="text-slate-400">{"{message}"}</code>, it's shown on its own line underneath instead. Used when no saved embed is selected
+          above.
         </p>
       </div>
 

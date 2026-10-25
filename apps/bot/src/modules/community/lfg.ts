@@ -62,7 +62,12 @@ const DEFAULT_PLAIN_TEMPLATE = "Join {members}{roleTag} in {voiceName}";
 async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMention: string, voiceChannel: VoiceBasedChannel, note: string) {
   const members = [...voiceChannel.members.filter((m) => !m.user.bot).values()].map((m) => m.toString()).join(" + ") || senderMention;
   const roleTag = eff.roleId ? ` <-- <@&${eff.roleId}>` : "";
-  const tokens = { user: senderMention, voice: voiceLabel(voiceChannel), voiceName: voiceChannel.name, members, roleTag, message: note || "—" };
+  // A direct channel-jump link, masked as the channel's name — clickable
+  // blue text in the sentence itself (works for anyone who can already see
+  // the channel), separate from the actual "Join Voice" card further below,
+  // which comes from a real invite link Discord auto-unfurls on its own line.
+  const voiceNameLinked = `[${voiceChannel.name}](https://discord.com/channels/${cfg.guildId}/${voiceChannel.id})`;
+  const tokens = { user: senderMention, voice: voiceLabel(voiceChannel), voiceName: voiceNameLinked, members, roleTag, message: note || "—" };
 
   // Embeds render mentions as inert text — no notification fires for a role
   // or member mention that only appears inside one. The plain-text path
@@ -87,12 +92,13 @@ async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMenti
 
   // Plain mode's own template already carries real mentions ({members},
   // {roleTag}) that ping on their own, so no separate ping line is needed
-  // here. The note gets its own line below the main announcement — unless
-  // the template already places {message} itself, in which case it's left
-  // inline there instead of appearing twice.
+  // here. The note gets its own line below the main announcement, fenced as
+  // a code block so it reads as "what they typed" rather than more
+  // sentence — unless the template already places {message} itself, in
+  // which case it's left inline there (unfenced) instead of appearing twice.
   const template = eff.message || DEFAULT_PLAIN_TEMPLATE;
   let text = substituteLfgTokens(template, tokens);
-  if (note && !template.includes("{message}")) text = [text, note].join("\n");
+  if (note && !template.includes("{message}")) text = [text, "```\n" + note + "\n```"].join("\n");
   return { content: text };
 }
 

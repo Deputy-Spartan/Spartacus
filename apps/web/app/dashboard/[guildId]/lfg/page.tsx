@@ -28,10 +28,10 @@ const MESSAGE_SEGMENT_TOKENS: SegmentToken[] = [
 const MESSAGE_TOKEN_DOCS = [
   { token: "{members}", description: "Mentions everyone currently in that voice channel, joined with +" },
   { token: "{roleTag}", description: "The ping role, formatted as \" <-- @role\" — empty if no role is set" },
-  { token: "{voiceName}", description: "The voice channel's plain name (no mention)" },
-  { token: "{voice}", description: "The voice channel's name plus a clickable mention" },
+  { token: "{voiceName}", description: "The channel's name as clickable blue link text — jumps straight to it, no invite needed" },
+  { token: "{voice}", description: "The voice channel's name plus a <#channel> mention instead" },
   { token: "{user}", description: "Mentions the member who ran the command" },
-  { token: "{message}", description: "Whatever the sender typed after the command — on its own line below if you don't add this block" },
+  { token: "{message}", description: "Whatever the sender typed after the command — shown in a code block on its own line below if you don't add this block" },
 ];
 
 const WRONG_CHANNEL_TOKENS = [{ token: "{channel}", description: "Mentions the locked channel this command is restricted to" }];

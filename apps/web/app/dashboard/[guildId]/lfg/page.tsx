@@ -44,7 +44,7 @@ const EMPTY: LfgCommandInput = {
   includeSender: true,
   enabled: true,
   mode: "plain",
-  message: "Join {members}{roleTag} in {voiceName}",
+  message: "Join {members} in {voiceName}",
   embedTitle: "🎮 Looking for a Group",
   embedDescription: "{user} is queuing up in **{voice}** — join the call and hop in!\n\n{message}",
   embedColor: "#00E5FF",

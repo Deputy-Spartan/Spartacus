@@ -57,7 +57,7 @@ function effective(cfg: LfgCommandWithCategories, category: LfgCategory | null):
   };
 }
 
-const DEFAULT_PLAIN_TEMPLATE = "Join {members}{roleTag} in {voiceName}";
+const DEFAULT_PLAIN_TEMPLATE = "Join {members} in {voiceName}";
 
 async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMention: string, voiceChannel: VoiceBasedChannel, note: string) {
   const members = [...voiceChannel.members.filter((m) => !m.user.bot).values()].map((m) => m.toString()).join(" + ") || senderMention;

@@ -26,13 +26,14 @@ function voiceLabel(channel: { id: string; name: string }): string {
   return `${channel.name} (<#${channel.id}>)`;
 }
 
-// A real invite link straight to the voice channel — pasted as its own line,
-// Discord unfurls this into its native voice-channel card with a "Join
-// Voice" button, so members can hop in without opening the channel first.
-// Requires the bot to have Create Invite there; silently skipped without it.
-async function joinVoiceInvite(channel: VoiceBasedChannel): Promise<string | null> {
-  const invite = await channel.createInvite({ maxAge: 3600, maxUses: 0, unique: false, reason: "LFG announcement" }).catch(() => null);
-  return invite?.url ?? null;
+// A direct channel-jump link — pasted bare on its own line, Discord unfurls
+// this into its compact native voice card (icon, channel name, live "in
+// {game}" if one's being played there, and a Join Voice button) for anyone
+// who already has access to the channel. No invite needed, unlike a
+// discord.gg/... link, which unfurls into a different "X others in voice"
+// card instead — this is the one that actually matches the reference look.
+function voiceJumpLink(guildId: string, channel: { id: string }): string {
+  return `https://discord.com/channels/${guildId}/${channel.id}`;
 }
 
 // A category only overrides which channel it must be run in, who gets
@@ -62,11 +63,11 @@ const DEFAULT_PLAIN_TEMPLATE = "Join {members} in {voiceName}";
 async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMention: string, voiceChannel: VoiceBasedChannel, note: string) {
   const members = [...voiceChannel.members.filter((m) => !m.user.bot).values()].map((m) => m.toString()).join(" + ") || senderMention;
   const roleTag = eff.roleId ? ` <-- <@&${eff.roleId}>` : "";
-  // A direct channel-jump link, masked as the channel's name — clickable
-  // blue text in the sentence itself (works for anyone who can already see
-  // the channel), separate from the actual "Join Voice" card further below,
-  // which comes from a real invite link Discord auto-unfurls on its own line.
-  const voiceNameLinked = `[${voiceChannel.name}](https://discord.com/channels/${cfg.guildId}/${voiceChannel.id})`;
+  const jumpLink = voiceJumpLink(cfg.guildId, voiceChannel);
+  // Masked as the channel's name — clickable blue text in the sentence
+  // itself. The same link is posted bare on its own line further below,
+  // which is what actually triggers Discord's native voice card.
+  const voiceNameLinked = `[${voiceChannel.name}](${jumpLink})`;
   const tokens = { user: senderMention, voice: voiceLabel(voiceChannel), voiceName: voiceNameLinked, members, roleTag, message: note || "—" };
 
   // Embeds render mentions as inert text — no notification fires for a role
@@ -133,8 +134,7 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
 
   const note = interaction.options.getString("message") ?? "";
   const payload = await buildAnnouncement(cfg, eff, `${interaction.user}`, voiceChannel, note);
-  const invite = await joinVoiceInvite(voiceChannel);
-  if (invite) payload.content = [payload.content, invite].filter(Boolean).join("\n");
+  payload.content = [payload.content, voiceJumpLink(cfg.guildId, voiceChannel)].filter(Boolean).join("\n");
   await interaction.reply(payload);
 }
 
@@ -168,8 +168,7 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommandWithCate
 
   if (!isSendableChannel(message.channel)) return;
   const payload = await buildAnnouncement(cfg, eff, `${message.author}`, voiceChannel, note);
-  const invite = await joinVoiceInvite(voiceChannel);
-  if (invite) payload.content = [payload.content, invite].filter(Boolean).join("\n");
+  payload.content = [payload.content, voiceJumpLink(cfg.guildId, voiceChannel)].filter(Boolean).join("\n");
   await message.channel.send(payload);
 }
 

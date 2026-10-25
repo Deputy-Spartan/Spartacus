@@ -12,7 +12,8 @@ import { MessageSegmentBuilder, type SegmentToken } from "../../../../components
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { api, type LfgCommandRow, type LfgCommandInput, type LfgCategoryRow, type LfgCategoryInput } from "../../../../lib/api";
+import { useBotAvatar } from "../../../../lib/useBotAvatar";
+import { api, type LfgCommandRow, type LfgCommandInput, type LfgCategoryRow, type LfgCategoryInput, type DiscordRoleOption } from "../../../../lib/api";
 
 type Tab = "active" | "create";
 
@@ -67,9 +68,15 @@ function LfgFields({
   onChange: (patch: Partial<LfgCommandInput>) => void;
 }) {
   const wrongChannelRef = useRef<HTMLTextAreaElement>(null);
+  const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
+  useEffect(() => {
+    api.getDiscordRoles(guildId).then(setRoles);
+  }, [guildId]);
+  const roleLabel = roles.find((r) => r.id === value.roleId)?.name ?? null;
 
   return (
-    <>
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+      <div className="min-w-0">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <div>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -166,7 +173,121 @@ function LfgFields({
           onChange={(v) => onChange({ wrongChannelMessage: v })}
         />
       </div>
-    </>
+      </div>
+
+      <div className="lg:sticky lg:top-4">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          Live preview
+        </p>
+        <LfgPreview template={value.message || "Join {members} in {voiceName}"} roleLabel={roleLabel} />
+        <p className="text-xs text-slate-600 mt-2">
+          Shows a stand-in member list and channel — the real announcement uses whoever's actually in the sender's voice channel when they run the
+          command.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Mimics Discord's own dark theme (not the dashboard's neon theme) so what
+// you see here is what actually shows up in Discord — same token-splitting
+// logic as the bot's own substituteLfgTokens, just rendered with styled
+// spans (mention pill, blue link, fenced code block) instead of plain text.
+const PREVIEW_MEMBERS = ["BustyBunz", "TT3ouls627-UBI", "Diego the Virgin"];
+const PREVIEW_VOICE_NAME = "[R28] Em | Chill";
+const PREVIEW_NOTE = "em+ good coms chill";
+
+function Mention({ children }: { children: React.ReactNode }) {
+  return <span className="text-[#c9cdfb] bg-[#5865f2]/30 rounded px-[2px]">{children}</span>;
+}
+
+function LfgPreview({ template, roleLabel }: { template: string; roleLabel: string | null }) {
+  const avatarUrl = useBotAvatar();
+  const tokenRe = /\{(members|roleTag|voiceName|voice|user|message)\}/g;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  let sawMessage = false;
+
+  while ((m = tokenRe.exec(template))) {
+    if (m.index > lastIndex) nodes.push(<span key={key++}>{template.slice(lastIndex, m.index)}</span>);
+    const tok = m[1];
+    if (tok === "members") {
+      nodes.push(
+        <span key={key++}>
+          {PREVIEW_MEMBERS.map((n, i) => (
+            <span key={i}>
+              <Mention>@{n}</Mention>
+              {i < PREVIEW_MEMBERS.length - 1 ? " + " : ""}
+            </span>
+          ))}
+        </span>
+      );
+    } else if (tok === "roleTag") {
+      if (roleLabel) {
+        nodes.push(
+          <span key={key++}>
+            {" <-- "}
+            <Mention>@{roleLabel}</Mention>
+          </span>
+        );
+      }
+    } else if (tok === "voiceName" || tok === "voice") {
+      nodes.push(
+        <span key={key++} className="text-[#00aff4] hover:underline cursor-pointer">
+          {PREVIEW_VOICE_NAME}
+        </span>
+      );
+    } else if (tok === "user") {
+      nodes.push(<Mention key={key++}>@You</Mention>);
+    } else if (tok === "message") {
+      sawMessage = true;
+      nodes.push(
+        <pre key={key++} className="block mt-1.5 bg-[#2b2d31] rounded px-2.5 py-1.5 font-mono text-xs text-[#dbdee1] whitespace-pre-wrap">
+          {PREVIEW_NOTE}
+        </pre>
+      );
+    }
+    lastIndex = tokenRe.lastIndex;
+  }
+  if (lastIndex < template.length) nodes.push(<span key={key++}>{template.slice(lastIndex)}</span>);
+
+  return (
+    <div className="rounded-lg bg-[#313338] p-4 font-sans">
+      <div className="flex gap-3">
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
+        ) : (
+          <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient flex items-center justify-center text-sm font-bold text-base-950">S</div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
+            <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
+            <span className="text-[#949ba4] text-xs">Today at 9:20 PM</span>
+          </div>
+
+          <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words mt-1 leading-relaxed">{nodes}</p>
+          {!sawMessage && (
+            <pre className="block mt-1.5 bg-[#2b2d31] rounded px-2.5 py-1.5 font-mono text-xs text-[#dbdee1] whitespace-pre-wrap">{PREVIEW_NOTE}</pre>
+          )}
+
+          <div className="mt-2 max-w-sm bg-[#2b2d31] rounded-lg p-2.5 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-[#f0b232] to-[#c77b1f] flex items-center justify-center text-base shrink-0">
+              🔊
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[#f2f3f5] text-xs font-semibold truncate">{PREVIEW_VOICE_NAME}</p>
+              <p className="text-[#949ba4] text-[11px] truncate">in your server</p>
+            </div>
+            <span className="shrink-0 bg-[#5865f2] text-white text-xs font-semibold px-3 py-1.5 rounded-full">Join Voice</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

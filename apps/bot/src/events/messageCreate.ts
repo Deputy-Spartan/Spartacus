@@ -15,8 +15,20 @@ import { isOwner } from "../lib/owner";
 
 export const name = Events.MessageCreate;
 
+// A brief overlap between the outgoing and incoming bot instance during a
+// deploy (or a gateway resume) can deliver the same message event to more
+// than one live connection, running every side effect below twice — double
+// XP, double currency, and a prefix command like !lfg replying twice. Same
+// dedupe shape as guildMemberAdd/Remove, keyed by the message's own id
+// since that's unique and stable across any duplicate delivery.
+const recentlyProcessed = new Set<string>();
+const DEDUPE_MS = 15_000;
+
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId) return;
+  if (recentlyProcessed.has(message.id)) return;
+  recentlyProcessed.add(message.id);
+  setTimeout(() => recentlyProcessed.delete(message.id), DEDUPE_MS);
 
   // Never registered with Discord (see setupTestServer.ts for why) — the
   // only way this is ever reachable at all is typing the exact phrase, and

@@ -991,6 +991,7 @@ export interface GiveawayInput {
 export type PollDurationMode = "TIMER" | "MANUAL";
 export type PollResultsStyle = "BARS" | "SIMPLE";
 export type PollBarStyle = "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC" | "SOLID";
+export type PollType = "CUSTOM" | "NATIVE";
 
 export interface PollRow {
   id: string;
@@ -999,6 +1000,8 @@ export interface PollRow {
   question: string;
   options: string[];
   emojis: string[];
+  pollType: PollType;
+  allowMultiselect: boolean;
   color: string | null;
   barColor: string | null;
   barColorSecondary: string | null;
@@ -1020,6 +1023,8 @@ export interface PollInput {
   question: string;
   options: string[];
   emojis: string[];
+  pollType?: PollType;
+  allowMultiselect?: boolean;
   color?: string;
   barColor?: string;
   barColorSecondary?: string;

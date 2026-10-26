@@ -891,6 +891,11 @@ enum PollDurationMode {
   MANUAL
 }
 
+enum PollType {
+  CUSTOM // our own embed + reactions, fully stylable (colors, bar style, private results, write-ins)
+  NATIVE // Discord's own built-in poll object — exact native look, but Discord controls it: no colors/bar style/private results, duration required, no write-in button
+}
+
 enum PollResultsStyle {
   BARS // a bar per option, built from barStyle's emoji, plus the vote count/percentage
   SIMPLE // just the emoji + label, no bar and no inline count — votes only visible via the reactions themselves, Dyno-style
@@ -912,7 +917,9 @@ model Poll {
   messageId    String?
   question     String
   options      String[] // display labels, indexed by position
-  emojis       String[] // reaction emoji per option, same index as options — what members actually click to vote
+  emojis       String[] // reaction emoji per option, same index as options — what members actually click to vote (and optionally shown next to the answer for NATIVE polls)
+  pollType           PollType         @default(CUSTOM)
+  allowMultiselect   Boolean          @default(false) // NATIVE only — CUSTOM always enforces one vote per member by design
   color              String?          @default("#00E5FF") // the embed's left border accent
   barColor           String?          @default("#00E5FF") // the result bar's "primary" (filled) color — SQUARE/CIRCLE snap to the nearest matching colored emoji on the live message too; CLASSIC/SOLID can't be colored on Discord (plain text), so it's dashboard-preview-only there
   barColorSecondary  String?          @default("#99AAB5") // the result bar's "secondary" (empty/remaining) color — same rules as barColor

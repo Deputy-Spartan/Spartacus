@@ -244,3 +244,36 @@ export async function handleWriteInModalSubmit(interaction: ModalSubmitInteracti
   await prisma.pollWriteIn.create({ data: { pollId, userId: interaction.user.id, text: text.slice(0, 1000) } });
   await interaction.reply({ content: `✅ Got it — your answer for **${poll.question}** has been recorded.`, ephemeral: true });
 }
+
+// ---- NATIVE poll vote mirroring ----
+// Discord's own poll object tracks votes itself — these two events just
+// mirror that into our PollVote table (answer id N maps to poll.options[N-1],
+// the same order the poll was created with) so the dashboard's results list
+// works identically for NATIVE and CUSTOM polls without special-casing it.
+export async function onNativeVoteAdd(pollAnswer: { id: number; poll: { messageId: string } }, userId: string) {
+  const poll = await prisma.poll.findFirst({ where: { messageId: pollAnswer.poll.messageId, pollType: "NATIVE" } });
+  if (!poll) return;
+  const emoji = poll.emojis[pollAnswer.id - 1];
+  if (emoji === undefined) return;
+
+  if (poll.allowMultiselect) {
+    await prisma.pollVote.upsert({
+      where: { pollId_userId: { pollId: poll.id, userId: `${userId}:${pollAnswer.id}` } },
+      create: { pollId: poll.id, userId: `${userId}:${pollAnswer.id}`, emoji },
+      update: { emoji },
+    });
+  } else {
+    await prisma.pollVote.upsert({
+      where: { pollId_userId: { pollId: poll.id, userId } },
+      create: { pollId: poll.id, userId, emoji },
+      update: { emoji },
+    });
+  }
+}
+
+export async function onNativeVoteRemove(pollAnswer: { id: number; poll: { messageId: string } }, userId: string) {
+  const poll = await prisma.poll.findFirst({ where: { messageId: pollAnswer.poll.messageId, pollType: "NATIVE" } });
+  if (!poll) return;
+  const key = poll.allowMultiselect ? `${userId}:${pollAnswer.id}` : userId;
+  await prisma.pollVote.delete({ where: { pollId_userId: { pollId: poll.id, userId: key } } }).catch(() => null);
+}

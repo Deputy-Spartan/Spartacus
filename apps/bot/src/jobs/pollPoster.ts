@@ -22,13 +22,14 @@ export function startPollPosterJob(client: Client) {
       if (!isSendableChannel(channel)) continue;
 
       const embed = await renderPollEmbed(poll);
-      const components = poll.allowWriteIn
-        ? [
-            new ActionRowBuilder<ButtonBuilder>().addComponents(
-              new ButtonBuilder().setCustomId(`poll:writein:${poll.id}`).setLabel("✍️ Write In").setStyle(ButtonStyle.Secondary)
-            ),
-          ]
-        : [];
+      const buttons: ButtonBuilder[] = [];
+      if (poll.allowWriteIn) {
+        buttons.push(new ButtonBuilder().setCustomId(`poll:writein:${poll.id}`).setLabel("✍️ Write In").setStyle(ButtonStyle.Secondary));
+      }
+      if (poll.allowLockIn) {
+        buttons.push(new ButtonBuilder().setCustomId(`poll:lockin:${poll.id}`).setLabel("🔒 Lock In").setStyle(ButtonStyle.Danger));
+      }
+      const components = buttons.length ? [new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)] : [];
       const message = await channel.send({ embeds: [embed], components }).catch((err) => {
         if (loggedThisTick < 5) {
           logError("bot", err, poll.guildId);

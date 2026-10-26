@@ -79,6 +79,7 @@ interface Draft {
   barStyle: PollBarStyle;
   isPrivate: boolean;
   allowWriteIn: boolean;
+  allowLockIn: boolean;
   durationMode: PollDurationMode;
   hours: string;
   minutes: string;
@@ -99,6 +100,7 @@ const EMPTY_DRAFT: Draft = {
   barStyle: "SOLID",
   isPrivate: false,
   allowWriteIn: false,
+  allowLockIn: false,
   durationMode: "MANUAL",
   hours: "24",
   minutes: "0",
@@ -294,6 +296,7 @@ function PollsList({
                 <p className="text-xs text-slate-500">
                   <span className={statusColor}>{statusLabel}</span> · {total} vote{total === 1 ? "" : "s"}
                   {p.allowWriteIn ? ` · ${p.writeIns.length} write-in(s)` : ""}
+                  {p.allowLockIn ? ` · ${p.submissions.length} locked in` : ""}
                   {p.isPrivate && !p.closed ? " · 🔒 hidden" : ""}
                 </p>
               </button>
@@ -430,6 +433,7 @@ function CreateWizard({
         barStyle: draft.barStyle,
         isPrivate: draft.isPrivate,
         allowWriteIn: draft.allowWriteIn,
+        allowLockIn: draft.allowLockIn,
         durationMode: draft.durationMode,
         hours: Number(draft.hours) || 0,
         minutes: Number(draft.minutes) || 0,
@@ -527,6 +531,17 @@ function CreateWizard({
                     </p>
                   </div>
                   <ToggleSwitch enabled={draft.allowMultiselect} onChange={(v) => onChange({ allowMultiselect: v })} />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Let members lock in their answer</p>
+                    <p className="text-xs text-slate-500">
+                      Adds a "🔒 Lock In" button. Once a member clicks it, their current reaction(s)/write-in are final — further reactions get removed on
+                      the spot and un-reacting no longer undoes their vote.
+                    </p>
+                  </div>
+                  <ToggleSwitch enabled={draft.allowLockIn} onChange={(v) => onChange({ allowLockIn: v })} />
                 </div>
               </div>
 
@@ -747,6 +762,7 @@ function PollPreview({ draft }: { draft: Draft }) {
               {draft.isPrivate ? "🔒 Results hidden · " : ""}
               {footer}
               {draft.allowWriteIn ? " · Click ✍️ Write In below to submit your own answer" : ""}
+              {draft.allowLockIn ? " · Click 🔒 Lock In once you're done to make your answer final" : ""}
             </p>
           </div>
 
@@ -757,9 +773,10 @@ function PollPreview({ draft }: { draft: Draft }) {
               </span>
             ))}
           </div>
-          {draft.allowWriteIn && (
-            <div className="mt-1.5">
-              <span className="bg-[#4e5058] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">✍️ Write In</span>
+          {(draft.allowWriteIn || draft.allowLockIn) && (
+            <div className="flex gap-1.5 mt-1.5">
+              {draft.allowWriteIn && <span className="bg-[#4e5058] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">✍️ Write In</span>}
+              {draft.allowLockIn && <span className="bg-[#da373c] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">🔒 Lock In</span>}
             </div>
           )}
         </div>

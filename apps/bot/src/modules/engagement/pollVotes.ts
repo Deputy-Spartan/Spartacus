@@ -70,6 +70,7 @@ export async function renderPollEmbed(poll: Poll) {
   else if (poll.durationMode === "TIMER" && poll.endsAt) statusLine = `⏱️ Ends <t:${Math.floor(poll.endsAt.getTime() / 1000)}:R>`;
   else statusLine = "🖐 Open until a staff member stops it";
   if (poll.allowWriteIn && !poll.closed) statusLine += " · Click ✍️ Write In below to submit your own answer";
+  if (poll.allowLockIn && !poll.closed) statusLine += " · Click 🔒 Lock In once you're done to make your answer final";
 
   const footerText = `${total} vote${total === 1 ? "" : "s"} total`;
 
@@ -83,6 +84,11 @@ export async function renderPollEmbed(poll: Poll) {
 async function findPoll(reaction: MessageReaction | PartialMessageReaction): Promise<Poll | null> {
   if (!reaction.message.id) return null;
   return prisma.poll.findFirst({ where: { messageId: reaction.message.id } });
+}
+
+async function isLockedIn(pollId: string, userId: string): Promise<boolean> {
+  const submission = await prisma.pollSubmission.findUnique({ where: { pollId_userId: { pollId, userId } } });
+  return !!submission;
 }
 
 // Posted as a reply right under the poll the moment it closes (timer or
@@ -110,6 +116,11 @@ export async function onReactionAdd(reaction: MessageReaction | PartialMessageRe
   if (!poll.emojis.includes(key)) return;
 
   if (poll.closed) {
+    await reaction.users.remove(user.id).catch(() => null);
+    return;
+  }
+
+  if (await isLockedIn(poll.id, user.id)) {
     await reaction.users.remove(user.id).catch(() => null);
     return;
   }
@@ -144,6 +155,9 @@ export async function onReactionRemove(reaction: MessageReaction | PartialMessag
   const key = emojiKey(reaction);
   if (!poll.emojis.includes(key)) return;
 
+  // Locked in: un-reacting doesn't undo the vote — it stays counted.
+  if (await isLockedIn(poll.id, user.id)) return;
+
   await prisma.pollVote.deleteMany({ where: { pollId: poll.id, userId: user.id, emoji: key } });
 
   const embed = await renderPollEmbed(poll);
@@ -158,6 +172,10 @@ export async function handleWriteInButton(interaction: ButtonInteraction, pollId
   const poll = await prisma.poll.findUnique({ where: { id: pollId } });
   if (!poll || poll.closed) {
     await interaction.reply({ content: "This poll isn't accepting answers anymore.", ephemeral: true });
+    return;
+  }
+  if (await isLockedIn(pollId, interaction.user.id)) {
+    await interaction.reply({ content: "🔒 You've already locked in your answer(s) for this poll.", ephemeral: true });
     return;
   }
 
@@ -182,6 +200,10 @@ export async function handleWriteInModalSubmit(interaction: ModalSubmitInteracti
     await interaction.reply({ content: "This poll isn't accepting answers anymore.", ephemeral: true });
     return;
   }
+  if (await isLockedIn(pollId, interaction.user.id)) {
+    await interaction.reply({ content: "🔒 You've already locked in your answer(s) for this poll.", ephemeral: true });
+    return;
+  }
 
   if (!poll.allowMultiselect) {
     const existingVotes = await prisma.pollVote.findMany({ where: { pollId, userId: interaction.user.id } });
@@ -202,4 +224,32 @@ export async function handleWriteInModalSubmit(interaction: ModalSubmitInteracti
   }
 
   await interaction.reply({ content: `✅ Got it — your answer for **${poll.question}** has been recorded.`, ephemeral: true });
+}
+
+// "🔒 Lock In" button — makes the member's current reaction(s)/write-in
+// final. Requires at least one answer already on record; after this,
+// onReactionAdd/onReactionRemove/handleWriteInButton/handleWriteInModalSubmit
+// all check isLockedIn() and refuse to change anything further for them.
+export async function handleLockInButton(interaction: ButtonInteraction, pollId: string) {
+  const poll = await prisma.poll.findUnique({ where: { id: pollId } });
+  if (!poll || poll.closed) {
+    await interaction.reply({ content: "This poll isn't accepting answers anymore.", ephemeral: true });
+    return;
+  }
+  if (await isLockedIn(pollId, interaction.user.id)) {
+    await interaction.reply({ content: "🔒 You've already locked in your answer(s) for this poll.", ephemeral: true });
+    return;
+  }
+
+  const [hasVote, hasWriteIn] = await Promise.all([
+    prisma.pollVote.findFirst({ where: { pollId, userId: interaction.user.id } }),
+    prisma.pollWriteIn.findFirst({ where: { pollId, userId: interaction.user.id } }),
+  ]);
+  if (!hasVote && !hasWriteIn) {
+    await interaction.reply({ content: "React to an option (or submit a write-in) before locking in.", ephemeral: true });
+    return;
+  }
+
+  await prisma.pollSubmission.create({ data: { pollId, userId: interaction.user.id } });
+  await interaction.reply({ content: "🔒 Your answer(s) are locked in and can't be changed.", ephemeral: true });
 }

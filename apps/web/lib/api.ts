@@ -1011,9 +1011,11 @@ export interface PollRow {
   closed: boolean;
   closedAt: string | null;
   allowWriteIn: boolean;
+  allowLockIn: boolean;
   createdAt: string;
   votes: Array<{ userId: string; emoji: string }>;
   writeIns: Array<{ id: string; userId: string; text: string; createdAt: string }>;
+  submissions: Array<{ userId: string; submittedAt: string }>;
 }
 
 export interface PollInput {
@@ -1032,6 +1034,7 @@ export interface PollInput {
   hours?: number;
   minutes?: number;
   allowWriteIn?: boolean;
+  allowLockIn?: boolean;
 }
 
 export interface EconomyMultiplier {

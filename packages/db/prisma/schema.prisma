@@ -926,9 +926,15 @@ model Poll {
   closed       Boolean          @default(false)
   closedAt     DateTime?
   allowWriteIn Boolean          @default(false) // adds a "✍️ Write In" button that opens a modal to collect a free-text answer instead of one of the fixed options
+  // Adds a "🔒 Lock In" button — once a member clicks it, their current
+  // reaction(s)/write-in are final: further reactions are removed on sight
+  // and un-reacting no longer undoes their vote. Requires at least one
+  // answer already in before it can be clicked.
+  allowLockIn  Boolean          @default(false)
   createdAt    DateTime         @default(now())
   votes        PollVote[]
   writeIns     PollWriteIn[]
+  submissions  PollSubmission[]
 
   @@index([guildId])
   @@index([messageId])
@@ -960,6 +966,19 @@ model PollWriteIn {
   createdAt DateTime @default(now())
 
   @@index([pollId])
+}
+
+// One row per member who's clicked "🔒 Lock In" on a poll — its mere
+// existence is the lock; pollVotes.ts checks it before letting a reaction
+// add/remove or a write-in change anything further for that member.
+model PollSubmission {
+  id          String   @id @default(cuid())
+  poll        Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId      String
+  userId      String
+  submittedAt DateTime @default(now())
+
+  @@unique([pollId, userId])
 }
 
 // ---- Suggestions ----

@@ -9,7 +9,7 @@ const router = Router();
 router.get("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async (req, res) => {
   const rows = await prisma.poll.findMany({
     where: { guildId: req.params.guildId },
-    include: { votes: true, writeIns: { orderBy: { createdAt: "desc" } } },
+    include: { votes: true, writeIns: { orderBy: { createdAt: "desc" } }, submissions: true },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -36,6 +36,7 @@ router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async
     hours,
     minutes,
     allowWriteIn,
+    allowLockIn,
   } = req.body as {
     channelId: string;
     question: string;
@@ -52,6 +53,7 @@ router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async
     hours?: number;
     minutes?: number;
     allowWriteIn?: boolean;
+    allowLockIn?: boolean;
   };
 
   if (!channelId || !question?.trim() || !Array.isArray(options) || options.length < 2 || options.length !== emojis?.length) {
@@ -85,6 +87,7 @@ router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async
       durationMode,
       endsAt,
       allowWriteIn: !!allowWriteIn,
+      allowLockIn: !!allowLockIn,
     },
   });
   res.status(201).json(row);

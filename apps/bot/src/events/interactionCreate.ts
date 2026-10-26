@@ -344,6 +344,18 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("poll:lockin:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "POLLS");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Polls is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const pollId = interaction.customId.split(":")[2];
+    const { handleLockInButton } = await import("../modules/engagement/pollVotes");
+    await handleLockInButton(interaction, pollId);
+    return;
+  }
+
   if (interaction.customId.startsWith("ticket:")) {
     var ticketParts = interaction.customId.split(":");
     const { handleTicketControl } = await import("../modules/tickets/tickets");

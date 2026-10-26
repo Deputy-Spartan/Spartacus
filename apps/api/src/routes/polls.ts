@@ -20,22 +20,37 @@ router.get("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async 
 // posts it within a few seconds — this just schedules it, same pattern as
 // giveaways/reaction role panels.
 router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, question, options, emojis, color, barColor, resultsStyle, barStyle, isPrivate, durationMode, hours, minutes, allowWriteIn } =
-    req.body as {
-      channelId: string;
-      question: string;
-      options: string[];
-      emojis: string[];
-      color?: string;
-      barColor?: string;
-      resultsStyle?: "BARS" | "SIMPLE";
-      barStyle?: "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC";
-      isPrivate?: boolean;
-      durationMode: "TIMER" | "MANUAL";
-      hours?: number;
-      minutes?: number;
-      allowWriteIn?: boolean;
-    };
+  const {
+    channelId,
+    question,
+    options,
+    emojis,
+    color,
+    barColor,
+    barColorSecondary,
+    resultsStyle,
+    barStyle,
+    isPrivate,
+    durationMode,
+    hours,
+    minutes,
+    allowWriteIn,
+  } = req.body as {
+    channelId: string;
+    question: string;
+    options: string[];
+    emojis: string[];
+    color?: string;
+    barColor?: string;
+    barColorSecondary?: string;
+    resultsStyle?: "BARS" | "SIMPLE";
+    barStyle?: "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC" | "SOLID";
+    isPrivate?: boolean;
+    durationMode: "TIMER" | "MANUAL";
+    hours?: number;
+    minutes?: number;
+    allowWriteIn?: boolean;
+  };
 
   if (!channelId || !question?.trim() || !Array.isArray(options) || options.length < 2 || options.length !== emojis?.length) {
     return res.status(400).json({ error: "A channel, a question, and at least 2 options each with their own emoji are required." });
@@ -60,6 +75,7 @@ router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async
       emojis,
       color: color || "#00E5FF",
       barColor: barColor || "#00E5FF",
+      barColorSecondary: barColorSecondary || "#99AAB5",
       resultsStyle: resultsStyle || "BARS",
       barStyle: barStyle || "SQUARE",
       isPrivate: !!isPrivate,

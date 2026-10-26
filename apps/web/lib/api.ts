@@ -1001,6 +1001,7 @@ export interface PollRow {
   emojis: string[];
   color: string | null;
   barColor: string | null;
+  barColorSecondary: string | null;
   resultsStyle: PollResultsStyle;
   barStyle: PollBarStyle;
   isPrivate: boolean;
@@ -1021,6 +1022,7 @@ export interface PollInput {
   emojis: string[];
   color?: string;
   barColor?: string;
+  barColorSecondary?: string;
   resultsStyle?: PollResultsStyle;
   barStyle?: PollBarStyle;
   isPrivate?: boolean;

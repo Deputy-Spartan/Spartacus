@@ -26,8 +26,9 @@ function emojiKey(reaction: MessageReaction | PartialMessageReaction): string {
 
 // Discord has no real progress-bar rendering in an embed, and monospace
 // block characters (the old `████░░░░` approach) render as an illegible
-// grey code pill on most clients. These are the "filled" emoji choices for
-// each colored barStyle, matched to the poll's own bar color.
+// grey code pill on most clients. These are the emoji choices SQUARE/CIRCLE
+// snap to for both the primary (filled) and secondary (empty) color —
+// includes white/black so a plain light/dark secondary still matches sensibly.
 const COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🟥", rgb: [221, 46, 68] },
   { emoji: "🟧", rgb: [240, 138, 55] },
@@ -36,6 +37,8 @@ const COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🟦", rgb: [85, 172, 238] },
   { emoji: "🟪", rgb: [170, 142, 214] },
   { emoji: "🟫", rgb: [168, 120, 74] },
+  { emoji: "⬜", rgb: [255, 255, 255] },
+  { emoji: "⬛", rgb: [49, 51, 56] },
 ];
 const COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🔴", rgb: [221, 46, 68] },
@@ -45,6 +48,8 @@ const COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🔵", rgb: [85, 172, 238] },
   { emoji: "🟣", rgb: [170, 142, 214] },
   { emoji: "🟤", rgb: [168, 120, 74] },
+  { emoji: "⚪", rgb: [255, 255, 255] },
+  { emoji: "⚫", rgb: [49, 51, 56] },
 ];
 
 function nearestColorEmoji(hex: string | null | undefined, palette: Array<{ emoji: string; rgb: [number, number, number] }>, fallback: string): string {
@@ -64,21 +69,28 @@ function nearestColorEmoji(hex: string | null | undefined, palette: Array<{ emoj
   return best.emoji;
 }
 
-// Returns the [filled, empty] emoji/char pair for a bar style — SQUARE and
-// CIRCLE match the poll's own barColor, BLOCK and CLASSIC are fixed/neutral.
+// Returns the [filled, empty] emoji/char pair for a bar style. SQUARE and
+// CIRCLE snap BOTH colors to the nearest matching emoji on the live message
+// itself; CLASSIC and SOLID stay plain ▰/▱ and █/░ there (Discord can't
+// color plain text) — their primary/secondary colors only affect the
+// dashboard's own preview, which is called out in the dashboard UI.
 function barChars(poll: Poll): [string, string] {
   switch (poll.barStyle) {
-    case "BLOCK":
-      return ["⬛", "⬜"];
     case "CIRCLE":
-      return [nearestColorEmoji(poll.barColor ?? poll.color, COLOR_CIRCLES, "🔵"), "⚪"];
+      return [
+        nearestColorEmoji(poll.barColor ?? poll.color, COLOR_CIRCLES, "🔵"),
+        nearestColorEmoji(poll.barColorSecondary, COLOR_CIRCLES, "⚪"),
+      ];
     case "CLASSIC":
       return ["▰", "▱"];
     case "SOLID":
       return ["█", "░"];
     case "SQUARE":
     default:
-      return [nearestColorEmoji(poll.barColor ?? poll.color, COLOR_SQUARES, "🟦"), "⬜"];
+      return [
+        nearestColorEmoji(poll.barColor ?? poll.color, COLOR_SQUARES, "🟦"),
+        nearestColorEmoji(poll.barColorSecondary, COLOR_SQUARES, "⬜"),
+      ];
   }
 }
 

@@ -913,8 +913,9 @@ model Poll {
   question     String
   options      String[] // display labels, indexed by position
   emojis       String[] // reaction emoji per option, same index as options — what members actually click to vote
-  color        String?          @default("#00E5FF") // the embed's left border accent
-  barColor     String?          @default("#00E5FF") // the result bar's fill color (SQUARE/CIRCLE bar styles only) — reflected on both the dashboard and the live embed, snapped to the nearest matching colored emoji
+  color              String?          @default("#00E5FF") // the embed's left border accent
+  barColor           String?          @default("#00E5FF") // the result bar's "primary" (filled) color — SQUARE/CIRCLE snap to the nearest matching colored emoji on the live message too; CLASSIC/SOLID can't be colored on Discord (plain text), so it's dashboard-preview-only there
+  barColorSecondary  String?          @default("#99AAB5") // the result bar's "secondary" (empty/remaining) color — same rules as barColor
   resultsStyle PollResultsStyle @default(BARS)
   barStyle     PollBarStyle     @default(SQUARE)
   isPrivate    Boolean          @default(false) // hides the tally/percentages in the embed itself until the poll closes

@@ -37,6 +37,8 @@ const PREVIEW_COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number
   { emoji: "🟦", rgb: [85, 172, 238] },
   { emoji: "🟪", rgb: [170, 142, 214] },
   { emoji: "🟫", rgb: [168, 120, 74] },
+  { emoji: "⬜", rgb: [255, 255, 255] },
+  { emoji: "⬛", rgb: [49, 51, 56] },
 ];
 const PREVIEW_COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🔴", rgb: [221, 46, 68] },
@@ -46,6 +48,8 @@ const PREVIEW_COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number
   { emoji: "🔵", rgb: [85, 172, 238] },
   { emoji: "🟣", rgb: [170, 142, 214] },
   { emoji: "🟤", rgb: [168, 120, 74] },
+  { emoji: "⚪", rgb: [255, 255, 255] },
+  { emoji: "⚫", rgb: [49, 51, 56] },
 ];
 
 function nearestColorEmoji(hex: string, palette: Array<{ emoji: string; rgb: [number, number, number] }>, fallback: string): string {
@@ -65,19 +69,21 @@ function nearestColorEmoji(hex: string, palette: Array<{ emoji: string; rgb: [nu
   return best.emoji;
 }
 
-function barChars(barStyle: PollBarStyle, barColor: string): [string, string] {
+// Primary/secondary colors apply to SQUARE and CIRCLE on the real Discord
+// message (snapped to the nearest matching emoji); CLASSIC/SOLID stay plain
+// ▰/▱ and █/░ there since Discord can't color plain text — their colors
+// here are preview-only, which the UI calls out next to those fields.
+function barChars(barStyle: PollBarStyle, primary: string, secondary: string): [string, string] {
   switch (barStyle) {
-    case "BLOCK":
-      return ["⬛", "⬜"];
     case "CIRCLE":
-      return [nearestColorEmoji(barColor, PREVIEW_COLOR_CIRCLES, "🔵"), "⚪"];
+      return [nearestColorEmoji(primary, PREVIEW_COLOR_CIRCLES, "🔵"), nearestColorEmoji(secondary, PREVIEW_COLOR_CIRCLES, "⚪")];
     case "CLASSIC":
       return ["▰", "▱"];
     case "SOLID":
       return ["█", "░"];
     case "SQUARE":
     default:
-      return [nearestColorEmoji(barColor, PREVIEW_COLOR_SQUARES, "🟦"), "⬜"];
+      return [nearestColorEmoji(primary, PREVIEW_COLOR_SQUARES, "🟦"), nearestColorEmoji(secondary, PREVIEW_COLOR_SQUARES, "⬜")];
   }
 }
 
@@ -120,6 +126,7 @@ interface Draft {
   options: Option[];
   color: string;
   barColor: string;
+  barColorSecondary: string;
   resultsStyle: PollResultsStyle;
   barStyle: PollBarStyle;
   isPrivate: boolean;
@@ -138,6 +145,7 @@ const EMPTY_DRAFT: Draft = {
   ],
   color: "#00E5FF",
   barColor: "#00E5FF",
+  barColorSecondary: "#99AAB5",
   resultsStyle: "BARS",
   barStyle: "SQUARE",
   isPrivate: false,
@@ -150,7 +158,6 @@ const EMPTY_DRAFT: Draft = {
 const BAR_STYLE_OPTIONS: Array<{ value: PollBarStyle; label: string; sample: string }> = [
   { value: "SQUARE", label: "Colored squares", sample: "🟦🟦🟦⬜⬜" },
   { value: "CIRCLE", label: "Colored circles", sample: "🔵🔵🔵⚪⚪" },
-  { value: "BLOCK", label: "Black & white", sample: "⬛⬛⬛⬜⬜" },
   { value: "CLASSIC", label: "Classic bar", sample: "▰▰▰▱▱" },
   { value: "SOLID", label: "Solid bar", sample: "██████░░░░" },
 ];
@@ -470,6 +477,7 @@ function CreateWizard({
         emojis: filled.map((o) => o.emoji),
         color: draft.color,
         barColor: draft.barColor,
+        barColorSecondary: draft.barColorSecondary,
         resultsStyle: draft.resultsStyle,
         barStyle: draft.barStyle,
         isPrivate: draft.isPrivate,
@@ -599,7 +607,7 @@ function CreateWizard({
               {draft.resultsStyle === "BARS" && (
                 <>
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Bar Style</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                     {BAR_STYLE_OPTIONS.map((opt) => (
                       <button
                         key={opt.value}
@@ -613,22 +621,31 @@ function CreateWizard({
                       </button>
                     ))}
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Primary Color</label>
+                      <p className="text-[11px] text-slate-600 mb-2">
+                        The filled part of the bar.{" "}
+                        {draft.barStyle === "SQUARE" || draft.barStyle === "CIRCLE"
+                          ? "Snapped to the nearest matching emoji — shown on the real Discord message too."
+                          : "Discord can't color plain text, so this only affects the preview here — the live bar stays its fixed look."}
+                      </p>
+                      <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
+                    </div>
+                    <div>
+                      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Secondary Color</label>
+                      <p className="text-[11px] text-slate-600 mb-2">The empty/remaining part of the bar. Same rules as Primary Color above.</p>
+                      <ColorPicker value={draft.barColorSecondary} onChange={(c) => onChange({ barColorSecondary: c })} />
+                    </div>
+                  </div>
                 </>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Embed Color</label>
-                  <p className="text-[11px] text-slate-600 mb-2">The left border accent on the real Discord message.</p>
-                  <ColorPicker value={draft.color} onChange={(c) => onChange({ color: c })} />
-                </div>
-                {draft.resultsStyle === "BARS" && (draft.barStyle === "SQUARE" || draft.barStyle === "CIRCLE") && (
-                  <div>
-                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Result Bar Color</label>
-                    <p className="text-[11px] text-slate-600 mb-2">Snapped to the nearest matching {draft.barStyle === "SQUARE" ? "square" : "circle"} — shown on the real Discord message too.</p>
-                    <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
-                  </div>
-                )}
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Embed Color</label>
+              <p className="text-[11px] text-slate-600 mb-2">The left border accent on the real Discord message.</p>
+              <div className="mb-4">
+                <ColorPicker value={draft.color} onChange={(c) => onChange({ color: c })} />
               </div>
 
               <div className="flex items-center justify-between mb-4 bg-base-950 border border-white/10 rounded-lg px-3 py-2.5">
@@ -715,7 +732,7 @@ function PollPreview({ draft }: { draft: Draft }) {
   const demoVotes = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
   const total = demoVotes.reduce((a, b) => a + b, 0) || 1;
   const barLen = draft.barStyle === "SOLID" || draft.barStyle === "CLASSIC" ? 20 : 10;
-  const [filledChar, emptyChar] = barChars(draft.barStyle, draft.barColor);
+  const [filledChar, emptyChar] = barChars(draft.barStyle, draft.barColor, draft.barColorSecondary);
 
   const footer = draft.durationMode === "TIMER" ? `⏱ Ends in ${draft.hours || 0}h ${draft.minutes || 0}m` : "🖐 Open until a staff member stops it";
 

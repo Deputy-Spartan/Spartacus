@@ -1,0 +1,32 @@
+import cron from "node-cron";
+import { Client } from "discord.js";
+import { prisma } from "../lib/prisma";
+import { isSendableChannel } from "../lib/channels";
+import { renderPollEmbed } from "../modules/engagement/pollVotes";
+
+// Every minute, closes any TIMER poll whose endsAt has passed — manual-stop
+// polls are closed directly from the dashboard/API instead, never by this
+// job. Closing always re-renders the embed, which is what actually reveals
+// a private poll's real numbers for the first time.
+export function startPollCloserJob(client: Client) {
+  cron.schedule("* * * * *", async () => {
+    const due = await prisma.poll.findMany({
+      where: { closed: false, durationMode: "TIMER", endsAt: { lte: new Date() } },
+      take: 50,
+    });
+
+    for (const poll of due) {
+      const closed = await prisma.poll.update({ where: { id: poll.id }, data: { closed: true, closedAt: new Date() } });
+      if (!closed.messageId) continue;
+
+      const channel = await client.channels.fetch(poll.channelId).catch(() => null);
+      if (!isSendableChannel(channel)) continue;
+
+      const message = await channel.messages.fetch(closed.messageId).catch(() => null);
+      if (!message) continue;
+
+      const embed = await renderPollEmbed(closed);
+      await message.edit({ embeds: [embed] }).catch(() => null);
+    }
+  });
+}

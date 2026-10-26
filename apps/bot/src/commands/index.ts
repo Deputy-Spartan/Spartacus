@@ -13,7 +13,6 @@ import event from "./events/event";
 import verify from "./security/verify";
 import quarantine from "./security/quarantine";
 import release from "./security/release";
-import poll from "./engagement/poll";
 import suggest from "./engagement/suggest";
 import { approveCommand as approveSuggestion, denyCommand as denySuggestion } from "./engagement/suggestionReview";
 import balance from "./economy/balance";
@@ -45,7 +44,6 @@ for (const command of [
   verify,
   quarantine,
   release,
-  poll,
   suggest,
   approveSuggestion,
   denySuggestion,

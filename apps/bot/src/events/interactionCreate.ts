@@ -439,18 +439,6 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if (interaction.customId.startsWith("poll:")) {
-    const enabled = await isModuleEnabled(interaction.guildId, "POLLS");
-    if (!enabled) {
-      await interaction.reply({ content: "⚠️ Polls is disabled for this server.", ephemeral: true });
-      return;
-    }
-    var pollParts = interaction.customId.split(":");
-    const { handlePollVote } = await import("../commands/engagement/poll");
-    await handlePollVote(interaction, pollParts[1], Number(pollParts[2]));
-    return;
-  }
-
   if (interaction.customId.startsWith("trivia:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "TRIVIA");
     if (!enabled) {

@@ -988,6 +988,40 @@ export interface GiveawayInput {
   savedEmbedId?: string | null;
 }
 
+export type PollDurationMode = "TIMER" | "MANUAL";
+
+export interface PollRow {
+  id: string;
+  channelId: string;
+  messageId: string | null;
+  question: string;
+  options: string[];
+  emojis: string[];
+  color: string | null;
+  isPrivate: boolean;
+  durationMode: PollDurationMode;
+  endsAt: string | null;
+  closed: boolean;
+  closedAt: string | null;
+  allowWriteIn: boolean;
+  createdAt: string;
+  votes: Array<{ userId: string; emoji: string }>;
+  writeIns: Array<{ id: string; userId: string; text: string; createdAt: string }>;
+}
+
+export interface PollInput {
+  channelId: string;
+  question: string;
+  options: string[];
+  emojis: string[];
+  color?: string;
+  isPrivate?: boolean;
+  durationMode: PollDurationMode;
+  hours?: number;
+  minutes?: number;
+  allowWriteIn?: boolean;
+}
+
 export interface EconomyMultiplier {
   channelId?: string;
   roleId?: string;
@@ -1654,6 +1688,11 @@ export const api = {
   getGiveaways: (guildId: string) => request<GiveawayRow[]>(`/guilds/${guildId}/giveaways`),
   addGiveaway: (guildId: string, body: GiveawayInput) =>
     request<GiveawayRow>(`/guilds/${guildId}/giveaways`, { method: "POST", body: JSON.stringify(body) }),
+
+  getPolls: (guildId: string) => request<PollRow[]>(`/guilds/${guildId}/polls`),
+  addPoll: (guildId: string, body: PollInput) => request<PollRow>(`/guilds/${guildId}/polls`, { method: "POST", body: JSON.stringify(body) }),
+  stopPoll: (guildId: string, id: string) => request<PollRow>(`/guilds/${guildId}/polls/${id}/stop`, { method: "POST" }),
+  deletePoll: (guildId: string, id: string) => request(`/guilds/${guildId}/polls/${id}`, { method: "DELETE" }),
 
   getEconomyConfig: (guildId: string) => request<EconomyConfig>(`/guilds/${guildId}/economy/config`),
   setEconomyConfig: (guildId: string, config: Partial<EconomyConfig>) =>

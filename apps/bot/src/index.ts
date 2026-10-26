@@ -18,6 +18,8 @@ import { startGiveawayPosterJob } from "./jobs/giveawayPoster";
 import { startTicketPanelPosterJob } from "./jobs/ticketPanelPoster";
 import { startRolePanelPosterJob } from "./jobs/rolePanelPoster";
 import { startReactionRolePosterJob } from "./jobs/reactionRolePoster";
+import { startPollPosterJob } from "./jobs/pollPoster";
+import { startPollCloserJob } from "./jobs/pollCloser";
 import { startScheduledMessagesJob } from "./jobs/scheduledMessages";
 import { startStatChannelsJob } from "./jobs/statChannels";
 import { startStatusChannelPosterJob } from "./jobs/statusChannelPoster";
@@ -41,6 +43,7 @@ import * as antiNuke from "./modules/security/antiNuke";
 import * as permWatch from "./modules/security/permWatch";
 import * as honeypot from "./modules/security/honeypot";
 import * as reactionRoles from "./modules/community/reactionRoles";
+import * as pollVotes from "./modules/engagement/pollVotes";
 import * as joinRoles from "./modules/community/joinRoles";
 import * as stickyMessages from "./modules/community/stickyMessages";
 import * as starboard from "./modules/community/starboard";
@@ -52,6 +55,7 @@ import * as inviteTracking from "./modules/community/inviteTracking";
 import * as modmail from "./modules/modmail/modmail";
 import * as supportIntake from "./modules/support/supportIntake";
 import * as applications from "./modules/community/applications";
+import * as pollWriteInCollector from "./modules/engagement/pollWriteInCollector";
 import * as channelLocks from "./modules/utility/channelLocks";
 import * as aiChat from "./modules/community/aiChat";
 import * as aiModeration from "./modules/moderation/aiModeration";
@@ -134,6 +138,10 @@ export { forceRepost as forceStickyRepost } from "./modules/community/stickyMess
 // announcement through the bot's own live gateway client instead of a
 // separate raw REST call.
 export { publishAnnouncement } from "./jobs/announcementPoster";
+// Re-exported so apps/api's "Stop Now" button can render the exact same
+// final-results embed the bot's own pollCloser job builds, instead of
+// duplicating that logic or waiting for the next minute's cron tick.
+export { renderPollEmbed } from "./modules/engagement/pollVotes";
 
 export function startBot() {
   const client = new Client({
@@ -185,6 +193,8 @@ export function startBot() {
     startTicketPanelPosterJob(c);
     startRolePanelPosterJob(c);
     startReactionRolePosterJob(c);
+    startPollPosterJob(c);
+    startPollCloserJob(c);
     startAnnouncementPosterJob(c);
     startAutoPurgeJob(c);
     startBirthdayAnnouncerJob(c);
@@ -216,6 +226,7 @@ export function startBot() {
   client.on(Events.MessageCreate, modmail.execute); // DM-only, filters guild messages internally
   client.on(Events.MessageCreate, modmail.handleStaffReply); // guild-only, filters DMs internally
   client.on(Events.MessageCreate, applications.execute); // DM-only, advances an in-progress application draft
+  client.on(Events.MessageCreate, pollWriteInCollector.execute); // DM-only, collects a poll write-in answer
   client.on(Events.MessageCreate, supportIntake.execute); // DM-only, flow picker + question chain + DM->ticket relay
   client.on(Events.MessageCreate, supportIntake.handleStaffMessage); // guild-only, ticket channel -> DM relay
   client.on(aiChat.name, aiChat.execute);
@@ -261,6 +272,8 @@ export function startBot() {
 
   client.on(Events.MessageReactionAdd, reactionRoles.onReactionAdd);
   client.on(Events.MessageReactionRemove, reactionRoles.onReactionRemove);
+  client.on(Events.MessageReactionAdd, pollVotes.onReactionAdd);
+  client.on(Events.MessageReactionRemove, pollVotes.onReactionRemove);
   client.on(Events.MessageReactionAdd, starboard.execute);
 
   client.on(Events.GuildAuditLogEntryCreate, antiNuke.execute);

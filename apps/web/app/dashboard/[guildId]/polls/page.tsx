@@ -14,7 +14,17 @@ import { api, type PollRow, type PollInput, type PollDurationMode } from "../../
 type Tab = "active" | "create";
 
 const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
-const EMOJI_POOL = ["🔥", "⚡", "🌙", "🏆", "💤", "🍕", "🎮", "🎲", "🎬", "⚖️"];
+
+// Default numbering for a new option: 1️⃣.."9️⃣, then 🔟 for ten. Discord has
+// no single-emoji glyph for 11+ (keycap digits don't combine into one
+// reaction), so past ten this falls back to 🇦 🇧 🇨... — still unique,
+// still one click, just letters instead of numbers. Always just a default:
+// every option's emoji can be changed with the picker next to it.
+function defaultEmojiFor(position: number): string {
+  if (position >= 1 && position <= 9) return `${position}⃣`;
+  if (position === 10) return "🔟";
+  return String.fromCodePoint(0x1f1e6 + ((position - 11) % 26)); // 11 -> 🇦, 12 -> 🇧, ...
+}
 
 interface Option {
   label: string;
@@ -37,8 +47,8 @@ const EMPTY_DRAFT: Draft = {
   question: "",
   channelId: null,
   options: [
-    { label: "", emoji: "🔥" },
-    { label: "", emoji: "⚡" },
+    { label: "", emoji: defaultEmojiFor(1) },
+    { label: "", emoji: defaultEmojiFor(2) },
   ],
   color: "#00E5FF",
   isPrivate: false,
@@ -278,9 +288,7 @@ function CreateWizard({
   }
 
   function addOption() {
-    const used = new Set(draft.options.map((o) => o.emoji));
-    const emoji = EMOJI_POOL.find((e) => !used.has(e)) ?? "❓";
-    onChange({ options: [...draft.options, { label: "", emoji }] });
+    onChange({ options: [...draft.options, { label: "", emoji: defaultEmojiFor(draft.options.length + 1) }] });
   }
   function updateOption(i: number, patch: Partial<Option>) {
     const next = [...draft.options];

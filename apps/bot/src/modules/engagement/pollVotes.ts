@@ -23,6 +23,38 @@ function emojiKey(reaction: MessageReaction | PartialMessageReaction): string {
   return reaction.emoji.id ?? reaction.emoji.name ?? "";
 }
 
+// Discord has no real progress-bar rendering in an embed, and monospace
+// block characters (the old `████░░░░` approach) render as an illegible
+// grey code pill on most clients. A row of colored square emoji reads
+// cleanly everywhere and actually reflects the poll's chosen bar color,
+// snapped to the nearest of Discord's built-in color squares.
+const COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
+  { emoji: "🟥", rgb: [221, 46, 68] },
+  { emoji: "🟧", rgb: [240, 138, 55] },
+  { emoji: "🟨", rgb: [253, 203, 88] },
+  { emoji: "🟩", rgb: [120, 177, 89] },
+  { emoji: "🟦", rgb: [85, 172, 238] },
+  { emoji: "🟪", rgb: [170, 142, 214] },
+  { emoji: "🟫", rgb: [168, 120, 74] },
+];
+
+function nearestColorSquare(hex: string | null | undefined): string {
+  const match = (hex ?? "").match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return "🟦";
+  const n = parseInt(match[1], 16);
+  const target: [number, number, number] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  let best = COLOR_SQUARES[0];
+  let bestDist = Infinity;
+  for (const sq of COLOR_SQUARES) {
+    const dist = sq.rgb.reduce((s, c, i) => s + (c - target[i]) ** 2, 0);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = sq;
+    }
+  }
+  return best.emoji;
+}
+
 // Shared by both add/remove — redraws the embed from the current vote
 // tally. Private polls keep their bars hatched/locked right up until
 // pollCloser reveals the real numbers at close.
@@ -30,32 +62,38 @@ export async function renderPollEmbed(poll: Poll) {
   const votes = await prisma.pollVote.findMany({ where: { pollId: poll.id } });
   const counts = poll.emojis.map((e) => votes.filter((v) => v.emoji === e).length);
   const total = counts.reduce((a, b) => a + b, 0);
+  const filledSquare = nearestColorSquare(poll.barColor ?? poll.color);
+  const barLen = 10;
 
   const lines = poll.options.map((opt, i) => {
     const emoji = poll.emojis[i];
     if (poll.isPrivate && !poll.closed) {
-      return `${emoji} **${opt}** — 🔒 hidden until the poll closes`;
+      return `${emoji} **${opt}**\n${"⬜".repeat(barLen)} · 🔒 hidden`;
     }
     const pct = total ? Math.round((counts[i] / total) * 100) : 0;
-    const barLen = 14;
     const filled = total ? Math.round((pct / 100) * barLen) : 0;
-    const bar = "█".repeat(filled) + "░".repeat(barLen - filled);
-    return `${emoji} **${opt}** — ${counts[i]} vote${counts[i] === 1 ? "" : "s"} (${pct}%)\n\`${bar}\``;
+    const bar = filledSquare.repeat(filled) + "⬜".repeat(barLen - filled);
+    return `${emoji} **${opt}** — ${counts[i]} vote${counts[i] === 1 ? "" : "s"} (${pct}%)\n${bar}`;
   });
 
-  const footerParts: string[] = [];
-  if (poll.isPrivate && !poll.closed) footerParts.push("🔒 Results hidden — reaction counts on this message are still visible to anyone, as usual on Discord");
-  if (poll.closed) footerParts.push(`Closed${poll.closedAt ? ` <t:${Math.floor(poll.closedAt.getTime() / 1000)}:R>` : ""} — final results`);
-  else if (poll.durationMode === "TIMER" && poll.endsAt) footerParts.push(`Ends <t:${Math.floor(poll.endsAt.getTime() / 1000)}:R>`);
-  else footerParts.push("Open until a staff member stops it");
-  footerParts.push(`${total} vote${total === 1 ? "" : "s"} total`);
-  if (poll.allowWriteIn && !poll.closed) footerParts.push("Click ✍️ Write In below to submit your own answer");
+  // Timestamps (<t:...>) and bold text only render inside the description
+  // and fields — an embed FOOTER is plain text only, so the old "Ends
+  // <t:...:R>" line there just showed the raw markup, never a live
+  // countdown. This status line lives in the description instead.
+  let statusLine: string;
+  if (poll.isPrivate && !poll.closed) statusLine = "🔒 Results hidden — reaction counts on this message are still visible to anyone, as usual on Discord";
+  else if (poll.closed) statusLine = `Closed${poll.closedAt ? ` <t:${Math.floor(poll.closedAt.getTime() / 1000)}:R>` : ""} — final results`;
+  else if (poll.durationMode === "TIMER" && poll.endsAt) statusLine = `⏱️ Ends <t:${Math.floor(poll.endsAt.getTime() / 1000)}:R>`;
+  else statusLine = "🖐 Open until a staff member stops it";
+  if (poll.allowWriteIn && !poll.closed) statusLine += " · Click ✍️ Write In below to submit your own answer";
+
+  const footerText = `${total} vote${total === 1 ? "" : "s"} total`;
 
   return new EmbedBuilder()
     .setColor((poll.color as `#${string}`) || "#00E5FF")
     .setTitle(`🗳️ ${poll.question}`)
-    .setDescription(lines.join("\n\n"))
-    .setFooter({ text: footerParts.join(" · ") });
+    .setDescription([lines.join("\n\n"), statusLine].join("\n\n"))
+    .setFooter({ text: footerText });
 }
 
 async function findPoll(reaction: MessageReaction | PartialMessageReaction): Promise<Poll | null> {

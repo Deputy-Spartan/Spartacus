@@ -26,6 +26,59 @@ function defaultEmojiFor(position: number): string {
   return String.fromCodePoint(0x1f1e6 + ((position - 11) % 26)); // 11 -> 🇦, 12 -> 🇧, ...
 }
 
+// Mirrors the bot's own bar-rendering exactly (apps/bot/src/modules/engagement/pollVotes.ts)
+// so the preview shows the real discrete emoji blocks instead of a smooth
+// CSS bar that doesn't match what actually posts to Discord.
+const PREVIEW_COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
+  { emoji: "🟥", rgb: [221, 46, 68] },
+  { emoji: "🟧", rgb: [240, 138, 55] },
+  { emoji: "🟨", rgb: [253, 203, 88] },
+  { emoji: "🟩", rgb: [120, 177, 89] },
+  { emoji: "🟦", rgb: [85, 172, 238] },
+  { emoji: "🟪", rgb: [170, 142, 214] },
+  { emoji: "🟫", rgb: [168, 120, 74] },
+];
+const PREVIEW_COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
+  { emoji: "🔴", rgb: [221, 46, 68] },
+  { emoji: "🟠", rgb: [240, 138, 55] },
+  { emoji: "🟡", rgb: [253, 203, 88] },
+  { emoji: "🟢", rgb: [120, 177, 89] },
+  { emoji: "🔵", rgb: [85, 172, 238] },
+  { emoji: "🟣", rgb: [170, 142, 214] },
+  { emoji: "🟤", rgb: [168, 120, 74] },
+];
+
+function nearestColorEmoji(hex: string, palette: Array<{ emoji: string; rgb: [number, number, number] }>, fallback: string): string {
+  const match = hex.match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return fallback;
+  const n = parseInt(match[1], 16);
+  const target: [number, number, number] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  let best = palette[0];
+  let bestDist = Infinity;
+  for (const sq of palette) {
+    const dist = sq.rgb.reduce((s, c, i) => s + (c - target[i]) ** 2, 0);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = sq;
+    }
+  }
+  return best.emoji;
+}
+
+function barChars(barStyle: PollBarStyle, barColor: string): [string, string] {
+  switch (barStyle) {
+    case "BLOCK":
+      return ["⬛", "⬜"];
+    case "CIRCLE":
+      return [nearestColorEmoji(barColor, PREVIEW_COLOR_CIRCLES, "🔵"), "⚪"];
+    case "CLASSIC":
+      return ["▰", "▱"];
+    case "SQUARE":
+    default:
+      return [nearestColorEmoji(barColor, PREVIEW_COLOR_SQUARES, "🟦"), "⬜"];
+  }
+}
+
 // Presets plus a raw <input type=color> for any custom RGB value — shared
 // by the Embed Color and Result Bar Color fields.
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
@@ -658,6 +711,8 @@ function PollPreview({ draft }: { draft: Draft }) {
   const filled = draft.options.filter((o) => o.label.trim());
   const demoVotes = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
   const total = demoVotes.reduce((a, b) => a + b, 0) || 1;
+  const barLen = 10;
+  const [filledChar, emptyChar] = barChars(draft.barStyle, draft.barColor);
 
   const footer = draft.durationMode === "TIMER" ? `⏱ Ends in ${draft.hours || 0}h ${draft.minutes || 0}m` : "🖐 Open until a staff member stops it";
 
@@ -689,22 +744,17 @@ function PollPreview({ draft }: { draft: Draft }) {
                 );
               }
               const pct = draft.isPrivate ? null : Math.round((demoVotes[i] / total) * 100);
+              const filledCount = draft.isPrivate ? 0 : Math.round(((pct ?? 0) / 100) * barLen);
+              const bar = draft.isPrivate ? emptyChar.repeat(barLen) : filledChar.repeat(filledCount) + emptyChar.repeat(barLen - filledCount);
               return (
                 <div key={i} className="mb-2 text-xs">
                   <div className="flex items-center justify-between mb-1 text-[#dbdee1]">
                     <span>
                       {o.emoji} {o.label}
                     </span>
-                    <span className="text-[#949ba4]">{draft.isPrivate ? "🔒" : `${pct}%`}</span>
+                    <span className="text-[#949ba4]">{draft.isPrivate ? "🔒 hidden" : `${pct}%`}</span>
                   </div>
-                  <div className="h-2.5 rounded bg-[#1e1f22] overflow-hidden">
-                    {!draft.isPrivate && (
-                      <div
-                        className="h-full"
-                        style={{ width: `${pct}%`, background: draft.barStyle === "BLOCK" ? "#e3e5e8" : draft.barStyle === "CLASSIC" ? "#8b94a7" : draft.barColor }}
-                      />
-                    )}
-                  </div>
+                  <div className="leading-none text-[13px] tracking-[1px]">{bar}</div>
                 </div>
               );
             })}

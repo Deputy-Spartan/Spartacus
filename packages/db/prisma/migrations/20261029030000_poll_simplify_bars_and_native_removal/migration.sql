@@ -17,6 +17,8 @@ DROP TYPE "PollType";
 
 -- One vote row per (poll, user, emoji) instead of one per (poll, user), so a
 -- member can hold more than one reaction's vote when allowMultiselect is on.
-ALTER TABLE "PollVote" DROP CONSTRAINT "PollVote_pollId_userId_key";
+-- This was originally created as a unique INDEX (not a table constraint),
+-- so it has to be dropped with DROP INDEX, not ALTER TABLE ... DROP CONSTRAINT.
+DROP INDEX "PollVote_pollId_userId_key";
 ALTER TABLE "PollVote" ADD CONSTRAINT "PollVote_pollId_userId_emoji_key" UNIQUE ("pollId", "userId", "emoji");
 CREATE INDEX "PollVote_pollId_userId_idx" ON "PollVote"("pollId", "userId");

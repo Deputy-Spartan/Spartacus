@@ -731,8 +731,13 @@ function PollPreview({ draft }: { draft: Draft }) {
   const filled = draft.options.filter((o) => o.label.trim());
   const demoVotes = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
   const total = demoVotes.reduce((a, b) => a + b, 0) || 1;
-  const barLen = draft.barStyle === "SOLID" || draft.barStyle === "CLASSIC" ? 20 : 10;
+  // The real bot message uses more segments for Classic/Solid (narrower
+  // characters read better with finer resolution there), but this preview
+  // card is a fixed, much narrower width — keep it at 10 everywhere so it
+  // never overflows the card.
+  const barLen = 10;
   const [filledChar, emptyChar] = barChars(draft.barStyle, draft.barColor, draft.barColorSecondary);
+  const isPlainBarStyle = draft.barStyle === "CLASSIC" || draft.barStyle === "SOLID";
 
   const footer = draft.durationMode === "TIMER" ? `⏱ Ends in ${draft.hours || 0}h ${draft.minutes || 0}m` : "🖐 Open until a staff member stops it";
 
@@ -765,7 +770,8 @@ function PollPreview({ draft }: { draft: Draft }) {
               }
               const pct = draft.isPrivate ? null : Math.round((demoVotes[i] / total) * 100);
               const filledCount = draft.isPrivate ? 0 : Math.round(((pct ?? 0) / 100) * barLen);
-              const bar = draft.isPrivate ? emptyChar.repeat(barLen) : filledChar.repeat(filledCount) + emptyChar.repeat(barLen - filledCount);
+              const filledPart = draft.isPrivate ? "" : filledChar.repeat(filledCount);
+              const emptyPart = emptyChar.repeat(barLen - filledPart.length);
               return (
                 <div key={i} className="mb-2 text-xs">
                   <div className="flex items-center justify-between mb-1 text-[#dbdee1]">
@@ -774,7 +780,13 @@ function PollPreview({ draft }: { draft: Draft }) {
                     </span>
                     <span className="text-[#949ba4]">{draft.isPrivate ? "🔒 hidden" : `${pct}%`}</span>
                   </div>
-                  <div className="leading-none text-[13px] tracking-[1px]">{bar}</div>
+                  <div className="leading-none text-[13px] tracking-[2px] whitespace-nowrap overflow-hidden">
+                    {/* Square/Circle carry their own color in the emoji itself; Classic/Solid are plain
+                        characters, so color them directly here to actually show Primary/Secondary —
+                        preview-only, since Discord can't color plain text on the real message. */}
+                    <span style={isPlainBarStyle ? { color: draft.barColor } : undefined}>{filledPart}</span>
+                    <span style={isPlainBarStyle ? { color: draft.barColorSecondary } : undefined}>{emptyPart}</span>
+                  </div>
                 </div>
               );
             })}

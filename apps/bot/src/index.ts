@@ -140,7 +140,7 @@ export { publishAnnouncement } from "./jobs/announcementPoster";
 // Re-exported so apps/api's "Stop Now" button can render the exact same
 // final-results embed the bot's own pollCloser job builds, instead of
 // duplicating that logic or waiting for the next minute's cron tick.
-export { renderPollEmbed } from "./modules/engagement/pollVotes";
+export { renderPollEmbed, announcePollClosed } from "./modules/engagement/pollVotes";
 
 export function startBot() {
   const client = new Client({

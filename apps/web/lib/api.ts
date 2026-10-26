@@ -989,6 +989,8 @@ export interface GiveawayInput {
 }
 
 export type PollDurationMode = "TIMER" | "MANUAL";
+export type PollResultsStyle = "BARS" | "SIMPLE";
+export type PollBarStyle = "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC";
 
 export interface PollRow {
   id: string;
@@ -999,6 +1001,8 @@ export interface PollRow {
   emojis: string[];
   color: string | null;
   barColor: string | null;
+  resultsStyle: PollResultsStyle;
+  barStyle: PollBarStyle;
   isPrivate: boolean;
   durationMode: PollDurationMode;
   endsAt: string | null;
@@ -1017,6 +1021,8 @@ export interface PollInput {
   emojis: string[];
   color?: string;
   barColor?: string;
+  resultsStyle?: PollResultsStyle;
+  barStyle?: PollBarStyle;
   isPrivate?: boolean;
   durationMode: PollDurationMode;
   hours?: number;

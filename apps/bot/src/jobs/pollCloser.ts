@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isSendableChannel } from "../lib/channels";
-import { renderPollEmbed } from "../modules/engagement/pollVotes";
+import { renderPollEmbed, announcePollClosed } from "../modules/engagement/pollVotes";
 
 // Every minute, closes any TIMER poll whose endsAt has passed — manual-stop
 // polls are closed directly from the dashboard/API instead, never by this
@@ -27,6 +27,7 @@ export function startPollCloserJob(client: Client) {
 
       const embed = await renderPollEmbed(closed);
       await message.edit({ embeds: [embed] }).catch(() => null);
+      await announcePollClosed(message);
     }
   });
 }

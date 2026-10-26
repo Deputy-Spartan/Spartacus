@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonInteraction,
   Events,
+  Message,
   MessageReaction,
   ModalBuilder,
   ModalSubmitInteraction,
@@ -25,9 +26,8 @@ function emojiKey(reaction: MessageReaction | PartialMessageReaction): string {
 
 // Discord has no real progress-bar rendering in an embed, and monospace
 // block characters (the old `████░░░░` approach) render as an illegible
-// grey code pill on most clients. A row of colored square emoji reads
-// cleanly everywhere and actually reflects the poll's chosen bar color,
-// snapped to the nearest of Discord's built-in color squares.
+// grey code pill on most clients. These are the "filled" emoji choices for
+// each colored barStyle, matched to the poll's own bar color.
 const COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🟥", rgb: [221, 46, 68] },
   { emoji: "🟧", rgb: [240, 138, 55] },
@@ -37,15 +37,24 @@ const COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
   { emoji: "🟪", rgb: [170, 142, 214] },
   { emoji: "🟫", rgb: [168, 120, 74] },
 ];
+const COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
+  { emoji: "🔴", rgb: [221, 46, 68] },
+  { emoji: "🟠", rgb: [240, 138, 55] },
+  { emoji: "🟡", rgb: [253, 203, 88] },
+  { emoji: "🟢", rgb: [120, 177, 89] },
+  { emoji: "🔵", rgb: [85, 172, 238] },
+  { emoji: "🟣", rgb: [170, 142, 214] },
+  { emoji: "🟤", rgb: [168, 120, 74] },
+];
 
-function nearestColorSquare(hex: string | null | undefined): string {
+function nearestColorEmoji(hex: string | null | undefined, palette: Array<{ emoji: string; rgb: [number, number, number] }>, fallback: string): string {
   const match = (hex ?? "").match(/^#?([0-9a-f]{6})$/i);
-  if (!match) return "🟦";
+  if (!match) return fallback;
   const n = parseInt(match[1], 16);
   const target: [number, number, number] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  let best = COLOR_SQUARES[0];
+  let best = palette[0];
   let bestDist = Infinity;
-  for (const sq of COLOR_SQUARES) {
+  for (const sq of palette) {
     const dist = sq.rgb.reduce((s, c, i) => s + (c - target[i]) ** 2, 0);
     if (dist < bestDist) {
       bestDist = dist;
@@ -55,6 +64,22 @@ function nearestColorSquare(hex: string | null | undefined): string {
   return best.emoji;
 }
 
+// Returns the [filled, empty] emoji/char pair for a bar style — SQUARE and
+// CIRCLE match the poll's own barColor, BLOCK and CLASSIC are fixed/neutral.
+function barChars(poll: Poll): [string, string] {
+  switch (poll.barStyle) {
+    case "BLOCK":
+      return ["⬛", "⬜"];
+    case "CIRCLE":
+      return [nearestColorEmoji(poll.barColor ?? poll.color, COLOR_CIRCLES, "🔵"), "⚪"];
+    case "CLASSIC":
+      return ["▰", "▱"];
+    case "SQUARE":
+    default:
+      return [nearestColorEmoji(poll.barColor ?? poll.color, COLOR_SQUARES, "🟦"), "⬜"];
+  }
+}
+
 // Shared by both add/remove — redraws the embed from the current vote
 // tally. Private polls keep their bars hatched/locked right up until
 // pollCloser reveals the real numbers at close.
@@ -62,17 +87,25 @@ export async function renderPollEmbed(poll: Poll) {
   const votes = await prisma.pollVote.findMany({ where: { pollId: poll.id } });
   const counts = poll.emojis.map((e) => votes.filter((v) => v.emoji === e).length);
   const total = counts.reduce((a, b) => a + b, 0);
-  const filledSquare = nearestColorSquare(poll.barColor ?? poll.color);
+  const [filledChar, emptyChar] = barChars(poll);
   const barLen = 10;
 
   const lines = poll.options.map((opt, i) => {
     const emoji = poll.emojis[i];
+
+    // SIMPLE just lists the options — no bar, no inline count — the way
+    // Dyno's default poll looks; votes are only visible via the reactions
+    // themselves underneath the message.
+    if (poll.resultsStyle === "SIMPLE") {
+      return `${emoji} **${opt}**`;
+    }
+
     if (poll.isPrivate && !poll.closed) {
-      return `${emoji} **${opt}**\n${"⬜".repeat(barLen)} · 🔒 hidden`;
+      return `${emoji} **${opt}**\n${emptyChar.repeat(barLen)} · 🔒 hidden`;
     }
     const pct = total ? Math.round((counts[i] / total) * 100) : 0;
     const filled = total ? Math.round((pct / 100) * barLen) : 0;
-    const bar = filledSquare.repeat(filled) + "⬜".repeat(barLen - filled);
+    const bar = filledChar.repeat(filled) + emptyChar.repeat(barLen - filled);
     return `${emoji} **${opt}** — ${counts[i]} vote${counts[i] === 1 ? "" : "s"} (${pct}%)\n${bar}`;
   });
 
@@ -99,6 +132,16 @@ export async function renderPollEmbed(poll: Poll) {
 async function findPoll(reaction: MessageReaction | PartialMessageReaction): Promise<Poll | null> {
   if (!reaction.message.id) return null;
   return prisma.poll.findFirst({ where: { messageId: reaction.message.id } });
+}
+
+// Posted as a reply right under the poll the moment it closes (timer or
+// manual) — the embed above already shows the final results, this just
+// makes the "voting's over" moment visible in the channel itself instead
+// of only showing up if someone happens to re-read the embed's footer.
+export async function announcePollClosed(message: Message) {
+  await message
+    .reply("🔒 **This poll has ended — voting is now closed.** No more votes or option changes will be counted; see the final results above.")
+    .catch(() => null);
 }
 
 // One vote per member: reacting with a different emoji on the same poll

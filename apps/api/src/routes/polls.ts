@@ -20,19 +20,22 @@ router.get("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async 
 // posts it within a few seconds — this just schedules it, same pattern as
 // giveaways/reaction role panels.
 router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, question, options, emojis, color, barColor, isPrivate, durationMode, hours, minutes, allowWriteIn } = req.body as {
-    channelId: string;
-    question: string;
-    options: string[];
-    emojis: string[];
-    color?: string;
-    barColor?: string;
-    isPrivate?: boolean;
-    durationMode: "TIMER" | "MANUAL";
-    hours?: number;
-    minutes?: number;
-    allowWriteIn?: boolean;
-  };
+  const { channelId, question, options, emojis, color, barColor, resultsStyle, barStyle, isPrivate, durationMode, hours, minutes, allowWriteIn } =
+    req.body as {
+      channelId: string;
+      question: string;
+      options: string[];
+      emojis: string[];
+      color?: string;
+      barColor?: string;
+      resultsStyle?: "BARS" | "SIMPLE";
+      barStyle?: "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC";
+      isPrivate?: boolean;
+      durationMode: "TIMER" | "MANUAL";
+      hours?: number;
+      minutes?: number;
+      allowWriteIn?: boolean;
+    };
 
   if (!channelId || !question?.trim() || !Array.isArray(options) || options.length < 2 || options.length !== emojis?.length) {
     return res.status(400).json({ error: "A channel, a question, and at least 2 options each with their own emoji are required." });
@@ -57,6 +60,8 @@ router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async
       emojis,
       color: color || "#00E5FF",
       barColor: barColor || "#00E5FF",
+      resultsStyle: resultsStyle || "BARS",
+      barStyle: barStyle || "SQUARE",
       isPrivate: !!isPrivate,
       durationMode,
       endsAt,
@@ -83,9 +88,10 @@ router.post("/guilds/:guildId/polls/:id/stop", requireAuth, requireGuildPermissi
     const channel = await client.channels.fetch(row.channelId).catch(() => null);
     const message = channel && "messages" in channel ? await channel.messages.fetch(row.messageId).catch(() => null) : null;
     if (message) {
-      const { renderPollEmbed } = await import("@spartacus/bot");
+      const { renderPollEmbed, announcePollClosed } = await import("@spartacus/bot");
       const embed = await renderPollEmbed(row);
       await message.edit({ embeds: [embed] }).catch(() => null);
+      await announcePollClosed(message);
     }
   }
 

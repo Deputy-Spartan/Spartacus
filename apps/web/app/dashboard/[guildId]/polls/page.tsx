@@ -9,7 +9,7 @@ import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import { useMemberNames } from "../../../../lib/useMemberNames";
-import { api, type PollRow, type PollInput, type PollDurationMode } from "../../../../lib/api";
+import { api, type PollRow, type PollInput, type PollDurationMode, type PollResultsStyle, type PollBarStyle } from "../../../../lib/api";
 
 type Tab = "active" | "past" | "create";
 
@@ -65,6 +65,8 @@ interface Draft {
   options: Option[];
   color: string;
   barColor: string;
+  resultsStyle: PollResultsStyle;
+  barStyle: PollBarStyle;
   isPrivate: boolean;
   allowWriteIn: boolean;
   durationMode: PollDurationMode;
@@ -81,12 +83,21 @@ const EMPTY_DRAFT: Draft = {
   ],
   color: "#00E5FF",
   barColor: "#00E5FF",
+  resultsStyle: "BARS",
+  barStyle: "SQUARE",
   isPrivate: false,
   allowWriteIn: false,
   durationMode: "MANUAL",
   hours: "24",
   minutes: "0",
 };
+
+const BAR_STYLE_OPTIONS: Array<{ value: PollBarStyle; label: string; sample: string }> = [
+  { value: "SQUARE", label: "Colored squares", sample: "🟦🟦🟦⬜⬜" },
+  { value: "CIRCLE", label: "Colored circles", sample: "🔵🔵🔵⚪⚪" },
+  { value: "BLOCK", label: "Black & white", sample: "⬛⬛⬛⬜⬜" },
+  { value: "CLASSIC", label: "Classic bar", sample: "▰▰▰▱▱" },
+];
 
 export default function PollsPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
@@ -403,6 +414,8 @@ function CreateWizard({
         emojis: filled.map((o) => o.emoji),
         color: draft.color,
         barColor: draft.barColor,
+        resultsStyle: draft.resultsStyle,
+        barStyle: draft.barStyle,
         isPrivate: draft.isPrivate,
         allowWriteIn: draft.allowWriteIn,
         durationMode: draft.durationMode,
@@ -507,19 +520,59 @@ function CreateWizard({
 
           {step === 3 && (
             <>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Results Display</label>
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => onChange({ resultsStyle: "BARS" })}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border ${
+                    draft.resultsStyle === "BARS" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
+                  }`}
+                >
+                  📊 Bars + counts
+                </button>
+                <button
+                  onClick={() => onChange({ resultsStyle: "SIMPLE" })}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border ${
+                    draft.resultsStyle === "SIMPLE" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
+                  }`}
+                >
+                  📋 Counts only (reactions only, no bars)
+                </button>
+              </div>
+
+              {draft.resultsStyle === "BARS" && (
+                <>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Bar Style</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                    {BAR_STYLE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => onChange({ barStyle: opt.value })}
+                        className={`px-2 py-2 rounded-lg text-xs border text-center ${
+                          draft.barStyle === opt.value ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
+                        }`}
+                      >
+                        <div className="mb-1">{opt.sample}</div>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Embed Color</label>
                   <p className="text-[11px] text-slate-600 mb-2">The left border accent on the real Discord message.</p>
                   <ColorPicker value={draft.color} onChange={(c) => onChange({ color: c })} />
                 </div>
-                <div>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Result Bar Color</label>
-                  <p className="text-[11px] text-slate-600 mb-2">
-                    Only the dashboard's own bars — Discord embeds can't color plain text, so the live message's bars are fixed block characters.
-                  </p>
-                  <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
-                </div>
+                {draft.resultsStyle === "BARS" && (draft.barStyle === "SQUARE" || draft.barStyle === "CIRCLE") && (
+                  <div>
+                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Result Bar Color</label>
+                    <p className="text-[11px] text-slate-600 mb-2">Snapped to the nearest matching {draft.barStyle === "SQUARE" ? "square" : "circle"} — shown on the real Discord message too.</p>
+                    <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between mb-4 bg-base-950 border border-white/10 rounded-lg px-3 py-2.5">
@@ -549,6 +602,10 @@ function CreateWizard({
                   🖐 Manual stop only
                 </button>
               </div>
+              <p className="text-[11px] text-slate-600 mb-3">
+                Either way, when it ends the bot posts a reply announcing the poll is closed and locks it — reactions after that point are removed and don't
+                count.
+              </p>
               {draft.durationMode === "TIMER" && (
                 <div className="flex gap-3 mb-2">
                   <div className="flex-1">
@@ -624,6 +681,13 @@ function PollPreview({ draft }: { draft: Draft }) {
             <p className="text-[#f2f3f5] font-semibold text-sm mb-2.5">🗳️ {draft.question || "Your question here"}</p>
             {filled.length === 0 && <p className="text-[#949ba4] text-xs italic">Add some options to see them here.</p>}
             {filled.map((o, i) => {
+              if (draft.resultsStyle === "SIMPLE") {
+                return (
+                  <p key={i} className="text-xs text-[#dbdee1] mb-1.5">
+                    {o.emoji} {o.label}
+                  </p>
+                );
+              }
               const pct = draft.isPrivate ? null : Math.round((demoVotes[i] / total) * 100);
               return (
                 <div key={i} className="mb-2 text-xs">
@@ -634,7 +698,12 @@ function PollPreview({ draft }: { draft: Draft }) {
                     <span className="text-[#949ba4]">{draft.isPrivate ? "🔒" : `${pct}%`}</span>
                   </div>
                   <div className="h-2.5 rounded bg-[#1e1f22] overflow-hidden">
-                    {!draft.isPrivate && <div className="h-full" style={{ width: `${pct}%`, background: draft.barColor }} />}
+                    {!draft.isPrivate && (
+                      <div
+                        className="h-full"
+                        style={{ width: `${pct}%`, background: draft.barStyle === "BLOCK" ? "#e3e5e8" : draft.barStyle === "CLASSIC" ? "#8b94a7" : draft.barColor }}
+                      />
+                    )}
                   </div>
                 </div>
               );

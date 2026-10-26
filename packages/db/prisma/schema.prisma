@@ -891,6 +891,18 @@ enum PollDurationMode {
   MANUAL
 }
 
+enum PollResultsStyle {
+  BARS // a bar per option, built from barStyle's emoji, plus the vote count/percentage
+  SIMPLE // just the emoji + label, no bar and no inline count — votes only visible via the reactions themselves, Dyno-style
+}
+
+enum PollBarStyle {
+  SQUARE // colored squares (🟥🟦...), snapped to the nearest match of barColor
+  BLOCK // plain ⬛/⬜, no color
+  CIRCLE // colored circles (🔴🔵...), same color-matching as SQUARE
+  CLASSIC // ▰/▱, a plain non-colored progress-bar look
+}
+
 model Poll {
   id           String           @id @default(cuid())
   guild        Guild            @relation(fields: [guildId], references: [id])
@@ -901,7 +913,9 @@ model Poll {
   options      String[] // display labels, indexed by position
   emojis       String[] // reaction emoji per option, same index as options — what members actually click to vote
   color        String?          @default("#00E5FF") // the embed's left border accent
-  barColor     String?          @default("#00E5FF") // the dashboard's own result-bar fill — Discord embeds can't color plain text, so this only affects the dashboard views, not the live Discord message
+  barColor     String?          @default("#00E5FF") // the result bar's fill color (SQUARE/CIRCLE bar styles only) — reflected on both the dashboard and the live embed, snapped to the nearest matching colored emoji
+  resultsStyle PollResultsStyle @default(BARS)
+  barStyle     PollBarStyle     @default(SQUARE)
   isPrivate    Boolean          @default(false) // hides the tally/percentages in the embed itself until the poll closes
   durationMode PollDurationMode @default(MANUAL)
   endsAt       DateTime? // set only when durationMode = TIMER

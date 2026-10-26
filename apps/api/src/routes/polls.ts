@@ -20,12 +20,13 @@ router.get("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async 
 // posts it within a few seconds — this just schedules it, same pattern as
 // giveaways/reaction role panels.
 router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, question, options, emojis, color, isPrivate, durationMode, hours, minutes, allowWriteIn } = req.body as {
+  const { channelId, question, options, emojis, color, barColor, isPrivate, durationMode, hours, minutes, allowWriteIn } = req.body as {
     channelId: string;
     question: string;
     options: string[];
     emojis: string[];
     color?: string;
+    barColor?: string;
     isPrivate?: boolean;
     durationMode: "TIMER" | "MANUAL";
     hours?: number;
@@ -55,6 +56,7 @@ router.post("/guilds/:guildId/polls", requireAuth, requireGuildPermission, async
       options,
       emojis,
       color: color || "#00E5FF",
+      barColor: barColor || "#00E5FF",
       isPrivate: !!isPrivate,
       durationMode,
       endsAt,

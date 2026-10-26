@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import { Client } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
@@ -23,7 +23,10 @@ export function startPollPosterJob(client: Client) {
       if (!isSendableChannel(channel)) continue;
 
       const embed = await renderPollEmbed(poll);
-      const message = await channel.send({ embeds: [embed] }).catch((err) => {
+      const components = poll.allowWriteIn
+        ? [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`poll:writein:${poll.id}`).setLabel("✍️ Write In").setStyle(ButtonStyle.Secondary))]
+        : [];
+      const message = await channel.send({ embeds: [embed], components }).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, poll.guildId); loggedThisTick++; }
         return null;
       });
@@ -31,9 +34,6 @@ export function startPollPosterJob(client: Client) {
 
       for (const emoji of poll.emojis) {
         await message.react(emoji).catch(() => null);
-      }
-      if (poll.allowWriteIn) {
-        await message.react("✍️").catch(() => null);
       }
 
       await prisma.poll.update({ where: { id: poll.id }, data: { messageId: message.id } });

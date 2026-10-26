@@ -1,4 +1,17 @@
-import { Events, MessageReaction, PartialMessageReaction, User, PartialUser, EmbedBuilder } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonInteraction,
+  Events,
+  MessageReaction,
+  ModalBuilder,
+  ModalSubmitInteraction,
+  PartialMessageReaction,
+  TextInputBuilder,
+  TextInputStyle,
+  User,
+  PartialUser,
+  EmbedBuilder,
+} from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import type { Poll } from "@spartacus/db";
@@ -36,7 +49,7 @@ export async function renderPollEmbed(poll: Poll) {
   else if (poll.durationMode === "TIMER" && poll.endsAt) footerParts.push(`Ends <t:${Math.floor(poll.endsAt.getTime() / 1000)}:R>`);
   else footerParts.push("Open until a staff member stops it");
   footerParts.push(`${total} vote${total === 1 ? "" : "s"} total`);
-  if (poll.allowWriteIn && !poll.closed) footerParts.push("React ✍️ to submit your own answer via DM");
+  if (poll.allowWriteIn && !poll.closed) footerParts.push("Click ✍️ Write In below to submit your own answer");
 
   return new EmbedBuilder()
     .setColor((poll.color as `#${string}`) || "#00E5FF")
@@ -60,22 +73,6 @@ export async function onReactionAdd(reaction: MessageReaction | PartialMessageRe
   const poll = await findPoll(reaction);
   if (!poll) return;
   const key = emojiKey(reaction);
-
-  if (poll.allowWriteIn && key === "✍️") {
-    await reaction.users.remove(user.id).catch(() => null); // not a real vote — just the prompt to open a DM
-    if (poll.closed) return;
-    await prisma.pollWriteInPending.upsert({
-      where: { userId: user.id },
-      create: { userId: user.id, pollId: poll.id },
-      update: { pollId: poll.id, createdAt: new Date() },
-    });
-    const discordUser = await reaction.client.users.fetch(user.id).catch(() => null);
-    await discordUser
-      ?.send(`✍️ What's your answer for **${poll.question}**? Just reply here with your answer.`)
-      .catch(() => null);
-    return;
-  }
-
   if (!poll.emojis.includes(key)) return;
 
   if (poll.closed) {
@@ -115,4 +112,38 @@ export async function onReactionRemove(reaction: MessageReaction | PartialMessag
 
   const embed = await renderPollEmbed(poll);
   await reaction.message.edit({ embeds: [embed] }).catch(() => null);
+}
+
+// "✍️ Write In" button on the poll message — opens a modal right in the
+// channel instead of DMing the member, so it can never collide with
+// Support DM/Modmail/Applications (every DM-driven module listens on
+// every DM; a modal only opens from this one specific interaction).
+export async function handleWriteInButton(interaction: ButtonInteraction, pollId: string) {
+  const poll = await prisma.poll.findUnique({ where: { id: pollId } });
+  if (!poll || poll.closed) {
+    await interaction.reply({ content: "This poll isn't accepting answers anymore.", ephemeral: true });
+    return;
+  }
+
+  const modal = new ModalBuilder()
+    .setCustomId(`pollwritein:${pollId}`)
+    .setTitle(poll.question.slice(0, 45))
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder().setCustomId("answer").setLabel("Your answer").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(1000)
+      )
+    );
+  await interaction.showModal(modal);
+}
+
+export async function handleWriteInModalSubmit(interaction: ModalSubmitInteraction, pollId: string) {
+  const poll = await prisma.poll.findUnique({ where: { id: pollId } });
+  if (!poll || poll.closed) {
+    await interaction.reply({ content: "This poll isn't accepting answers anymore.", ephemeral: true });
+    return;
+  }
+
+  const text = interaction.fields.getTextInputValue("answer").trim();
+  await prisma.pollWriteIn.create({ data: { pollId, userId: interaction.user.id, text: text.slice(0, 1000) } });
+  await interaction.reply({ content: `✅ Got it — your answer for **${poll.question}** has been recorded.`, ephemeral: true });
 }

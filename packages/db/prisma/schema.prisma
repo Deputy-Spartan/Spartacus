@@ -900,13 +900,14 @@ model Poll {
   question     String
   options      String[] // display labels, indexed by position
   emojis       String[] // reaction emoji per option, same index as options — what members actually click to vote
-  color        String?          @default("#00E5FF")
+  color        String?          @default("#00E5FF") // the embed's left border accent
+  barColor     String?          @default("#00E5FF") // the dashboard's own result-bar fill — Discord embeds can't color plain text, so this only affects the dashboard views, not the live Discord message
   isPrivate    Boolean          @default(false) // hides the tally/percentages in the embed itself until the poll closes
   durationMode PollDurationMode @default(MANUAL)
   endsAt       DateTime? // set only when durationMode = TIMER
   closed       Boolean          @default(false)
   closedAt     DateTime?
-  allowWriteIn Boolean          @default(false) // adds a ✍️ reaction that DMs the clicker to collect a free-text answer instead of one of the fixed options
+  allowWriteIn Boolean          @default(false) // adds a "✍️ Write In" button that opens a modal to collect a free-text answer instead of one of the fixed options
   createdAt    DateTime         @default(now())
   votes        PollVote[]
   writeIns     PollWriteIn[]
@@ -925,9 +926,12 @@ model PollVote {
   @@unique([pollId, userId])
 }
 
-// A member's own typed answer, collected over DM after they click the poll's
-// ✍️ write-in reaction — kept separate from PollVote since it's free text,
-// not one of the fixed options, and shown as its own list on the dashboard.
+// A member's own typed answer, collected through the poll's "✍️ Write In"
+// button and modal (not a DM — a modal only opens from a real interaction,
+// and a DM collector was colliding with other DM-driven modules like
+// Support DM/Modmail/Applications, which all listen on every DM). Kept
+// separate from PollVote since it's free text, not one of the fixed
+// options, and shown as its own list on the dashboard.
 model PollWriteIn {
   id        String   @id @default(cuid())
   poll      Poll     @relation(fields: [pollId], references: [id])
@@ -937,16 +941,6 @@ model PollWriteIn {
   createdAt DateTime @default(now())
 
   @@index([pollId])
-}
-
-// One row per member currently mid-DM answering a write-in prompt — created
-// when they click ✍️, consumed (and deleted) by their next DM. A member can
-// only have one pending write-in at a time across every poll.
-model PollWriteInPending {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  pollId    String
-  createdAt DateTime @default(now())
 }
 
 // ---- Suggestions ----

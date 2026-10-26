@@ -998,6 +998,7 @@ export interface PollRow {
   options: string[];
   emojis: string[];
   color: string | null;
+  barColor: string | null;
   isPrivate: boolean;
   durationMode: PollDurationMode;
   endsAt: string | null;
@@ -1015,6 +1016,7 @@ export interface PollInput {
   options: string[];
   emojis: string[];
   color?: string;
+  barColor?: string;
   isPrivate?: boolean;
   durationMode: PollDurationMode;
   hours?: number;

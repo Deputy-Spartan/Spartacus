@@ -215,6 +215,18 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isModalSubmit() && interaction.customId.startsWith("pollwritein:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "POLLS");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Polls is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const pollId = interaction.customId.split(":")[1];
+    const { handleWriteInModalSubmit } = await import("../modules/engagement/pollVotes");
+    await handleWriteInModalSubmit(interaction, pollId);
+    return;
+  }
+
   if (interaction.isModalSubmit() && interaction.customId === "birthdaysetmodal") {
     const enabled = await isModuleEnabled(interaction.guildId, "BIRTHDAYS");
     if (!enabled) {
@@ -317,6 +329,18 @@ export async function execute(interaction: Interaction) {
     var ticketPanelParts = interaction.customId.split(":");
     const { handleOpenTicket } = await import("../modules/tickets/tickets");
     await handleOpenTicket(interaction, ticketPanelParts[1], ticketPanelParts[2]);
+    return;
+  }
+
+  if (interaction.customId.startsWith("poll:writein:")) {
+    const enabled = await isModuleEnabled(interaction.guildId, "POLLS");
+    if (!enabled) {
+      await interaction.reply({ content: "⚠️ Polls is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const pollId = interaction.customId.split(":")[2];
+    const { handleWriteInButton } = await import("../modules/engagement/pollVotes");
+    await handleWriteInButton(interaction, pollId);
     return;
   }
 

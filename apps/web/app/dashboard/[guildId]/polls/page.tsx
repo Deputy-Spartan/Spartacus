@@ -26,6 +26,34 @@ function defaultEmojiFor(position: number): string {
   return String.fromCodePoint(0x1f1e6 + ((position - 11) % 26)); // 11 -> 🇦, 12 -> 🇧, ...
 }
 
+// Presets plus a raw <input type=color> for any custom RGB value — shared
+// by the Embed Color and Result Bar Color fields.
+function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {COLOR_PRESETS.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          className={`w-6 h-6 rounded-full border-2 ${value.toLowerCase() === c.toLowerCase() ? "border-white" : "border-transparent"}`}
+          style={{ background: c }}
+          title={c}
+        />
+      ))}
+      <label className="relative w-6 h-6 rounded-full border-2 border-dashed border-white/20 cursor-pointer overflow-hidden shrink-0" title="Custom color">
+        <input
+          type="color"
+          value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#00e5ff"}
+          onChange={(e) => onChange(e.target.value)}
+          className="absolute -top-1 -left-1 w-8 h-8 cursor-pointer"
+        />
+      </label>
+      <span className="text-xs font-mono text-slate-500">{value}</span>
+    </div>
+  );
+}
+
 interface Option {
   label: string;
   emoji: string;
@@ -36,6 +64,7 @@ interface Draft {
   channelId: string | null;
   options: Option[];
   color: string;
+  barColor: string;
   isPrivate: boolean;
   allowWriteIn: boolean;
   durationMode: PollDurationMode;
@@ -51,6 +80,7 @@ const EMPTY_DRAFT: Draft = {
     { label: "", emoji: defaultEmojiFor(2) },
   ],
   color: "#00E5FF",
+  barColor: "#00E5FF",
   isPrivate: false,
   allowWriteIn: false,
   durationMode: "MANUAL",
@@ -213,7 +243,7 @@ function PollsList({ guildId, refreshKey, onGoCreate }: { guildId: string; refre
                           <span className="text-xs text-slate-500">{hidden ? "🔒 hidden" : `${counts[i]} (${pct}%)`}</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-base-800 overflow-hidden">
-                          {!hidden && <div className="h-full bg-neon-gradient" style={{ width: `${pct}%` }} />}
+                          {!hidden && <div className="h-full" style={{ width: `${pct}%`, background: p.barColor || "#00E5FF" }} />}
                         </div>
                       </div>
                     );
@@ -312,6 +342,7 @@ function CreateWizard({
         options: filled.map((o) => o.label.trim()),
         emojis: filled.map((o) => o.emoji),
         color: draft.color,
+        barColor: draft.barColor,
         isPrivate: draft.isPrivate,
         allowWriteIn: draft.allowWriteIn,
         durationMode: draft.durationMode,
@@ -395,7 +426,8 @@ function CreateWizard({
                   <div>
                     <p className="text-sm font-medium">Allow write-in answers</p>
                     <p className="text-xs text-slate-500">
-                      Adds a ✍️ reaction — clicking it DMs the member to collect their own typed answer if none of the options fit.
+                      Adds a "✍️ Write In" button — clicking it opens a pop-up form right there in the channel to collect a typed answer, if none of the
+                      options fit. Answers show up back here on the Active &amp; Past Polls tab.
                     </p>
                   </div>
                   <ToggleSwitch enabled={draft.allowWriteIn} onChange={(v) => onChange({ allowWriteIn: v })} />
@@ -415,16 +447,19 @@ function CreateWizard({
 
           {step === 3 && (
             <>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
-              <div className="flex gap-1.5 mb-4">
-                {COLOR_PRESETS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => onChange({ color: c })}
-                    className={`w-6 h-6 rounded-full border-2 ${draft.color === c ? "border-white" : "border-transparent"}`}
-                    style={{ background: c }}
-                  />
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Embed Color</label>
+                  <p className="text-[11px] text-slate-600 mb-2">The left border accent on the real Discord message.</p>
+                  <ColorPicker value={draft.color} onChange={(c) => onChange({ color: c })} />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Result Bar Color</label>
+                  <p className="text-[11px] text-slate-600 mb-2">
+                    Only the dashboard's own bars — Discord embeds can't color plain text, so the live message's bars are fixed block characters.
+                  </p>
+                  <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
+                </div>
               </div>
 
               <div className="flex items-center justify-between mb-4 bg-base-950 border border-white/10 rounded-lg px-3 py-2.5">
@@ -539,7 +574,7 @@ function PollPreview({ draft }: { draft: Draft }) {
                     <span className="text-[#949ba4]">{draft.isPrivate ? "🔒" : `${pct}%`}</span>
                   </div>
                   <div className="h-2.5 rounded bg-[#1e1f22] overflow-hidden">
-                    {!draft.isPrivate && <div className="h-full" style={{ width: `${pct}%`, background: draft.color }} />}
+                    {!draft.isPrivate && <div className="h-full" style={{ width: `${pct}%`, background: draft.barColor }} />}
                   </div>
                 </div>
               );
@@ -547,7 +582,7 @@ function PollPreview({ draft }: { draft: Draft }) {
             <p className="text-[#949ba4] text-[10.5px] mt-2">
               {draft.isPrivate ? "🔒 Results hidden · " : ""}
               {footer}
-              {draft.allowWriteIn ? " · React ✍️ to submit your own answer via DM" : ""}
+              {draft.allowWriteIn ? " · Click ✍️ Write In below to submit your own answer" : ""}
             </p>
           </div>
 
@@ -557,8 +592,12 @@ function PollPreview({ draft }: { draft: Draft }) {
                 {o.emoji} {demoVotes[i]}
               </span>
             ))}
-            {draft.allowWriteIn && <span className="bg-[#2b2d31] border border-[#3f4248] rounded-full px-2 py-0.5 text-xs text-[#dbdee1]">✍️</span>}
           </div>
+          {draft.allowWriteIn && (
+            <div className="mt-1.5">
+              <span className="bg-[#4e5058] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">✍️ Write In</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

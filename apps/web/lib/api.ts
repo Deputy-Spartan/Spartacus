@@ -990,7 +990,7 @@ export interface GiveawayInput {
 
 export type PollDurationMode = "TIMER" | "MANUAL";
 export type PollResultsStyle = "BARS" | "SIMPLE";
-export type PollBarStyle = "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC";
+export type PollBarStyle = "SQUARE" | "BLOCK" | "CIRCLE" | "CLASSIC" | "SOLID";
 
 export interface PollRow {
   id: string;

@@ -74,6 +74,8 @@ function barChars(poll: Poll): [string, string] {
       return [nearestColorEmoji(poll.barColor ?? poll.color, COLOR_CIRCLES, "🔵"), "⚪"];
     case "CLASSIC":
       return ["▰", "▱"];
+    case "SOLID":
+      return ["█", "░"];
     case "SQUARE":
     default:
       return [nearestColorEmoji(poll.barColor ?? poll.color, COLOR_SQUARES, "🟦"), "⬜"];
@@ -88,7 +90,9 @@ export async function renderPollEmbed(poll: Poll) {
   const counts = poll.emojis.map((e) => votes.filter((v) => v.emoji === e).length);
   const total = counts.reduce((a, b) => a + b, 0);
   const [filledChar, emptyChar] = barChars(poll);
-  const barLen = 10;
+  // Narrow characters (solid blocks, the classic bar) read better with more
+  // segments; wide emoji squares/circles get cramped past ten.
+  const barLen = poll.barStyle === "SOLID" || poll.barStyle === "CLASSIC" ? 20 : 10;
 
   const lines = poll.options.map((opt, i) => {
     const emoji = poll.emojis[i];

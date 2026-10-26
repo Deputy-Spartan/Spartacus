@@ -901,6 +901,7 @@ enum PollBarStyle {
   BLOCK // plain ⬛/⬜, no color
   CIRCLE // colored circles (🔴🔵...), same color-matching as SQUARE
   CLASSIC // ▰/▱, a plain non-colored progress-bar look
+  SOLID // █/░, a dense continuous-looking bar — the original look, no color (Discord can't color plain text)
 }
 
 model Poll {

@@ -73,6 +73,8 @@ function barChars(barStyle: PollBarStyle, barColor: string): [string, string] {
       return [nearestColorEmoji(barColor, PREVIEW_COLOR_CIRCLES, "🔵"), "⚪"];
     case "CLASSIC":
       return ["▰", "▱"];
+    case "SOLID":
+      return ["█", "░"];
     case "SQUARE":
     default:
       return [nearestColorEmoji(barColor, PREVIEW_COLOR_SQUARES, "🟦"), "⬜"];
@@ -150,6 +152,7 @@ const BAR_STYLE_OPTIONS: Array<{ value: PollBarStyle; label: string; sample: str
   { value: "CIRCLE", label: "Colored circles", sample: "🔵🔵🔵⚪⚪" },
   { value: "BLOCK", label: "Black & white", sample: "⬛⬛⬛⬜⬜" },
   { value: "CLASSIC", label: "Classic bar", sample: "▰▰▰▱▱" },
+  { value: "SOLID", label: "Solid bar", sample: "██████░░░░" },
 ];
 
 export default function PollsPage({ params }: { params: { guildId: string } }) {
@@ -596,7 +599,7 @@ function CreateWizard({
               {draft.resultsStyle === "BARS" && (
                 <>
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Bar Style</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
                     {BAR_STYLE_OPTIONS.map((opt) => (
                       <button
                         key={opt.value}
@@ -711,7 +714,7 @@ function PollPreview({ draft }: { draft: Draft }) {
   const filled = draft.options.filter((o) => o.label.trim());
   const demoVotes = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
   const total = demoVotes.reduce((a, b) => a + b, 0) || 1;
-  const barLen = 10;
+  const barLen = draft.barStyle === "SOLID" || draft.barStyle === "CLASSIC" ? 20 : 10;
   const [filledChar, emptyChar] = barChars(draft.barStyle, draft.barColor);
 
   const footer = draft.durationMode === "TIMER" ? `⏱ Ends in ${draft.hours || 0}h ${draft.minutes || 0}m` : "🖐 Open until a staff member stops it";

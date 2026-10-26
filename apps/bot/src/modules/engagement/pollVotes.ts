@@ -24,74 +24,11 @@ function emojiKey(reaction: MessageReaction | PartialMessageReaction): string {
   return reaction.emoji.id ?? reaction.emoji.name ?? "";
 }
 
-// Discord has no real progress-bar rendering in an embed, and monospace
-// block characters (the old `████░░░░` approach) render as an illegible
-// grey code pill on most clients. These are the emoji choices SQUARE/CIRCLE
-// snap to for both the primary (filled) and secondary (empty) color —
-// includes white/black so a plain light/dark secondary still matches sensibly.
-const COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
-  { emoji: "🟥", rgb: [221, 46, 68] },
-  { emoji: "🟧", rgb: [240, 138, 55] },
-  { emoji: "🟨", rgb: [253, 203, 88] },
-  { emoji: "🟩", rgb: [120, 177, 89] },
-  { emoji: "🟦", rgb: [85, 172, 238] },
-  { emoji: "🟪", rgb: [170, 142, 214] },
-  { emoji: "🟫", rgb: [168, 120, 74] },
-  { emoji: "⬜", rgb: [255, 255, 255] },
-  { emoji: "⬛", rgb: [49, 51, 56] },
-];
-const COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
-  { emoji: "🔴", rgb: [221, 46, 68] },
-  { emoji: "🟠", rgb: [240, 138, 55] },
-  { emoji: "🟡", rgb: [253, 203, 88] },
-  { emoji: "🟢", rgb: [120, 177, 89] },
-  { emoji: "🔵", rgb: [85, 172, 238] },
-  { emoji: "🟣", rgb: [170, 142, 214] },
-  { emoji: "🟤", rgb: [168, 120, 74] },
-  { emoji: "⚪", rgb: [255, 255, 255] },
-  { emoji: "⚫", rgb: [49, 51, 56] },
-];
-
-function nearestColorEmoji(hex: string | null | undefined, palette: Array<{ emoji: string; rgb: [number, number, number] }>, fallback: string): string {
-  const match = (hex ?? "").match(/^#?([0-9a-f]{6})$/i);
-  if (!match) return fallback;
-  const n = parseInt(match[1], 16);
-  const target: [number, number, number] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  let best = palette[0];
-  let bestDist = Infinity;
-  for (const sq of palette) {
-    const dist = sq.rgb.reduce((s, c, i) => s + (c - target[i]) ** 2, 0);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = sq;
-    }
-  }
-  return best.emoji;
-}
-
-// Returns the [filled, empty] emoji/char pair for a bar style. SQUARE and
-// CIRCLE snap BOTH colors to the nearest matching emoji on the live message
-// itself; CLASSIC and SOLID stay plain ▰/▱ and █/░ there (Discord can't
-// color plain text) — their primary/secondary colors only affect the
-// dashboard's own preview, which is called out in the dashboard UI.
+// Both remaining bar styles are plain characters — Discord can't color
+// plain text, so barColor/barColorSecondary only affect the dashboard's own
+// preview (called out in the dashboard UI), never the live message.
 function barChars(poll: Poll): [string, string] {
-  switch (poll.barStyle) {
-    case "CIRCLE":
-      return [
-        nearestColorEmoji(poll.barColor ?? poll.color, COLOR_CIRCLES, "🔵"),
-        nearestColorEmoji(poll.barColorSecondary, COLOR_CIRCLES, "⚪"),
-      ];
-    case "CLASSIC":
-      return ["▰", "▱"];
-    case "SOLID":
-      return ["█", "░"];
-    case "SQUARE":
-    default:
-      return [
-        nearestColorEmoji(poll.barColor ?? poll.color, COLOR_SQUARES, "🟦"),
-        nearestColorEmoji(poll.barColorSecondary, COLOR_SQUARES, "⬜"),
-      ];
-  }
+  return poll.barStyle === "SOLID" ? ["█", "░"] : ["▰", "▱"];
 }
 
 // Shared by both add/remove — redraws the embed from the current vote
@@ -102,9 +39,7 @@ export async function renderPollEmbed(poll: Poll) {
   const counts = poll.emojis.map((e) => votes.filter((v) => v.emoji === e).length);
   const total = counts.reduce((a, b) => a + b, 0);
   const [filledChar, emptyChar] = barChars(poll);
-  // Narrow characters (solid blocks, the classic bar) read better with more
-  // segments; wide emoji squares/circles get cramped past ten.
-  const barLen = poll.barStyle === "SOLID" || poll.barStyle === "CLASSIC" ? 20 : 10;
+  const barLen = 20;
 
   const lines = poll.options.map((opt, i) => {
     const emoji = poll.emojis[i];
@@ -160,9 +95,11 @@ export async function announcePollClosed(message: Message) {
     .catch(() => null);
 }
 
-// One vote per member: reacting with a different emoji on the same poll
-// swaps their vote and the bot removes their old reaction so the message
-// itself never shows someone double-counted across options.
+// allowMultiselect=false: reacting is the member's one answer — any other
+// reaction they're already holding on this poll gets removed (both the DB
+// row and their actual reaction on the message), and any write-in they'd
+// submitted is cleared too, so switching answers never leaves more than one
+// counted. allowMultiselect=true: reactions just stack, no removal.
 export async function onReactionAdd(reaction: MessageReaction | PartialMessageReaction, user: User | PartialUser) {
   if (user.bot || !reaction.message.guildId) return;
   if (!(await isModuleEnabled(reaction.message.guildId, "POLLS"))) return;
@@ -177,16 +114,21 @@ export async function onReactionAdd(reaction: MessageReaction | PartialMessageRe
     return;
   }
 
-  const existing = await prisma.pollVote.findUnique({ where: { pollId_userId: { pollId: poll.id, userId: user.id } } });
-  if (existing && existing.emoji !== key) {
-    const oldReaction = reaction.message.reactions?.cache?.get(existing.emoji);
-    await oldReaction?.users.remove(user.id).catch(() => null);
+  if (!poll.allowMultiselect) {
+    const existingVotes = await prisma.pollVote.findMany({ where: { pollId: poll.id, userId: user.id } });
+    for (const vote of existingVotes) {
+      if (vote.emoji === key) continue;
+      const oldReaction = reaction.message.reactions?.cache?.get(vote.emoji);
+      await oldReaction?.users.remove(user.id).catch(() => null);
+      await prisma.pollVote.delete({ where: { id: vote.id } }).catch(() => null);
+    }
+    await prisma.pollWriteIn.deleteMany({ where: { pollId: poll.id, userId: user.id } });
   }
 
   await prisma.pollVote.upsert({
-    where: { pollId_userId: { pollId: poll.id, userId: user.id } },
+    where: { pollId_userId_emoji: { pollId: poll.id, userId: user.id, emoji: key } },
     create: { pollId: poll.id, userId: user.id, emoji: key },
-    update: { emoji: key },
+    update: {},
   });
 
   const embed = await renderPollEmbed(poll);
@@ -202,10 +144,7 @@ export async function onReactionRemove(reaction: MessageReaction | PartialMessag
   const key = emojiKey(reaction);
   if (!poll.emojis.includes(key)) return;
 
-  const existing = await prisma.pollVote.findUnique({ where: { pollId_userId: { pollId: poll.id, userId: user.id } } });
-  if (!existing || existing.emoji !== key) return; // they un-reacted the one that got replaced, not their current vote
-
-  await prisma.pollVote.delete({ where: { pollId_userId: { pollId: poll.id, userId: user.id } } }).catch(() => null);
+  await prisma.pollVote.deleteMany({ where: { pollId: poll.id, userId: user.id, emoji: key } });
 
   const embed = await renderPollEmbed(poll);
   await reaction.message.edit({ embeds: [embed] }).catch(() => null);
@@ -233,6 +172,10 @@ export async function handleWriteInButton(interaction: ButtonInteraction, pollId
   await interaction.showModal(modal);
 }
 
+// allowMultiselect=false: a write-in replaces whatever the member had
+// already picked — their standing reactions get removed (DB rows and the
+// actual reactions on the message) and any earlier write-in is cleared —
+// same "one answer, switching replaces it" rule as reacting does above.
 export async function handleWriteInModalSubmit(interaction: ModalSubmitInteraction, pollId: string) {
   const poll = await prisma.poll.findUnique({ where: { id: pollId } });
   if (!poll || poll.closed) {
@@ -240,40 +183,23 @@ export async function handleWriteInModalSubmit(interaction: ModalSubmitInteracti
     return;
   }
 
+  if (!poll.allowMultiselect) {
+    const existingVotes = await prisma.pollVote.findMany({ where: { pollId, userId: interaction.user.id } });
+    for (const vote of existingVotes) {
+      const oldReaction = interaction.message?.reactions.cache.get(vote.emoji);
+      await oldReaction?.users.remove(interaction.user.id).catch(() => null);
+    }
+    if (existingVotes.length) await prisma.pollVote.deleteMany({ where: { pollId, userId: interaction.user.id } });
+    await prisma.pollWriteIn.deleteMany({ where: { pollId, userId: interaction.user.id } });
+  }
+
   const text = interaction.fields.getTextInputValue("answer").trim();
   await prisma.pollWriteIn.create({ data: { pollId, userId: interaction.user.id, text: text.slice(0, 1000) } });
-  await interaction.reply({ content: `✅ Got it — your answer for **${poll.question}** has been recorded.`, ephemeral: true });
-}
 
-// ---- NATIVE poll vote mirroring ----
-// Discord's own poll object tracks votes itself — these two events just
-// mirror that into our PollVote table (answer id N maps to poll.options[N-1],
-// the same order the poll was created with) so the dashboard's results list
-// works identically for NATIVE and CUSTOM polls without special-casing it.
-export async function onNativeVoteAdd(pollAnswer: { id: number; poll: { messageId: string } }, userId: string) {
-  const poll = await prisma.poll.findFirst({ where: { messageId: pollAnswer.poll.messageId, pollType: "NATIVE" } });
-  if (!poll) return;
-  const emoji = poll.emojis[pollAnswer.id - 1];
-  if (emoji === undefined) return;
-
-  if (poll.allowMultiselect) {
-    await prisma.pollVote.upsert({
-      where: { pollId_userId: { pollId: poll.id, userId: `${userId}:${pollAnswer.id}` } },
-      create: { pollId: poll.id, userId: `${userId}:${pollAnswer.id}`, emoji },
-      update: { emoji },
-    });
-  } else {
-    await prisma.pollVote.upsert({
-      where: { pollId_userId: { pollId: poll.id, userId } },
-      create: { pollId: poll.id, userId, emoji },
-      update: { emoji },
-    });
+  if (interaction.message) {
+    const embed = await renderPollEmbed(poll);
+    await interaction.message.edit({ embeds: [embed] }).catch(() => null);
   }
-}
 
-export async function onNativeVoteRemove(pollAnswer: { id: number; poll: { messageId: string } }, userId: string) {
-  const poll = await prisma.poll.findFirst({ where: { messageId: pollAnswer.poll.messageId, pollType: "NATIVE" } });
-  if (!poll) return;
-  const key = poll.allowMultiselect ? `${userId}:${pollAnswer.id}` : userId;
-  await prisma.pollVote.delete({ where: { pollId_userId: { pollId: poll.id, userId: key } } }).catch(() => null);
+  await interaction.reply({ content: `✅ Got it — your answer for **${poll.question}** has been recorded.`, ephemeral: true });
 }

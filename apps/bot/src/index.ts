@@ -272,8 +272,6 @@ export function startBot() {
   client.on(Events.MessageReactionRemove, reactionRoles.onReactionRemove);
   client.on(Events.MessageReactionAdd, pollVotes.onReactionAdd);
   client.on(Events.MessageReactionRemove, pollVotes.onReactionRemove);
-  client.on(Events.MessagePollVoteAdd, pollVotes.onNativeVoteAdd);
-  client.on(Events.MessagePollVoteRemove, pollVotes.onNativeVoteRemove);
   client.on(Events.MessageReactionAdd, starboard.execute);
 
   client.on(Events.GuildAuditLogEntryCreate, antiNuke.execute);

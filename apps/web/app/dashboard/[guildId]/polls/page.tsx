@@ -9,7 +9,7 @@ import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import { useMemberNames } from "../../../../lib/useMemberNames";
-import { api, type PollRow, type PollInput, type PollDurationMode, type PollResultsStyle, type PollBarStyle, type PollType } from "../../../../lib/api";
+import { api, type PollRow, type PollInput, type PollDurationMode, type PollResultsStyle, type PollBarStyle } from "../../../../lib/api";
 
 type Tab = "active" | "past" | "create";
 
@@ -26,65 +26,12 @@ function defaultEmojiFor(position: number): string {
   return String.fromCodePoint(0x1f1e6 + ((position - 11) % 26)); // 11 -> 🇦, 12 -> 🇧, ...
 }
 
-// Mirrors the bot's own bar-rendering exactly (apps/bot/src/modules/engagement/pollVotes.ts)
-// so the preview shows the real discrete emoji blocks instead of a smooth
-// CSS bar that doesn't match what actually posts to Discord.
-const PREVIEW_COLOR_SQUARES: Array<{ emoji: string; rgb: [number, number, number] }> = [
-  { emoji: "🟥", rgb: [221, 46, 68] },
-  { emoji: "🟧", rgb: [240, 138, 55] },
-  { emoji: "🟨", rgb: [253, 203, 88] },
-  { emoji: "🟩", rgb: [120, 177, 89] },
-  { emoji: "🟦", rgb: [85, 172, 238] },
-  { emoji: "🟪", rgb: [170, 142, 214] },
-  { emoji: "🟫", rgb: [168, 120, 74] },
-  { emoji: "⬜", rgb: [255, 255, 255] },
-  { emoji: "⬛", rgb: [49, 51, 56] },
-];
-const PREVIEW_COLOR_CIRCLES: Array<{ emoji: string; rgb: [number, number, number] }> = [
-  { emoji: "🔴", rgb: [221, 46, 68] },
-  { emoji: "🟠", rgb: [240, 138, 55] },
-  { emoji: "🟡", rgb: [253, 203, 88] },
-  { emoji: "🟢", rgb: [120, 177, 89] },
-  { emoji: "🔵", rgb: [85, 172, 238] },
-  { emoji: "🟣", rgb: [170, 142, 214] },
-  { emoji: "🟤", rgb: [168, 120, 74] },
-  { emoji: "⚪", rgb: [255, 255, 255] },
-  { emoji: "⚫", rgb: [49, 51, 56] },
-];
-
-function nearestColorEmoji(hex: string, palette: Array<{ emoji: string; rgb: [number, number, number] }>, fallback: string): string {
-  const match = hex.match(/^#?([0-9a-f]{6})$/i);
-  if (!match) return fallback;
-  const n = parseInt(match[1], 16);
-  const target: [number, number, number] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  let best = palette[0];
-  let bestDist = Infinity;
-  for (const sq of palette) {
-    const dist = sq.rgb.reduce((s, c, i) => s + (c - target[i]) ** 2, 0);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = sq;
-    }
-  }
-  return best.emoji;
-}
-
-// Primary/secondary colors apply to SQUARE and CIRCLE on the real Discord
-// message (snapped to the nearest matching emoji); CLASSIC/SOLID stay plain
-// ▰/▱ and █/░ there since Discord can't color plain text — their colors
-// here are preview-only, which the UI calls out next to those fields.
-function barChars(barStyle: PollBarStyle, primary: string, secondary: string): [string, string] {
-  switch (barStyle) {
-    case "CIRCLE":
-      return [nearestColorEmoji(primary, PREVIEW_COLOR_CIRCLES, "🔵"), nearestColorEmoji(secondary, PREVIEW_COLOR_CIRCLES, "⚪")];
-    case "CLASSIC":
-      return ["▰", "▱"];
-    case "SOLID":
-      return ["█", "░"];
-    case "SQUARE":
-    default:
-      return [nearestColorEmoji(primary, PREVIEW_COLOR_SQUARES, "🟦"), nearestColorEmoji(secondary, PREVIEW_COLOR_SQUARES, "⬜")];
-  }
+// Mirrors the bot's own bar-rendering exactly (apps/bot/src/modules/engagement/pollVotes.ts).
+// Both bar styles are plain characters — Discord can't color plain text, so
+// primary/secondary color only ever affects this preview, never the live
+// message, which the UI calls out next to those fields.
+function barChars(barStyle: PollBarStyle): [string, string] {
+  return barStyle === "SOLID" ? ["█", "░"] : ["▰", "▱"];
 }
 
 // Presets plus a raw <input type=color> for any custom RGB value — shared
@@ -124,7 +71,6 @@ interface Draft {
   question: string;
   channelId: string | null;
   options: Option[];
-  pollType: PollType;
   allowMultiselect: boolean;
   color: string;
   barColor: string;
@@ -145,13 +91,12 @@ const EMPTY_DRAFT: Draft = {
     { label: "", emoji: defaultEmojiFor(1) },
     { label: "", emoji: defaultEmojiFor(2) },
   ],
-  pollType: "CUSTOM",
   allowMultiselect: false,
   color: "#00E5FF",
   barColor: "#00E5FF",
   barColorSecondary: "#99AAB5",
   resultsStyle: "BARS",
-  barStyle: "SQUARE",
+  barStyle: "SOLID",
   isPrivate: false,
   allowWriteIn: false,
   durationMode: "MANUAL",
@@ -160,8 +105,6 @@ const EMPTY_DRAFT: Draft = {
 };
 
 const BAR_STYLE_OPTIONS: Array<{ value: PollBarStyle; label: string; sample: string }> = [
-  { value: "SQUARE", label: "Colored squares", sample: "🟦🟦🟦⬜⬜" },
-  { value: "CIRCLE", label: "Colored circles", sample: "🔵🔵🔵⚪⚪" },
   { value: "CLASSIC", label: "Classic bar", sample: "▰▰▰▱▱" },
   { value: "SOLID", label: "Solid bar", sample: "██████░░░░" },
 ];
@@ -347,14 +290,7 @@ function PollsList({
           <NeonCard key={p.id}>
             <div className="flex items-center justify-between gap-3">
               <button className="min-w-0 flex-1 text-left" onClick={() => setExpanded(expanded === p.id ? null : p.id)}>
-                <p className="font-medium truncate">
-                  {p.pollType === "NATIVE" && (
-                    <span className="mr-1.5 text-[10px] uppercase tracking-wide text-neon-blue bg-neon-blue/10 border border-neon-blue/30 rounded px-1 py-0.5">
-                      Native
-                    </span>
-                  )}
-                  {p.question}
-                </p>
+                <p className="font-medium truncate">{p.question}</p>
                 <p className="text-xs text-slate-500">
                   <span className={statusColor}>{statusLabel}</span> · {total} vote{total === 1 ? "" : "s"}
                   {p.allowWriteIn ? ` · ${p.writeIns.length} write-in(s)` : ""}
@@ -477,9 +413,6 @@ function CreateWizard({
   async function create() {
     const err = validateStep(2) || validateStep(1);
     if (err) return setError(err);
-    if (draft.pollType === "NATIVE" && (Number(draft.hours) || 0) * 60 + (Number(draft.minutes) || 0) <= 0) {
-      return setError("Set a timer duration greater than zero — native Discord polls always require one.");
-    }
     setError(null);
     setCreating(true);
     try {
@@ -489,7 +422,6 @@ function CreateWizard({
         question: draft.question.trim(),
         options: filled.map((o) => o.label.trim()),
         emojis: filled.map((o) => o.emoji),
-        pollType: draft.pollType,
         allowMultiselect: draft.allowMultiselect,
         color: draft.color,
         barColor: draft.barColor,
@@ -498,7 +430,7 @@ function CreateWizard({
         barStyle: draft.barStyle,
         isPrivate: draft.isPrivate,
         allowWriteIn: draft.allowWriteIn,
-        durationMode: draft.pollType === "NATIVE" ? "TIMER" : draft.durationMode,
+        durationMode: draft.durationMode,
         hours: Number(draft.hours) || 0,
         minutes: Number(draft.minutes) || 0,
       };
@@ -534,28 +466,6 @@ function CreateWizard({
 
           {step === 1 && (
             <>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Poll Type</label>
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={() => onChange({ pollType: "CUSTOM" })}
-                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border text-left ${
-                    draft.pollType === "CUSTOM" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
-                  }`}
-                >
-                  <div className="font-semibold mb-0.5">🎨 Custom Embed</div>
-                  <div className="text-[10.5px] opacity-80">Colors, bar style, private results, write-ins — fully stylable</div>
-                </button>
-                <button
-                  onClick={() => onChange({ pollType: "NATIVE" })}
-                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border text-left ${
-                    draft.pollType === "NATIVE" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
-                  }`}
-                >
-                  <div className="font-semibold mb-0.5">🗳️ Native Discord Poll</div>
-                  <div className="text-[10.5px] opacity-80">Discord's own clean poll UI — requires a timer, no custom styling</div>
-                </button>
-              </div>
-
               <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Question</label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
@@ -596,27 +506,28 @@ function CreateWizard({
                 + Add option
               </button>
 
-              <div className="mt-5 pt-4 border-t border-white/5">
-                {draft.pollType === "CUSTOM" ? (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Allow write-in answers</p>
-                      <p className="text-xs text-slate-500">
-                        Adds a "✍️ Write In" button — clicking it opens a pop-up form right there in the channel to collect a typed answer, if none of the
-                        options fit. Answers show up back here on the Active &amp; Past Polls tab.
-                      </p>
-                    </div>
-                    <ToggleSwitch enabled={draft.allowWriteIn} onChange={(v) => onChange({ allowWriteIn: v })} />
+              <div className="mt-5 pt-4 border-t border-white/5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Allow write-in answers</p>
+                    <p className="text-xs text-slate-500">
+                      Adds a "✍️ Write In" button — clicking it opens a pop-up form right there in the channel to collect a typed answer, if none of the
+                      options fit. Answers show up back here on the Active &amp; Past Polls tab.
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">Allow multiple answers</p>
-                      <p className="text-xs text-slate-500">Members can select more than one option instead of just one.</p>
-                    </div>
-                    <ToggleSwitch enabled={draft.allowMultiselect} onChange={(v) => onChange({ allowMultiselect: v })} />
+                  <ToggleSwitch enabled={draft.allowWriteIn} onChange={(v) => onChange({ allowWriteIn: v })} />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Allow multiple answers</p>
+                    <p className="text-xs text-slate-500">
+                      Members can react to more than one option, and submit a write-in on top of their reaction(s). Off (default): each member gets one
+                      answer total — reacting to a different option, or submitting a write-in, replaces whatever they picked before.
+                    </p>
                   </div>
-                )}
+                  <ToggleSwitch enabled={draft.allowMultiselect} onChange={(v) => onChange({ allowMultiselect: v })} />
+                </div>
               </div>
 
               <div className="flex justify-between mt-4">
@@ -632,9 +543,7 @@ function CreateWizard({
 
           {step === 3 && (
             <>
-              {draft.pollType === "CUSTOM" && (
-                <>
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Results Display</label>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Results Display</label>
                   <div className="flex gap-2 mb-4">
                     <button
                       onClick={() => onChange({ resultsStyle: "BARS" })}
@@ -676,10 +585,8 @@ function CreateWizard({
                         <div>
                           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Primary Color</label>
                           <p className="text-[11px] text-slate-600 mb-2">
-                            The filled part of the bar.{" "}
-                            {draft.barStyle === "SQUARE" || draft.barStyle === "CIRCLE"
-                              ? "Snapped to the nearest matching emoji — shown on the real Discord message too."
-                              : "Discord can't color plain text, so this only affects the preview here — the live bar stays its fixed look."}
+                            The filled part of the bar. Discord can't color plain text, so this only affects the preview here — the live bar stays its fixed
+                            look.
                           </p>
                           <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
                         </div>
@@ -705,42 +612,31 @@ function CreateWizard({
                     </div>
                     <ToggleSwitch enabled={draft.isPrivate} onChange={(v) => onChange({ isPrivate: v })} />
                   </div>
-                </>
-              )}
 
               <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Duration</label>
-              {draft.pollType === "CUSTOM" ? (
-                <>
-                  <div className="flex gap-2 mb-3">
-                    <button
-                      onClick={() => onChange({ durationMode: "TIMER" })}
-                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border ${
-                        draft.durationMode === "TIMER" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
-                      }`}
-                    >
-                      ⏱ Timer
-                    </button>
-                    <button
-                      onClick={() => onChange({ durationMode: "MANUAL" })}
-                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border ${
-                        draft.durationMode === "MANUAL" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
-                      }`}
-                    >
-                      🖐 Manual stop only
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-600 mb-3">
-                    Either way, when it ends the bot posts a reply announcing the poll is closed and locks it — reactions after that point are removed and
-                    don't count.
-                  </p>
-                </>
-              ) : (
-                <p className="text-[11px] text-slate-600 mb-3">
-                  Native Discord polls always require a timer (max 32 days) — Discord has no "manual stop only" option for its own poll type, though you
-                  can still end it early with Stop Now.
-                </p>
-              )}
-              {(draft.pollType === "NATIVE" || draft.durationMode === "TIMER") && (
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => onChange({ durationMode: "TIMER" })}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border ${
+                    draft.durationMode === "TIMER" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
+                  }`}
+                >
+                  ⏱ Timer
+                </button>
+                <button
+                  onClick={() => onChange({ durationMode: "MANUAL" })}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border ${
+                    draft.durationMode === "MANUAL" ? "bg-neon-blue/10 border-neon-blue/40 text-neon-blue" : "bg-base-950 border-white/10 text-slate-400"
+                  }`}
+                >
+                  🖐 Manual stop only
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600 mb-3">
+                Either way, when it ends the bot posts a reply announcing the poll is closed and locks it — reactions after that point are removed and
+                don't count.
+              </p>
+              {draft.durationMode === "TIMER" && (
                 <div className="flex gap-3 mb-2">
                   <div className="flex-1">
                     <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Hours</label>
@@ -792,13 +688,10 @@ function PollPreview({ draft }: { draft: Draft }) {
   const filled = draft.options.filter((o) => o.label.trim());
   const demoVotes = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
   const total = demoVotes.reduce((a, b) => a + b, 0) || 1;
-  // The real bot message uses more segments for Classic/Solid (narrower
-  // characters read better with finer resolution there), but this preview
-  // card is a fixed, much narrower width — keep it at 10 everywhere so it
-  // never overflows the card.
+  // The real bot message uses 20 segments; this preview card is a fixed,
+  // much narrower width — keep it at 10 so it never overflows the card.
   const barLen = 10;
-  const [filledChar, emptyChar] = barChars(draft.barStyle, draft.barColor, draft.barColorSecondary);
-  const isPlainBarStyle = draft.barStyle === "CLASSIC" || draft.barStyle === "SOLID";
+  const [filledChar, emptyChar] = barChars(draft.barStyle);
 
   const footer = draft.durationMode === "TIMER" ? `⏱ Ends in ${draft.hours || 0}h ${draft.minutes || 0}m` : "🖐 Open until a staff member stops it";
 
@@ -818,32 +711,6 @@ function PollPreview({ draft }: { draft: Draft }) {
             <span className="text-[#949ba4] text-xs">Today at 7:40 PM</span>
           </div>
 
-          {draft.pollType === "NATIVE" ? (
-            <div className="mt-2 rounded border border-[#3f4248] p-3 max-w-sm">
-              <p className="text-[#f2f3f5] font-semibold text-sm mb-1">{draft.question || "Your question here"}</p>
-              <p className="text-[#949ba4] text-[11px] mb-2.5">{draft.allowMultiselect ? "Select one or more answers" : "Select one answer"}</p>
-              {filled.length === 0 && <p className="text-[#949ba4] text-xs italic">Add some options to see them here.</p>}
-              {filled.map((o, i) => {
-                const pct = Math.round((demoVotes[i] / total) * 100);
-                return (
-                  <div key={i} className="mb-2">
-                    <div className="relative rounded border border-[#3f4248] overflow-hidden h-7">
-                      <div className="absolute inset-y-0 left-0 bg-[#4e5058]" style={{ width: `${pct}%` }} />
-                      <div className="relative flex items-center justify-between h-full px-2.5 text-xs text-[#f2f3f5]">
-                        <span>
-                          {o.emoji} {o.label}
-                        </span>
-                        <span className="text-[#949ba4]">{pct}%</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              <p className="text-[#949ba4] text-[10.5px] mt-2">
-                {total} vote{total === 1 ? "" : "s"} · {footer}
-              </p>
-            </div>
-          ) : (
           <div className="mt-2 rounded bg-[#2b2d31] border-l-4 p-3 max-w-sm" style={{ borderColor: draft.color }}>
             <p className="text-[#f2f3f5] font-semibold text-sm mb-2.5">🗳️ {draft.question || "Your question here"}</p>
             {filled.length === 0 && <p className="text-[#949ba4] text-xs italic">Add some options to see them here.</p>}
@@ -868,11 +735,10 @@ function PollPreview({ draft }: { draft: Draft }) {
                     <span className="text-[#949ba4]">{draft.isPrivate ? "🔒 hidden" : `${pct}%`}</span>
                   </div>
                   <div className="leading-none text-[13px] tracking-[2px] whitespace-nowrap overflow-hidden">
-                    {/* Square/Circle carry their own color in the emoji itself; Classic/Solid are plain
-                        characters, so color them directly here to actually show Primary/Secondary —
+                    {/* Both bar styles are plain characters, so color them directly here —
                         preview-only, since Discord can't color plain text on the real message. */}
-                    <span style={isPlainBarStyle ? { color: draft.barColor } : undefined}>{filledPart}</span>
-                    <span style={isPlainBarStyle ? { color: draft.barColorSecondary } : undefined}>{emptyPart}</span>
+                    <span style={{ color: draft.barColor }}>{filledPart}</span>
+                    <span style={{ color: draft.barColorSecondary }}>{emptyPart}</span>
                   </div>
                 </div>
               );
@@ -883,18 +749,15 @@ function PollPreview({ draft }: { draft: Draft }) {
               {draft.allowWriteIn ? " · Click ✍️ Write In below to submit your own answer" : ""}
             </p>
           </div>
-          )}
 
-          {draft.pollType === "CUSTOM" && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {filled.map((o, i) => (
-                <span key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-full px-2 py-0.5 text-xs text-[#dbdee1]">
-                  {o.emoji} {demoVotes[i]}
-                </span>
-              ))}
-            </div>
-          )}
-          {draft.pollType === "CUSTOM" && draft.allowWriteIn && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {filled.map((o, i) => (
+              <span key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-full px-2 py-0.5 text-xs text-[#dbdee1]">
+                {o.emoji} {demoVotes[i]}
+              </span>
+            ))}
+          </div>
+          {draft.allowWriteIn && (
             <div className="mt-1.5">
               <span className="bg-[#4e5058] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">✍️ Write In</span>
             </div>

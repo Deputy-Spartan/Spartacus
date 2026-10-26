@@ -856,9 +856,9 @@ function PollPreview({ draft }: { draft: Draft }) {
                 );
               }
               const pct = draft.isPrivate ? null : Math.round((demoVotes[i] / total) * 100);
-              const filledCount = draft.isPrivate ? 0 : Math.round(((pct ?? 0) / 100) * barLen);
+              const filledCount = draft.isPrivate ? 0 : Math.min(barLen, Math.round(((pct ?? 0) / 100) * barLen));
               const filledPart = draft.isPrivate ? "" : filledChar.repeat(filledCount);
-              const emptyPart = emptyChar.repeat(barLen - filledPart.length);
+              const emptyPart = emptyChar.repeat(barLen - filledCount);
               return (
                 <div key={i} className="mb-2 text-xs">
                   <div className="flex items-center justify-between mb-1 text-[#dbdee1]">

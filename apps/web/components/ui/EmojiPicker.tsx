@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type DiscordEmojiOption } from "../../lib/api";
+import { STANDARD_EMOJI_CATEGORIES } from "../../lib/standardEmojis";
 
 function emojiUrl(id: string, animated: boolean) {
   return `https://cdn.discordapp.com/emojis/${id}.${animated ? "gif" : "png"}?size=48`;
@@ -29,18 +30,50 @@ export function ServerEmojiGrid({ guildId, onPick }: { guildId: string; onPick: 
   );
 }
 
+// The clickable grid of standard Unicode emoji, grouped into categories
+// with a left-hand rail to jump between them.
+function StandardEmojiGrid({ onPick }: { onPick: (emoji: string) => void }) {
+  const [cat, setCat] = useState(0);
+  return (
+    <div className="flex gap-2">
+      <div className="flex flex-col gap-0.5 w-20 shrink-0 overflow-y-auto max-h-48">
+        {STANDARD_EMOJI_CATEGORIES.map((c, i) => (
+          <button
+            key={c.label}
+            type="button"
+            onClick={() => setCat(i)}
+            className={`text-left text-[10.5px] px-1.5 py-1 rounded ${i === cat ? "bg-neon-blue/15 text-neon-blue" : "text-slate-500 hover:text-slate-300"}`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex-1 flex flex-wrap gap-0.5 max-h-48 overflow-y-auto content-start">
+        {STANDARD_EMOJI_CATEGORIES[cat].emojis.map((e, i) => (
+          <button key={e + i} type="button" onClick={() => onPick(e)} className="text-lg p-1 rounded hover:bg-white/10 leading-none">
+            {e}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface EmojiPickerProps {
   guildId: string;
   value: string;
   onChange: (emoji: string) => void;
 }
 
-// Select-only picker for one of the server's own emojis — nobody has to type
-// or paste an emoji code. The stored value is still the full code the bot
-// needs, but it is never shown as text.
+// Picker for any emoji — a standard Unicode one (the full curated set, not
+// just this server's custom emojis) or one of this server's own custom
+// emojis. The stored value is either the raw unicode character or the
+// server emoji's full <:name:id> token; the button face renders whichever
+// one it currently holds instead of only recognizing custom-emoji tokens.
 export function EmojiPicker({ guildId, value, onChange }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
-  const match = value.match(/^<(a?):(\w+):(\d+)>$/);
+  const [tab, setTab] = useState<"standard" | "server">("standard");
+  const customMatch = value.match(/^<(a?):(\w+):(\d+)>$/);
 
   return (
     <div>
@@ -50,14 +83,16 @@ export function EmojiPicker({ guildId, value, onChange }: EmojiPickerProps) {
           onClick={() => setOpen(!open)}
           className="flex-1 min-w-0 flex items-center gap-2 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm text-left hover:border-neon-blue/40"
         >
-          {match ? (
+          {customMatch ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={emojiUrl(match[3], match[1] === "a")} alt="" className="h-5 w-5" />
-              <span className="truncate text-slate-300">:{match[2]}:</span>
+              <img src={emojiUrl(customMatch[3], customMatch[1] === "a")} alt="" className="h-5 w-5" />
+              <span className="truncate text-slate-300">:{customMatch[2]}:</span>
             </>
+          ) : value ? (
+            <span className="text-lg leading-none">{value}</span>
           ) : (
-            <span className="text-slate-500">Choose a server emoji…</span>
+            <span className="text-slate-500">Choose an emoji…</span>
           )}
         </button>
         {value && (
@@ -67,14 +102,39 @@ export function EmojiPicker({ guildId, value, onChange }: EmojiPickerProps) {
         )}
       </div>
       {open && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-base-900 p-3 max-h-56 overflow-y-auto">
-          <ServerEmojiGrid
-            guildId={guildId}
-            onPick={(e) => {
-              onChange(e.token);
-              setOpen(false);
-            }}
-          />
+        <div className="mt-2 rounded-lg border border-white/10 bg-base-900 p-3">
+          <div className="flex gap-1 mb-2">
+            <button
+              type="button"
+              onClick={() => setTab("standard")}
+              className={`flex-1 text-xs px-2 py-1 rounded ${tab === "standard" ? "bg-neon-blue/15 text-neon-blue" : "text-slate-500 hover:text-slate-300"}`}
+            >
+              Any emoji
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("server")}
+              className={`flex-1 text-xs px-2 py-1 rounded ${tab === "server" ? "bg-neon-blue/15 text-neon-blue" : "text-slate-500 hover:text-slate-300"}`}
+            >
+              Server emojis
+            </button>
+          </div>
+          {tab === "standard" ? (
+            <StandardEmojiGrid
+              onPick={(e) => {
+                onChange(e);
+                setOpen(false);
+              }}
+            />
+          ) : (
+            <ServerEmojiGrid
+              guildId={guildId}
+              onPick={(e) => {
+                onChange(e.token);
+                setOpen(false);
+              }}
+            />
+          )}
         </div>
       )}
     </div>

@@ -918,7 +918,7 @@ model Poll {
 
 model PollVote {
   id     String @id @default(cuid())
-  poll   Poll   @relation(fields: [pollId], references: [id])
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
   pollId String
   userId String
   emoji  String // which option's emoji this user last voted with — one vote per user, switching replaces it
@@ -934,7 +934,7 @@ model PollVote {
 // options, and shown as its own list on the dashboard.
 model PollWriteIn {
   id        String   @id @default(cuid())
-  poll      Poll     @relation(fields: [pollId], references: [id])
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
   pollId    String
   userId    String
   text      String

@@ -11,7 +11,7 @@ import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import { api, type PollRow, type PollInput, type PollDurationMode } from "../../../../lib/api";
 
-type Tab = "active" | "create";
+type Tab = "active" | "past" | "create";
 
 const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
 
@@ -120,7 +120,16 @@ function PollsTabs({ guildId }: { guildId: string }) {
             tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
           ].join(" ")}
         >
-          Active & Past Polls
+          Active Polls
+        </button>
+        <button
+          onClick={() => setTab("past")}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "past" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          Past Polls
         </button>
         <button
           onClick={() => {
@@ -137,7 +146,30 @@ function PollsTabs({ guildId }: { guildId: string }) {
         </button>
       </div>
 
-      {tab === "active" && <PollsList guildId={guildId} refreshKey={refreshKey} onGoCreate={() => { setDraft(EMPTY_DRAFT); setDraftKey((k) => k + 1); setTab("create"); }} />}
+      {tab === "active" && (
+        <PollsList
+          guildId={guildId}
+          refreshKey={refreshKey}
+          filter="active"
+          onGoCreate={() => {
+            setDraft(EMPTY_DRAFT);
+            setDraftKey((k) => k + 1);
+            setTab("create");
+          }}
+        />
+      )}
+      {tab === "past" && (
+        <PollsList
+          guildId={guildId}
+          refreshKey={refreshKey}
+          filter="past"
+          onGoCreate={() => {
+            setDraft(EMPTY_DRAFT);
+            setDraftKey((k) => k + 1);
+            setTab("create");
+          }}
+        />
+      )}
       {tab === "create" && (
         <CreateWizard
           key={draftKey}
@@ -158,27 +190,50 @@ function PollsTabs({ guildId }: { guildId: string }) {
 // Active / Past Polls
 // ---------------------------------------------------------------------------
 
-function PollsList({ guildId, refreshKey, onGoCreate }: { guildId: string; refreshKey: number; onGoCreate: () => void }) {
+function PollsList({
+  guildId,
+  refreshKey,
+  filter,
+  onGoCreate,
+}: {
+  guildId: string;
+  refreshKey: number;
+  filter: "active" | "past";
+  onGoCreate: () => void;
+}) {
   const confirm = useConfirm();
-  const [rows, setRows] = useState<PollRow[] | null>(null);
+  const [allRows, setAllRows] = useState<PollRow[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const rows = allRows ? allRows.filter((r) => (filter === "active" ? !r.closed : r.closed)) : null;
   const { displayName } = useMemberNames(guildId, rows?.flatMap((r) => [...r.votes.map((v) => v.userId), ...r.writeIns.map((w) => w.userId)]) ?? []);
 
   function refresh() {
-    api.getPolls(guildId).then(setRows);
+    api.getPolls(guildId).then(setAllRows);
   }
   useEffect(refresh, [guildId, refreshKey]);
 
   async function stop(poll: PollRow) {
     if (!(await confirm(`Stop "${poll.question}" now? This reveals the final results immediately.`))) return;
-    await api.stopPoll(guildId, poll.id);
-    refresh();
+    setError(null);
+    try {
+      await api.stopPoll(guildId, poll.id);
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to stop poll");
+    }
   }
 
   async function remove(poll: PollRow) {
-    if (!(await confirm(`Delete "${poll.question}"? This only removes it from the dashboard — delete the Discord message yourself if you want it gone too.`))) return;
-    await api.deletePoll(guildId, poll.id);
-    refresh();
+    if (!(await confirm(`Delete "${poll.question}"? This removes it (and its votes/write-ins) from the dashboard — delete the Discord message yourself if you want it gone too.`)))
+      return;
+    setError(null);
+    try {
+      await api.deletePoll(guildId, poll.id);
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete poll");
+    }
   }
 
   if (rows === null) return <p className="text-sm text-slate-500">Loading…</p>;
@@ -187,11 +242,15 @@ function PollsList({ guildId, refreshKey, onGoCreate }: { guildId: string; refre
     return (
       <NeonCard>
         <div className="text-center py-10">
-          <p className="text-sm text-slate-400 mb-1">No polls yet.</p>
-          <p className="text-xs text-slate-600 mb-4">Create one to get live, reaction-based voting in any channel.</p>
-          <button onClick={onGoCreate} className="neon-button-sm">
-            + Create New
-          </button>
+          <p className="text-sm text-slate-400 mb-1">{filter === "active" ? "No active polls." : "No past polls yet."}</p>
+          <p className="text-xs text-slate-600 mb-4">
+            {filter === "active" ? "Create one to get live, reaction-based voting in any channel." : "Closed polls will show up here."}
+          </p>
+          {filter === "active" && (
+            <button onClick={onGoCreate} className="neon-button-sm">
+              + Create New
+            </button>
+          )}
         </div>
       </NeonCard>
     );
@@ -199,6 +258,7 @@ function PollsList({ guildId, refreshKey, onGoCreate }: { guildId: string; refre
 
   return (
     <div className="space-y-3">
+      {error && <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">{error}</p>}
       {rows.map((p) => {
         const counts = p.emojis.map((e) => p.votes.filter((v) => v.emoji === e).length);
         const total = counts.reduce((a, b) => a + b, 0);

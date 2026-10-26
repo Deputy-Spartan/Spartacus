@@ -93,6 +93,8 @@ router.post("/guilds/:guildId/polls/:id/stop", requireAuth, requireGuildPermissi
 });
 
 router.delete("/guilds/:guildId/polls/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const poll = await prisma.poll.findUnique({ where: { id: req.params.id } });
+  if (!poll || poll.guildId !== req.params.guildId) return res.status(404).json({ error: "Poll not found" });
   await prisma.poll.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

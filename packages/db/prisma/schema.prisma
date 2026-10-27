@@ -58,6 +58,7 @@ model Guild {
   modmailThreads    ModmailThread[]
   serverPartnerships ServerPartnership[]
   playerReports     PlayerReport[]
+  playerReportSettings PlayerReportSettings?
   permWatchConfig   PermWatchConfig?
   channelLocks      ChannelLock[]
   commandToggles    CommandToggle[]
@@ -1168,9 +1169,28 @@ model PlayerReport {
   reportedUserId String
   reason         String
   status         ReportStatus @default(OPEN)
-  createdAt      DateTime     @default(now())
+
+  // The embed posted to the review channel, and the discussion thread
+  // opened on it — staff reply right there in Discord, and every message
+  // in that thread gets appended to `transcript` live (see
+  // events/messageCreate.ts) so it survives even if the thread is archived.
+  messageId   String?
+  channelId   String?    @unique
+  claimedById String?
+  closedAt    DateTime?
+  transcript  Json       @default("[]") // [{ authorTag, authorId, content, attachmentUrls, at }, ...]
+
+  createdAt DateTime @default(now())
 
   @@index([guildId, status])
+}
+
+model PlayerReportSettings {
+  id              String  @id @default(cuid())
+  guild           Guild   @relation(fields: [guildId], references: [id])
+  guildId         String  @unique
+  reviewChannelId String?
+  staffRoleId     String?
 }
 
 // ---- Perm Watch ----

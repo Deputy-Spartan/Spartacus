@@ -22,6 +22,14 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && (interaction.customId.startsWith("report:claim:") || interaction.customId.startsWith("report:close:"))) {
+    const [, action, reportId] = interaction.customId.split(":");
+    const { handleReportClaim, handleReportClose } = await import("../modules/moderation/playerReports");
+    if (action === "claim") await handleReportClaim(interaction, reportId);
+    else await handleReportClose(interaction, reportId);
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId.startsWith("access:approve:")) {
     const requestId = interaction.customId.split(":")[2];
     const { handleAccessApprove } = await import("../modules/owner/accessRequests");

@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { postReportForReview } from "../../modules/moderation/playerReports";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -28,6 +29,8 @@ const command: CommandModule = {
       content: `✅ Report submitted (#${report.id.slice(0, 8)}). Staff will review it.`,
       ephemeral: true,
     });
+
+    await postReportForReview(interaction.client, report.id);
   },
 };
 

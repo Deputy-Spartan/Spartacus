@@ -39,6 +39,14 @@ export async function execute(message: Message) {
     return;
   }
 
+  // A Player Report's discussion thread — every message there is appended
+  // to the report's transcript so it's preserved even once the thread is
+  // archived/deleted.
+  if (message.channel.isThread()) {
+    const { appendReportTranscript } = await import("../modules/moderation/playerReports");
+    await appendReportTranscript(message.channelId, message);
+  }
+
   // --- Moderation / automod ---
   if (await isModuleEnabled(message.guildId, "MODERATION")) {
     const toggle = await prisma.moduleToggle.findUnique({

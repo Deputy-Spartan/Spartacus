@@ -1235,6 +1235,11 @@ export interface AppealRow {
   resolvedAt: string | null;
 }
 
+export interface ReportSettingsRow {
+  reviewChannelId: string | null;
+  staffRoleId: string | null;
+}
+
 export interface ModDigestSettingsRow {
   channelId: string | null;
   frequency: "DAILY" | "WEEKLY";
@@ -1750,11 +1755,25 @@ export const api = {
     request(`/guilds/${guildId}/cases/${caseNumber}`, { method: "DELETE" }),
 
   getReports: (guildId: string) =>
-    request<Array<{ id: string; reporterId: string; reportedUserId: string; reason: string; status: string; createdAt: string }>>(
-      `/guilds/${guildId}/reports`
-    ),
+    request<
+      Array<{
+        id: string;
+        reporterId: string;
+        reportedUserId: string;
+        reason: string;
+        status: string;
+        claimedById: string | null;
+        closedAt: string | null;
+        transcript: Array<{ authorId: string; authorTag: string; content: string; attachmentUrls: string[]; at: string }>;
+        createdAt: string;
+      }>
+    >(`/guilds/${guildId}/reports`),
   setReportStatus: (guildId: string, id: string, status: string) =>
     request(`/guilds/${guildId}/reports/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
+
+  getReportSettings: (guildId: string) => request<ReportSettingsRow>(`/guilds/${guildId}/report-settings`),
+  setReportSettings: (guildId: string, body: Partial<ReportSettingsRow>) =>
+    request<ReportSettingsRow>(`/guilds/${guildId}/report-settings`, { method: "PUT", body: JSON.stringify(body) }),
 
   getPartnerships: (guildId: string) =>
     request<Array<{ id: string; partnerName: string; partnerInvite: string | null; type: string; since: string }>>(

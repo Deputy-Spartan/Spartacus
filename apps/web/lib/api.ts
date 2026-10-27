@@ -1349,7 +1349,8 @@ export const api = {
   uploadImage: (guildId: string, file: File) => uploadFile(`/guilds/${guildId}/upload-image`, file),
 
   getMe: () => request<CurrentUser>("/me"),
-  getGuilds: () => request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>("/guilds"),
+  getGuilds: () =>
+    request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean; owner: boolean }>>("/guilds"),
 
   getAccessStatus: () => request<AccessStatus>("/access-status"),
   requestAccess: (message?: string) =>
@@ -1740,6 +1741,8 @@ export const api = {
     request<Array<{ caseNumber: number; userId: string; action: string; reason: string | null; moderatorId: string; createdAt: string }>>(
       `/guilds/${guildId}/cases`
     ),
+  deleteCase: (guildId: string, caseNumber: number) =>
+    request(`/guilds/${guildId}/cases/${caseNumber}`, { method: "DELETE" }),
 
   getReports: (guildId: string) =>
     request<Array<{ id: string; reporterId: string; reportedUserId: string; reason: string; status: string; createdAt: string }>>(

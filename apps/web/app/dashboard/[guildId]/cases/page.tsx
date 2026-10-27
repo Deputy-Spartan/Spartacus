@@ -6,6 +6,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api } from "../../../../lib/api";
 import { downloadCsv } from "../../../../lib/csv";
 import { useMemberNames } from "../../../../lib/useMemberNames";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 
 interface CaseRow {
   caseNumber: number;
@@ -18,11 +19,28 @@ interface CaseRow {
 
 export default function CasesPage({ params }: { params: { guildId: string } }) {
   const [cases, setCases] = useState<CaseRow[]>([]);
+  const [isGuildOwner, setIsGuildOwner] = useState(false);
   const { displayName } = useMemberNames(params.guildId, cases.flatMap((c) => [c.userId, c.moderatorId]));
+  const confirm = useConfirm();
 
   useEffect(() => {
     api.getCases(params.guildId).then(setCases);
+    api
+      .getGuilds()
+      .then((rows) => setIsGuildOwner(!!rows.find((g) => g.id === params.guildId)?.owner))
+      .catch(() => null);
   }, [params.guildId]);
+
+  async function removeCase(caseNumber: number) {
+    const ok = await confirm(`Permanently delete case #${caseNumber}? This can't be undone.`, {
+      title: "Delete case",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    await api.deleteCase(params.guildId, caseNumber);
+    setCases((prev) => prev.filter((c) => c.caseNumber !== caseNumber));
+  }
 
   return (
     <div>
@@ -61,11 +79,22 @@ export default function CasesPage({ params }: { params: { guildId: string } }) {
         <div className="divide-y divide-white/5">
           {cases.map((c) => (
             <div key={c.caseNumber} className="py-3 text-sm">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">
                   #{c.caseNumber} — <span className="text-neon-blue">{c.action}</span>
                 </span>
-                <span className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>
+                  {isGuildOwner && (
+                    <button
+                      onClick={() => removeCase(c.caseNumber)}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                      title="Server owner only"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-slate-500 mt-1">
                 {displayName(c.userId)} · by {displayName(c.moderatorId)} {c.reason ? `— ${c.reason}` : ""}

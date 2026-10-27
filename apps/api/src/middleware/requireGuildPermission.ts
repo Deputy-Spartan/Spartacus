@@ -1,6 +1,6 @@
 import { NextFunction, Response } from "express";
 import { prisma } from "@spartacus/db";
-import { AuthedRequest } from "./requireAuth";
+import { AuthedRequest, isOwner } from "./requireAuth";
 
 const MANAGE_GUILD = 0x20;
 const ADMINISTRATOR = 0x8;
@@ -47,6 +47,20 @@ export async function requireGuildPermission(req: AuthedRequest, res: Response, 
         .catch(() => null);
     });
   }
+
+  next();
+}
+
+// For actions scoped to the Discord server's actual owner (not just anyone
+// with Manage Server) — e.g. deleting moderation history. Must run after
+// requireGuildPermission, which already confirmed the guild is in the
+// session. The bot's own global owner (OWNER_DISCORD_ID) always passes too.
+export function requireGuildOwner(req: AuthedRequest, res: Response, next: NextFunction) {
+  if (isOwner(req.user?.id)) return next();
+
+  const { guildId } = req.params;
+  const guild = req.session?.guilds.find((g) => g.id === guildId);
+  if (!guild?.owner) return res.status(403).json({ error: "Only the server owner can do this" });
 
   next();
 }

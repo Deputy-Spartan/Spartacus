@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
-import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { requireGuildPermission, requireGuildOwner } from "../middleware/requireGuildPermission";
 
 const router = Router();
 
@@ -70,6 +70,27 @@ router.get("/guilds/:guildId/cases", requireAuth, requireGuildPermission, async 
   });
   res.json(rows);
 });
+
+// Server-owner-only — moderation history is evidence; letting any
+// Manage-Server mod erase it would let them cover their own tracks.
+router.delete(
+  "/guilds/:guildId/cases/:caseNumber",
+  requireAuth,
+  requireGuildPermission,
+  requireGuildOwner,
+  async (req, res) => {
+    const caseNumber = Number(req.params.caseNumber);
+    if (!Number.isInteger(caseNumber)) return res.status(400).json({ error: "Invalid case number" });
+
+    const existing = await prisma.moderationCase.findUnique({
+      where: { guildId_caseNumber: { guildId: req.params.guildId, caseNumber } },
+    });
+    if (!existing) return res.status(404).json({ error: "Case not found" });
+
+    await prisma.moderationCase.delete({ where: { id: existing.id } });
+    res.status(204).send();
+  }
+);
 
 // --- Quarantine (read active records) ---
 router.get("/guilds/:guildId/quarantine", requireAuth, requireGuildPermission, async (req, res) => {

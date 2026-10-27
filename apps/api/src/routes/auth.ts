@@ -60,6 +60,7 @@ router.get("/auth/discord/callback", async (req, res) => {
     name: string;
     icon: string | null;
     permissions: string;
+    owner: boolean;
   }>;
 
   // Only servers the user can actually manage go into the session — a

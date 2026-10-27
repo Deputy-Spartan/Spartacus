@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
-import { requireAuth } from "../middleware/requireAuth";
+import { requireAuth, type AuthedRequest } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { getBotClient } from "../lib/botClient";
 
 const router = Router();
 
@@ -61,6 +62,24 @@ router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
   });
 
   res.json(config);
+});
+
+// Posts a real welcome/goodbye message to the configured channel right now,
+// standing in the clicking admin's own account for the member — lets staff
+// see exactly what members will see (pings included) without waiting for a
+// real join/leave, and without needing a throwaway test account.
+router.post("/guilds/:guildId/welcome/send-test", requireAuth, requireGuildPermission, async (req: AuthedRequest, res) => {
+  const { kind } = req.body as { kind?: "welcome" | "goodbye" };
+  if (kind !== "welcome" && kind !== "goodbye") return res.status(400).json({ error: "kind must be 'welcome' or 'goodbye'" });
+
+  const client = getBotClient();
+  if (!client) return res.status(503).json({ error: "Bot isn't connected right now." });
+  if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+
+  const { sendWelcomeTest } = await import("@spartacus/bot");
+  const result = await sendWelcomeTest(client, req.params.guildId, req.user.id, kind);
+  if (!result.ok) return res.status(400).json({ error: result.error ?? "Failed to send test message." });
+  res.json({ ok: true });
 });
 
 // ---- Greetings (random join-message pool with a wave button) ----

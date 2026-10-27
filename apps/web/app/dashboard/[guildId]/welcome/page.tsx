@@ -27,6 +27,7 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
   const [tab, setTab] = useState<Tab>("message");
   const [config, setConfig] = useState<WelcomeConfig | null>(null);
   const [saving, setSaving] = useState(false);
+  const [testStatus, setTestStatus] = useState<{ kind: "welcome" | "goodbye"; state: "sending" | "sent" | "error"; message?: string } | null>(null);
 
   useEffect(() => {
     api.getWelcome(params.guildId).then(setConfig);
@@ -45,9 +46,21 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
   const autoSave = useAutoSave(config, save);
 
+  async function sendTest(kind: "welcome" | "goodbye") {
+    setTestStatus({ kind, state: "sending" });
+    try {
+      await api.sendWelcomeTest(params.guildId, kind);
+      setTestStatus({ kind, state: "sent" });
+    } catch (e) {
+      setTestStatus({ kind, state: "error", message: e instanceof Error ? e.message : "Failed to send." });
+    }
+    setTimeout(() => setTestStatus(null), 4000);
+  }
+
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
   const previewText = config.welcomeText.replace("{server}", "Iron Legion").replace("{user}", "@Draven");
+  const goodbyePreviewText = config.goodbyeText.replace("{server}", "Iron Legion").replace("{user}", "Draven");
 
   return (
     <div>
@@ -172,18 +185,58 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
           )}
         </NeonCard>
 
-        <NeonCard>
-          <p className="text-xs uppercase tracking-wide text-slate-500 mb-3">Live Preview (Welcome)</p>
-          <StickyPreview
-            content={config.embedEnabled ? "" : previewText}
-            embedEnabled={config.embedEnabled}
-            embedTitle={config.embedTitle ?? ""}
-            embedDescription={previewText}
-            embedColor={config.embedColor}
-            buttons={[]}
-            embedExtra={config.embedExtra ?? {}}
-          />
-        </NeonCard>
+        <div className="space-y-4">
+          <NeonCard>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Live Preview (Welcome)</p>
+              <button onClick={() => sendTest("welcome")} disabled={!config.channelId || testStatus?.state === "sending"} className="neon-button-sm disabled:opacity-40">
+                {testStatus?.kind === "welcome" && testStatus.state === "sending" ? "Sending…" : "Send Test"}
+              </button>
+            </div>
+            <StickyPreview
+              content={config.embedEnabled ? "" : previewText}
+              embedEnabled={config.embedEnabled}
+              embedTitle={config.embedTitle ?? ""}
+              embedDescription={previewText}
+              embedColor={config.embedColor}
+              buttons={[]}
+              embedExtra={config.embedExtra ?? {}}
+            />
+            {testStatus?.kind === "welcome" && testStatus.state === "sent" && (
+              <p className="text-xs text-emerald-400 mt-2">✓ Sent to the welcome channel, standing in for you.</p>
+            )}
+            {testStatus?.kind === "welcome" && testStatus.state === "error" && <p className="text-xs text-red-400 mt-2">⚠ {testStatus.message}</p>}
+          </NeonCard>
+
+          <NeonCard>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Live Preview (Goodbye)</p>
+              <button onClick={() => sendTest("goodbye")} disabled={!config.channelId || testStatus?.state === "sending"} className="neon-button-sm disabled:opacity-40">
+                {testStatus?.kind === "goodbye" && testStatus.state === "sending" ? "Sending…" : "Send Test"}
+              </button>
+            </div>
+            <StickyPreview
+              content={config.embedEnabled ? "" : goodbyePreviewText}
+              embedEnabled={config.embedEnabled}
+              embedTitle={config.embedTitle ?? ""}
+              embedDescription={goodbyePreviewText}
+              embedColor={config.embedColor}
+              buttons={[]}
+              embedExtra={config.embedExtra ?? {}}
+            />
+            {testStatus?.kind === "goodbye" && testStatus.state === "sent" && (
+              <p className="text-xs text-emerald-400 mt-2">✓ Sent to the welcome channel, standing in for you.</p>
+            )}
+            {testStatus?.kind === "goodbye" && testStatus.state === "error" && <p className="text-xs text-red-400 mt-2">⚠ {testStatus.message}</p>}
+          </NeonCard>
+
+          <p className="text-xs text-slate-500">
+            💡 "Send Test" posts the real message to your welcome channel using your own account in place of the new member, so you can see
+            exactly how it looks — but Discord only pings <em>you</em>, not a stranger. If you want to test how an{" "}
+            <code className="text-neon-blue">@role</code> mention in your message notifies people, create a small test role, give it to
+            yourself (and anyone else helping test), and mention that role instead of a real staff role while you're testing.
+          </p>
+        </div>
       </div>
       )}
 

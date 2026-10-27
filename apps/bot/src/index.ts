@@ -148,6 +148,10 @@ export { postRulesGatePanel } from "./jobs/rulesGatePoster";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel } from "./modules/security/verification";
+// Re-exported so apps/api's Welcome "Send Test" button can post the real
+// welcome/goodbye message (exact same render as a live join/leave) to the
+// configured channel on demand.
+export { sendWelcomeTest } from "./modules/community/welcomeRender";
 
 export function startBot() {
   const client = new Client({

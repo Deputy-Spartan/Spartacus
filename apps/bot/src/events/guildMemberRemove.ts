@@ -1,8 +1,7 @@
 import { Events, GuildMember, PartialGuildMember } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
-import { buildStickyPayload } from "../lib/stickyRender";
-import { resolveSavedEmbed } from "../lib/savedEmbedRender";
+import { buildGoodbyePayload } from "../modules/community/welcomeRender";
 
 export const name = Events.GuildMemberRemove;
 
@@ -26,26 +25,6 @@ export async function execute(member: GuildMember | PartialGuildMember) {
   const channel = await member.guild.channels.fetch(config.channelId).catch(() => null);
   if (!channel?.isTextBased()) return;
 
-  const tokens = { "{user}": member.user.username, "{server}": member.guild.name };
-  const text = (config.goodbyeText ?? "{user} has left {server}.")
-    .replace("{user}", tokens["{user}"])
-    .replace("{server}", tokens["{server}"]);
-
-  const saved = await resolveSavedEmbed(config.savedEmbedId);
-  const payload = await buildStickyPayload(
-    {
-      // Same reasoning as the join side — embed mode carries the text in
-      // the embed body, so content stays empty instead of repeating it.
-      content: config.embedEnabled ? "" : text,
-      embedEnabled: config.embedEnabled,
-      embedTitle: config.embedTitle,
-      embedDescription: text,
-      embedColor: config.embedColor,
-      buttons: config.buttons,
-      embedExtra: config.embedExtra,
-    },
-    { savedEmbed: saved, guildId: member.guild.id, tokens }
-  );
-
+  const payload = await buildGoodbyePayload(member.guild, config, member);
   await channel.send(payload);
 }

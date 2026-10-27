@@ -1388,6 +1388,8 @@ export const api = {
   getWelcome: (guildId: string) => request<WelcomeConfig>(`/guilds/${guildId}/welcome`),
   setWelcome: (guildId: string, config: Partial<WelcomeConfig>) =>
     request<WelcomeConfig>(`/guilds/${guildId}/welcome`, { method: "PUT", body: JSON.stringify(config) }),
+  sendWelcomeTest: (guildId: string, kind: "welcome" | "goodbye") =>
+    request<{ ok: boolean }>(`/guilds/${guildId}/welcome/send-test`, { method: "POST", body: JSON.stringify({ kind }) }),
 
   getWelcomeGreetings: (guildId: string) => request<WelcomeGreetingRow[]>(`/guilds/${guildId}/welcome-greetings`),
   addWelcomeGreeting: (guildId: string, body: Partial<WelcomeGreetingRow>) =>

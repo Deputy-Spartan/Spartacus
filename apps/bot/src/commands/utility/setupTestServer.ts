@@ -73,6 +73,8 @@ interface Plan {
   channelsToReparent: Array<{ channelId: string; label: string; targetCategoryName: string }>;
   staleChannelIds: string[];
   staleChannelLabels: string[];
+  duplicateChannelIds: string[];
+  duplicateChannelLabels: string[];
   emptyCategoryIds: string[];
 }
 
@@ -111,6 +113,24 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
     }
   }
 
+  // Any candidate sharing a spec'd channel's name that wasn't claimed above
+  // (as the correctly-placed one or the one being reparented) is a true
+  // duplicate — e.g. two "#lfg" channels anywhere in the server — and gets
+  // deleted outright rather than left sitting around or silently ignored,
+  // regardless of which category it happens to live in.
+  const duplicateChannelIds: string[] = [];
+  const duplicateChannelLabels: string[] = [];
+  const specNames = new Set(layout.flatMap((c) => c.channels.map((ch) => ch.name.toLowerCase())));
+  for (const name of specNames) {
+    for (const c of byName.get(name) ?? []) {
+      if (!claimedChannelIds.has(c.id)) {
+        claimedChannelIds.add(c.id);
+        duplicateChannelIds.push(c.id);
+        duplicateChannelLabels.push(`#${c.name}`);
+      }
+    }
+  }
+
   // Stale: anything currently sitting under one of our managed categories
   // that wasn't claimed above — i.e. doesn't match any current spec for
   // that category, so it's left over from a retired/renamed feature.
@@ -133,7 +153,16 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
     if (kept === 0 && children.size > 0) emptyCategoryIds.push(cat.id);
   }
 
-  return { categoriesToCreate, channelsToCreate, channelsToReparent, staleChannelIds, staleChannelLabels, emptyCategoryIds };
+  return {
+    categoriesToCreate,
+    channelsToCreate,
+    channelsToReparent,
+    staleChannelIds,
+    staleChannelLabels,
+    duplicateChannelIds,
+    duplicateChannelLabels,
+    emptyCategoryIds,
+  };
 }
 
 async function ensureCategories(guild: Guild, names: string[]): Promise<{ ids: Map<string, string>; failures: string[] }> {
@@ -223,7 +252,7 @@ async function applyReparent(guild: Guild, plan: Plan): Promise<{ reparented: nu
 async function applyDelete(guild: Guild, plan: Plan): Promise<{ deletedChannels: number; deletedCategories: number }> {
   let deletedChannels = 0;
   let deletedCategories = 0;
-  for (const id of plan.staleChannelIds) {
+  for (const id of [...plan.staleChannelIds, ...plan.duplicateChannelIds]) {
     const channel = await guild.channels.fetch(id).catch(() => null);
     if (channel) {
       await channel.delete().catch(() => null);
@@ -280,6 +309,13 @@ function summarize(plan: Plan): string {
         (plan.emptyCategoryIds.length > 0 ? `\n(and ${plan.emptyCategoryIds.length} categor${plan.emptyCategoryIds.length === 1 ? "y" : "ies"} that'd be left empty)` : "")
     );
   }
+  if (plan.duplicateChannelIds.length > 0) {
+    parts.push(
+      `♻️ Would delete ${plan.duplicateChannelIds.length} duplicate channel(s) (extra copies of a channel the layout already has elsewhere):\n` +
+        plan.duplicateChannelLabels.slice(0, 15).join("\n") +
+        (plan.duplicateChannelLabels.length > 15 ? `\n…and ${plan.duplicateChannelLabels.length - 15} more` : "")
+    );
+  }
   return parts.join("\n\n");
 }
 
@@ -292,7 +328,12 @@ export async function runSetupTestServer(message: Message) {
   const layout = buildLayout();
   const plan = computePlan(guild, layout);
 
-  if (plan.channelsToCreate.length === 0 && plan.channelsToReparent.length === 0 && plan.staleChannelIds.length === 0) {
+  if (
+    plan.channelsToCreate.length === 0 &&
+    plan.channelsToReparent.length === 0 &&
+    plan.staleChannelIds.length === 0 &&
+    plan.duplicateChannelIds.length === 0
+  ) {
     await message.reply("✅ Already up to date — every dashboard feature has a correctly-placed channel, nothing stale.");
     return;
   }
@@ -302,7 +343,8 @@ export async function runSetupTestServer(message: Message) {
   pendingPlans.set(token, { guildId: guild.id, plan, createdAt: Date.now() });
 
   const buttons = [new ButtonBuilder().setCustomId(`setuptestserver:confirm:${token}`).setLabel("Confirm").setStyle(ButtonStyle.Success)];
-  if ((plan.channelsToCreate.length > 0 || plan.channelsToReparent.length > 0) && plan.staleChannelIds.length > 0) {
+  const hasRemovals = plan.staleChannelIds.length > 0 || plan.duplicateChannelIds.length > 0;
+  if ((plan.channelsToCreate.length > 0 || plan.channelsToReparent.length > 0) && hasRemovals) {
     buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:deleteonly:${token}`).setLabel("Delete stale only").setStyle(ButtonStyle.Danger));
   }
   buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:skip:${token}`).setLabel("Skip").setStyle(ButtonStyle.Secondary));

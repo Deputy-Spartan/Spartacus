@@ -141,6 +141,9 @@ export { publishAnnouncement } from "./jobs/announcementPoster";
 // final-results embed the bot's own pollCloser job builds, instead of
 // duplicating that logic or waiting for the next minute's cron tick.
 export { renderPollEmbed, announcePollClosed } from "./modules/engagement/pollVotes";
+// Re-exported so apps/api's Rules Gate settings save can post/repost the
+// panel immediately instead of waiting up to a minute for the catch-up cron.
+export { postRulesGatePanel } from "./jobs/rulesGatePoster";
 
 export function startBot() {
   const client = new Client({

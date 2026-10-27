@@ -1203,6 +1203,7 @@ export interface BumpReminderSettingsRow {
 export interface RulesGateSettingsRow {
   channelId: string | null;
   roleId: string | null;
+  savedEmbedId: string | null;
 }
 
 export interface SuggestionAnalyticsSettingsRow {

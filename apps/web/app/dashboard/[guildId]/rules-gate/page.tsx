@@ -6,6 +6,8 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type RulesGateSettingsRow } from "../../../../lib/api";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import Link from "next/link";
 
 export default function RulesGatePage({ params }: { params: { guildId: string } }) {
   const [settings, setSettings] = useState<RulesGateSettingsRow | null>(null);
@@ -28,13 +30,16 @@ export default function RulesGatePage({ params }: { params: { guildId: string } 
         guildId={params.guildId}
         moduleKey="RULES_GATE"
         title="Rules Gate"
-        description="Posts a single '✅ I Agree' button in a channel — clicking it grants a role, confirming the member has read the rules."
+        description="Posts your rules embed with an '✅ I Agree' button in a channel — clicking it grants a role, confirming the member has read the rules."
       />
 
       <NeonCard className="max-w-xl">
         <p className="text-xs text-slate-500 mb-4">
-          This only adds the agree-button panel — post your actual rules text as a normal message in the
-          channel first, then set it below.
+          Build the full rules message below (title, images, links, multiple fields — even multiple embeds) in the{" "}
+          <Link href={`/dashboard/${params.guildId}/embed-creator`} className="text-neon-blue hover:underline">
+            Embed Creator
+          </Link>
+          , then pick it here. Saving posts (or reposts) it right away.
         </p>
 
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Rules Channel</label>
@@ -53,6 +58,8 @@ export default function RulesGatePage({ params }: { params: { guildId: string } 
           onChange={(id) => update({ roleId: id || null })}
           placeholder="No role configured yet"
         />
+
+        <SavedEmbedPicker guildId={params.guildId} value={settings?.savedEmbedId ?? null} onChange={(id) => update({ savedEmbedId: id })} />
 
         {saved && <p className="text-xs text-emerald-400 mt-2">Saved ✓</p>}
       </NeonCard>

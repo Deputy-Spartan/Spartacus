@@ -1330,12 +1330,13 @@ model MilestoneSettings {
 // bot / account age), this is about confirming the rules were read.
 
 model RulesGateSettings {
-  id        String  @id @default(cuid())
-  guild     Guild   @relation(fields: [guildId], references: [id])
-  guildId   String  @unique
-  channelId String?
-  messageId String?
-  roleId    String?
+  id           String  @id @default(cuid())
+  guild        Guild   @relation(fields: [guildId], references: [id])
+  guildId      String  @unique
+  channelId    String?
+  messageId    String?
+  roleId       String?
+  savedEmbedId String? // shared Embed Creator preset used as the rules message body — supports multiple embeds/fields/images/links; resolved live at post time
 }
 
 // ---- Prestige ----

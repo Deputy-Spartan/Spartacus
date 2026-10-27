@@ -49,12 +49,17 @@ export async function buildWelcomePayload(guild: Guild, config: WelcomeConfig, m
 }
 
 // Shared by guildMemberRemove.ts (a real leave) and sendWelcomeTest below.
-export async function buildGoodbyePayload(guild: Guild, config: WelcomeConfig, member: GuildMember | PartialGuildMember) {
-  const tokens = { "{user}": member.user.username, "{server}": guild.name };
+// `asMention` is only ever true for the test send: a real goodbye uses the
+// plain username since a member who already left can't be usefully pinged,
+// but the test's "member" is the admin themselves, still in the server, so
+// mentioning them (and getting the same real ping Welcome's test gets) is
+// what actually proves the message works.
+export async function buildGoodbyePayload(guild: Guild, config: WelcomeConfig, member: GuildMember | PartialGuildMember, asMention = false) {
+  const tokens = { "{user}": asMention ? `<@${member.id}>` : member.user.username, "{server}": guild.name };
   const text = (config.goodbyeText ?? "{user} has left {server}.").replace("{user}", tokens["{user}"]).replace("{server}", tokens["{server}"]);
 
   const saved = await resolveSavedEmbed(config.savedEmbedId);
-  return buildStickyPayload(
+  const payload = await buildStickyPayload(
     {
       content: config.embedEnabled ? "" : text,
       embedEnabled: config.embedEnabled,
@@ -66,6 +71,12 @@ export async function buildGoodbyePayload(guild: Guild, config: WelcomeConfig, m
     },
     { savedEmbed: saved, guildId: guild.id, tokens }
   );
+
+  if (asMention && !payload.content?.includes(tokens["{user}"])) {
+    payload.content = [tokens["{user}"], payload.content].filter(Boolean).join(" ");
+  }
+
+  return payload;
 }
 
 // Dashboard's "Send Test" button — posts the real welcome or goodbye
@@ -86,7 +97,7 @@ export async function sendWelcomeTest(client: Client, guildId: string, callerId:
   const member = await guild.members.fetch(callerId).catch(() => null);
   if (!member) return { ok: false, error: "Couldn't find your membership in this server." };
 
-  const payload = kind === "welcome" ? await buildWelcomePayload(guild, config, member) : await buildGoodbyePayload(guild, config, member);
+  const payload = kind === "welcome" ? await buildWelcomePayload(guild, config, member) : await buildGoodbyePayload(guild, config, member, true);
   const prefix = `🧪 **Test ${kind === "welcome" ? "welcome" : "goodbye"} message** — only you triggered this, no one actually joined/left.`;
   await channel.send({ ...payload, content: [prefix, payload.content].filter(Boolean).join("\n") });
 

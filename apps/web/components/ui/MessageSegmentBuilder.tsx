@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ToggleSwitch } from "./ToggleSwitch";
 
 export interface SegmentToken {
   key: string;
@@ -93,7 +94,7 @@ export function MessageSegmentBuilder({ value, onChange, tokens }: MessageSegmen
   function updateText(i: number, text: string) {
     const next = [...segments];
     next[i] = { ...next[i], text };
-    setSegments(next); // onChange fires on blur to avoid re-serializing every keystroke
+    commit(next);
   }
 
   function remove(i: number) {
@@ -150,23 +151,13 @@ export function MessageSegmentBuilder({ value, onChange, tokens }: MessageSegmen
                 className="flex-1 min-w-0 bg-base-950 border border-white/10 rounded-md px-2 py-1 text-xs"
                 value={seg.text ?? ""}
                 onChange={(e) => updateText(i, e.target.value)}
-                onBlur={() => commit(segments)}
                 placeholder="Text"
               />
             )}
 
-            <button
-              type="button"
-              onClick={() => toggle(i)}
-              className={`shrink-0 w-8 h-[18px] rounded-full relative transition-colors ${seg.enabled ? "bg-neon-blue" : "bg-base-950 border border-white/10"}`}
-              title={seg.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
-            >
-              <span
-                className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-transform ${
-                  seg.enabled ? "translate-x-[16px]" : "translate-x-[2px]"
-                }`}
-              />
-            </button>
+            <div title={seg.enabled ? "Enabled — click to disable" : "Disabled — click to enable"} className="shrink-0">
+              <ToggleSwitch enabled={seg.enabled} onChange={() => toggle(i)} label={`${seg.type === "token" ? seg.label : seg.text || "text"} block`} />
+            </div>
 
             <button
               type="button"

@@ -63,8 +63,25 @@ function buildLayout(): CategorySpec[] {
   return layout;
 }
 
+// Strips a leading emoji/symbol (and the whitespace after it) so "🔵
+// moderation" and a pre-emoji "Moderation" normalize to the same key —
+// NAV_SECTIONS grew emoji prefixes at some point, and without this an old
+// category never matches its current spec by exact name, so the script
+// just builds a second one forever instead of recognizing it as the same
+// category.
+function normalizeCategoryName(name: string): string {
+  return name
+    .replace(/^[\p{Extended_Pictographic}‍️☀-➿]+\s*/u, "")
+    .trim()
+    .toLowerCase();
+}
+
 interface Plan {
   categoriesToCreate: string[]; // category names that don't exist yet
+  // An existing category matches a spec'd one once emoji/casing is ignored,
+  // but its literal name has drifted (e.g. "Moderation" vs "🔵 moderation")
+  // — renamed in place rather than recreated so permission overrides stick.
+  categoriesToRename: Array<{ id: string; from: string; to: string }>;
   channelsToCreate: Array<{ categoryName: string; channel: ChannelSpec }>;
   // A channel with the right name exists somewhere in the server but isn't
   // parented under the category it's supposed to be in (this is what a
@@ -76,6 +93,13 @@ interface Plan {
   duplicateChannelIds: string[];
   duplicateChannelLabels: string[];
   emptyCategoryIds: string[];
+  // A second (or third…) category that normalizes to the same name as one
+  // already claimed as canonical — e.g. a leftover "Moderation" sitting
+  // beside the current "🔵 moderation". Its channels get folded into the
+  // canonical category (as reparents/stale above) and the now-empty shell
+  // gets deleted here rather than left behind.
+  duplicateCategoryIds: string[];
+  duplicateCategoryLabels: string[];
 }
 
 function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
@@ -87,18 +111,46 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
     byName.get(key)!.push({ id: c.id, name: c.name, parentId: c.parentId });
   }
 
+  // Group existing categories by normalized name so every spelling/emoji
+  // variant of e.g. "moderation" is recognized as the same logical category.
+  const categoriesByNorm = new Map<string, Array<{ id: string; name: string }>>();
+  for (const c of guild.channels.cache.values()) {
+    if (c.type !== ChannelType.GuildCategory) continue;
+    const key = normalizeCategoryName(c.name);
+    if (!categoriesByNorm.has(key)) categoriesByNorm.set(key, []);
+    categoriesByNorm.get(key)!.push({ id: c.id, name: c.name });
+  }
+
   const claimedChannelIds = new Set<string>();
   const categoriesToCreate: string[] = [];
+  const categoriesToRename: Plan["categoriesToRename"] = [];
   const channelsToCreate: Plan["channelsToCreate"] = [];
   const channelsToReparent: Plan["channelsToReparent"] = [];
+  // Maps a layout category's spec name -> the real id/name of the single
+  // canonical Discord category it resolves to (for channel matching below).
+  const canonicalByLayoutName = new Map<string, { id: string; name: string } | null>();
+  const claimedCategoryIds = new Set<string>();
 
   for (const category of layout) {
-    const existingCategory = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === category.name);
-    if (!existingCategory) categoriesToCreate.push(category.name);
+    const norm = normalizeCategoryName(category.name);
+    const group = categoriesByNorm.get(norm) ?? [];
+    // Prefer an exact-name match as canonical (already correctly named);
+    // otherwise just take the first one found and rename it.
+    const canonical = group.find((c) => c.name === category.name) ?? group[0] ?? null;
+
+    if (!canonical) {
+      categoriesToCreate.push(category.name);
+    } else {
+      claimedCategoryIds.add(canonical.id);
+      if (canonical.name !== category.name) {
+        categoriesToRename.push({ id: canonical.id, from: canonical.name, to: category.name });
+      }
+    }
+    canonicalByLayoutName.set(category.name, canonical);
 
     for (const ch of category.channels) {
       const candidates = byName.get(ch.name.toLowerCase()) ?? [];
-      const alreadyCorrect = existingCategory && candidates.find((c) => c.parentId === existingCategory.id);
+      const alreadyCorrect = canonical && candidates.find((c) => c.parentId === canonical.id);
       if (alreadyCorrect) {
         claimedChannelIds.add(alreadyCorrect.id);
         continue;
@@ -110,6 +162,27 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
         continue;
       }
       channelsToCreate.push({ categoryName: category.name, channel: ch });
+    }
+  }
+
+  // Any additional category in a normalized group beyond the canonical one
+  // (e.g. a leftover plain "Moderation" beside the current "🔵 moderation")
+  // is a duplicate shell — its channels get swept up as stale/reparented
+  // below (the stale scan covers every category in a managed group, not
+  // just the canonical one), and the empty shell itself is deleted here.
+  const duplicateCategoryIds: string[] = [];
+  const duplicateCategoryLabels: string[] = [];
+  const managedCategoryIds = new Set<string>();
+  for (const category of layout) {
+    const norm = normalizeCategoryName(category.name);
+    const group = categoriesByNorm.get(norm) ?? [];
+    for (const c of group) {
+      managedCategoryIds.add(c.id);
+      if (!claimedCategoryIds.has(c.id)) {
+        claimedCategoryIds.add(c.id); // avoid double-listing if norm somehow repeats
+        duplicateCategoryIds.push(c.id);
+        duplicateCategoryLabels.push(c.name);
+      }
     }
   }
 
@@ -131,30 +204,35 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
     }
   }
 
-  // Stale: anything currently sitting under one of our managed categories
-  // that wasn't claimed above — i.e. doesn't match any current spec for
-  // that category, so it's left over from a retired/renamed feature.
+  // Stale: anything currently sitting under ANY managed category (canonical
+  // or a duplicate shell) that wasn't claimed above — i.e. doesn't match any
+  // current spec for that category, so it's left over from a retired/renamed
+  // feature (or belongs to a duplicate shell being merged away).
   const staleChannelIds: string[] = [];
   const staleChannelLabels: string[] = [];
   const emptyCategoryIds: string[] = [];
-  const managedCategoryNames = new Set(layout.map((c) => c.name));
 
+  const duplicateCategoryIdSet = new Set(duplicateCategoryIds);
   for (const cat of guild.channels.cache.values()) {
-    if (cat.type !== ChannelType.GuildCategory || !managedCategoryNames.has(cat.name)) continue;
+    if (cat.type !== ChannelType.GuildCategory || !managedCategoryIds.has(cat.id)) continue;
     const children = guild.channels.cache.filter((c) => c.parentId === cat.id);
     let kept = 0;
     for (const child of children.values()) {
       if (claimedChannelIds.has(child.id)) kept++;
       else {
+        // Unclaimed child of any managed category (canonical or a
+        // duplicate shell being merged away) — doesn't match any current
+        // spec for it, so it's left over and gets deleted.
         staleChannelIds.push(child.id);
         staleChannelLabels.push(`#${child.name} (${cat.name})`);
       }
     }
-    if (kept === 0 && children.size > 0) emptyCategoryIds.push(cat.id);
+    if (kept === 0 && children.size > 0 && !duplicateCategoryIdSet.has(cat.id)) emptyCategoryIds.push(cat.id);
   }
 
   return {
     categoriesToCreate,
+    categoriesToRename,
     channelsToCreate,
     channelsToReparent,
     staleChannelIds,
@@ -162,6 +240,8 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
     duplicateChannelIds,
     duplicateChannelLabels,
     emptyCategoryIds,
+    duplicateCategoryIds,
+    duplicateCategoryLabels,
   };
 }
 
@@ -169,7 +249,7 @@ async function ensureCategories(guild: Guild, names: string[]): Promise<{ ids: M
   const ids = new Map<string, string>();
   const failures: string[] = [];
   for (const name of names) {
-    const existing = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === name);
+    const existing = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && normalizeCategoryName(c.name) === normalizeCategoryName(name));
     if (existing) {
       ids.set(name, existing.id);
       continue;
@@ -183,6 +263,26 @@ async function ensureCategories(guild: Guild, names: string[]): Promise<{ ids: M
     }
   }
   return { ids, failures };
+}
+
+async function applyRename(guild: Guild, plan: Plan): Promise<{ renamed: number; failures: string[] }> {
+  const failures: string[] = [];
+  let renamed = 0;
+  for (const r of plan.categoriesToRename) {
+    const category = await guild.channels.fetch(r.id).catch(() => null);
+    if (!category) {
+      failures.push(`(category) ${r.from}`);
+      continue;
+    }
+    try {
+      await category.setName(r.to);
+      renamed++;
+    } catch (err) {
+      failures.push(`(category) ${r.from}`);
+      console.error(`[setup-test-server] failed to rename category "${r.from}" -> "${r.to}":`, err);
+    }
+  }
+  return { renamed, failures };
 }
 
 async function applyCreate(guild: Guild, plan: Plan): Promise<{ created: number; failures: string[] }> {
@@ -259,9 +359,13 @@ async function applyDelete(guild: Guild, plan: Plan): Promise<{ deletedChannels:
       deletedChannels++;
     }
   }
-  for (const id of plan.emptyCategoryIds) {
+  for (const id of [...plan.emptyCategoryIds, ...plan.duplicateCategoryIds]) {
     const category = await guild.channels.fetch(id).catch(() => null);
     if (category) {
+      // Only safe to delete once empty — anything still under it (e.g. a
+      // duplicate-shell channel that failed to reparent) would be lost.
+      const stillHasChildren = guild.channels.cache.some((c) => c.parentId === id);
+      if (stillHasChildren) continue;
       await category.delete().catch(() => null);
       deletedCategories++;
     }
@@ -284,6 +388,18 @@ function pruneExpired() {
 
 function summarize(plan: Plan): string {
   const parts: string[] = [];
+  if (plan.categoriesToRename.length > 0) {
+    parts.push(
+      `🏷️ Would rename ${plan.categoriesToRename.length} categor${plan.categoriesToRename.length === 1 ? "y" : "ies"} to match the dashboard (same category, old naming — e.g. missing its emoji prefix):\n` +
+        plan.categoriesToRename.map((r) => `${r.from} → ${r.to}`).join("\n")
+    );
+  }
+  if (plan.duplicateCategoryIds.length > 0) {
+    parts.push(
+      `♻️ Would merge and delete ${plan.duplicateCategoryIds.length} duplicate categor${plan.duplicateCategoryIds.length === 1 ? "y" : "ies"} (leftover copy of a category that already exists under the current name):\n` +
+        plan.duplicateCategoryLabels.join("\n")
+    );
+  }
   if (plan.channelsToCreate.length > 0) {
     parts.push(
       `✅ Would create ${plan.channelsToCreate.length} channel(s)` +
@@ -329,6 +445,8 @@ export async function runSetupTestServer(message: Message) {
   const plan = computePlan(guild, layout);
 
   if (
+    plan.categoriesToRename.length === 0 &&
+    plan.duplicateCategoryIds.length === 0 &&
     plan.channelsToCreate.length === 0 &&
     plan.channelsToReparent.length === 0 &&
     plan.staleChannelIds.length === 0 &&
@@ -343,7 +461,7 @@ export async function runSetupTestServer(message: Message) {
   pendingPlans.set(token, { guildId: guild.id, plan, createdAt: Date.now() });
 
   const buttons = [new ButtonBuilder().setCustomId(`setuptestserver:confirm:${token}`).setLabel("Confirm").setStyle(ButtonStyle.Success)];
-  const hasRemovals = plan.staleChannelIds.length > 0 || plan.duplicateChannelIds.length > 0;
+  const hasRemovals = plan.staleChannelIds.length > 0 || plan.duplicateChannelIds.length > 0 || plan.duplicateCategoryIds.length > 0;
   if ((plan.channelsToCreate.length > 0 || plan.channelsToReparent.length > 0) && hasRemovals) {
     buttons.push(new ButtonBuilder().setCustomId(`setuptestserver:deleteonly:${token}`).setLabel("Delete stale only").setStyle(ButtonStyle.Danger));
   }
@@ -374,15 +492,17 @@ export async function handleSetupTestServerConfirm(interaction: ButtonInteractio
   if (!pending) return;
   const guild = interaction.guild!;
 
+  const { renamed, failures: renameFailures } = await applyRename(guild, pending.plan);
   const { created, failures: createFailures } = await applyCreate(guild, pending.plan);
   const { reparented, failures: reparentFailures } = await applyReparent(guild, pending.plan);
   const { deletedChannels, deletedCategories } = await applyDelete(guild, pending.plan);
-  const failures = [...createFailures, ...reparentFailures];
+  const failures = [...renameFailures, ...createFailures, ...reparentFailures];
 
   const parts = [
     `✅ Created ${created} channel(s).`,
+    `🏷️ Renamed ${renamed} categor${renamed === 1 ? "y" : "ies"} to match the dashboard.`,
     `📦 Moved ${reparented} channel(s) into their correct category.`,
-    `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} empty categor${deletedCategories === 1 ? "y" : "ies"}` : ""}.`,
+    `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} categor${deletedCategories === 1 ? "y" : "ies"} (stale/duplicate)` : ""}.`,
   ];
   if (failures.length > 0) parts.push(`⚠️ Couldn't finish: ${failures.join(", ")} — check my Manage Channels permission.`);
   await interaction.update({ content: parts.join("\n"), components: [] });
@@ -393,7 +513,7 @@ export async function handleSetupTestServerDeleteOnly(interaction: ButtonInterac
   if (!pending) return;
   const { deletedChannels, deletedCategories } = await applyDelete(interaction.guild!, pending.plan);
   await interaction.update({
-    content: `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} empty categor${deletedCategories === 1 ? "y" : "ies"}` : ""}. Nothing was created or moved.`,
+    content: `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} categor${deletedCategories === 1 ? "y" : "ies"} (stale/duplicate)` : ""}. Nothing was created, renamed, or moved.`,
     components: [],
   });
 }

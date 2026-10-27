@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
-import { requireAuth } from "../middleware/requireAuth";
+import { requireAuth, type AuthedRequest } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { getBotClient } from "../lib/botClient";
 
 const router = Router();
 
@@ -48,6 +49,17 @@ router.put("/guilds/:guildId/birthday-config", requireAuth, requireGuildPermissi
     update: data,
   });
   res.json(row);
+});
+
+router.post("/guilds/:guildId/birthday-config/send-test", requireAuth, requireGuildPermission, async (req: AuthedRequest, res) => {
+  const client = getBotClient();
+  if (!client) return res.status(503).json({ error: "Bot isn't connected right now." });
+  if (!req.user) return res.status(401).json({ error: "Not authenticated" });
+
+  const { sendBirthdayTest } = await import("@spartacus/bot");
+  const result = await sendBirthdayTest(client, req.params.guildId, req.user.id);
+  if (!result.ok) return res.status(400).json({ error: result.error ?? "Failed to send test announcement." });
+  res.json({ ok: true });
 });
 
 router.get("/guilds/:guildId/birthdays", requireAuth, requireGuildPermission, async (req, res) => {

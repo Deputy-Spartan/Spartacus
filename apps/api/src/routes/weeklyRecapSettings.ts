@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { getBotClient } from "../lib/botClient";
 
 const router = Router();
 
@@ -20,6 +21,19 @@ router.put("/guilds/:guildId/weekly-recap-settings", requireAuth, requireGuildPe
   });
 
   res.json(row);
+});
+
+router.post("/guilds/:guildId/weekly-recap-settings/send-test", requireAuth, requireGuildPermission, async (req, res) => {
+  const settings = await prisma.weeklyRecapSettings.findUnique({ where: { guildId: req.params.guildId } });
+  if (!settings) return res.status(400).json({ error: "Set a recap channel first." });
+
+  const client = getBotClient();
+  if (!client) return res.status(503).json({ error: "Bot isn't connected right now." });
+
+  const { postWeeklyRecap } = await import("@spartacus/bot");
+  const result = await postWeeklyRecap(client, settings, { isTest: true });
+  if (!result.ok) return res.status(400).json({ error: result.error ?? "Failed to send test recap." });
+  res.json({ ok: true });
 });
 
 export default router;

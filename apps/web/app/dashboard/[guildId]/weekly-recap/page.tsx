@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type WeeklyRecapSettingsRow } from "../../../../lib/api";
+import { SendTestButton } from "../../../../components/ui/SendTestButton";
 
 export default function WeeklyRecapPage({ params }: { params: { guildId: string } }) {
   const [settings, setSettings] = useState<WeeklyRecapSettingsRow | null>(null);
@@ -38,6 +39,14 @@ export default function WeeklyRecapPage({ params }: { params: { guildId: string 
           kind="text"
           placeholder="Off — not posting anywhere"
         />
+
+        <div className="mt-4">
+          <SendTestButton
+            onSend={() => api.sendWeeklyRecapTest(params.guildId)}
+            disabled={!settings?.channelId}
+            successMessage="Sent — check the recap channel."
+          />
+        </div>
       </NeonCard>
     </div>
   );

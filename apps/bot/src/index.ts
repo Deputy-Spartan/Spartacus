@@ -152,6 +152,12 @@ export { postVerificationPanel } from "./modules/security/verification";
 // welcome/goodbye message (exact same render as a live join/leave) to the
 // configured channel on demand.
 export { sendWelcomeTest } from "./modules/community/welcomeRender";
+// Re-exported so apps/api's Weekly Recap "Send Test" button can post the
+// exact same embed the Monday cron builds, on demand.
+export { postWeeklyRecap } from "./jobs/weeklyRecap";
+// Re-exported so apps/api's Birthdays "Send Test" button can announce a
+// test birthday for the clicking admin on demand.
+export { sendBirthdayTest } from "./jobs/birthdayAnnouncer";
 
 export function startBot() {
   const client = new Client({

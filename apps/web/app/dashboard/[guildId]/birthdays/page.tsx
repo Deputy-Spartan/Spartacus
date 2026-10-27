@@ -11,6 +11,7 @@ import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExampl
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
+import { SendTestButton } from "../../../../components/ui/SendTestButton";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
@@ -103,7 +104,7 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start mt-4">
         <NeonCard>
-          <div className="rounded-lg bg-[#313338] p-4 font-sans mb-4">
+          <div className="rounded-lg bg-[#313338] p-4 font-sans mb-3">
             <div className="flex items-baseline gap-2 mb-2">
               <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
               <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
@@ -115,6 +116,14 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
                 {(config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, "@member")}
               </p>
             )}
+          </div>
+
+          <div className="mb-4">
+            <SendTestButton
+              onSend={() => api.sendBirthdayTest(params.guildId)}
+              disabled={!config.channelId}
+              successMessage="Sent — check the announcement channel."
+            />
           </div>
 
           <p className="font-medium mb-3">Saved Birthdays ({birthdays.length})</p>

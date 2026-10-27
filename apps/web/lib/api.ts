@@ -1654,6 +1654,7 @@ export const api = {
   getBirthdayConfig: (guildId: string) => request<BirthdayConfigRow>(`/guilds/${guildId}/birthday-config`),
   setBirthdayConfig: (guildId: string, body: Partial<BirthdayConfigRow>) =>
     request<BirthdayConfigRow>(`/guilds/${guildId}/birthday-config`, { method: "PUT", body: JSON.stringify(body) }),
+  sendBirthdayTest: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/birthday-config/send-test`, { method: "POST" }),
   getBirthdays: (guildId: string) => request<BirthdayRow[]>(`/guilds/${guildId}/birthdays`),
   deleteBirthday: (guildId: string, userId: string) => request(`/guilds/${guildId}/birthdays/${userId}`, { method: "DELETE" }),
 
@@ -1847,6 +1848,7 @@ export const api = {
   getWeeklyRecapSettings: (guildId: string) => request<WeeklyRecapSettingsRow>(`/guilds/${guildId}/weekly-recap-settings`),
   updateWeeklyRecapSettings: (guildId: string, input: Partial<WeeklyRecapSettingsRow>) =>
     request<WeeklyRecapSettingsRow>(`/guilds/${guildId}/weekly-recap-settings`, { method: "PUT", body: JSON.stringify(input) }),
+  sendWeeklyRecapTest: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/weekly-recap-settings/send-test`, { method: "POST" }),
 
   getVoiceActivity: (guildId: string) => request<VoiceActivityRow[]>(`/guilds/${guildId}/voice-activity`),
   getAchievements: (guildId: string) => request<AchievementRow[]>(`/guilds/${guildId}/achievements`),

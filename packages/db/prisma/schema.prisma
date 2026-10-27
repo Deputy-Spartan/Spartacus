@@ -1911,6 +1911,20 @@ model ModDigestSettings {
   guild     Guild   @relation(fields: [guildId], references: [id])
   guildId   String  @unique
   channelId String?
+
+  frequency String @default("WEEKLY") // DAILY | WEEKLY
+  dayOfWeek Int    @default(1) // 0=Sunday..6=Saturday — only read when frequency is WEEKLY
+  hourUtc   Int    @default(12) // 0-23
+
+  // Empty = count every moderator. Set = only moderators holding one of
+  // these roles are included, and a moderator holding more than one of
+  // them gets one digest line per held role instead of being merged.
+  staffRoleIds String[] @default([])
+
+  // Dashboard's "Send Now" button stamps this; the job picks it up on its
+  // next minute tick and clears it, regardless of the scheduled time.
+  manualSendRequestedAt DateTime?
+  lastSentAt            DateTime?
 }
 
 // ---- Voice Activity ----

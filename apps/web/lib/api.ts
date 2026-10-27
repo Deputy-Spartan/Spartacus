@@ -1237,6 +1237,11 @@ export interface AppealRow {
 
 export interface ModDigestSettingsRow {
   channelId: string | null;
+  frequency: "DAILY" | "WEEKLY";
+  dayOfWeek: number;
+  hourUtc: number;
+  staffRoleIds: string[];
+  lastSentAt: string | null;
 }
 
 export interface WeeklyRecapSettingsRow {
@@ -1813,6 +1818,7 @@ export const api = {
   getModDigestSettings: (guildId: string) => request<ModDigestSettingsRow>(`/guilds/${guildId}/mod-digest-settings`),
   updateModDigestSettings: (guildId: string, input: Partial<ModDigestSettingsRow>) =>
     request<ModDigestSettingsRow>(`/guilds/${guildId}/mod-digest-settings`, { method: "PUT", body: JSON.stringify(input) }),
+  sendModDigestNow: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/mod-digest-settings/send-now`, { method: "POST" }),
 
   getWeeklyRecapSettings: (guildId: string) => request<WeeklyRecapSettingsRow>(`/guilds/${guildId}/weekly-recap-settings`),
   updateWeeklyRecapSettings: (guildId: string, input: Partial<WeeklyRecapSettingsRow>) =>

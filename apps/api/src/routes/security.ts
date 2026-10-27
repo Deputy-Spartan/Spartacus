@@ -2,22 +2,69 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission, requireGuildOwner } from "../middleware/requireGuildPermission";
+import { getBotClient } from "../lib/botClient";
 
 const router = Router();
 
 // --- Verification ---
 router.get("/guilds/:guildId/verification", requireAuth, requireGuildPermission, async (req, res) => {
   const config = await prisma.verificationConfig.findUnique({ where: { guildId: req.params.guildId } });
-  res.json(config ?? { guildId: req.params.guildId, verifiedRoleId: null, minAccountAgeDays: 0 });
+  res.json(
+    config ?? {
+      guildId: req.params.guildId,
+      verifiedRoleId: null,
+      minAccountAgeDays: 0,
+      panelChannelId: null,
+      savedEmbedId: null,
+    }
+  );
 });
 
 router.put("/guilds/:guildId/verification", requireAuth, requireGuildPermission, async (req, res) => {
-  const { verifiedRoleId, minAccountAgeDays } = req.body;
+  const { verifiedRoleId, minAccountAgeDays, panelChannelId, savedEmbedId } = req.body as {
+    verifiedRoleId?: string | null;
+    minAccountAgeDays?: number;
+    panelChannelId?: string | null;
+    savedEmbedId?: string | null;
+  };
+
+  const existing = await prisma.verificationConfig.findUnique({ where: { guildId: req.params.guildId } });
+  // Mirrors apps/api/src/routes/rulesGateSettings.ts — any change that
+  // affects what the panel looks like clears panelMessageId so it gets
+  // redrawn/reposted instead of editing a now-stale message.
+  const channelChanged = panelChannelId !== undefined && existing && existing.panelChannelId !== panelChannelId;
+  const embedChanged = savedEmbedId !== undefined && existing && existing.savedEmbedId !== savedEmbedId;
+
   const config = await prisma.verificationConfig.upsert({
     where: { guildId: req.params.guildId },
-    create: { guildId: req.params.guildId, verifiedRoleId, minAccountAgeDays },
-    update: { verifiedRoleId, minAccountAgeDays },
+    create: {
+      guildId: req.params.guildId,
+      verifiedRoleId,
+      minAccountAgeDays,
+      panelChannelId: panelChannelId ?? null,
+      savedEmbedId: savedEmbedId ?? null,
+    },
+    update: {
+      verifiedRoleId,
+      minAccountAgeDays,
+      ...(panelChannelId !== undefined ? { panelChannelId } : {}),
+      ...(savedEmbedId !== undefined ? { savedEmbedId } : {}),
+      ...(channelChanged || embedChanged ? { panelMessageId: null } : {}),
+    },
   });
+
+  if ((channelChanged || embedChanged) && config.panelChannelId) {
+    const client = getBotClient();
+    if (client) {
+      if (existing?.panelMessageId && existing.panelChannelId) {
+        const oldChannel = await client.channels.fetch(existing.panelChannelId).catch(() => null);
+        if (oldChannel?.isTextBased()) await oldChannel.messages.delete(existing.panelMessageId).catch(() => null);
+      }
+      const { postVerificationPanel } = await import("@spartacus/bot");
+      await postVerificationPanel(client, config).catch(() => null);
+    }
+  }
+
   res.json(config);
 });
 

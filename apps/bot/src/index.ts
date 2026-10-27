@@ -36,6 +36,7 @@ import { startSuggestionAnalyticsJob } from "./jobs/suggestionAnalytics";
 import { startRemindersJob } from "./jobs/reminders";
 import { startMemberMilestonesJob } from "./jobs/memberMilestones";
 import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
+import { startVerificationPosterJob } from "./jobs/verificationPoster";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -144,6 +145,9 @@ export { renderPollEmbed, announcePollClosed } from "./modules/engagement/pollVo
 // Re-exported so apps/api's Rules Gate settings save can post/repost the
 // panel immediately instead of waiting up to a minute for the catch-up cron.
 export { postRulesGatePanel } from "./jobs/rulesGatePoster";
+// Re-exported so apps/api's Verification settings save can post/repost the
+// panel immediately, same reasoning as postRulesGatePanel above.
+export { postVerificationPanel } from "./modules/security/verification";
 
 export function startBot() {
   const client = new Client({
@@ -211,6 +215,7 @@ export function startBot() {
     startRemindersJob(c);
     startMemberMilestonesJob(c);
     startRulesGatePosterJob(c);
+    startVerificationPosterJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);

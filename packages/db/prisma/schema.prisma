@@ -814,11 +814,17 @@ model ModerationCase {
 // ---- Verification ----
 
 model VerificationConfig {
-  id             String  @id @default(cuid())
-  guild          Guild   @relation(fields: [guildId], references: [id])
-  guildId        String  @unique
-  verifiedRoleId String?
-  minAccountAgeDays Int  @default(0)
+  id                String  @id @default(cuid())
+  guild             Guild   @relation(fields: [guildId], references: [id])
+  guildId           String  @unique
+  verifiedRoleId    String?
+  minAccountAgeDays Int     @default(0)
+
+  // Optional embed+button panel, alongside (not instead of) /verify — both
+  // run the same check/grant logic. Unset panelChannelId = slash command only.
+  panelChannelId String?
+  panelMessageId String?
+  savedEmbedId   String? // shared Embed Creator preset used as the panel body; falls back to a bare placeholder embed if unset
 }
 
 // ---- Quarantine ----

@@ -22,6 +22,12 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && interaction.customId === "verify:click") {
+    const { handleVerifyButton } = await import("../modules/security/verification");
+    await handleVerifyButton(interaction);
+    return;
+  }
+
   if (interaction.isButton() && (interaction.customId.startsWith("report:claim:") || interaction.customId.startsWith("report:close:"))) {
     const [, action, reportId] = interaction.customId.split(":");
     const { handleReportClaim, handleReportClose } = await import("../modules/moderation/playerReports");

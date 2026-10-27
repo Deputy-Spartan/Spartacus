@@ -1083,6 +1083,8 @@ export interface VerificationConfig {
   guildId: string;
   verifiedRoleId: string | null;
   minAccountAgeDays: number;
+  panelChannelId: string | null;
+  savedEmbedId: string | null;
 }
 export interface AntiNukeConfig {
   guildId: string;

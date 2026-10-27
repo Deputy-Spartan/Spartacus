@@ -48,7 +48,11 @@ const CHECKS: Array<{ key: keyof AutomodConfig; label: string; hint: string }> =
   { key: "excessiveSpoilersEnabled", label: "Excessive Spoilers", hint: "Removes messages with more than 3 ||spoiler|| tags." },
   { key: "excessiveMentionsEnabled", label: "Excessive Mentions", hint: "Removes messages that @-mention more than 5 users/roles." },
   { key: "repeatedTextEnabled", label: "Repeated Text", hint: "Removes messages with a character repeated 10+ times in a row." },
-  { key: "zalgoEnabled", label: "Zalgo Text", hint: "Removes messages using combining-character \"glitch\" text." },
+  {
+    key: "zalgoEnabled",
+    label: "Zalgo Text",
+    hint: 'Removes "glitch" text stacked with combining accent marks, e.g. "h̸̢̡̛͕̹̟̤̝̉̓̇̈́͒̈͑̕e̶̮̅̈́̀̕l̴̬̇̈̓͂l̶̡͊̿̓ò̷̢̈" instead of plain "hello".',
+  },
 ];
 
 const TABS: Array<{ key: Tab; label: string }> = [
@@ -65,6 +69,7 @@ export default function ModerationPage({ params }: { params: { guildId: string }
   const [config, setConfig] = useState<AutomodConfig>(DEFAULT_CONFIG);
   const [bannedWordsInput, setBannedWordsInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [bannedWordsStatus, setBannedWordsStatus] = useState<"idle" | "saved" | "error">("idle");
 
   useEffect(() => {
     api.getModeration(params.guildId).then(({ enabled, config }) => {
@@ -95,7 +100,14 @@ export default function ModerationPage({ params }: { params: { guildId: string }
       .split(",")
       .map((w) => w.trim())
       .filter(Boolean);
-    await persist({ ...config, bannedWords: words });
+    setBannedWordsStatus("idle");
+    try {
+      await persist({ ...config, bannedWords: words });
+      setBannedWordsStatus("saved");
+    } catch {
+      setBannedWordsStatus("error");
+    }
+    setTimeout(() => setBannedWordsStatus("idle"), 3000);
   }
 
   return (
@@ -155,15 +167,20 @@ export default function ModerationPage({ params }: { params: { guildId: string }
               <ToggleSwitch enabled={config.bannedWordsEnabled} onChange={(v) => toggleCheck("bannedWordsEnabled", v)} label="Banned words" />
             </div>
             <textarea
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-3 text-sm min-h-24 focus:outline-none focus:ring-1 focus:ring-neon-blue mb-3"
+              className="w-full bg-base-950 border border-white/10 rounded-lg p-3 text-sm min-h-24 focus:outline-none focus:ring-1 focus:ring-neon-blue mb-1"
               placeholder="comma, separated, words"
               value={bannedWordsInput}
               onChange={(e) => setBannedWordsInput(e.target.value)}
               disabled={!config.bannedWordsEnabled}
             />
-            <button onClick={saveBannedWords} disabled={!config.bannedWordsEnabled} className="neon-button-sm disabled:opacity-40">
-              Save word list
-            </button>
+            <p className="text-xs text-slate-600 mb-3">Separate each word or phrase with a comma, e.g. "word1, word2, some phrase".</p>
+            <div className="flex items-center gap-3">
+              <button onClick={saveBannedWords} disabled={!config.bannedWordsEnabled} className="neon-button-sm disabled:opacity-40">
+                Save word list
+              </button>
+              {bannedWordsStatus === "saved" && <span className="text-xs text-emerald-400">✓ Saved</span>}
+              {bannedWordsStatus === "error" && <span className="text-xs text-red-400">⚠ Failed to save — try again</span>}
+            </div>
             <p className="text-xs text-slate-500 mt-3">Messages containing any of these are removed automatically.</p>
           </NeonCard>
         </div>

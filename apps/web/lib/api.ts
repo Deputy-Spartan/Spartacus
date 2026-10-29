@@ -1213,6 +1213,18 @@ export interface RulesGateSettingsRow {
   agreeReplyMessage: string | null;
   alreadyAgreedMessage: string | null;
   noRoleConfiguredMessage: string | null;
+  rulesVersion: number;
+  minAccountAgeDays: number | null;
+  accountTooNewMessage: string | null;
+  declineEnabled: boolean;
+  declineAction: "NONE" | "KICK" | "CHANNEL";
+  declineChannelId: string | null;
+  declineReplyMessage: string | null;
+  reminderEnabled: boolean;
+  reminderDelayHours: number;
+  reminderMessage: string | null;
+  defaultEmbedTitle: string | null;
+  defaultEmbedDescription: string | null;
 }
 
 export interface RulesGateAgreementRow {
@@ -1221,6 +1233,15 @@ export interface RulesGateAgreementRow {
   username: string;
   roleId: string | null;
   agreedAt: string;
+  version: number;
+  sectionId: string | null;
+}
+
+export interface RulesGateSectionRow {
+  id: string;
+  label: string;
+  roleId: string;
+  sortOrder: number;
 }
 
 export interface SuggestionAnalyticsSettingsRow {
@@ -1850,6 +1871,13 @@ export const api = {
   getRulesGateAgreements: (guildId: string) => request<RulesGateAgreementRow[]>(`/guilds/${guildId}/rules-gate-agreements`),
   purgeRulesGateAgreements: (guildId: string) =>
     request<{ deleted: number }>(`/guilds/${guildId}/rules-gate-agreements`, { method: "DELETE" }),
+  bumpRulesGateVersion: (guildId: string) =>
+    request<{ newVersion: number; revoked: number }>(`/guilds/${guildId}/rules-gate-settings/bump-version`, { method: "POST" }),
+  getRulesGateSections: (guildId: string) => request<RulesGateSectionRow[]>(`/guilds/${guildId}/rules-gate-sections`),
+  addRulesGateSection: (guildId: string, input: { label: string; roleId: string }) =>
+    request<RulesGateSectionRow>(`/guilds/${guildId}/rules-gate-sections`, { method: "POST", body: JSON.stringify(input) }),
+  deleteRulesGateSection: (guildId: string, id: string) =>
+    request<{ ok: boolean }>(`/guilds/${guildId}/rules-gate-sections/${id}`, { method: "DELETE" }),
 
   getConfessionSettings: (guildId: string) => request<ConfessionSettingsRow>(`/guilds/${guildId}/confession-settings`),
   updateConfessionSettings: (guildId: string, input: Partial<ConfessionSettingsRow>) =>

@@ -1383,7 +1383,62 @@ model RulesGateSettings {
   alreadyAgreedMessage String? // sent when they've already agreed
   noRoleConfiguredMessage String? // sent when the server hasn't set a role to grant yet
 
+  // Bumped by the "New Rules Version" action in Settings — revokes roleId
+  // from every current holder so they have to click Agree again, without
+  // touching the historical RulesGateAgreement rows already on file.
+  rulesVersion Int @default(1)
+
+  minAccountAgeDays    Int? // reject the agree click if the Discord account is younger than this
+  accountTooNewMessage String?
+
+  declineEnabled       Boolean                @default(false)
+  declineAction        RulesGateDeclineAction  @default(NONE)
+  declineChannelId     String? // where to direct them when declineAction = CHANNEL
+  declineReplyMessage  String? // shown after a decline (before a KICK, or instead of one for CHANNEL)
+
+  reminderEnabled    Boolean @default(false)
+  reminderDelayHours Int     @default(24)
+  reminderMessage    String?
+
+  // Used only when savedEmbedId is unset — the bare placeholder embed
+  // posted to the rules channel (apps/bot/src/jobs/rulesGatePoster.ts)
+  defaultEmbedTitle       String?
+  defaultEmbedDescription String?
+
   agreements RulesGateAgreement[]
+  sections   RulesGateSection[]
+}
+
+enum RulesGateDeclineAction {
+  NONE
+  KICK
+  CHANNEL
+}
+
+// An extra, independently-clickable button alongside the main Agree button —
+// e.g. "Trading Rules" granting its own sub-role — for servers that want
+// per-section acknowledgment instead of one blanket agreement.
+model RulesGateSection {
+  id         String            @id @default(cuid())
+  settings   RulesGateSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  settingsId String
+  guildId    String
+  label      String
+  roleId     String
+  sortOrder  Int               @default(0)
+}
+
+// Tracks a member from join until they agree (or the reminder job gives up
+// after one nudge) — lets the reminder job find who hasn't agreed without
+// scanning the whole member list. Created on join, deleted on agree.
+model RulesGatePendingMember {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  joinedAt   DateTime  @default(now())
+  remindedAt DateTime?
+
+  @@unique([guildId, userId])
 }
 
 // One row per member who has clicked "I Agree" — the dashboard-side audit
@@ -1400,6 +1455,8 @@ model RulesGateAgreement {
   username  String // cached at agree time so the trail still reads if the member leaves
   roleId    String?
   agreedAt  DateTime @default(now())
+  version   Int      @default(1) // settings.rulesVersion at the time of this agreement
+  sectionId String?  // non-null when this is a per-section acknowledgment, not the main agreement
 
   @@index([guildId, agreedAt])
 }

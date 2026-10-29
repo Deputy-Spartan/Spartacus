@@ -36,6 +36,7 @@ import { startSuggestionAnalyticsJob } from "./jobs/suggestionAnalytics";
 import { startRemindersJob } from "./jobs/reminders";
 import { startMemberMilestonesJob } from "./jobs/memberMilestones";
 import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
+import { startRulesGateReminderJob } from "./jobs/rulesGateReminder";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 
@@ -146,6 +147,7 @@ export { renderPollEmbed, announcePollClosed } from "./modules/engagement/pollVo
 // Re-exported so apps/api's Rules Gate settings save can post/repost the
 // panel immediately instead of waiting up to a minute for the catch-up cron.
 export { postRulesGatePanel } from "./jobs/rulesGatePoster";
+export { bumpRulesVersion } from "./modules/community/rulesGate";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel } from "./modules/security/verification";
@@ -229,6 +231,7 @@ export function startBot() {
     startRemindersJob(c);
     startMemberMilestonesJob(c);
     startRulesGatePosterJob(c);
+    startRulesGateReminderJob(c);
     startVerificationPosterJob(c);
     startPlayerReportPosterJob(c);
 
@@ -270,6 +273,7 @@ export function startBot() {
   client.on(Events.MessageDelete, logger.onMessageDelete);
   client.on(Events.MessageUpdate, logger.onMessageUpdate);
   client.on(Events.GuildMemberAdd, logger.onMemberAdd);
+  client.on(Events.GuildMemberAdd, guildMemberAdd.onMemberJoin);
   client.on(Events.GuildMemberRemove, logger.onMemberRemove);
   client.on(Events.GuildMemberUpdate, logger.onMemberUpdate);
   client.on(Events.VoiceStateUpdate, logger.onVoiceStateUpdate);

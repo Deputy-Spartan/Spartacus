@@ -44,3 +44,22 @@ export async function handleWave(interaction: ButtonInteraction, targetUserId: s
   }
   await interaction.reply({ content: `👋 You waved to welcome <@${targetUserId}>!`, ephemeral: true });
 }
+
+// Tracks the member for the Rules reminder job (apps/bot/src/jobs/rulesGateReminder.ts)
+// so it can nudge whoever hasn't agreed yet without scanning the whole member list.
+// Deleted the moment they agree (see modules/community/rulesGate.ts).
+export async function onMemberJoin(member: GuildMember) {
+  const enabled = await isModuleEnabled(member.guild.id, "RULES_GATE");
+  if (!enabled) return;
+
+  const settings = await prisma.rulesGateSettings.findUnique({ where: { guildId: member.guild.id } });
+  if (!settings?.channelId || !settings.roleId) return;
+
+  await prisma.rulesGatePendingMember
+    .upsert({
+      where: { guildId_userId: { guildId: member.guild.id, userId: member.id } },
+      create: { guildId: member.guild.id, userId: member.id },
+      update: { joinedAt: new Date(), remindedAt: null },
+    })
+    .catch(() => null);
+}

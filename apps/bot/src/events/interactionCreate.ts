@@ -488,15 +488,29 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if (interaction.customId.startsWith("rulesgate:agree:")) {
+  if (interaction.customId.startsWith("rulesgate:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "RULES_GATE");
     if (!enabled) {
       await interaction.reply({ content: "⚠️ Rules is disabled for this server.", ephemeral: true });
       return;
     }
-    const settingsId = interaction.customId.split(":")[2];
-    const { handleRulesGateAgree } = await import("../modules/community/rulesGate");
-    await handleRulesGateAgree(interaction, settingsId);
+    const rgParts = interaction.customId.split(":");
+    const rgAction = rgParts[1];
+    if (rgAction === "agree") {
+      const { handleRulesGateAgree } = await import("../modules/community/rulesGate");
+      await handleRulesGateAgree(interaction, rgParts[2]);
+      return;
+    }
+    if (rgAction === "decline") {
+      const { handleRulesGateDecline } = await import("../modules/community/rulesGate");
+      await handleRulesGateDecline(interaction, rgParts[2]);
+      return;
+    }
+    if (rgAction === "section") {
+      const { handleRulesGateSection } = await import("../modules/community/rulesGate");
+      await handleRulesGateSection(interaction, rgParts[2], rgParts[3]);
+      return;
+    }
     return;
   }
 

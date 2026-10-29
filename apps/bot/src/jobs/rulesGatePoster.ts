@@ -5,12 +5,27 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
-import type { RulesGateSettings } from "@prisma/client";
+import type { RulesGateSettings, RulesGateSection } from "@prisma/client";
 
-function agreeRow(settingsId: string) {
-  return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`rulesgate:agree:${settingsId}`).setLabel("✅ I Agree").setStyle(ButtonStyle.Success)
+function agreeRow(settings: RulesGateSettings) {
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`rulesgate:agree:${settings.id}`).setLabel("✅ I Agree").setStyle(ButtonStyle.Success)
   );
+  if (settings.declineEnabled) {
+    row.addComponents(new ButtonBuilder().setCustomId(`rulesgate:decline:${settings.id}`).setLabel("❌ I Don't Agree").setStyle(ButtonStyle.Danger));
+  }
+  return row;
+}
+
+// Up to 4 section buttons on a second row, keeping the two rows well under
+// Discord's 5-components-per-row / 25-total limits.
+function sectionRow(settingsId: string, sections: RulesGateSection[]) {
+  if (sections.length === 0) return null;
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  for (const section of sections.slice(0, 4)) {
+    row.addComponents(new ButtonBuilder().setCustomId(`rulesgate:section:${settingsId}:${section.id}`).setLabel(section.label).setStyle(ButtonStyle.Secondary));
+  }
+  return row;
 }
 
 // Posts (or reposts after a channel change) one guild's gate panel —
@@ -33,13 +48,18 @@ export async function postRulesGatePanel(client: Client, settings: RulesGateSett
         embeds: [
           new EmbedBuilder()
             .setColor(0x3b82f6)
-            .setTitle("📜 Server Rules")
-            .setDescription("Click the button below to confirm you've read and agree to the rules."),
+            .setTitle(settings.defaultEmbedTitle || "📜 Server Rules")
+            .setDescription(settings.defaultEmbedDescription || "Click the button below to confirm you've read and agree to the rules."),
         ],
       };
 
+  const sections = await prisma.rulesGateSection.findMany({ where: { settingsId: settings.id }, orderBy: { sortOrder: "asc" } });
+  const rows = [...(payload.components ?? []), agreeRow(settings)];
+  const secondRow = sectionRow(settings.id, sections);
+  if (secondRow) rows.push(secondRow);
+
   const message = await channel
-    .send({ ...payload, components: [...(payload.components ?? []), agreeRow(settings.id)] })
+    .send({ ...payload, components: rows })
     .catch((err) => {
       logError("bot", err, settings.guildId);
       return null;

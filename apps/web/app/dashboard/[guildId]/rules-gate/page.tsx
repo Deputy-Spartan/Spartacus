@@ -8,8 +8,9 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { api, type RulesGateSettingsRow, type RulesGateAgreementRow } from "../../../../lib/api";
+import { api, type RulesGateSettingsRow, type RulesGateAgreementRow, type RulesGateSectionRow, type EmbedCreatorPresetRow } from "../../../../lib/api";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
 import Link from "next/link";
 
 type Tab = "settings" | "activity";
@@ -23,6 +24,13 @@ const DEFAULT_AGREE_REPLY = "✅ Thanks — you now have access!";
 const DEFAULT_ALREADY_AGREED = "You've already agreed!";
 const DEFAULT_NO_ROLE_CONFIGURED = "This server hasn't configured a role to grant yet — ask an admin to set one up.";
 const DEFAULT_DM_CONFIRM = "✅ Thanks for agreeing to the rules in **{server}** — you now have access!";
+const DEFAULT_EMBED_TITLE = "📜 Server Rules";
+const DEFAULT_EMBED_DESCRIPTION = "Click the button below to confirm you've read and agree to the rules.";
+const DEFAULT_ACCOUNT_TOO_NEW = "Your Discord account is too new to agree to the rules in **{server}** yet — try again in a few days.";
+const DEFAULT_DECLINE_REPLY_CHANNEL = "No worries — head to {channel} if you have questions about the rules before agreeing.";
+const DEFAULT_DECLINE_REPLY_KICK = "Understood — you'll be removed from **{server}** since you don't agree to the rules.";
+const DEFAULT_REMINDER =
+  '👋 Just a reminder — you still need to agree to the rules in **{server}** to get full access. Head back to the server and click "I Agree".';
 
 export default function RulesGatePage({ params }: { params: { guildId: string } }) {
   const [tab, setTab] = useState<Tab>("settings");
@@ -108,7 +116,35 @@ function SettingsTab({
         />
 
         <SavedEmbedPicker guildId={guildId} value={settings?.savedEmbedId ?? null} onChange={(id) => update({ savedEmbedId: id })} />
+
+        <EmbedPreviewBlock guildId={guildId} savedEmbedId={settings?.savedEmbedId ?? null} />
+
+        {!settings?.savedEmbedId && (
+          <div className="mt-5 pt-5 border-t border-white/5">
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Default Embed Title</label>
+            <input
+              type="text"
+              value={settings?.defaultEmbedTitle ?? ""}
+              onChange={(e) => update({ defaultEmbedTitle: e.target.value || null })}
+              placeholder={DEFAULT_EMBED_TITLE}
+              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
+            />
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Default Embed Description</label>
+            <textarea
+              value={settings?.defaultEmbedDescription ?? ""}
+              onChange={(e) => update({ defaultEmbedDescription: e.target.value || null })}
+              placeholder={DEFAULT_EMBED_DESCRIPTION}
+              rows={2}
+              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+            />
+            <p className="text-xs text-slate-600 mt-1">
+              What gets posted when no saved embed is selected above — pick a saved embed instead for full control (images, links, fields).
+            </p>
+          </div>
+        )}
       </NeonCard>
+
+      <SectionsCard guildId={guildId} />
 
       <NeonCard className="max-w-xl">
         <p className="font-medium mb-1">Onboarding Extras</p>
@@ -145,10 +181,284 @@ function SettingsTab({
           </div>
           <ToggleSwitch enabled={settings?.dmConfirmEnabled ?? false} onChange={(v) => update({ dmConfirmEnabled: v })} />
         </div>
+
+        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Minimum Account Age (days)</label>
+        <p className="text-xs text-slate-500 mb-2">Rejects the agree click if the member's Discord account is younger than this — helps against alt/raid accounts.</p>
+        <input
+          type="number"
+          min={0}
+          value={settings?.minAccountAgeDays ?? ""}
+          onChange={(e) => update({ minAccountAgeDays: e.target.value ? Number(e.target.value) : null })}
+          placeholder="Off — no minimum"
+          className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
+        />
+        {settings?.minAccountAgeDays != null && (
+          <>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Account-Too-New Reply</label>
+            <textarea
+              value={settings.accountTooNewMessage ?? ""}
+              onChange={(e) => update({ accountTooNewMessage: e.target.value || null })}
+              placeholder={DEFAULT_ACCOUNT_TOO_NEW}
+              rows={2}
+              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+            />
+          </>
+        )}
       </NeonCard>
 
+      <DeclineCard guildId={guildId} settings={settings} update={update} />
+      <ReminderCard settings={settings} update={update} />
+      <VersionCard guildId={guildId} settings={settings} />
       <MessagesCard settings={settings} update={update} />
     </div>
+  );
+}
+
+function EmbedPreviewBlock({ guildId, savedEmbedId }: { guildId: string; savedEmbedId: string | null }) {
+  const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
+
+  useEffect(() => {
+    api.getEmbedCreatorPresets(guildId).then(setPresets);
+  }, [guildId]);
+
+  if (!savedEmbedId) return null;
+  const preset = presets.find((p) => p.id === savedEmbedId);
+  if (!preset) return null;
+
+  return (
+    <div className="mt-5 pt-5 border-t border-white/5">
+      <div className="flex items-center justify-between mb-2.5">
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</label>
+        <Link href={`/dashboard/${guildId}/embed-creator`} className="text-[11px] text-neon-blue hover:underline">
+          Edit in Embed Creator
+        </Link>
+      </div>
+      <div className="bg-base-950 border border-white/10 rounded-lg p-3">
+        <EmbedCreatorPreview guildId={guildId} state={preset.data} />
+      </div>
+    </div>
+  );
+}
+
+function SectionsCard({ guildId }: { guildId: string }) {
+  const [sections, setSections] = useState<RulesGateSectionRow[]>([]);
+  const [label, setLabel] = useState("");
+  const [roleId, setRoleId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api.getRulesGateSections(guildId).then(setSections);
+  }
+  useEffect(refresh, [guildId]);
+
+  async function add() {
+    if (!label.trim() || !roleId) return;
+    setError(null);
+    try {
+      await api.addRulesGateSection(guildId, { label: label.trim(), roleId });
+      setLabel("");
+      setRoleId(null);
+      refresh();
+    } catch {
+      setError("Couldn't add that section — up to 4 are supported.");
+    }
+  }
+
+  async function remove(id: string) {
+    await api.deleteRulesGateSection(guildId, id);
+    refresh();
+  }
+
+  return (
+    <NeonCard className="max-w-xl">
+      <p className="font-medium mb-1">Sections (Optional)</p>
+      <p className="text-xs text-slate-500 mb-4">
+        Add extra buttons next to "I Agree" for per-topic acknowledgment (e.g. "Trading Rules", "Voice Chat Rules") — each grants its own role,
+        independent of the main agreement. Up to 4.
+      </p>
+
+      {sections.length > 0 && (
+        <div className="flex flex-col divide-y divide-white/5 mb-4">
+          {sections.map((s) => (
+            <div key={s.id} className="flex items-center justify-between py-2 text-sm">
+              <span className="text-white">{s.label}</span>
+              <button onClick={() => remove(s.id)} className="text-xs text-slate-500 hover:text-red-400">
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {sections.length < 4 && (
+        <div className="flex flex-col gap-2">
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Section label, e.g. Trading Rules"
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
+          />
+          <RoleSelect guildId={guildId} value={roleId} onChange={setRoleId} placeholder="Role to grant for this section" />
+          <button
+            onClick={add}
+            disabled={!label.trim() || !roleId}
+            className="self-start text-xs font-medium px-3 py-1.5 rounded-lg bg-neon-blue/10 border border-neon-blue/40 text-neon-blue hover:bg-neon-blue/20 transition-colors disabled:opacity-40"
+          >
+            + Add Section
+          </button>
+          {error && <p className="text-xs text-red-400">{error}</p>}
+        </div>
+      )}
+    </NeonCard>
+  );
+}
+
+function DeclineCard({
+  guildId,
+  settings,
+  update,
+}: {
+  guildId: string;
+  settings: RulesGateSettingsRow | null;
+  update: (patch: Partial<RulesGateSettingsRow>) => void;
+}) {
+  const declineRef = useRef<HTMLTextAreaElement>(null);
+
+  return (
+    <NeonCard className="max-w-xl">
+      <div className="flex items-center justify-between mb-1">
+        <p className="font-medium">"I Don't Agree" Button</p>
+        <ToggleSwitch enabled={settings?.declineEnabled ?? false} onChange={(v) => update({ declineEnabled: v })} />
+      </div>
+      <p className="text-xs text-slate-500 mb-4">Adds a second button for members who don't agree, instead of leaving them stuck with no role.</p>
+
+      {settings?.declineEnabled && (
+        <>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">When Clicked</label>
+          <select
+            value={settings.declineAction}
+            onChange={(e) => update({ declineAction: e.target.value as RulesGateSettingsRow["declineAction"] })}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-blue/50"
+          >
+            <option value="NONE">Just reply — no other action</option>
+            <option value="CHANNEL">Point them to a channel</option>
+            <option value="KICK">Kick them from the server</option>
+          </select>
+
+          {settings.declineAction === "CHANNEL" && (
+            <>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Channel to Point To</label>
+              <ChannelSelect
+                guildId={guildId}
+                value={settings.declineChannelId}
+                onChange={(id) => update({ declineChannelId: id || null })}
+                kind="text"
+                placeholder="No channel set"
+              />
+            </>
+          )}
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Reply Message</label>
+          <textarea
+            ref={declineRef}
+            value={settings.declineReplyMessage ?? ""}
+            onChange={(e) => update({ declineReplyMessage: e.target.value || null })}
+            placeholder={settings.declineAction === "KICK" ? DEFAULT_DECLINE_REPLY_KICK : DEFAULT_DECLINE_REPLY_CHANNEL}
+            rows={2}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+          />
+          <PlaceholderExamples
+            items={settings.declineAction === "CHANNEL" ? [...SERVER_TOKEN, { token: "{channel}", description: "The configured channel mention" }] : SERVER_TOKEN}
+            inputRef={declineRef}
+            value={settings.declineReplyMessage ?? ""}
+            onChange={(v) => update({ declineReplyMessage: v || null })}
+          />
+        </>
+      )}
+    </NeonCard>
+  );
+}
+
+function ReminderCard({
+  settings,
+  update,
+}: {
+  settings: RulesGateSettingsRow | null;
+  update: (patch: Partial<RulesGateSettingsRow>) => void;
+}) {
+  const reminderRef = useRef<HTMLTextAreaElement>(null);
+
+  return (
+    <NeonCard className="max-w-xl">
+      <div className="flex items-center justify-between mb-1">
+        <p className="font-medium">Reminder DM</p>
+        <ToggleSwitch enabled={settings?.reminderEnabled ?? false} onChange={(v) => update({ reminderEnabled: v })} />
+      </div>
+      <p className="text-xs text-slate-500 mb-4">
+        DMs members who joined but haven't agreed yet, once, after a delay — a nudge for people who miss the rules channel.
+      </p>
+
+      {settings?.reminderEnabled && (
+        <>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Delay (hours)</label>
+          <input
+            type="number"
+            min={1}
+            value={settings.reminderDelayHours}
+            onChange={(e) => update({ reminderDelayHours: Number(e.target.value) || 1 })}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-blue/50"
+          />
+
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Reminder Message</label>
+          <textarea
+            ref={reminderRef}
+            value={settings.reminderMessage ?? ""}
+            onChange={(e) => update({ reminderMessage: e.target.value || null })}
+            placeholder={DEFAULT_REMINDER}
+            rows={2}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+          />
+          <PlaceholderExamples items={SERVER_TOKEN} inputRef={reminderRef} value={settings.reminderMessage ?? ""} onChange={(v) => update({ reminderMessage: v || null })} />
+        </>
+      )}
+    </NeonCard>
+  );
+}
+
+function VersionCard({ guildId, settings }: { guildId: string; settings: RulesGateSettingsRow | null }) {
+  const confirm = useConfirm();
+  const [bumping, setBumping] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  async function bump() {
+    const ok = await confirm(
+      "Bump the rules version and revoke the granted role from everyone who currently has it? They'll need to click \"I Agree\" again — this does not touch the audit trail.",
+      { title: "New rules version", confirmLabel: "Bump version", danger: true }
+    );
+    if (!ok) return;
+    setBumping(true);
+    const res = await api.bumpRulesGateVersion(guildId);
+    setBumping(false);
+    setResult(`Now on v${res.newVersion} — revoked the role from ${res.revoked} member${res.revoked === 1 ? "" : "s"}.`);
+  }
+
+  return (
+    <NeonCard className="max-w-xl">
+      <p className="font-medium mb-1">New Rules Version</p>
+      <p className="text-xs text-slate-500 mb-3">
+        Updated the rules? Bump the version to revoke the role from everyone who currently has it, so they have to re-read and agree again.
+        Currently on <b>v{settings?.rulesVersion ?? 1}</b>.
+      </p>
+      <button
+        onClick={bump}
+        disabled={bumping}
+        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-400 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+      >
+        {bumping ? "Bumping…" : "New Rules Version"}
+      </button>
+      {result && <p className="text-xs text-emerald-400 mt-2">{result}</p>}
+    </NeonCard>
   );
 }
 

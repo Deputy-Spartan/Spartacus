@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type ReportSettingsRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 
@@ -52,6 +53,42 @@ function ReportSettings({ guildId }: { guildId: string }) {
           />
         </div>
       </div>
+    </NeonCard>
+  );
+}
+
+function ReportPanel({ guildId }: { guildId: string }) {
+  const [settings, setSettings] = useState<ReportSettingsRow | null>(null);
+
+  useEffect(() => {
+    api.getReportSettings(guildId).then(setSettings);
+  }, [guildId]);
+
+  async function patch(partial: Partial<ReportSettingsRow>) {
+    setSettings((prev) => (prev ? { ...prev, ...partial } : prev));
+    await api.setReportSettings(guildId, partial);
+  }
+
+  if (!settings) return null;
+
+  return (
+    <NeonCard className="mb-4">
+      <p className="font-medium mb-1">Report a Player — Panel (optional)</p>
+      <p className="text-xs text-slate-500 mb-3">
+        Posts an embed with a 🚩 Report a Player button — an alternative to <code className="text-neon-blue">/report</code> for members
+        who'd rather click than type a command. Clicking opens a private modal (who, and why); nothing is posted publicly, and only
+        the reporter sees the confirmation. They get a DM when the report is created and another when it's claimed. Leave the channel
+        unset to use the slash command only.
+      </p>
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Panel Channel</label>
+      <ChannelSelect
+        guildId={guildId}
+        value={settings.panelChannelId}
+        onChange={(id) => patch({ panelChannelId: id || null })}
+        kind="text"
+        placeholder="Off — slash command only"
+      />
+      <SavedEmbedPicker guildId={guildId} value={settings.savedEmbedId} onChange={(id) => patch({ savedEmbedId: id })} />
     </NeonCard>
   );
 }
@@ -109,10 +146,11 @@ export default function ReportsPage({ params }: { params: { guildId: string } })
         guildId={params.guildId}
         moduleKey="PLAYER_REPORTS"
         title="Player Reports"
-        description="Submitted via /report — posts to your review channel as a claimable, closeable ticket. Resolve them here or in Discord."
+        description="Submitted via /report or the Report a Player panel — posts to your review channel as a claimable, closeable ticket. Resolve them here or in Discord."
       />
 
       <ReportSettings guildId={params.guildId} />
+      <ReportPanel guildId={params.guildId} />
 
       <NeonCard>
         {reports.length === 0 && <p className="text-sm text-slate-500">No reports yet.</p>}

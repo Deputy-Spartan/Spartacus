@@ -1197,6 +1197,13 @@ model PlayerReportSettings {
   guildId         String  @unique
   reviewChannelId String?
   staffRoleId     String?
+
+  // Optional "Report a Player" embed+button panel — clicking it opens a
+  // modal (same private workflow as /report) instead of requiring members
+  // to know the slash command exists. Unset panelChannelId = command only.
+  panelChannelId String?
+  panelMessageId String?
+  savedEmbedId   String? // shared Embed Creator preset used as the panel body; falls back to a bare placeholder embed if unset
 }
 
 // ---- Perm Watch ----

@@ -28,6 +28,26 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && interaction.customId === "playerreport:open") {
+    if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "PLAYER_REPORTS"))) {
+      await interaction.reply({ content: "⚠️ Player Reports is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const { handlePlayerReportPanelButton } = await import("../modules/moderation/playerReports");
+    await handlePlayerReportPanelButton(interaction);
+    return;
+  }
+
+  if (interaction.isModalSubmit() && interaction.customId === "playerreportmodal") {
+    if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "PLAYER_REPORTS"))) {
+      await interaction.reply({ content: "⚠️ Player Reports is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const { handlePlayerReportModalSubmit } = await import("../modules/moderation/playerReports");
+    await handlePlayerReportModalSubmit(interaction);
+    return;
+  }
+
   if (interaction.isButton() && (interaction.customId.startsWith("report:claim:") || interaction.customId.startsWith("report:close:"))) {
     const [, action, reportId] = interaction.customId.split(":");
     const { handleReportClaim, handleReportClose } = await import("../modules/moderation/playerReports");

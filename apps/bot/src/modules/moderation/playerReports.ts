@@ -1,6 +1,23 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, EmbedBuilder, GuildMember, Message, PermissionFlagsBits } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonInteraction,
+  ButtonStyle,
+  Client,
+  EmbedBuilder,
+  GuildMember,
+  Message,
+  ModalBuilder,
+  ModalSubmitInteraction,
+  PermissionFlagsBits,
+  TextInputBuilder,
+  TextInputStyle,
+} from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
+import { isModuleEnabled } from "../../lib/moduleGate";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 import type { PlayerReport, PlayerReportSettings } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
@@ -36,6 +53,129 @@ function buildEmbed(report: PlayerReport) {
     )
     .setFooter({ text: `Report ID: ${report.id}` })
     .setTimestamp();
+}
+
+function reportPanelRow() {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId("playerreport:open").setLabel("🚩 Report a Player").setStyle(ButtonStyle.Danger)
+  );
+}
+
+// Posts (or reposts after a channel/embed change) the "Report a Player"
+// panel — shared by the catch-up cron (jobs/playerReportPoster.ts) and the
+// dashboard's immediate "Save" trigger. Mirrors postVerificationPanel /
+// postRulesGatePanel exactly.
+export async function postPlayerReportPanel(client: Client, settings: PlayerReportSettings): Promise<boolean> {
+  if (!settings.panelChannelId) return false;
+  const enabled = await isModuleEnabled(settings.guildId, "PLAYER_REPORTS");
+  if (!enabled) return false;
+
+  const channel = await client.channels.fetch(settings.panelChannelId).catch(() => null);
+  if (!isSendableChannel(channel)) return false;
+
+  const saved = await resolveSavedEmbed(settings.savedEmbedId);
+  const payload = saved
+    ? await buildSavedEmbedPayload(settings.guildId, saved)
+    : {
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("🚩 Report a Player")
+            .setDescription(
+              "Having an issue with another member? Click below to report it privately to staff. Only you and the reviewing staff member will ever see what you submit."
+            ),
+        ],
+      };
+
+  const message = await channel
+    .send({ ...payload, components: [...(payload.components ?? []), reportPanelRow()] })
+    .catch((err) => {
+      logError("bot", err, settings.guildId);
+      return null;
+    });
+  if (!message) return false;
+
+  await prisma.playerReportSettings.update({ where: { id: settings.id }, data: { panelMessageId: message.id } });
+  return true;
+}
+
+// Panel button click — opens a modal asking who and why, instead of
+// requiring the member to know /report exists. Nothing about this report
+// is visible to anyone but the member and whoever can see the (staff-only,
+// permission-locked) review channel: the modal reply and both DMs below are
+// always private/ephemeral.
+export async function handlePlayerReportPanelButton(interaction: ButtonInteraction) {
+  const modal = new ModalBuilder()
+    .setCustomId("playerreportmodal")
+    .setTitle("Report a Player")
+    .addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("target")
+          .setLabel("Who are you reporting? (@mention or user ID)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(100)
+      ),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(
+        new TextInputBuilder()
+          .setCustomId("reason")
+          .setLabel("What happened?")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true)
+          .setMaxLength(1000)
+      )
+    );
+  await interaction.showModal(modal);
+}
+
+export async function handlePlayerReportModalSubmit(interaction: ModalSubmitInteraction) {
+  if (!interaction.guildId || !interaction.guild) return;
+
+  const rawTarget = interaction.fields.getTextInputValue("target").trim();
+  const reason = interaction.fields.getTextInputValue("reason").trim();
+  const targetId = rawTarget.replace(/[<@!>]/g, "");
+
+  if (!/^\d{15,25}$/.test(targetId)) {
+    await interaction.reply({ content: "⚠️ That doesn't look like a valid @mention or user ID. Try again from the panel button.", ephemeral: true });
+    return;
+  }
+  if (targetId === interaction.user.id) {
+    await interaction.reply({ content: "⚠️ You can't report yourself.", ephemeral: true });
+    return;
+  }
+
+  const targetMember = await interaction.guild.members.fetch(targetId).catch(() => null);
+  if (!targetMember) {
+    await interaction.reply({ content: "⚠️ Couldn't find that member in this server — double check the mention or ID.", ephemeral: true });
+    return;
+  }
+  if (targetMember.user.bot) {
+    await interaction.reply({ content: "⚠️ You can't report a bot.", ephemeral: true });
+    return;
+  }
+
+  const report = await prisma.playerReport.create({
+    data: {
+      guildId: interaction.guildId,
+      reporterId: interaction.user.id,
+      reportedUserId: targetId,
+      reason,
+    },
+  });
+
+  await interaction.reply({
+    content: `✅ Report submitted privately (#${report.id.slice(0, 8)}). Staff will review it — check your DMs for updates.`,
+    ephemeral: true,
+  });
+
+  await postReportForReview(interaction.client, report.id);
+
+  await interaction.user
+    .send(
+      `🚩 Your report in **${interaction.guild.name}** has been created (#${report.id.slice(0, 8)}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.`
+    )
+    .catch(() => null); // DMs off — the ephemeral reply above already confirmed it either way.
 }
 
 async function canReview(member: GuildMember | null, settings: PlayerReportSettings | null): Promise<boolean> {
@@ -110,6 +250,11 @@ export async function handleReportClaim(interaction: ButtonInteraction, reportId
 
   await refreshMessage(interaction.client, updated, settings);
   await interaction.reply({ content: `🙋 Claimed by <@${interaction.user.id}>.` });
+
+  const reporter = await interaction.client.users.fetch(report.reporterId).catch(() => null);
+  await reporter
+    ?.send(`🙋 Your report #${report.id.slice(0, 8)} in **${interaction.guild?.name ?? "the server"}** has been claimed by a staff member and is now being reviewed.`)
+    .catch(() => null);
 }
 
 export async function handleReportClose(interaction: ButtonInteraction, reportId: string) {

@@ -1241,6 +1241,8 @@ export interface AppealRow {
 export interface ReportSettingsRow {
   reviewChannelId: string | null;
   staffRoleId: string | null;
+  panelChannelId: string | null;
+  savedEmbedId: string | null;
 }
 
 export interface ModDigestSettingsRow {

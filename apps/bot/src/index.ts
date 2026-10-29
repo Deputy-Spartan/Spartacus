@@ -37,6 +37,7 @@ import { startRemindersJob } from "./jobs/reminders";
 import { startMemberMilestonesJob } from "./jobs/memberMilestones";
 import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
+import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -148,6 +149,9 @@ export { postRulesGatePanel } from "./jobs/rulesGatePoster";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel } from "./modules/security/verification";
+// Same reasoning — apps/api's report-settings route posts/reposts the
+// "Report a Player" panel immediately on save.
+export { postPlayerReportPanel } from "./modules/moderation/playerReports";
 // Re-exported so apps/api's Welcome "Send Test" button can post the real
 // welcome/goodbye message (exact same render as a live join/leave) to the
 // configured channel on demand.
@@ -226,6 +230,7 @@ export function startBot() {
     startMemberMilestonesJob(c);
     startRulesGatePosterJob(c);
     startVerificationPosterJob(c);
+    startPlayerReportPosterJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);

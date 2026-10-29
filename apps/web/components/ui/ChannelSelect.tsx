@@ -9,6 +9,11 @@ interface ChannelSelectProps {
   onChange: (channelId: string) => void;
   kind?: "text" | "voice" | "category";
   placeholder?: string;
+  // Hides the "Currently: Category / #channel" line above the selects —
+  // for when this sits beside another field (e.g. a RoleSelect) in a grid
+  // row and needs its dropdown to start at the same height, not shifted
+  // down by this summary line only ChannelSelect has.
+  showCurrent?: boolean;
 }
 
 const NO_CATEGORY = "__none__";
@@ -26,7 +31,7 @@ function RefreshButton({ onClick, spinning }: { onClick: () => void; spinning: b
   );
 }
 
-export function ChannelSelect({ guildId, value, onChange, kind = "text", placeholder }: ChannelSelectProps) {
+export function ChannelSelect({ guildId, value, onChange, kind = "text", placeholder, showCurrent = true }: ChannelSelectProps) {
   const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [categoryId, setCategoryId] = useState<string>("");
@@ -66,7 +71,7 @@ export function ChannelSelect({ guildId, value, onChange, kind = "text", placeho
   if (kind === "category") {
     return (
       <div className="mb-4">
-        {activeCategory && (
+        {showCurrent && activeCategory && (
           <p className="text-xs text-slate-500 mb-1.5">
             Currently: <span className="text-slate-300">{activeCategory.name}</span>
           </p>
@@ -94,7 +99,7 @@ export function ChannelSelect({ guildId, value, onChange, kind = "text", placeho
 
   return (
     <div className="mb-4">
-      {activeChannel && (
+      {showCurrent && activeChannel && (
         <p className="text-xs text-slate-500 mb-1.5">
           Currently: <span className="text-slate-300">{activeChannel.categoryName ?? "No category"}</span>
           <span className="text-slate-600"> / </span>

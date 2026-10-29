@@ -41,7 +41,13 @@ function ReportSettings({ guildId }: { guildId: string }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <p className="text-xs text-slate-500 mb-1">Review channel</p>
-          <ChannelSelect guildId={guildId} value={settings.reviewChannelId} onChange={(v) => patch({ reviewChannelId: v || null })} kind="text" />
+          <ChannelSelect
+            guildId={guildId}
+            value={settings.reviewChannelId}
+            onChange={(v) => patch({ reviewChannelId: v || null })}
+            kind="text"
+            showCurrent={false}
+          />
         </div>
         <div>
           <p className="text-xs text-slate-500 mb-1">Staff role</p>

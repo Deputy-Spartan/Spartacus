@@ -262,15 +262,17 @@ function ReportsTab({ guildId }: { guildId: string }) {
     reports.flatMap((r) => [r.reporterId, r.reportedUserId, ...(r.claimedById ? [r.claimedById] : [])])
   );
 
-  function refresh() {
-    api.getReports(guildId).then(setReports);
-  }
-  useEffect(refresh, [guildId]);
-
-  async function setStatus(id: string, status: string) {
-    await api.setReportStatus(guildId, id, status);
+  useEffect(() => {
+    function refresh() {
+      api.getReports(guildId).then(setReports);
+    }
     refresh();
-  }
+    // Status (open/claimed/resolved/closed) only ever changes from Discord —
+    // Claim/Resolved/Close on the report channel itself — so this polls to
+    // stay current instead of offering any way to change it here.
+    const interval = setInterval(refresh, 8000);
+    return () => clearInterval(interval);
+  }, [guildId]);
 
   return (
     <NeonCard>
@@ -299,17 +301,12 @@ function ReportsTab({ guildId }: { guildId: string }) {
               ) : null}
             </p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {["OPEN", "REVIEWING", "RESOLVED", "CLOSED"].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatus(r.id, s)}
-                  className={`text-xs px-2.5 py-1 rounded-md border ${
-                    r.status === s ? STATUS_STYLE[s] : "border-white/10 text-slate-500"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+              <span
+                title="Reflects what's happening in Discord — claim/resolve/close from the report channel to change it"
+                className={`text-xs px-2.5 py-1 rounded-md border cursor-default ${STATUS_STYLE[r.status] ?? "border-white/10 text-slate-500"}`}
+              >
+                {r.status}
+              </span>
               <button
                 onClick={() => setExpanded(expanded === r.id ? null : r.id)}
                 className="text-xs px-2.5 py-1 rounded-md border border-white/10 text-slate-400 hover:text-neon-blue hover:border-neon-blue transition-colors ml-auto"

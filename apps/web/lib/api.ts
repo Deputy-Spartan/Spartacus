@@ -1785,8 +1785,6 @@ export const api = {
         createdAt: string;
       }>
     >(`/guilds/${guildId}/reports`),
-  setReportStatus: (guildId: string, id: string, status: string) =>
-    request(`/guilds/${guildId}/reports/${id}`, { method: "PATCH", body: JSON.stringify({ status }) }),
 
   getReportSettings: (guildId: string) => request<ReportSettingsRow>(`/guilds/${guildId}/report-settings`),
   setReportSettings: (guildId: string, body: Partial<ReportSettingsRow>) =>

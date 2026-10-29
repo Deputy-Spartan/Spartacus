@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
-import type { ReportStatus } from "@prisma/client";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
@@ -14,14 +13,6 @@ router.get("/guilds/:guildId/reports", requireAuth, requireGuildPermission, asyn
     orderBy: { createdAt: "desc" },
   });
   res.json(rows);
-});
-
-router.patch("/guilds/:guildId/reports/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const { status } = req.body as { status: ReportStatus };
-  const data: { status: ReportStatus; closedAt?: Date } = { status };
-  if (status === "RESOLVED") data.closedAt = new Date();
-  const row = await prisma.playerReport.update({ where: { id: req.params.id }, data });
-  res.json(row);
 });
 
 // --- Player Reports Settings (report category + staff role + report panel) ---

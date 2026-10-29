@@ -12,11 +12,41 @@ router.get("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPerm
     channelId: row?.channelId ?? null,
     roleId: row?.roleId ?? null,
     savedEmbedId: row?.savedEmbedId ?? null,
+    roleToRemoveId: row?.roleToRemoveId ?? null,
+    logChannelId: row?.logChannelId ?? null,
+    dmConfirmEnabled: row?.dmConfirmEnabled ?? false,
+    dmConfirmMessage: row?.dmConfirmMessage ?? null,
+    agreedCount: row?.agreedCount ?? 0,
+    agreeReplyMessage: row?.agreeReplyMessage ?? null,
+    alreadyAgreedMessage: row?.alreadyAgreedMessage ?? null,
+    noRoleConfiguredMessage: row?.noRoleConfiguredMessage ?? null,
   });
 });
 
 router.put("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, roleId, savedEmbedId } = req.body as { channelId?: string | null; roleId?: string | null; savedEmbedId?: string | null };
+  const {
+    channelId,
+    roleId,
+    savedEmbedId,
+    roleToRemoveId,
+    logChannelId,
+    dmConfirmEnabled,
+    dmConfirmMessage,
+    agreeReplyMessage,
+    alreadyAgreedMessage,
+    noRoleConfiguredMessage,
+  } = req.body as {
+    channelId?: string | null;
+    roleId?: string | null;
+    savedEmbedId?: string | null;
+    roleToRemoveId?: string | null;
+    logChannelId?: string | null;
+    dmConfirmEnabled?: boolean;
+    dmConfirmMessage?: string | null;
+    agreeReplyMessage?: string | null;
+    alreadyAgreedMessage?: string | null;
+    noRoleConfiguredMessage?: string | null;
+  };
 
   const existing = await prisma.rulesGateSettings.findUnique({ where: { guildId: req.params.guildId } });
   // Any change that affects what the panel should look like clears
@@ -28,11 +58,30 @@ router.put("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPerm
 
   const row = await prisma.rulesGateSettings.upsert({
     where: { guildId: req.params.guildId },
-    create: { guildId: req.params.guildId, channelId: channelId ?? null, roleId: roleId ?? null, savedEmbedId: savedEmbedId ?? null },
+    create: {
+      guildId: req.params.guildId,
+      channelId: channelId ?? null,
+      roleId: roleId ?? null,
+      savedEmbedId: savedEmbedId ?? null,
+      roleToRemoveId: roleToRemoveId ?? null,
+      logChannelId: logChannelId ?? null,
+      ...(dmConfirmEnabled !== undefined ? { dmConfirmEnabled } : {}),
+      ...(dmConfirmMessage !== undefined ? { dmConfirmMessage } : {}),
+      ...(agreeReplyMessage !== undefined ? { agreeReplyMessage } : {}),
+      ...(alreadyAgreedMessage !== undefined ? { alreadyAgreedMessage } : {}),
+      ...(noRoleConfiguredMessage !== undefined ? { noRoleConfiguredMessage } : {}),
+    },
     update: {
       ...(channelId !== undefined ? { channelId } : {}),
       ...(roleId !== undefined ? { roleId } : {}),
       ...(savedEmbedId !== undefined ? { savedEmbedId } : {}),
+      ...(roleToRemoveId !== undefined ? { roleToRemoveId } : {}),
+      ...(logChannelId !== undefined ? { logChannelId } : {}),
+      ...(dmConfirmEnabled !== undefined ? { dmConfirmEnabled } : {}),
+      ...(dmConfirmMessage !== undefined ? { dmConfirmMessage } : {}),
+      ...(agreeReplyMessage !== undefined ? { agreeReplyMessage } : {}),
+      ...(alreadyAgreedMessage !== undefined ? { alreadyAgreedMessage } : {}),
+      ...(noRoleConfiguredMessage !== undefined ? { noRoleConfiguredMessage } : {}),
       ...(channelChanged || embedChanged ? { messageId: null } : {}),
     },
   });

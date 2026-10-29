@@ -491,7 +491,7 @@ export async function execute(interaction: Interaction) {
   if (interaction.customId.startsWith("rulesgate:agree:")) {
     const enabled = await isModuleEnabled(interaction.guildId, "RULES_GATE");
     if (!enabled) {
-      await interaction.reply({ content: "⚠️ Rules Gate is disabled for this server.", ephemeral: true });
+      await interaction.reply({ content: "⚠️ Rules is disabled for this server.", ephemeral: true });
       return;
     }
     const settingsId = interaction.customId.split(":")[2];

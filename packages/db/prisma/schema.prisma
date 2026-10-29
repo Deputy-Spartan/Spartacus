@@ -1371,6 +1371,19 @@ model RulesGateSettings {
   messageId    String?
   roleId       String?
   savedEmbedId String? // shared Embed Creator preset used as the rules message body — supports multiple embeds/fields/images/links; resolved live at post time
+
+  roleToRemoveId String? // e.g. @Unverified — stripped when the member agrees, alongside granting roleId
+  logChannelId    String? // posts a line here each time someone agrees, for an audit trail
+  dmConfirmEnabled Boolean @default(false)
+  dmConfirmMessage String? // falls back to a default when blank; supports {server} token
+
+  agreedCount Int @default(0) // running total of agreements, survives role removal/member leave so the stat never regresses
+
+  // Editable copies of the ephemeral replies the "I Agree" button sends —
+  // each falls back to a built-in default when blank; all support {server}
+  agreeReplyMessage    String? // sent on a successful agree
+  alreadyAgreedMessage String? // sent when they've already agreed
+  noRoleConfiguredMessage String? // sent when the server hasn't set a role to grant yet
 }
 
 // ---- Prestige ----

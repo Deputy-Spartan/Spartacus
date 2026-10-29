@@ -45,7 +45,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/anti-nuke", label: "Anti-Nuke", icon: "💣", moduleKey: "ANTI_NUKE" },
       { href: "/server-backup", label: "Server Backup", icon: "🗄️", moduleKey: "SERVER_BACKUP" },
       { href: "/verification", label: "Verification", icon: "✅", moduleKey: "VERIFICATION" },
-      { href: "/rules-gate", label: "Rules Gate", icon: "📜", moduleKey: "RULES_GATE" },
+      { href: "/rules-gate", label: "Rules", icon: "📜", moduleKey: "RULES_GATE" },
       { href: "/honeypot", label: "Honeypot", icon: "🍯", moduleKey: "HONEYPOT" },
       { href: "/perm-watch", label: "Perm Watch", icon: "🔍", moduleKey: "PERM_WATCH" },
     ],

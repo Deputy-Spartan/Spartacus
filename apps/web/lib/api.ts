@@ -1206,6 +1206,14 @@ export interface RulesGateSettingsRow {
   channelId: string | null;
   roleId: string | null;
   savedEmbedId: string | null;
+  roleToRemoveId: string | null;
+  logChannelId: string | null;
+  dmConfirmEnabled: boolean;
+  dmConfirmMessage: string | null;
+  agreedCount: number;
+  agreeReplyMessage: string | null;
+  alreadyAgreedMessage: string | null;
+  noRoleConfiguredMessage: string | null;
 }
 
 export interface SuggestionAnalyticsSettingsRow {

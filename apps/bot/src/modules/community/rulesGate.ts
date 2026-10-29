@@ -56,7 +56,15 @@ export async function handleRulesGateAgree(interaction: ButtonInteraction, setti
     return;
   }
 
-  await prisma.rulesGateSettings.update({ where: { id: settings.id }, data: { agreedCount: { increment: 1 } } });
+  await prisma.rulesGateAgreement.create({
+    data: {
+      settingsId: settings.id,
+      guildId: interaction.guild.id,
+      userId: member.id,
+      username: member.user.tag,
+      roleId: settings.roleId,
+    },
+  });
 
   await interaction.reply({ content: renderMessage(settings.agreeReplyMessage, DEFAULT_AGREE_REPLY, interaction.guild.name), ephemeral: true });
 

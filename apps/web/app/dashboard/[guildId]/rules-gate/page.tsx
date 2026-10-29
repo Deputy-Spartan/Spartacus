@@ -7,7 +7,8 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
-import { api, type RulesGateSettingsRow } from "../../../../lib/api";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { api, type RulesGateSettingsRow, type RulesGateAgreementRow } from "../../../../lib/api";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import Link from "next/link";
 
@@ -64,7 +65,7 @@ export default function RulesGatePage({ params }: { params: { guildId: string } 
       </div>
 
       {tab === "settings" && <SettingsTab guildId={params.guildId} settings={settings} update={update} />}
-      {tab === "activity" && <ActivityTab settings={settings} />}
+      {tab === "activity" && <ActivityTab guildId={params.guildId} />}
     </div>
   );
 }
@@ -222,23 +223,76 @@ function MessagesCard({
   );
 }
 
-function ActivityTab({ settings }: { settings: RulesGateSettingsRow | null }) {
+function ActivityTab({ guildId }: { guildId: string }) {
+  const [agreements, setAgreements] = useState<RulesGateAgreementRow[] | null>(null);
+  const [isGuildOwner, setIsGuildOwner] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const confirm = useConfirm();
+
+  function refresh() {
+    api.getRulesGateAgreements(guildId).then(setAgreements);
+  }
+
+  useEffect(() => {
+    refresh();
+    api.getGuilds().then((rows) => setIsGuildOwner(!!rows.find((g) => g.id === guildId)?.owner)).catch(() => null);
+  }, [guildId]);
+
+  async function purge() {
+    const ok = await confirm("Permanently delete the entire rules-agreement audit trail for this server? This can't be undone.", {
+      title: "Purge audit trail",
+      confirmLabel: "Purge everything",
+      danger: true,
+    });
+    if (!ok) return;
+    setPurging(true);
+    await api.purgeRulesGateAgreements(guildId);
+    setPurging(false);
+    refresh();
+  }
+
   return (
-    <NeonCard className="max-w-xl">
-      <p className="font-medium mb-1">Agreement Stats</p>
-      <p className="text-xs text-slate-500 mb-4">
-        A running total of how many members have clicked "I Agree" — this keeps counting even if someone later leaves or loses the role, so
-        it's a true historical count, not a live member tally.
-      </p>
-      <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-white">{settings?.agreedCount ?? 0}</span>
-        <span className="text-xs text-slate-500">total agreements</span>
-      </div>
-      {!settings?.logChannelId && (
-        <p className="text-xs text-slate-500 mt-4">
-          Want a live, per-member audit trail instead of just a count? Set an <b>Agreement Log Channel</b> in the Settings tab.
+    <div className="flex flex-col gap-5 max-w-xl">
+      <NeonCard>
+        <p className="font-medium mb-1">Audit Trail</p>
+        <p className="text-xs text-slate-500 mb-4">
+          Every member who has clicked "I Agree", most recent first — kept here even if they later leave or lose the role, so it's a true
+          historical record. Most recent 200 shown.
         </p>
+
+        {agreements === null && <p className="text-xs text-slate-500">Loading…</p>}
+        {agreements?.length === 0 && <p className="text-xs text-slate-500">No agreements recorded yet.</p>}
+
+        {agreements && agreements.length > 0 && (
+          <div className="flex flex-col divide-y divide-white/5 -mx-1">
+            {agreements.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-3 px-1 py-2.5 text-sm">
+                <div>
+                  <p className="text-white">
+                    {a.username} <span className="text-slate-500 font-mono text-xs">({a.userId})</span>
+                  </p>
+                  {a.roleId && <p className="text-xs text-slate-500">granted role {a.roleId}</p>}
+                </div>
+                <span className="text-xs text-slate-500 whitespace-nowrap">{new Date(a.agreedAt).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </NeonCard>
+
+      {isGuildOwner && (
+        <NeonCard className="border-red-500/20">
+          <p className="font-medium mb-1 text-red-400">Danger Zone</p>
+          <p className="text-xs text-slate-500 mb-3">Permanently deletes the audit trail above for this server. Server owner only.</p>
+          <button
+            onClick={purge}
+            disabled={purging}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/40 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+          >
+            {purging ? "Purging…" : "Purge Audit Trail"}
+          </button>
+        </NeonCard>
       )}
-    </NeonCard>
+    </div>
   );
 }

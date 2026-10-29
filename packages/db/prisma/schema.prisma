@@ -1377,13 +1377,31 @@ model RulesGateSettings {
   dmConfirmEnabled Boolean @default(false)
   dmConfirmMessage String? // falls back to a default when blank; supports {server} token
 
-  agreedCount Int @default(0) // running total of agreements, survives role removal/member leave so the stat never regresses
-
   // Editable copies of the ephemeral replies the "I Agree" button sends —
   // each falls back to a built-in default when blank; all support {server}
   agreeReplyMessage    String? // sent on a successful agree
   alreadyAgreedMessage String? // sent when they've already agreed
   noRoleConfiguredMessage String? // sent when the server hasn't set a role to grant yet
+
+  agreements RulesGateAgreement[]
+}
+
+// One row per member who has clicked "I Agree" — the dashboard-side audit
+// trail backing the Activity tab (apps/web/.../rules-gate/page.tsx), separate
+// from the optional in-Discord log channel. Purge is owner-only (see
+// apps/api/src/routes/rulesGateSettings.ts), same reasoning as Player Reports'
+// transcript purge — this is evidence staff agreed to the rules.
+model RulesGateAgreement {
+  id        String             @id @default(cuid())
+  settings  RulesGateSettings  @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  settingsId String
+  guildId   String
+  userId    String
+  username  String // cached at agree time so the trail still reads if the member leaves
+  roleId    String?
+  agreedAt  DateTime @default(now())
+
+  @@index([guildId, agreedAt])
 }
 
 // ---- Prestige ----

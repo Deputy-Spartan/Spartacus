@@ -1210,10 +1210,17 @@ export interface RulesGateSettingsRow {
   logChannelId: string | null;
   dmConfirmEnabled: boolean;
   dmConfirmMessage: string | null;
-  agreedCount: number;
   agreeReplyMessage: string | null;
   alreadyAgreedMessage: string | null;
   noRoleConfiguredMessage: string | null;
+}
+
+export interface RulesGateAgreementRow {
+  id: string;
+  userId: string;
+  username: string;
+  roleId: string | null;
+  agreedAt: string;
 }
 
 export interface SuggestionAnalyticsSettingsRow {
@@ -1840,6 +1847,9 @@ export const api = {
   getRulesGateSettings: (guildId: string) => request<RulesGateSettingsRow>(`/guilds/${guildId}/rules-gate-settings`),
   updateRulesGateSettings: (guildId: string, input: Partial<RulesGateSettingsRow>) =>
     request<RulesGateSettingsRow>(`/guilds/${guildId}/rules-gate-settings`, { method: "PUT", body: JSON.stringify(input) }),
+  getRulesGateAgreements: (guildId: string) => request<RulesGateAgreementRow[]>(`/guilds/${guildId}/rules-gate-agreements`),
+  purgeRulesGateAgreements: (guildId: string) =>
+    request<{ deleted: number }>(`/guilds/${guildId}/rules-gate-agreements`, { method: "DELETE" }),
 
   getConfessionSettings: (guildId: string) => request<ConfessionSettingsRow>(`/guilds/${guildId}/confession-settings`),
   updateConfessionSettings: (guildId: string, input: Partial<ConfessionSettingsRow>) =>

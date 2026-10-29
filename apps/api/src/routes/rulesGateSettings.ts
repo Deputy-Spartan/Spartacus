@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
-import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { requireGuildPermission, requireGuildOwner } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
 
 const router = Router();
@@ -16,7 +16,6 @@ router.get("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPerm
     logChannelId: row?.logChannelId ?? null,
     dmConfirmEnabled: row?.dmConfirmEnabled ?? false,
     dmConfirmMessage: row?.dmConfirmMessage ?? null,
-    agreedCount: row?.agreedCount ?? 0,
     agreeReplyMessage: row?.agreeReplyMessage ?? null,
     alreadyAgreedMessage: row?.alreadyAgreedMessage ?? null,
     noRoleConfiguredMessage: row?.noRoleConfiguredMessage ?? null,
@@ -105,6 +104,25 @@ router.put("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPerm
   }
 
   res.json(row);
+});
+
+// Dashboard-side audit trail of every agreement (separate from the optional
+// in-Discord log channel) — most recent first, capped so the page stays fast.
+router.get("/guilds/:guildId/rules-gate-agreements", requireAuth, requireGuildPermission, async (req, res) => {
+  const rows = await prisma.rulesGateAgreement.findMany({
+    where: { guildId: req.params.guildId },
+    orderBy: { agreedAt: "desc" },
+    take: 200,
+  });
+  res.json(rows);
+});
+
+// Server-owner-only, same reasoning as Player Reports' transcript purge —
+// this is evidence of who agreed to the rules and when, so letting any
+// Manage-Server staffer wipe it would let them erase their own tracks.
+router.delete("/guilds/:guildId/rules-gate-agreements", requireAuth, requireGuildPermission, requireGuildOwner, async (req, res) => {
+  const result = await prisma.rulesGateAgreement.deleteMany({ where: { guildId: req.params.guildId } });
+  res.json({ deleted: result.count });
 });
 
 export default router;

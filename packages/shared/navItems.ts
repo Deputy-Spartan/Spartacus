@@ -32,7 +32,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/moderation", label: "Moderator", icon: "🛡️", moduleKey: "MODERATION" },
       { href: "/cases", label: "Cases & Warnings", icon: "📁", moduleKey: "MODERATION" },
       { href: "/reports", label: "Player Reports", icon: "🚩", moduleKey: "PLAYER_REPORTS" },
-      { href: "/mod-digest", label: "Mod Digest", icon: "📋", moduleKey: "MOD_DIGEST" },
+      { href: "/mod-digest", label: "Weekly Staff Report", icon: "📋", moduleKey: "MOD_DIGEST" },
       { href: "/warn-escalation", label: "Warn Escalation", icon: "📈", moduleKey: "WARN_ESCALATION" },
       { href: "/appeals", label: "Appeals", icon: "🙏", moduleKey: "BAN_APPEALS" },
     ],

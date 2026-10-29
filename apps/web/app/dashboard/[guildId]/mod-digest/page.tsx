@@ -90,7 +90,7 @@ export default function ModDigestPage({ params }: { params: { guildId: string } 
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="MOD_DIGEST"
-        title="Mod Accountability Digest"
+        title="Weekly Staff Report"
         description="Posts a summary of recent moderation actions — warns, mutes, kicks, and bans — broken down by moderator, on the schedule below."
       />
 

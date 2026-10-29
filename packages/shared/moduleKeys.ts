@@ -103,7 +103,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   STATUS_CHANNEL: "Status Channel",
   WARN_ESCALATION: "Warn Escalation",
   BAN_APPEALS: "Ban/Mute Appeals",
-  MOD_DIGEST: "Mod Accountability Digest",
+  MOD_DIGEST: "Weekly Staff Report",
   VOICE_ACTIVITY: "Voice Activity",
   WEEKLY_RECAP: "Weekly Recap",
   ACHIEVEMENTS: "Achievements",

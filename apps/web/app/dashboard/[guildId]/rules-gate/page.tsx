@@ -20,6 +20,17 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "activity", label: "Activity", icon: "📊" },
 ];
 
+const STEPS = [
+  { label: "Channel & Role", hint: "Where it posts, what it grants" },
+  { label: "Rules Message", hint: "Pick or write the embed" },
+  { label: "Onboarding Extras", hint: "Role swap, log, DM, account age" },
+  { label: "Sections", hint: "Optional per-topic buttons" },
+  { label: "Decline Option", hint: "Optional \"I Don't Agree\"" },
+  { label: "Reminders", hint: "Optional nudge DM" },
+  { label: "Button Messages", hint: "Customize what it says" },
+  { label: "Maintenance", hint: "Re-verify after rule changes" },
+] as const;
+
 const DEFAULT_AGREE_REPLY = "✅ Thanks — you now have access!";
 const DEFAULT_ALREADY_AGREED = "You've already agreed!";
 const DEFAULT_NO_ROLE_CONFIGURED = "This server hasn't configured a role to grant yet — ask an admin to set one up.";
@@ -87,132 +98,197 @@ function SettingsTab({
   settings: RulesGateSettingsRow | null;
   update: (patch: Partial<RulesGateSettingsRow>) => void;
 }) {
+  const [step, setStep] = useState(0);
+  const lastStep = STEPS.length - 1;
+
   return (
-    <div className="flex flex-col lg:flex-row gap-5 items-start">
-      <div className="flex flex-col gap-5 max-w-xl w-full">
-      <NeonCard>
-        <p className="text-xs text-slate-500 mb-4">
-          Build the full rules message below (title, images, links, multiple fields — even multiple embeds) in the{" "}
-          <Link href={`/dashboard/${guildId}/embed-creator`} className="text-neon-blue hover:underline">
-            Embed Creator
-          </Link>
-          , then pick it here. Saving posts (or reposts) it right away.
-        </p>
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Rules Channel</label>
-        <ChannelSelect
-          guildId={guildId}
-          value={settings?.channelId ?? null}
-          onChange={(id) => update({ channelId: id || null })}
-          kind="text"
-          placeholder="Off — no panel posted"
-        />
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Role to Grant</label>
-        <RoleSelect
-          guildId={guildId}
-          value={settings?.roleId ?? null}
-          onChange={(id) => update({ roleId: id || null })}
-          placeholder="No role configured yet"
-        />
-
-        <SavedEmbedPicker guildId={guildId} value={settings?.savedEmbedId ?? null} onChange={(id) => update({ savedEmbedId: id })} />
-
-        {!settings?.savedEmbedId && (
-          <div className="mt-5 pt-5 border-t border-white/5">
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Default Embed Title</label>
-            <input
-              type="text"
-              value={settings?.defaultEmbedTitle ?? ""}
-              onChange={(e) => update({ defaultEmbedTitle: e.target.value || null })}
-              placeholder={DEFAULT_EMBED_TITLE}
-              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
-            />
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Default Embed Description</label>
-            <textarea
-              value={settings?.defaultEmbedDescription ?? ""}
-              onChange={(e) => update({ defaultEmbedDescription: e.target.value || null })}
-              placeholder={DEFAULT_EMBED_DESCRIPTION}
-              rows={2}
-              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-            />
-            <p className="text-xs text-slate-600 mt-1">
-              What gets posted when no saved embed is selected above — pick a saved embed instead for full control (images, links, fields).
-            </p>
-          </div>
-        )}
-      </NeonCard>
-
-      <SectionsCard guildId={guildId} />
-
-      <NeonCard className="max-w-xl">
-        <p className="font-medium mb-1">Onboarding Extras</p>
-        <p className="text-xs text-slate-500 mb-4">
-          Optional add-ons that make the rules gate double as the last step of verification instead of a standalone embed.
-        </p>
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Role to Remove on Agree</label>
-        <p className="text-xs text-slate-500 mb-2">
-          Strip a pending/unverified role (e.g. @Unverified) the moment someone agrees — pairs well with Verification or the Rules Gate acting
-          as your final gate.
-        </p>
-        <RoleSelect
-          guildId={guildId}
-          value={settings?.roleToRemoveId ?? null}
-          onChange={(id) => update({ roleToRemoveId: id || null })}
-          placeholder="None — don't remove any role"
-        />
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Agreement Log Channel</label>
-        <p className="text-xs text-slate-500 mb-2">Posts a line here every time a member agrees — a lightweight audit trail for staff.</p>
-        <ChannelSelect
-          guildId={guildId}
-          value={settings?.logChannelId ?? null}
-          onChange={(id) => update({ logChannelId: id || null })}
-          kind="text"
-          placeholder="Off — no log posted"
-        />
-
-        <div className="flex items-center justify-between mt-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">DM Confirmation</p>
-            <p className="text-xs text-slate-500 mt-0.5">Send the member a DM when they agree, in addition to the in-channel reply.</p>
-          </div>
-          <ToggleSwitch enabled={settings?.dmConfirmEnabled ?? false} onChange={(v) => update({ dmConfirmEnabled: v })} />
-        </div>
-
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Minimum Account Age (days)</label>
-        <p className="text-xs text-slate-500 mb-2">Rejects the agree click if the member's Discord account is younger than this — helps against alt/raid accounts.</p>
-        <input
-          type="number"
-          min={0}
-          value={settings?.minAccountAgeDays ?? ""}
-          onChange={(e) => update({ minAccountAgeDays: e.target.value ? Number(e.target.value) : null })}
-          placeholder="Off — no minimum"
-          className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
-        />
-        {settings?.minAccountAgeDays != null && (
-          <>
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Account-Too-New Reply</label>
-            <textarea
-              value={settings.accountTooNewMessage ?? ""}
-              onChange={(e) => update({ accountTooNewMessage: e.target.value || null })}
-              placeholder={DEFAULT_ACCOUNT_TOO_NEW}
-              rows={2}
-              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-            />
-          </>
-        )}
-      </NeonCard>
-
-      <DeclineCard guildId={guildId} settings={settings} update={update} />
-      <ReminderCard settings={settings} update={update} />
-      <VersionCard guildId={guildId} settings={settings} />
-      <MessagesCard settings={settings} update={update} />
+    <div className="flex flex-col lg:flex-row gap-6 items-start">
+      <div className="flex gap-1.5 lg:flex-col lg:gap-1 lg:w-[220px] lg:flex-none overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+        {STEPS.map((s, i) => (
+          <button
+            key={s.label}
+            onClick={() => setStep(i)}
+            className={`flex items-center gap-2.5 text-left px-3 py-2 rounded-lg border text-xs whitespace-nowrap lg:whitespace-normal transition-colors ${
+              i === step
+                ? "bg-neon-blue/15 border-neon-blue/40 text-white"
+                : i < step
+                ? "border-white/5 text-slate-400 hover:text-white hover:border-white/15"
+                : "border-white/5 text-slate-500 hover:text-white hover:border-white/15"
+            }`}
+          >
+            <span
+              className={`flex-none w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold ${
+                i < step ? "bg-emerald-500/20 text-emerald-400" : i === step ? "bg-neon-blue/30 text-white" : "bg-white/5 text-slate-500"
+              }`}
+            >
+              {i < step ? "✓" : i + 1}
+            </span>
+            <span className="hidden lg:block">
+              <span className="block font-medium">{s.label}</span>
+              <span className="block text-[10px] text-slate-500 font-normal">{s.hint}</span>
+            </span>
+            <span className="lg:hidden font-medium">{s.label}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="w-full lg:w-[380px] lg:sticky lg:top-5">
-        <EmbedPreviewBlock guildId={guildId} savedEmbedId={settings?.savedEmbedId ?? null} />
+      <div className="flex-1 w-full min-w-0">
+        <p className="text-xs text-slate-500 mb-3">
+          Step {step + 1} of {STEPS.length} — {STEPS[step].label}
+        </p>
+
+        {step === 0 && (
+          <NeonCard className="max-w-xl">
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Rules Channel</label>
+            <ChannelSelect
+              guildId={guildId}
+              value={settings?.channelId ?? null}
+              onChange={(id) => update({ channelId: id || null })}
+              kind="text"
+              placeholder="Off — no panel posted"
+            />
+
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Role to Grant</label>
+            <RoleSelect
+              guildId={guildId}
+              value={settings?.roleId ?? null}
+              onChange={(id) => update({ roleId: id || null })}
+              placeholder="No role configured yet"
+            />
+          </NeonCard>
+        )}
+
+        {step === 1 && (
+          <div className="flex flex-col lg:flex-row gap-5 items-start">
+            <NeonCard className="max-w-xl w-full">
+              <p className="text-xs text-slate-500 mb-4">
+                Build the full rules message (title, images, links, multiple fields — even multiple embeds) in the{" "}
+                <Link href={`/dashboard/${guildId}/embed-creator`} className="text-neon-blue hover:underline">
+                  Embed Creator
+                </Link>
+                , then pick it here. Saving posts (or reposts) it right away.
+              </p>
+              <SavedEmbedPicker guildId={guildId} value={settings?.savedEmbedId ?? null} onChange={(id) => update({ savedEmbedId: id })} />
+
+              {!settings?.savedEmbedId && (
+                <div className="mt-5 pt-5 border-t border-white/5">
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Default Embed Title</label>
+                  <input
+                    type="text"
+                    value={settings?.defaultEmbedTitle ?? ""}
+                    onChange={(e) => update({ defaultEmbedTitle: e.target.value || null })}
+                    placeholder={DEFAULT_EMBED_TITLE}
+                    className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
+                  />
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Default Embed Description</label>
+                  <textarea
+                    value={settings?.defaultEmbedDescription ?? ""}
+                    onChange={(e) => update({ defaultEmbedDescription: e.target.value || null })}
+                    placeholder={DEFAULT_EMBED_DESCRIPTION}
+                    rows={2}
+                    className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+                  />
+                  <p className="text-xs text-slate-600 mt-1">
+                    What gets posted when no saved embed is selected above — pick a saved embed instead for full control (images, links,
+                    fields).
+                  </p>
+                </div>
+              )}
+            </NeonCard>
+            <div className="w-full lg:w-[360px] lg:sticky lg:top-5">
+              <EmbedPreviewBlock guildId={guildId} savedEmbedId={settings?.savedEmbedId ?? null} />
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <NeonCard className="max-w-xl">
+            <p className="text-xs text-slate-500 mb-4">
+              Optional add-ons that make the rules gate double as the last step of verification instead of a standalone embed.
+            </p>
+
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Role to Remove on Agree</label>
+            <p className="text-xs text-slate-500 mb-2">
+              Strip a pending/unverified role (e.g. @Unverified) the moment someone agrees — pairs well with Verification or the Rules Gate
+              acting as your final gate.
+            </p>
+            <RoleSelect
+              guildId={guildId}
+              value={settings?.roleToRemoveId ?? null}
+              onChange={(id) => update({ roleToRemoveId: id || null })}
+              placeholder="None — don't remove any role"
+            />
+
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Agreement Log Channel</label>
+            <p className="text-xs text-slate-500 mb-2">Posts a line here every time a member agrees — a lightweight audit trail for staff.</p>
+            <ChannelSelect
+              guildId={guildId}
+              value={settings?.logChannelId ?? null}
+              onChange={(id) => update({ logChannelId: id || null })}
+              kind="text"
+              placeholder="Off — no log posted"
+            />
+
+            <div className="flex items-center justify-between mt-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">DM Confirmation</p>
+                <p className="text-xs text-slate-500 mt-0.5">Send the member a DM when they agree, in addition to the in-channel reply.</p>
+              </div>
+              <ToggleSwitch enabled={settings?.dmConfirmEnabled ?? false} onChange={(v) => update({ dmConfirmEnabled: v })} />
+            </div>
+
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Minimum Account Age (days)</label>
+            <p className="text-xs text-slate-500 mb-2">
+              Rejects the agree click if the member's Discord account is younger than this — helps against alt/raid accounts.
+            </p>
+            <input
+              type="number"
+              min={0}
+              value={settings?.minAccountAgeDays ?? ""}
+              onChange={(e) => update({ minAccountAgeDays: e.target.value ? Number(e.target.value) : null })}
+              placeholder="Off — no minimum"
+              className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
+            />
+            {settings?.minAccountAgeDays != null && (
+              <>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Account-Too-New Reply</label>
+                <textarea
+                  value={settings.accountTooNewMessage ?? ""}
+                  onChange={(e) => update({ accountTooNewMessage: e.target.value || null })}
+                  placeholder={DEFAULT_ACCOUNT_TOO_NEW}
+                  rows={2}
+                  className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+                />
+              </>
+            )}
+          </NeonCard>
+        )}
+
+        {step === 3 && <SectionsCard guildId={guildId} />}
+        {step === 4 && <DeclineCard guildId={guildId} settings={settings} update={update} />}
+        {step === 5 && <ReminderCard settings={settings} update={update} />}
+        {step === 6 && <MessagesCard settings={settings} update={update} />}
+        {step === 7 && <VersionCard guildId={guildId} settings={settings} />}
+
+        <div className="flex items-center justify-between max-w-xl mt-5">
+          <button
+            onClick={() => setStep((s) => Math.max(0, s - 1))}
+            disabled={step === 0}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30"
+          >
+            ← Back
+          </button>
+          {step < lastStep ? (
+            <button
+              onClick={() => setStep((s) => Math.min(lastStep, s + 1))}
+              className="text-xs font-medium px-4 py-1.5 rounded-lg bg-neon-blue/15 border border-neon-blue/40 text-white hover:bg-neon-blue/25 transition-colors"
+            >
+              Next →
+            </button>
+          ) : (
+            <span className="text-xs text-emerald-400">✓ That's every step — you're all set.</span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1244,6 +1244,12 @@ export interface ReportSettingsRow {
   channelNameFormat: string;
   panelChannelId: string | null;
   savedEmbedId: string | null;
+  dmCreateEnabled: boolean;
+  dmCreateMessage: string | null;
+  dmClaimEnabled: boolean;
+  dmClaimMessage: string | null;
+  dmCloseEnabled: boolean;
+  dmCloseMessage: string | null;
 }
 
 export interface ModDigestSettingsRow {

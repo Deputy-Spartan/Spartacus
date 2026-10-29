@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonInteraction,
   ButtonStyle,
@@ -32,7 +33,35 @@ interface TranscriptEntry {
   at: string;
 }
 
-const STATUS_COLOR: Record<string, number> = { OPEN: 0xe74c3c, REVIEWING: 0xffc857, RESOLVED: 0x2ecc71 };
+const STATUS_COLOR: Record<string, number> = { OPEN: 0xe74c3c, REVIEWING: 0xffc857, RESOLVED: 0x2ecc71, CLOSED: 0x95a5a6 };
+
+// Fallback copy for each DM, used whenever the dashboard's custom message
+// field is left blank — editable on the Player Reports Settings tab, each
+// with its own on/off toggle (dmCreateEnabled/dmClaimEnabled/dmCloseEnabled).
+export const DEFAULT_DM_CREATE =
+  "🚩 Your report in **{server}** has been created (#{number}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.";
+export const DEFAULT_DM_CLAIM = "🙋 Your report #{number} in **{server}** has been claimed by a staff member and is now being reviewed.";
+export const DEFAULT_DM_CLOSE = "🔒 Your report #{number} in **{server}** has been closed. Here's a transcript of the report channel for your records.";
+
+function renderDmTemplate(template: string | null | undefined, fallback: string, tokens: Record<string, string>): string {
+  let text = template && template.trim() ? template : fallback;
+  for (const [key, value] of Object.entries(tokens)) {
+    text = text.replace(new RegExp(`\\{${key}\\}`, "g"), value);
+  }
+  return text;
+}
+
+function formatTranscriptLines(entries: TranscriptEntry[]): string {
+  if (entries.length === 0) return "(No messages in this report channel.)";
+  return entries
+    .map((e) => {
+      const time = e.at.slice(11, 19);
+      const content = e.content || (e.attachmentUrls.length > 0 ? "(attachment only)" : "");
+      const attachments = e.attachmentUrls.length > 0 ? `\n  attachments: ${e.attachmentUrls.join(", ")}` : "";
+      return `[${time}] ${e.authorTag}: ${content}${attachments}`;
+    })
+    .join("\n");
+}
 
 // Discord channel names are lowercase-and-dashes only, so tokens get
 // substituted before that normalization runs. Mirrors modules/tickets/
@@ -51,12 +80,20 @@ function buildChannelName(format: string | undefined, tokens: { user: string; re
   );
 }
 
+// OPEN: Claim, Resolved, Close. Once claimed (REVIEWING), Claim disappears
+// — only Resolved and Close remain. RESOLVED/CLOSED are terminal: the
+// channel is already deleting itself by then (see finalizeReport), so no
+// buttons are shown at all.
 function controlRow(reportId: string, status: string) {
   const row = new ActionRowBuilder<ButtonBuilder>();
-  if (status !== "RESOLVED") {
+  if (status === "RESOLVED" || status === "CLOSED") return row;
+  if (status === "OPEN") {
     row.addComponents(new ButtonBuilder().setCustomId(`report:claim:${reportId}`).setLabel("Claim").setStyle(ButtonStyle.Primary));
-    row.addComponents(new ButtonBuilder().setCustomId(`report:close:${reportId}`).setLabel("Close").setStyle(ButtonStyle.Danger));
   }
+  row.addComponents(
+    new ButtonBuilder().setCustomId(`report:resolve:${reportId}`).setLabel("Resolved").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`report:close:${reportId}`).setLabel("Close").setStyle(ButtonStyle.Danger)
+  );
   return row;
 }
 
@@ -225,6 +262,13 @@ export async function createPlayerReport(
     await prisma.playerReport.update({ where: { id: report.id }, data: { messageId: message.id } });
   }
 
+  if (settings.dmCreateEnabled) {
+    const reporterUserForDm = reporterUser ?? (await client.users.fetch(reporterId).catch(() => null));
+    await reporterUserForDm
+      ?.send(renderDmTemplate(settings.dmCreateMessage, DEFAULT_DM_CREATE, { server: guild.name, number: String(reportNumber) }))
+      .catch(() => null); // DMs off — the caller's own ephemeral reply already confirmed it either way.
+  }
+
   return { ok: true, report };
 }
 
@@ -271,12 +315,6 @@ export async function handlePlayerReportModalSubmit(interaction: ModalSubmitInte
     content: `✅ Report submitted privately (#${result.report.reportNumber}). Staff will review it — check your DMs for updates.`,
     ephemeral: true,
   });
-
-  await interaction.user
-    .send(
-      `🚩 Your report in **${interaction.guild.name}** has been created (#${result.report.reportNumber}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.`
-    )
-    .catch(() => null); // DMs off — the ephemeral reply above already confirmed it either way.
 }
 
 async function refreshMessage(client: Client, report: PlayerReport) {
@@ -299,7 +337,7 @@ export async function handleReportClaim(interaction: ButtonInteraction, reportId
     await interaction.reply({ content: "You don't have the staff role needed to review reports.", ephemeral: true });
     return;
   }
-  if (report.status === "RESOLVED") {
+  if (report.status === "RESOLVED" || report.status === "CLOSED") {
     await interaction.reply({ content: "This report is already closed.", ephemeral: true });
     return;
   }
@@ -316,13 +354,25 @@ export async function handleReportClaim(interaction: ButtonInteraction, reportId
   await refreshMessage(interaction.client, updated);
   await interaction.reply({ content: `🙋 Claimed by <@${interaction.user.id}>.` });
 
-  const reporter = await interaction.client.users.fetch(report.reporterId).catch(() => null);
-  await reporter
-    ?.send(`🙋 Your report #${report.reportNumber} in **${interaction.guild?.name ?? "the server"}** has been claimed by a staff member and is now being reviewed.`)
-    .catch(() => null);
+  if (settings?.dmClaimEnabled !== false) {
+    const reporter = await interaction.client.users.fetch(report.reporterId).catch(() => null);
+    await reporter
+      ?.send(
+        renderDmTemplate(settings?.dmClaimMessage, DEFAULT_DM_CLAIM, {
+          server: interaction.guild?.name ?? "the server",
+          number: String(report.reportNumber ?? "?"),
+        })
+      )
+      .catch(() => null);
+  }
 }
 
-export async function handleReportClose(interaction: ButtonInteraction, reportId: string) {
+// Shared by both terminal buttons (Resolved and Close) — same DM-with-
+// transcript + auto-delete behavior either way, only the final status and
+// the reply wording differ. Mirrors modules/tickets/tickets.ts's
+// closeTicket: reply first ("closing in N seconds"), then delete on a
+// timer so staff see the confirmation before the channel disappears.
+async function finalizeReport(interaction: ButtonInteraction, reportId: string, finalStatus: "RESOLVED" | "CLOSED") {
   const report = await prisma.playerReport.findUnique({ where: { id: reportId } });
   if (!report) {
     await interaction.reply({ content: "This report no longer exists.", ephemeral: true });
@@ -334,34 +384,57 @@ export async function handleReportClose(interaction: ButtonInteraction, reportId
     await interaction.reply({ content: "You don't have the staff role needed to review reports.", ephemeral: true });
     return;
   }
-  if (report.status === "RESOLVED") {
+  if (report.status === "RESOLVED" || report.status === "CLOSED") {
     await interaction.reply({ content: "This report is already closed.", ephemeral: true });
     return;
   }
 
   const updated = await prisma.playerReport.update({
     where: { id: reportId },
-    data: { status: "RESOLVED", closedAt: new Date(), claimedById: report.claimedById ?? interaction.user.id },
+    data: { status: finalStatus, closedAt: new Date(), claimedById: report.claimedById ?? interaction.user.id },
   });
 
   await refreshMessage(interaction.client, updated);
-  await interaction.reply({ content: `🔒 Report closed by <@${interaction.user.id}>.` });
+  const verb = finalStatus === "RESOLVED" ? "resolved" : "closed";
+  await interaction.reply({ content: `🔒 Report ${verb} by <@${interaction.user.id}> — deleting this channel in 5 seconds…` });
 
-  // Lock the channel instead of deleting it — the transcript and embed stay
-  // readable to staff as a record, nobody can post in it anymore.
-  if (updated.channelId && settings?.staffRoleId) {
-    const channel = await interaction.client.channels.fetch(updated.channelId).catch(() => null);
-    if (channel && "permissionOverwrites" in channel) {
-      await channel.permissionOverwrites.edit(settings.staffRoleId, { SendMessages: false }).catch(() => null);
+  if (settings?.dmCloseEnabled !== false) {
+    const reporter = await interaction.client.users.fetch(report.reporterId).catch(() => null);
+    if (reporter) {
+      const entries = Array.isArray(updated.transcript) ? (updated.transcript as unknown as TranscriptEntry[]) : [];
+      const transcriptText = formatTranscriptLines(entries);
+      const attachment = new AttachmentBuilder(Buffer.from(transcriptText, "utf-8"), {
+        name: `transcript-report-${updated.reportNumber ?? updated.id.slice(0, 8)}.txt`,
+      });
+      await reporter
+        .send({
+          content: renderDmTemplate(settings?.dmCloseMessage, DEFAULT_DM_CLOSE, {
+            server: interaction.guild?.name ?? "the server",
+            number: String(updated.reportNumber ?? "?"),
+          }),
+          files: [attachment],
+        })
+        .catch(() => null);
     }
   }
+
+  setTimeout(() => interaction.channel?.delete().catch(() => null), 5000);
+}
+
+export async function handleReportResolve(interaction: ButtonInteraction, reportId: string) {
+  await finalizeReport(interaction, reportId, "RESOLVED");
+}
+
+export async function handleReportClose(interaction: ButtonInteraction, reportId: string) {
+  await finalizeReport(interaction, reportId, "CLOSED");
 }
 
 // Called from events/messageCreate.ts for every message posted while
 // PLAYER_REPORTS is enabled — keeps a durable copy of the conversation in
-// each report's own channel (which may later be locked, though not
-// deleted) that the dashboard reads as the transcript. No-ops instantly for
-// any channel that isn't a report channel.
+// each report's own channel so the transcript survives the channel being
+// deleted a few seconds after Resolved/Close is clicked (see
+// finalizeReport). No-ops instantly for any channel that isn't a report
+// channel.
 export async function appendReportTranscript(channelId: string, message: Message) {
   const report = await prisma.playerReport.findUnique({ where: { channelId } });
   if (!report) return;

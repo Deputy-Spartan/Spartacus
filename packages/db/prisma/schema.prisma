@@ -1165,6 +1165,7 @@ enum ReportStatus {
   OPEN
   REVIEWING
   RESOLVED
+  CLOSED
 }
 
 model PlayerReport {
@@ -1213,6 +1214,17 @@ model PlayerReportSettings {
   panelChannelId String?
   panelMessageId String?
   savedEmbedId   String? // shared Embed Creator preset used as the panel body; falls back to a bare placeholder embed if unset
+
+  // Per-event DM toggles + custom copy, sent to the reporter — editable on
+  // the dashboard's Settings tab. A blank *Message falls back to a sensible
+  // default (see DEFAULT_DM_* in modules/moderation/playerReports.ts); the
+  // *Enabled flag can turn any one of them off without clearing the text.
+  dmCreateEnabled Boolean @default(true)
+  dmCreateMessage String?
+  dmClaimEnabled  Boolean @default(true)
+  dmClaimMessage  String?
+  dmCloseEnabled  Boolean @default(true) // close DM also includes a transcript attachment
+  dmCloseMessage  String?
 }
 
 // ---- Perm Watch ----

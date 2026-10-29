@@ -33,16 +33,40 @@ router.get("/guilds/:guildId/report-settings", requireAuth, requireGuildPermissi
     channelNameFormat: row?.channelNameFormat ?? "report-{number}",
     panelChannelId: row?.panelChannelId ?? null,
     savedEmbedId: row?.savedEmbedId ?? null,
+    dmCreateEnabled: row?.dmCreateEnabled ?? true,
+    dmCreateMessage: row?.dmCreateMessage ?? null,
+    dmClaimEnabled: row?.dmClaimEnabled ?? true,
+    dmClaimMessage: row?.dmClaimMessage ?? null,
+    dmCloseEnabled: row?.dmCloseEnabled ?? true,
+    dmCloseMessage: row?.dmCloseMessage ?? null,
   });
 });
 
 router.put("/guilds/:guildId/report-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { staffRoleId, categoryId, channelNameFormat, panelChannelId, savedEmbedId } = req.body as {
+  const {
+    staffRoleId,
+    categoryId,
+    channelNameFormat,
+    panelChannelId,
+    savedEmbedId,
+    dmCreateEnabled,
+    dmCreateMessage,
+    dmClaimEnabled,
+    dmClaimMessage,
+    dmCloseEnabled,
+    dmCloseMessage,
+  } = req.body as {
     staffRoleId?: string | null;
     categoryId?: string | null;
     channelNameFormat?: string;
     panelChannelId?: string | null;
     savedEmbedId?: string | null;
+    dmCreateEnabled?: boolean;
+    dmCreateMessage?: string | null;
+    dmClaimEnabled?: boolean;
+    dmClaimMessage?: string | null;
+    dmCloseEnabled?: boolean;
+    dmCloseMessage?: string | null;
   };
 
   const existing = await prisma.playerReportSettings.findUnique({ where: { guildId: req.params.guildId } });
@@ -61,6 +85,12 @@ router.put("/guilds/:guildId/report-settings", requireAuth, requireGuildPermissi
       channelNameFormat: channelNameFormat ?? "report-{number}",
       panelChannelId: panelChannelId ?? null,
       savedEmbedId: savedEmbedId ?? null,
+      ...(dmCreateEnabled !== undefined ? { dmCreateEnabled } : {}),
+      ...(dmCreateMessage !== undefined ? { dmCreateMessage } : {}),
+      ...(dmClaimEnabled !== undefined ? { dmClaimEnabled } : {}),
+      ...(dmClaimMessage !== undefined ? { dmClaimMessage } : {}),
+      ...(dmCloseEnabled !== undefined ? { dmCloseEnabled } : {}),
+      ...(dmCloseMessage !== undefined ? { dmCloseMessage } : {}),
     },
     update: {
       ...(staffRoleId !== undefined ? { staffRoleId } : {}),
@@ -69,6 +99,12 @@ router.put("/guilds/:guildId/report-settings", requireAuth, requireGuildPermissi
       ...(panelChannelId !== undefined ? { panelChannelId } : {}),
       ...(savedEmbedId !== undefined ? { savedEmbedId } : {}),
       ...(channelChanged || embedChanged ? { panelMessageId: null } : {}),
+      ...(dmCreateEnabled !== undefined ? { dmCreateEnabled } : {}),
+      ...(dmCreateMessage !== undefined ? { dmCreateMessage } : {}),
+      ...(dmClaimEnabled !== undefined ? { dmClaimEnabled } : {}),
+      ...(dmClaimMessage !== undefined ? { dmClaimMessage } : {}),
+      ...(dmCloseEnabled !== undefined ? { dmCloseEnabled } : {}),
+      ...(dmCloseMessage !== undefined ? { dmCloseMessage } : {}),
     },
   });
 

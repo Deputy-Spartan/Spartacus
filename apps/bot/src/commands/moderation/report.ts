@@ -34,12 +34,6 @@ const command: CommandModule = {
       content: `✅ Report submitted privately (#${result.report.reportNumber}). Staff will review it — check your DMs for updates.`,
       ephemeral: true,
     });
-
-    await interaction.user
-      .send(
-        `🚩 Your report in **${interaction.guild.name}** has been created (#${result.report.reportNumber}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.`
-      )
-      .catch(() => null);
   },
 };
 

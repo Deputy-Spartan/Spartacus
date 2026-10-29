@@ -48,10 +48,16 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if (interaction.isButton() && (interaction.customId.startsWith("report:claim:") || interaction.customId.startsWith("report:close:"))) {
+  if (
+    interaction.isButton() &&
+    (interaction.customId.startsWith("report:claim:") ||
+      interaction.customId.startsWith("report:resolve:") ||
+      interaction.customId.startsWith("report:close:"))
+  ) {
     const [, action, reportId] = interaction.customId.split(":");
-    const { handleReportClaim, handleReportClose } = await import("../modules/moderation/playerReports");
+    const { handleReportClaim, handleReportResolve, handleReportClose } = await import("../modules/moderation/playerReports");
     if (action === "claim") await handleReportClaim(interaction, reportId);
+    else if (action === "resolve") await handleReportResolve(interaction, reportId);
     else await handleReportClose(interaction, reportId);
     return;
   }

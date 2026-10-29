@@ -5,17 +5,20 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type ReportSettingsRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 
 type ReportRow = Awaited<ReturnType<typeof api.getReports>>[number];
+type Tab = "reports" | "settings";
 
 const STATUS_STYLE: Record<string, string> = {
   OPEN: "border-red-500/40 text-red-400",
   REVIEWING: "border-amber-500/40 text-amber-400",
   RESOLVED: "border-emerald-500/40 text-emerald-400",
+  CLOSED: "border-slate-500/40 text-slate-400",
 };
 
 const CHANNEL_NAME_TOKENS = [
@@ -24,7 +27,12 @@ const CHANNEL_NAME_TOKENS = [
   { token: "{reported}", description: "The reported member's username" },
 ];
 
-function ReportSettings({ guildId }: { guildId: string }) {
+const DM_TOKENS = [
+  { token: "{number}", description: "This report's sequential number" },
+  { token: "{server}", description: "This server's name" },
+];
+
+function ReportSettingsCard({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<ReportSettingsRow | null>(null);
   const channelNameRef = useRef<HTMLInputElement>(null);
 
@@ -44,7 +52,7 @@ function ReportSettings({ guildId }: { guildId: string }) {
       <p className="font-medium mb-1">Report Channels & Staff Role</p>
       <p className="text-xs text-slate-500 mb-3">
         Ticket-style: every new report opens its own private channel under the category below, visible only to the staff role (and
-        Manage Server). Nobody else — the reporter included — can see it. Only that role can claim or close a report.
+        Manage Server). Nobody else — the reporter included — can see it. Only that role can claim, resolve, or close a report.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-1">
         <div>
@@ -85,7 +93,7 @@ function ReportSettings({ guildId }: { guildId: string }) {
   );
 }
 
-function ReportPanel({ guildId }: { guildId: string }) {
+function ReportPanelCard({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<ReportSettingsRow | null>(null);
 
   useEffect(() => {
@@ -105,8 +113,7 @@ function ReportPanel({ guildId }: { guildId: string }) {
       <p className="text-xs text-slate-500 mb-3">
         Posts an embed with a 🚩 Report a Player button — an alternative to <code className="text-neon-blue">/report</code> for members
         who'd rather click than type a command. Clicking opens a private modal (who, and why); nothing is posted publicly, and only
-        the reporter sees the confirmation. They get a DM when the report is created and another when it's claimed. Leave the channel
-        unset to use the slash command only.
+        the reporter sees the confirmation. Leave the channel unset to use the slash command only.
       </p>
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Panel Channel</label>
       <ChannelSelect
@@ -118,6 +125,103 @@ function ReportPanel({ guildId }: { guildId: string }) {
       />
       <SavedEmbedPicker guildId={guildId} value={settings.savedEmbedId} onChange={(id) => patch({ savedEmbedId: id })} />
     </NeonCard>
+  );
+}
+
+interface DmFieldDef {
+  enabledKey: "dmCreateEnabled" | "dmClaimEnabled" | "dmCloseEnabled";
+  messageKey: "dmCreateMessage" | "dmClaimMessage" | "dmCloseMessage";
+  label: string;
+  hint: string;
+  placeholder: string;
+}
+
+const DM_FIELDS: DmFieldDef[] = [
+  {
+    enabledKey: "dmCreateEnabled",
+    messageKey: "dmCreateMessage",
+    label: "Report Created",
+    hint: "Sent to the reporter the moment their report channel is created (from /report or the panel).",
+    placeholder: "🚩 Your report in **{server}** has been created (#{number}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.",
+  },
+  {
+    enabledKey: "dmClaimEnabled",
+    messageKey: "dmClaimMessage",
+    label: "Report Claimed",
+    hint: "Sent when a staff member clicks Claim on the report channel.",
+    placeholder: "🙋 Your report #{number} in **{server}** has been claimed by a staff member and is now being reviewed.",
+  },
+  {
+    enabledKey: "dmCloseEnabled",
+    messageKey: "dmCloseMessage",
+    label: "Report Resolved / Closed",
+    hint: "Sent when staff clicks Resolved or Close, with a transcript of the report channel attached as a .txt file — right before the channel deletes itself.",
+    placeholder: "🔒 Your report #{number} in **{server}** has been closed. Here's a transcript of the report channel for your records.",
+  },
+];
+
+function DmMessagesCard({ guildId }: { guildId: string }) {
+  const [settings, setSettings] = useState<ReportSettingsRow | null>(null);
+  const refs = {
+    dmCreateMessage: useRef<HTMLTextAreaElement>(null),
+    dmClaimMessage: useRef<HTMLTextAreaElement>(null),
+    dmCloseMessage: useRef<HTMLTextAreaElement>(null),
+  };
+
+  useEffect(() => {
+    api.getReportSettings(guildId).then(setSettings);
+  }, [guildId]);
+
+  async function patch(partial: Partial<ReportSettingsRow>) {
+    setSettings((prev) => (prev ? { ...prev, ...partial } : prev));
+    await api.setReportSettings(guildId, partial);
+  }
+
+  if (!settings) return null;
+
+  return (
+    <NeonCard className="mb-4">
+      <p className="font-medium mb-1">DM Messages</p>
+      <p className="text-xs text-slate-500 mb-3">
+        Each update below can be turned off independently. When a message is left blank, the default shown as its placeholder is used.
+      </p>
+      <div className="space-y-5">
+        {DM_FIELDS.map((f) => (
+          <div key={f.enabledKey} className="border-t border-white/5 pt-4 first:border-t-0 first:pt-0">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-medium">{f.label}</p>
+              <ToggleSwitch enabled={settings[f.enabledKey]} onChange={(v) => patch({ [f.enabledKey]: v } as Partial<ReportSettingsRow>)} label={`Send DM on ${f.label}`} />
+            </div>
+            <p className="text-xs text-slate-500 mb-2">{f.hint}</p>
+            <textarea
+              ref={refs[f.messageKey]}
+              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm disabled:opacity-50"
+              rows={2}
+              placeholder={f.placeholder}
+              value={settings[f.messageKey] ?? ""}
+              disabled={!settings[f.enabledKey]}
+              onChange={(e) => patch({ [f.messageKey]: e.target.value || null } as Partial<ReportSettingsRow>)}
+            />
+            <PlaceholderExamples
+              items={DM_TOKENS}
+              inputRef={refs[f.messageKey]}
+              value={settings[f.messageKey] ?? ""}
+              onChange={(v) => patch({ [f.messageKey]: v || null } as Partial<ReportSettingsRow>)}
+            />
+          </div>
+        ))}
+      </div>
+    </NeonCard>
+  );
+}
+
+function SettingsTab({ guildId }: { guildId: string }) {
+  return (
+    <div>
+      <ReportSettingsCard guildId={guildId} />
+      <ReportPanelCard guildId={guildId} />
+      <DmMessagesCard guildId={guildId} />
+    </div>
   );
 }
 
@@ -150,23 +254,84 @@ function Transcript({ guildId, report }: { guildId: string; report: ReportRow })
   );
 }
 
-export default function ReportsPage({ params }: { params: { guildId: string } }) {
+function ReportsTab({ guildId }: { guildId: string }) {
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const { displayName } = useMemberNames(
-    params.guildId,
+    guildId,
     reports.flatMap((r) => [r.reporterId, r.reportedUserId, ...(r.claimedById ? [r.claimedById] : [])])
   );
 
   function refresh() {
-    api.getReports(params.guildId).then(setReports);
+    api.getReports(guildId).then(setReports);
   }
-  useEffect(refresh, [params.guildId]);
+  useEffect(refresh, [guildId]);
 
   async function setStatus(id: string, status: string) {
-    await api.setReportStatus(params.guildId, id, status);
+    await api.setReportStatus(guildId, id, status);
     refresh();
   }
+
+  return (
+    <NeonCard>
+      {reports.length === 0 && <p className="text-sm text-slate-500">No reports yet.</p>}
+      <div className="divide-y divide-white/5">
+        {reports.map((r) => (
+          <div key={r.id} className="py-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {r.reportNumber ? <span className="text-slate-500">#{r.reportNumber}</span> : null} Reported{" "}
+                <span className="text-neon-blue">{displayName(r.reportedUserId)}</span> by {displayName(r.reporterId)}
+              </span>
+              <span className="text-xs text-slate-500 shrink-0">{new Date(r.createdAt).toLocaleString()}</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">{r.reason}</p>
+            <p className="text-xs text-slate-600 mt-1">
+              {r.claimedById ? `Claimed by ${displayName(r.claimedById)}` : "Unclaimed"}
+              {r.closedAt ? ` · Closed ${new Date(r.closedAt).toLocaleString()}` : ""}
+              {r.channelId ? (
+                <>
+                  {" · "}
+                  <a href={`https://discord.com/channels/${guildId}/${r.channelId}`} target="_blank" rel="noreferrer" className="text-neon-blue/80 underline">
+                    Open channel
+                  </a>
+                </>
+              ) : null}
+            </p>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {["OPEN", "REVIEWING", "RESOLVED", "CLOSED"].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatus(r.id, s)}
+                  className={`text-xs px-2.5 py-1 rounded-md border ${
+                    r.status === s ? STATUS_STYLE[s] : "border-white/10 text-slate-500"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+              <button
+                onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                className="text-xs px-2.5 py-1 rounded-md border border-white/10 text-slate-400 hover:text-neon-blue hover:border-neon-blue transition-colors ml-auto"
+              >
+                {expanded === r.id ? "Hide transcript" : `Transcript (${r.transcript.length})`}
+              </button>
+            </div>
+            {expanded === r.id && <Transcript guildId={guildId} report={r} />}
+          </div>
+        ))}
+      </div>
+    </NeonCard>
+  );
+}
+
+const TABS: Array<{ key: Tab; label: string; icon: string }> = [
+  { key: "reports", label: "Reports", icon: "🚩" },
+  { key: "settings", label: "Settings", icon: "⚙️" },
+];
+
+export default function ReportsPage({ params }: { params: { guildId: string } }) {
+  const [tab, setTab] = useState<Tab>("reports");
 
   return (
     <div>
@@ -177,58 +342,24 @@ export default function ReportsPage({ params }: { params: { guildId: string } })
         description="Submitted via /report or the Report a Player panel — each one opens its own private, numbered channel under your report category. Resolve them here or in Discord."
       />
 
-      <ReportSettings guildId={params.guildId} />
-      <ReportPanel guildId={params.guildId} />
+      <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={[
+              "px-4 py-2 text-sm border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5",
+              tab === t.key ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+            ].join(" ")}
+          >
+            <span>{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
 
-      <NeonCard>
-        {reports.length === 0 && <p className="text-sm text-slate-500">No reports yet.</p>}
-        <div className="divide-y divide-white/5">
-          {reports.map((r) => (
-            <div key={r.id} className="py-3 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span>
-                  {r.reportNumber ? <span className="text-slate-500">#{r.reportNumber}</span> : null} Reported{" "}
-                  <span className="text-neon-blue">{displayName(r.reportedUserId)}</span> by {displayName(r.reporterId)}
-                </span>
-                <span className="text-xs text-slate-500 shrink-0">{new Date(r.createdAt).toLocaleString()}</span>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">{r.reason}</p>
-              <p className="text-xs text-slate-600 mt-1">
-                {r.claimedById ? `Claimed by ${displayName(r.claimedById)}` : "Unclaimed"}
-                {r.closedAt ? ` · Closed ${new Date(r.closedAt).toLocaleString()}` : ""}
-                {r.channelId ? (
-                  <>
-                    {" · "}
-                    <a href={`https://discord.com/channels/${params.guildId}/${r.channelId}`} target="_blank" rel="noreferrer" className="text-neon-blue/80 underline">
-                      Open channel
-                    </a>
-                  </>
-                ) : null}
-              </p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                {["OPEN", "REVIEWING", "RESOLVED"].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setStatus(r.id, s)}
-                    className={`text-xs px-2.5 py-1 rounded-md border ${
-                      r.status === s ? STATUS_STYLE[s] : "border-white/10 text-slate-500"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-                  className="text-xs px-2.5 py-1 rounded-md border border-white/10 text-slate-400 hover:text-neon-blue hover:border-neon-blue transition-colors ml-auto"
-                >
-                  {expanded === r.id ? "Hide transcript" : `Transcript (${r.transcript.length})`}
-                </button>
-              </div>
-              {expanded === r.id && <Transcript guildId={params.guildId} report={r} />}
-            </div>
-          ))}
-        </div>
-      </NeonCard>
+      {tab === "reports" && <ReportsTab guildId={params.guildId} />}
+      {tab === "settings" && <SettingsTab guildId={params.guildId} />}
     </div>
   );
 }

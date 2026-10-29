@@ -88,8 +88,9 @@ function SettingsTab({
   update: (patch: Partial<RulesGateSettingsRow>) => void;
 }) {
   return (
-    <div className="flex flex-col gap-5">
-      <NeonCard className="max-w-xl">
+    <div className="flex flex-col lg:flex-row gap-5 items-start">
+      <div className="flex flex-col gap-5 max-w-xl w-full">
+      <NeonCard>
         <p className="text-xs text-slate-500 mb-4">
           Build the full rules message below (title, images, links, multiple fields — even multiple embeds) in the{" "}
           <Link href={`/dashboard/${guildId}/embed-creator`} className="text-neon-blue hover:underline">
@@ -116,8 +117,6 @@ function SettingsTab({
         />
 
         <SavedEmbedPicker guildId={guildId} value={settings?.savedEmbedId ?? null} onChange={(id) => update({ savedEmbedId: id })} />
-
-        <EmbedPreviewBlock guildId={guildId} savedEmbedId={settings?.savedEmbedId ?? null} />
 
         {!settings?.savedEmbedId && (
           <div className="mt-5 pt-5 border-t border-white/5">
@@ -210,6 +209,11 @@ function SettingsTab({
       <ReminderCard settings={settings} update={update} />
       <VersionCard guildId={guildId} settings={settings} />
       <MessagesCard settings={settings} update={update} />
+      </div>
+
+      <div className="w-full lg:w-[380px] lg:sticky lg:top-5">
+        <EmbedPreviewBlock guildId={guildId} savedEmbedId={settings?.savedEmbedId ?? null} />
+      </div>
     </div>
   );
 }
@@ -221,12 +225,19 @@ function EmbedPreviewBlock({ guildId, savedEmbedId }: { guildId: string; savedEm
     api.getEmbedCreatorPresets(guildId).then(setPresets);
   }, [guildId]);
 
-  if (!savedEmbedId) return null;
+  if (!savedEmbedId) {
+    return (
+      <NeonCard>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
+        <p className="text-xs text-slate-500">Pick a saved embed on the left to see a live preview of what gets posted here.</p>
+      </NeonCard>
+    );
+  }
   const preset = presets.find((p) => p.id === savedEmbedId);
   if (!preset) return null;
 
   return (
-    <div className="mt-5 pt-5 border-t border-white/5">
+    <NeonCard>
       <div className="flex items-center justify-between mb-2.5">
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</label>
         <Link href={`/dashboard/${guildId}/embed-creator`} className="text-[11px] text-neon-blue hover:underline">
@@ -236,7 +247,7 @@ function EmbedPreviewBlock({ guildId, savedEmbedId }: { guildId: string; savedEm
       <div className="bg-base-950 border border-white/10 rounded-lg p-3">
         <EmbedCreatorPreview guildId={guildId} state={preset.data} />
       </div>
-    </div>
+    </NeonCard>
   );
 }
 

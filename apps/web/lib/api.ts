@@ -1785,6 +1785,7 @@ export const api = {
         createdAt: string;
       }>
     >(`/guilds/${guildId}/reports`),
+  purgeReports: (guildId: string) => request<{ deleted: number }>(`/guilds/${guildId}/reports`, { method: "DELETE" }),
 
   getReportSettings: (guildId: string) => request<ReportSettingsRow>(`/guilds/${guildId}/report-settings`),
   setReportSettings: (guildId: string, body: Partial<ReportSettingsRow>) =>

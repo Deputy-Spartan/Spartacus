@@ -8,6 +8,7 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type ReportSettingsRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 
@@ -215,12 +216,55 @@ function DmMessagesCard({ guildId }: { guildId: string }) {
   );
 }
 
+function DangerZoneCard({ guildId }: { guildId: string }) {
+  const [isGuildOwner, setIsGuildOwner] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const confirm = useConfirm();
+
+  useEffect(() => {
+    api
+      .getGuilds()
+      .then((rows) => setIsGuildOwner(!!rows.find((g) => g.id === guildId)?.owner))
+      .catch(() => null);
+  }, [guildId]);
+
+  if (!isGuildOwner) return null;
+
+  async function purge() {
+    const ok = await confirm(
+      "Permanently delete every player report and its transcript for this server? This can't be undone — currently open report channels in Discord are untouched, but their history here will be gone.",
+      { title: "Purge all reports", confirmLabel: "Purge everything", danger: true }
+    );
+    if (!ok) return;
+    setPurging(true);
+    await api.purgeReports(guildId);
+    setPurging(false);
+  }
+
+  return (
+    <NeonCard className="border-red-500/20">
+      <p className="font-medium mb-1 text-red-400">Danger Zone</p>
+      <p className="text-xs text-slate-500 mb-3">
+        Permanently deletes every report and transcript for this server from the dashboard. Server owner only.
+      </p>
+      <button
+        onClick={purge}
+        disabled={purging}
+        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/40 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+      >
+        {purging ? "Purging…" : "Purge All Reports & Transcripts"}
+      </button>
+    </NeonCard>
+  );
+}
+
 function SettingsTab({ guildId }: { guildId: string }) {
   return (
     <div>
       <ReportSettingsCard guildId={guildId} />
       <ReportPanelCard guildId={guildId} />
       <DmMessagesCard guildId={guildId} />
+      <DangerZoneCard guildId={guildId} />
     </div>
   );
 }

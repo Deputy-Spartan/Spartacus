@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
-import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { requireGuildPermission, requireGuildOwner } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
 
 const router = Router();
@@ -13,6 +13,16 @@ router.get("/guilds/:guildId/reports", requireAuth, requireGuildPermission, asyn
     orderBy: { createdAt: "desc" },
   });
   res.json(rows);
+});
+
+// Server-owner-only, same reasoning as the Cases & Warnings delete below —
+// transcripts are evidence of what happened in a report, so letting any
+// Manage-Server staffer wipe them would let them erase their own tracks.
+// Does NOT touch any currently-open report channel in Discord (those stay
+// up and keep working; this only clears the dashboard/DB-side history).
+router.delete("/guilds/:guildId/reports", requireAuth, requireGuildPermission, requireGuildOwner, async (req, res) => {
+  const result = await prisma.playerReport.deleteMany({ where: { guildId: req.params.guildId } });
+  res.json({ deleted: result.count });
 });
 
 // --- Player Reports Settings (report category + staff role + report panel) ---

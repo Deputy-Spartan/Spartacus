@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { api, type ReportSettingsRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
@@ -17,8 +18,15 @@ const STATUS_STYLE: Record<string, string> = {
   RESOLVED: "border-emerald-500/40 text-emerald-400",
 };
 
+const CHANNEL_NAME_TOKENS = [
+  { token: "{number}", description: "This report's sequential number (1, 2, 3…)" },
+  { token: "{user}", description: "The reporter's username" },
+  { token: "{reported}", description: "The reported member's username" },
+];
+
 function ReportSettings({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<ReportSettingsRow | null>(null);
+  const channelNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.getReportSettings(guildId).then(setSettings);
@@ -33,21 +41,15 @@ function ReportSettings({ guildId }: { guildId: string }) {
 
   return (
     <NeonCard className="mb-4">
-      <p className="font-medium mb-1">Review Channel & Staff Role</p>
+      <p className="font-medium mb-1">Report Channels & Staff Role</p>
       <p className="text-xs text-slate-500 mb-3">
-        New reports post here as a ticket-style embed with Claim/Close buttons, in a discussion thread staff can reply in. Only the role
-        below (or anyone with Manage Server) can claim or close a report.
+        Ticket-style: every new report opens its own private channel under the category below, visible only to the staff role (and
+        Manage Server). Nobody else — the reporter included — can see it. Only that role can claim or close a report.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-1">
         <div>
-          <p className="text-xs text-slate-500 mb-1">Review channel</p>
-          <ChannelSelect
-            guildId={guildId}
-            value={settings.reviewChannelId}
-            onChange={(v) => patch({ reviewChannelId: v || null })}
-            kind="text"
-            showCurrent={false}
-          />
+          <p className="text-xs text-slate-500 mb-1">Report category</p>
+          <ChannelSelect guildId={guildId} value={settings.categoryId} onChange={(v) => patch({ categoryId: v || null })} kind="category" />
         </div>
         <div>
           <p className="text-xs text-slate-500 mb-1">Staff role</p>
@@ -55,10 +57,24 @@ function ReportSettings({ guildId }: { guildId: string }) {
             guildId={guildId}
             value={settings.staffRoleId}
             onChange={(roleId) => patch({ staffRoleId: roleId || null })}
-            placeholder="Anyone with Manage Server"
+            placeholder="No role set — locked to Manage Server only"
           />
         </div>
       </div>
+
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Channel Name Format</label>
+      <input
+        ref={channelNameRef}
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+        value={settings.channelNameFormat}
+        onChange={(e) => patch({ channelNameFormat: e.target.value })}
+      />
+      <PlaceholderExamples
+        items={CHANNEL_NAME_TOKENS}
+        inputRef={channelNameRef}
+        value={settings.channelNameFormat}
+        onChange={(v) => patch({ channelNameFormat: v })}
+      />
     </NeonCard>
   );
 }
@@ -103,7 +119,7 @@ function Transcript({ guildId, report }: { guildId: string; report: ReportRow })
   const { displayName } = useMemberNames(guildId, report.transcript.map((t) => t.authorId));
 
   if (report.transcript.length === 0) {
-    return <p className="text-xs text-slate-600 mt-2">No messages in the discussion thread yet.</p>;
+    return <p className="text-xs text-slate-600 mt-2">No messages in the report channel yet.</p>;
   }
 
   return (
@@ -152,7 +168,7 @@ export default function ReportsPage({ params }: { params: { guildId: string } })
         guildId={params.guildId}
         moduleKey="PLAYER_REPORTS"
         title="Player Reports"
-        description="Submitted via /report or the Report a Player panel — posts to your review channel as a claimable, closeable ticket. Resolve them here or in Discord."
+        description="Submitted via /report or the Report a Player panel — each one opens its own private, numbered channel under your report category. Resolve them here or in Discord."
       />
 
       <ReportSettings guildId={params.guildId} />
@@ -165,7 +181,8 @@ export default function ReportsPage({ params }: { params: { guildId: string } })
             <div key={r.id} className="py-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span>
-                  Reported <span className="text-neon-blue">{displayName(r.reportedUserId)}</span> by {displayName(r.reporterId)}
+                  {r.reportNumber ? <span className="text-slate-500">#{r.reportNumber}</span> : null} Reported{" "}
+                  <span className="text-neon-blue">{displayName(r.reportedUserId)}</span> by {displayName(r.reporterId)}
                 </span>
                 <span className="text-xs text-slate-500 shrink-0">{new Date(r.createdAt).toLocaleString()}</span>
               </div>
@@ -173,6 +190,14 @@ export default function ReportsPage({ params }: { params: { guildId: string } })
               <p className="text-xs text-slate-600 mt-1">
                 {r.claimedById ? `Claimed by ${displayName(r.claimedById)}` : "Unclaimed"}
                 {r.closedAt ? ` · Closed ${new Date(r.closedAt).toLocaleString()}` : ""}
+                {r.channelId ? (
+                  <>
+                    {" · "}
+                    <a href={`https://discord.com/channels/${params.guildId}/${r.channelId}`} target="_blank" rel="noreferrer" className="text-neon-blue/80 underline">
+                      Open channel
+                    </a>
+                  </>
+                ) : null}
               </p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {["OPEN", "REVIEWING", "RESOLVED"].map((s) => (

@@ -24,21 +24,23 @@ router.patch("/guilds/:guildId/reports/:id", requireAuth, requireGuildPermission
   res.json(row);
 });
 
-// --- Player Reports Settings (review channel + staff role + report panel) ---
+// --- Player Reports Settings (report category + staff role + report panel) ---
 router.get("/guilds/:guildId/report-settings", requireAuth, requireGuildPermission, async (req, res) => {
   const row = await prisma.playerReportSettings.findUnique({ where: { guildId: req.params.guildId } });
   res.json({
-    reviewChannelId: row?.reviewChannelId ?? null,
     staffRoleId: row?.staffRoleId ?? null,
+    categoryId: row?.categoryId ?? null,
+    channelNameFormat: row?.channelNameFormat ?? "report-{number}",
     panelChannelId: row?.panelChannelId ?? null,
     savedEmbedId: row?.savedEmbedId ?? null,
   });
 });
 
 router.put("/guilds/:guildId/report-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { reviewChannelId, staffRoleId, panelChannelId, savedEmbedId } = req.body as {
-    reviewChannelId?: string | null;
+  const { staffRoleId, categoryId, channelNameFormat, panelChannelId, savedEmbedId } = req.body as {
     staffRoleId?: string | null;
+    categoryId?: string | null;
+    channelNameFormat?: string;
     panelChannelId?: string | null;
     savedEmbedId?: string | null;
   };
@@ -54,14 +56,16 @@ router.put("/guilds/:guildId/report-settings", requireAuth, requireGuildPermissi
     where: { guildId: req.params.guildId },
     create: {
       guildId: req.params.guildId,
-      reviewChannelId: reviewChannelId ?? null,
       staffRoleId: staffRoleId ?? null,
+      categoryId: categoryId ?? null,
+      channelNameFormat: channelNameFormat ?? "report-{number}",
       panelChannelId: panelChannelId ?? null,
       savedEmbedId: savedEmbedId ?? null,
     },
     update: {
-      ...(reviewChannelId !== undefined ? { reviewChannelId } : {}),
       ...(staffRoleId !== undefined ? { staffRoleId } : {}),
+      ...(categoryId !== undefined ? { categoryId } : {}),
+      ...(channelNameFormat !== undefined ? { channelNameFormat } : {}),
       ...(panelChannelId !== undefined ? { panelChannelId } : {}),
       ...(savedEmbedId !== undefined ? { savedEmbedId } : {}),
       ...(channelChanged || embedChanged ? { panelMessageId: null } : {}),

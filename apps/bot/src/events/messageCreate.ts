@@ -39,10 +39,11 @@ export async function execute(message: Message) {
     return;
   }
 
-  // A Player Report's discussion thread — every message there is appended
-  // to the report's transcript so it's preserved even once the thread is
-  // archived/deleted.
-  if (message.channel.isThread()) {
+  // A Player Report's own dedicated channel — every message there is
+  // appended to the report's transcript so it's preserved even once the
+  // channel is closed/deleted. Gated on the module being on so this lookup
+  // isn't run for every message in the server.
+  if (await isModuleEnabled(message.guildId, "PLAYER_REPORTS")) {
     const { appendReportTranscript } = await import("../modules/moderation/playerReports");
     await appendReportTranscript(message.channelId, message);
   }

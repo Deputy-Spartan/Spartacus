@@ -1176,15 +1176,17 @@ model PlayerReport {
   reason         String
   status         ReportStatus @default(OPEN)
 
-  // The embed posted to the review channel, and the discussion thread
-  // opened on it — staff reply right there in Discord, and every message
-  // in that thread gets appended to `transcript` live (see
-  // events/messageCreate.ts) so it survives even if the thread is archived.
-  messageId   String?
-  channelId   String?    @unique
-  claimedById String?
-  closedAt    DateTime?
-  transcript  Json       @default("[]") // [{ authorTag, authorId, content, attachmentUrls, at }, ...]
+  // Ticket-style: each report gets its own private channel under the
+  // configured category instead of a shared review-channel+thread. The
+  // control embed (Claim/Close) is the channel's first message, and every
+  // message posted in it gets appended to `transcript` live (see
+  // events/messageCreate.ts) so it survives even after the channel closes.
+  reportNumber Int? // sequential per guild, from PlayerReportSettings.reportCounter — used in the channel name
+  messageId    String?
+  channelId    String?    @unique
+  claimedById  String?
+  closedAt     DateTime?
+  transcript   Json       @default("[]") // [{ authorTag, authorId, content, attachmentUrls, at }, ...]
 
   createdAt DateTime @default(now())
 
@@ -1192,11 +1194,18 @@ model PlayerReport {
 }
 
 model PlayerReportSettings {
-  id              String  @id @default(cuid())
-  guild           Guild   @relation(fields: [guildId], references: [id])
-  guildId         String  @unique
-  reviewChannelId String?
-  staffRoleId     String?
+  id          String  @id @default(cuid())
+  guild       Guild   @relation(fields: [guildId], references: [id])
+  guildId     String  @unique
+  staffRoleId String?
+
+  // Ticket-style report channels: each new report creates its own channel
+  // under this category, named from channelNameFormat ({user}/{reported}/
+  // {number} tokens), numbered via the atomic reportCounter below (same
+  // "increment on create" pattern as TicketPanel.ticketCounter).
+  categoryId        String?
+  channelNameFormat String  @default("report-{number}")
+  reportCounter     Int     @default(0)
 
   // Optional "Report a Player" embed+button panel — clicking it opens a
   // modal (same private workflow as /report) instead of requiring members

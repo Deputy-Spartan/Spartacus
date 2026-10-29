@@ -1239,8 +1239,9 @@ export interface AppealRow {
 }
 
 export interface ReportSettingsRow {
-  reviewChannelId: string | null;
   staffRoleId: string | null;
+  categoryId: string | null;
+  channelNameFormat: string;
   panelChannelId: string | null;
   savedEmbedId: string | null;
 }
@@ -1766,10 +1767,12 @@ export const api = {
     request<
       Array<{
         id: string;
+        reportNumber: number | null;
         reporterId: string;
         reportedUserId: string;
         reason: string;
         status: string;
+        channelId: string | null;
         claimedById: string | null;
         closedAt: string | null;
         transcript: Array<{ authorId: string; authorTag: string; content: string; attachmentUrls: string[]; at: string }>;

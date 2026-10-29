@@ -1,6 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { prisma } from "../../lib/prisma";
-import { postReportForReview } from "../../modules/moderation/playerReports";
+import { createPlayerReport } from "../../modules/moderation/playerReports";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -12,25 +11,35 @@ const command: CommandModule = {
     .addStringOption((o) => o.setName("reason").setDescription("What happened").setRequired(true)) as SlashCommandBuilder,
 
   async execute(interaction) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId || !interaction.guild) return;
     const reported = interaction.options.getUser("user", true);
     const reason = interaction.options.getString("reason", true);
 
-    const report = await prisma.playerReport.create({
-      data: {
-        guildId: interaction.guildId,
-        reporterId: interaction.user.id,
-        reportedUserId: reported.id,
-        reason,
-      },
-    });
+    if (reported.id === interaction.user.id) {
+      await interaction.reply({ content: "⚠️ You can't report yourself.", ephemeral: true });
+      return;
+    }
+    if (reported.bot) {
+      await interaction.reply({ content: "⚠️ You can't report a bot.", ephemeral: true });
+      return;
+    }
+
+    const result = await createPlayerReport(interaction.client, interaction.guild, interaction.user.id, reported.id, reason);
+    if (!result.ok) {
+      await interaction.reply({ content: `⚠️ ${result.error}`, ephemeral: true });
+      return;
+    }
 
     await interaction.reply({
-      content: `✅ Report submitted (#${report.id.slice(0, 8)}). Staff will review it.`,
+      content: `✅ Report submitted privately (#${result.report.reportNumber}). Staff will review it — check your DMs for updates.`,
       ephemeral: true,
     });
 
-    await postReportForReview(interaction.client, report.id);
+    await interaction.user
+      .send(
+        `🚩 Your report in **${interaction.guild.name}** has been created (#${result.report.reportNumber}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.`
+      )
+      .catch(() => null);
   },
 };
 

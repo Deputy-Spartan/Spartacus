@@ -3,12 +3,15 @@ import {
   ButtonBuilder,
   ButtonInteraction,
   ButtonStyle,
+  ChannelType,
   Client,
   EmbedBuilder,
+  Guild,
   GuildMember,
   Message,
   ModalBuilder,
   ModalSubmitInteraction,
+  type OverwriteResolvable,
   PermissionFlagsBits,
   TextInputBuilder,
   TextInputStyle,
@@ -31,6 +34,23 @@ interface TranscriptEntry {
 
 const STATUS_COLOR: Record<string, number> = { OPEN: 0xe74c3c, REVIEWING: 0xffc857, RESOLVED: 0x2ecc71 };
 
+// Discord channel names are lowercase-and-dashes only, so tokens get
+// substituted before that normalization runs. Mirrors modules/tickets/
+// tickets.ts's buildChannelName — same idea, different token set.
+function buildChannelName(format: string | undefined, tokens: { user: string; reported: string; number: string }) {
+  const name = (format || "report-{number}")
+    .replace(/{user}/g, tokens.user)
+    .replace(/{reported}/g, tokens.reported)
+    .replace(/{number}|{count}/g, tokens.number);
+  return (
+    name
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .slice(0, 90) || `report-${tokens.number}`
+  );
+}
+
 function controlRow(reportId: string, status: string) {
   const row = new ActionRowBuilder<ButtonBuilder>();
   if (status !== "RESOLVED") {
@@ -43,7 +63,7 @@ function controlRow(reportId: string, status: string) {
 function buildEmbed(report: PlayerReport) {
   return new EmbedBuilder()
     .setColor(STATUS_COLOR[report.status] ?? 0x5865f2)
-    .setTitle(`🚩 Player Report — ${report.status}`)
+    .setTitle(`🚩 Player Report #${report.reportNumber ?? "?"} — ${report.status}`)
     .addFields(
       { name: "Reported", value: `<@${report.reportedUserId}>`, inline: true },
       { name: "Reporter", value: `<@${report.reporterId}>`, inline: true },
@@ -82,7 +102,7 @@ export async function postPlayerReportPanel(client: Client, settings: PlayerRepo
             .setColor(0xe74c3c)
             .setTitle("🚩 Report a Player")
             .setDescription(
-              "Having an issue with another member? Click below to report it privately to staff. Only you and the reviewing staff member will ever see what you submit."
+              "Having an issue with another member? Click below to report it privately to staff. A private ticket channel gets opened just for your report — only you and staff ever know it exists."
             ),
         ],
       };
@@ -100,10 +120,7 @@ export async function postPlayerReportPanel(client: Client, settings: PlayerRepo
 }
 
 // Panel button click — opens a modal asking who and why, instead of
-// requiring the member to know /report exists. Nothing about this report
-// is visible to anyone but the member and whoever can see the (staff-only,
-// permission-locked) review channel: the modal reply and both DMs below are
-// always private/ephemeral.
+// requiring the member to know /report exists.
 export async function handlePlayerReportPanelButton(interaction: ButtonInteraction) {
   const modal = new ModalBuilder()
     .setCustomId("playerreportmodal")
@@ -127,6 +144,95 @@ export async function handlePlayerReportPanelButton(interaction: ButtonInteracti
       )
     );
   await interaction.showModal(modal);
+}
+
+// Ticket-style report creation — shared by the panel modal below and
+// /report (see commands/moderation/report.ts). Creates a brand-new private
+// channel under the configured category, named from channelNameFormat and
+// numbered via an atomic counter (same "increment on create" pattern as
+// TicketPanel.ticketCounter in modules/tickets/tickets.ts), posts the
+// Claim/Close control embed as its first message, and pings the staff role.
+// The reporter is never added to the channel — everything they see comes
+// back to them as a DM or an ephemeral reply, never channel access.
+export async function createPlayerReport(
+  client: Client,
+  guild: Guild,
+  reporterId: string,
+  reportedUserId: string,
+  reason: string
+): Promise<{ ok: true; report: PlayerReport } | { ok: false; error: string }> {
+  const settings = await prisma.playerReportSettings.findUnique({ where: { guildId: guild.id } });
+  if (!settings?.categoryId) {
+    return { ok: false, error: "Player Reports isn't fully set up yet — ask an admin to pick a category on the dashboard." };
+  }
+
+  const category = await guild.channels.fetch(settings.categoryId).catch(() => null);
+  if (!category || category.type !== ChannelType.GuildCategory) {
+    return { ok: false, error: "The configured report category no longer exists — ask an admin to re-pick one on the dashboard." };
+  }
+
+  const updatedSettings = await prisma.playerReportSettings.update({
+    where: { id: settings.id },
+    data: { reportCounter: { increment: 1 } },
+  });
+  const reportNumber = updatedSettings.reportCounter;
+
+  const [reporterUser, reportedUser] = await Promise.all([
+    client.users.fetch(reporterId).catch(() => null),
+    client.users.fetch(reportedUserId).catch(() => null),
+  ]);
+
+  // Locked down tight: @everyone (reporter included) can't see the channel
+  // at all — only the staff role (or, failing that, nobody but server
+  // admins via their own Discord permissions) can.
+  const overwrites: OverwriteResolvable[] = [{ id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }];
+  if (settings.staffRoleId) {
+    overwrites.push({ id: settings.staffRoleId, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] });
+  }
+
+  const channel = await guild.channels
+    .create({
+      name: buildChannelName(settings.channelNameFormat, {
+        user: reporterUser?.username ?? "unknown",
+        reported: reportedUser?.username ?? "unknown",
+        number: String(reportNumber),
+      }),
+      type: ChannelType.GuildText,
+      parent: category.id,
+      permissionOverwrites: overwrites,
+    })
+    .catch((err) => {
+      logError("bot", err, guild.id);
+      return null;
+    });
+
+  if (!channel) {
+    return { ok: false, error: "Couldn't create the report channel — check my Manage Channels permission and that the category isn't full." };
+  }
+
+  const report = await prisma.playerReport.create({
+    data: { guildId: guild.id, reporterId, reportedUserId, reason, reportNumber, channelId: channel.id },
+  });
+
+  const message = await channel
+    .send({
+      content: settings.staffRoleId ? `<@&${settings.staffRoleId}>` : undefined,
+      embeds: [buildEmbed(report)],
+      components: [controlRow(report.id, report.status)],
+    })
+    .catch(() => null);
+  if (message) {
+    await prisma.playerReport.update({ where: { id: report.id }, data: { messageId: message.id } });
+  }
+
+  return { ok: true, report };
+}
+
+async function canReview(member: GuildMember | null, settings: PlayerReportSettings | null): Promise<boolean> {
+  if (!member) return false;
+  if (member.permissions.has(PermissionFlagsBits.ManageGuild)) return true;
+  if (settings?.staffRoleId && member.roles.cache.has(settings.staffRoleId)) return true;
+  return false;
 }
 
 export async function handlePlayerReportModalSubmit(interaction: ModalSubmitInteraction) {
@@ -155,68 +261,27 @@ export async function handlePlayerReportModalSubmit(interaction: ModalSubmitInte
     return;
   }
 
-  const report = await prisma.playerReport.create({
-    data: {
-      guildId: interaction.guildId,
-      reporterId: interaction.user.id,
-      reportedUserId: targetId,
-      reason,
-    },
-  });
+  const result = await createPlayerReport(interaction.client, interaction.guild, interaction.user.id, targetId, reason);
+  if (!result.ok) {
+    await interaction.reply({ content: `⚠️ ${result.error}`, ephemeral: true });
+    return;
+  }
 
   await interaction.reply({
-    content: `✅ Report submitted privately (#${report.id.slice(0, 8)}). Staff will review it — check your DMs for updates.`,
+    content: `✅ Report submitted privately (#${result.report.reportNumber}). Staff will review it — check your DMs for updates.`,
     ephemeral: true,
   });
 
-  await postReportForReview(interaction.client, report.id);
-
   await interaction.user
     .send(
-      `🚩 Your report in **${interaction.guild.name}** has been created (#${report.id.slice(0, 8)}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.`
+      `🚩 Your report in **${interaction.guild.name}** has been created (#${result.report.reportNumber}). Staff can now see it — you'll get another DM here once it's claimed. This is private; nobody else can see that you filed it.`
     )
     .catch(() => null); // DMs off — the ephemeral reply above already confirmed it either way.
 }
 
-async function canReview(member: GuildMember | null, settings: PlayerReportSettings | null): Promise<boolean> {
-  if (!member) return false;
-  if (member.permissions.has(PermissionFlagsBits.ManageGuild)) return true;
-  if (settings?.staffRoleId && member.roles.cache.has(settings.staffRoleId)) return true;
-  return false;
-}
-
-// Posts the review embed and opens a discussion thread on it — called right
-// after /report creates the row. Staff reply directly in that thread; every
-// message there gets appended to the report's transcript live (see
-// events/messageCreate.ts) so the dashboard has a durable record even after
-// the thread is archived.
-export async function postReportForReview(client: Message["client"], reportId: string) {
-  const report = await prisma.playerReport.findUnique({ where: { id: reportId } });
-  if (!report) return;
-
-  const settings = await prisma.playerReportSettings.findUnique({ where: { guildId: report.guildId } });
-  if (!settings?.reviewChannelId) return;
-
-  const channel = await client.channels.fetch(settings.reviewChannelId).catch(() => null);
-  if (!isSendableChannel(channel)) return;
-
-  const message = await channel
-    .send({
-      content: settings.staffRoleId ? `<@&${settings.staffRoleId}>` : undefined,
-      embeds: [buildEmbed(report)],
-      components: [controlRow(report.id, report.status)],
-    })
-    .catch(() => null);
-  if (!message) return;
-
-  const thread = await message.startThread({ name: `Report ${report.id.slice(0, 8)}`, autoArchiveDuration: 10080 }).catch(() => null);
-
-  await prisma.playerReport.update({ where: { id: report.id }, data: { messageId: message.id, channelId: thread?.id ?? null } });
-}
-
-async function refreshMessage(client: Message["client"], report: PlayerReport, settings: PlayerReportSettings | null) {
-  if (!settings?.reviewChannelId || !report.messageId) return;
-  const channel = await client.channels.fetch(settings.reviewChannelId).catch(() => null);
+async function refreshMessage(client: Client, report: PlayerReport) {
+  if (!report.channelId || !report.messageId) return;
+  const channel = await client.channels.fetch(report.channelId).catch(() => null);
   if (!channel?.isTextBased()) return;
   const message = await channel.messages.fetch(report.messageId).catch(() => null);
   await message?.edit({ embeds: [buildEmbed(report)], components: [controlRow(report.id, report.status)] }).catch(() => null);
@@ -248,12 +313,12 @@ export async function handleReportClaim(interaction: ButtonInteraction, reportId
     data: { status: "REVIEWING", claimedById: interaction.user.id },
   });
 
-  await refreshMessage(interaction.client, updated, settings);
+  await refreshMessage(interaction.client, updated);
   await interaction.reply({ content: `🙋 Claimed by <@${interaction.user.id}>.` });
 
   const reporter = await interaction.client.users.fetch(report.reporterId).catch(() => null);
   await reporter
-    ?.send(`🙋 Your report #${report.id.slice(0, 8)} in **${interaction.guild?.name ?? "the server"}** has been claimed by a staff member and is now being reviewed.`)
+    ?.send(`🙋 Your report #${report.reportNumber} in **${interaction.guild?.name ?? "the server"}** has been claimed by a staff member and is now being reviewed.`)
     .catch(() => null);
 }
 
@@ -279,23 +344,24 @@ export async function handleReportClose(interaction: ButtonInteraction, reportId
     data: { status: "RESOLVED", closedAt: new Date(), claimedById: report.claimedById ?? interaction.user.id },
   });
 
-  await refreshMessage(interaction.client, updated, settings);
+  await refreshMessage(interaction.client, updated);
+  await interaction.reply({ content: `🔒 Report closed by <@${interaction.user.id}>.` });
 
-  if (report.channelId) {
-    const thread = await interaction.client.channels.fetch(report.channelId).catch(() => null);
-    if (thread?.isThread()) {
-      await thread.send(`🔒 Report closed by <@${interaction.user.id}>.`).catch(() => null);
-      await thread.setArchived(true).catch(() => null);
-      await thread.setLocked(true).catch(() => null);
+  // Lock the channel instead of deleting it — the transcript and embed stay
+  // readable to staff as a record, nobody can post in it anymore.
+  if (updated.channelId && settings?.staffRoleId) {
+    const channel = await interaction.client.channels.fetch(updated.channelId).catch(() => null);
+    if (channel && "permissionOverwrites" in channel) {
+      await channel.permissionOverwrites.edit(settings.staffRoleId, { SendMessages: false }).catch(() => null);
     }
   }
-
-  await interaction.reply({ content: `🔒 Report closed by <@${interaction.user.id}>.` });
 }
 
-// Called from events/messageCreate.ts for every message posted in a report's
-// discussion thread — keeps a durable copy of the conversation (the thread
-// itself can be archived/deleted) that the dashboard reads as the transcript.
+// Called from events/messageCreate.ts for every message posted while
+// PLAYER_REPORTS is enabled — keeps a durable copy of the conversation in
+// each report's own channel (which may later be locked, though not
+// deleted) that the dashboard reads as the transcript. No-ops instantly for
+// any channel that isn't a report channel.
 export async function appendReportTranscript(channelId: string, message: Message) {
   const report = await prisma.playerReport.findUnique({ where: { channelId } });
   if (!report) return;

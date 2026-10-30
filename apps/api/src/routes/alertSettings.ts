@@ -11,17 +11,19 @@ router.get("/guilds/:guildId/alert-settings", requireAuth, requireGuildPermissio
     errorChannelId: row?.errorChannelId ?? null,
     deployChannelId: row?.deployChannelId ?? null,
     uptimeChannelId: row?.uptimeChannelId ?? null,
+    botUpdatesChannelId: row?.botUpdatesChannelId ?? null,
   });
 });
 
 // Partial update — the Errors page only ever sends errorChannelId/
-// deployChannelId, the Status Channel page only ever sends uptimeChannelId;
-// whichever fields are omitted are left untouched.
+// deployChannelId, the Status Channel page only ever sends uptimeChannelId/
+// botUpdatesChannelId; whichever fields are omitted are left untouched.
 router.put("/guilds/:guildId/alert-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { errorChannelId, deployChannelId, uptimeChannelId } = req.body as {
+  const { errorChannelId, deployChannelId, uptimeChannelId, botUpdatesChannelId } = req.body as {
     errorChannelId?: string | null;
     deployChannelId?: string | null;
     uptimeChannelId?: string | null;
+    botUpdatesChannelId?: string | null;
   };
 
   const row = await prisma.alertSettings.upsert({
@@ -31,11 +33,13 @@ router.put("/guilds/:guildId/alert-settings", requireAuth, requireGuildPermissio
       errorChannelId: errorChannelId ?? null,
       deployChannelId: deployChannelId ?? null,
       uptimeChannelId: uptimeChannelId ?? null,
+      botUpdatesChannelId: botUpdatesChannelId ?? null,
     },
     update: {
       ...(errorChannelId !== undefined ? { errorChannelId } : {}),
       ...(deployChannelId !== undefined ? { deployChannelId } : {}),
       ...(uptimeChannelId !== undefined ? { uptimeChannelId } : {}),
+      ...(botUpdatesChannelId !== undefined ? { botUpdatesChannelId } : {}),
     },
   });
 

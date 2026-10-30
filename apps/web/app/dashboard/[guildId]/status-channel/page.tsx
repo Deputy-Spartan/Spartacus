@@ -209,8 +209,50 @@ function UptimeHistoryCard({ guildId }: { guildId: string }) {
   );
 }
 
+function BotUpdatesChannelCard({ guildId }: { guildId: string }) {
+  const [alertSettings, setAlertSettings] = useState<AlertSettingsRow | null>(null);
+
+  useEffect(() => {
+    api.getAlertSettings(guildId).then(setAlertSettings);
+  }, [guildId]);
+
+  async function update(newChannelId: string) {
+    const value = newChannelId || null;
+    setAlertSettings((prev) => (prev ? { ...prev, botUpdatesChannelId: value } : prev));
+    await api.updateAlertSettings(guildId, { botUpdatesChannelId: value });
+  }
+
+  return (
+    <NeonCard>
+      <p className="font-medium mb-1">Bot Updates Channel</p>
+      <p className="text-xs text-slate-500 mb-3">
+        Mirrors every "What's New" post here automatically — so your members hear about new Spartacus features without visiting the
+        dashboard.
+      </p>
+      <ChannelSelect
+        guildId={guildId}
+        value={alertSettings?.botUpdatesChannelId ?? null}
+        onChange={update}
+        kind="text"
+        placeholder="Off — not posting anywhere"
+      />
+    </NeonCard>
+  );
+}
+
+type Tab = "channels" | "owner";
+
 export default function StatusChannelPage({ params }: { params: { guildId: string } }) {
+  const [tab, setTab] = useState<Tab>("channels");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    api
+      .getAccessStatus()
+      .then((s) => setIsOwner(s.status === "owner"))
+      .catch(() => setIsOwner(false));
+  }, []);
 
   return (
     <div>
@@ -221,16 +263,46 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
         description="Posts a live embed to a channel of your choosing showing whether Spartacus is online, refreshed every minute."
       />
 
-      <div className="space-y-4">
-        <ManualOverrideCard />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ActiveChannelsCard key={refreshKey} guildId={params.guildId} />
-          <AddChannelCard guildId={params.guildId} onAdded={() => setRefreshKey((k) => k + 1)} />
-        </div>
-
-        <UptimeHistoryCard guildId={params.guildId} />
+      <div className="flex gap-1 mb-5 border-b border-white/5">
+        <button
+          onClick={() => setTab("channels")}
+          className={[
+            "px-4 py-2 text-sm border-b-2 transition-colors",
+            tab === "channels" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          Status Channels
+        </button>
+        {isOwner && (
+          <button
+            onClick={() => setTab("owner")}
+            className={[
+              "px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1.5",
+              tab === "owner" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+            ].join(" ")}
+          >
+            🔑 Owner Only
+          </button>
+        )}
       </div>
+
+      {tab === "channels" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ActiveChannelsCard key={refreshKey} guildId={params.guildId} />
+            <AddChannelCard guildId={params.guildId} onAdded={() => setRefreshKey((k) => k + 1)} />
+          </div>
+
+          <UptimeHistoryCard guildId={params.guildId} />
+          <BotUpdatesChannelCard guildId={params.guildId} />
+        </div>
+      )}
+
+      {tab === "owner" && isOwner && (
+        <div className="space-y-4">
+          <ManualOverrideCard />
+        </div>
+      )}
     </div>
   );
 }

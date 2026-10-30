@@ -1564,6 +1564,7 @@ model AlertSettings {
   errorChannelId  String? // new ErrorLog rows for this guild get posted here as an embed
   deployChannelId String? // posted once per new production deploy (detected via RENDER_GIT_COMMIT change)
   uptimeChannelId String? // a running log of bot went-offline / back-online events, distinct from the live status embed
+  botUpdatesChannelId String? // mirrors every What's New changelog post (apps/api/src/routes/changelog.ts) here as an embed
 }
 
 // ---- Uptime Incidents ----

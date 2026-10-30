@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth, isOwner, type AuthedRequest } from "../middleware/requireAuth";
+import { postChannelMessage } from "../lib/discordRest";
 
 const router = Router();
 
@@ -42,6 +43,24 @@ router.post("/changelog", requireAuth, async (req: AuthedRequest, res) => {
   if (!title?.trim() || !description?.trim()) return res.status(400).json({ error: "Enter a title and description." });
   const row = await prisma.changelogEntry.create({ data: { title: title.trim(), description: description.trim() } });
   res.status(201).json(row);
+
+  // Mirror the post into every server that's opted into a Bot Updates
+  // channel (Status Channel module) — fire-and-forget, after responding,
+  // so one slow/failed Discord post never delays or breaks publishing.
+  const subscribers = await prisma.alertSettings.findMany({ where: { botUpdatesChannelId: { not: null } } });
+  for (const s of subscribers) {
+    await postChannelMessage(s.botUpdatesChannelId as string, {
+      embeds: [
+        {
+          color: 0x7b99bc,
+          title: `🆕 ${row.title}`,
+          description: row.description,
+          timestamp: row.createdAt.toISOString(),
+          footer: { text: "Spartacus update" },
+        },
+      ],
+    }).catch(() => null);
+  }
 });
 
 router.patch("/changelog/:id", requireAuth, async (req: AuthedRequest, res) => {

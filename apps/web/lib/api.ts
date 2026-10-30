@@ -1181,6 +1181,7 @@ export interface AlertSettingsRow {
   errorChannelId: string | null;
   deployChannelId: string | null;
   uptimeChannelId: string | null;
+  botUpdatesChannelId: string | null;
 }
 
 export interface WarnEscalationSettingsRow {

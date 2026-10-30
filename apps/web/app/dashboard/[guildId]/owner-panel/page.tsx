@@ -258,26 +258,32 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
       )}
 
       {tab === "grant" && (
-        <NeonCard className="mb-4 max-w-lg">
+        <NeonCard className="mb-4 max-w-xl">
           <p className="font-medium mb-1">Grant access directly</p>
-          <p className="text-xs text-slate-500 mb-3">Add someone by Discord ID without waiting for a request.</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-              placeholder="Discord ID, e.g. 573920184756201933"
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-            />
-            <input
-              className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              placeholder="Username (for your reference)"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-            <button onClick={grant} className="neon-button shrink-0">
-              Grant access
-            </button>
+          <p className="text-xs text-slate-500 mb-4">Add someone by Discord ID without waiting for a request.</p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1.5">Discord ID</label>
+              <input
+                className="w-full bg-base-950 border border-white/10 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-neon-blue/50"
+                placeholder="573920184756201933"
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1.5">Username (for your reference)</label>
+              <input
+                className="w-full bg-base-950 border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-neon-blue/50"
+                placeholder="e.g. deputy_spartan"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
           </div>
+          <button onClick={grant} className="neon-button w-full sm:w-auto mt-4">
+            Grant access
+          </button>
           <FormError message={error} />
         </NeonCard>
       )}

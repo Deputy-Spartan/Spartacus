@@ -68,6 +68,7 @@ import { startStatusChannelWatchdog } from "./jobs/statusChannelWatchdog";
 import { announceDeployIfNew } from "./jobs/deployAnnouncer";
 import { migrateLegacyEmbeds } from "./jobs/migrateLegacyEmbeds";
 import { startErrorAlertPoller } from "./jobs/errorAlertPoller";
+import { startVercelDeployWatcher } from "./jobs/vercelDeployWatcher";
 import alertSettingsRouter from "./routes/alertSettings";
 import aiConfigRouter from "./routes/aiConfig";
 import serverBackupsRouter from "./routes/serverBackups";
@@ -224,5 +225,6 @@ if (process.env.RUN_BOT_INLINE !== "false") {
 // process was never coupled to the bot's lifecycle in the first place.
 startStatusChannelWatchdog();
 startErrorAlertPoller();
+startVercelDeployWatcher();
 announceDeployIfNew();
 migrateLegacyEmbeds().catch((err) => console.error("[migrateLegacyEmbeds] failed:", err));

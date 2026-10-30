@@ -1175,6 +1175,7 @@ export interface BotStatusRow {
   message: string | null;
   lastHeartbeatAt: string | null;
   lastError: { message: string; source: string; createdAt: string } | null;
+  dashboardDeployingSince?: string | null; // set while a new dashboard version is building on Vercel
 }
 
 export interface AlertSettingsRow {

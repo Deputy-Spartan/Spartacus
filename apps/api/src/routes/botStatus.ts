@@ -24,6 +24,7 @@ router.get("/bot-status", requireAuth, async (_req, res) => {
     message: status.message,
     lastHeartbeatAt: status.lastHeartbeatAt?.toISOString() ?? null,
     lastError,
+    dashboardDeployingSince: status.dashboardDeployingSince?.toISOString() ?? null,
   });
 });
 

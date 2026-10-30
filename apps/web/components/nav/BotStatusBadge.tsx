@@ -22,6 +22,8 @@ export function BotStatusBadge() {
 
   const title = status?.manual
     ? `Manually set${status.message ? `: ${status.message}` : ""}`
+    : status?.dashboardDeployingSince
+    ? `New dashboard version building on Vercel (started ${new Date(status.dashboardDeployingSince).toLocaleTimeString()}) — refresh once this goes back to Online`
     : phase === "offline" && status?.lastError
       ? `Last error: ${status.lastError.message} — see the Errors page for details`
       : status?.lastHeartbeatAt

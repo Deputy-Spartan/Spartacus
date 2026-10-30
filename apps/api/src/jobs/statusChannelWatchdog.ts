@@ -19,6 +19,7 @@ const CHECK_INTERVAL_MS = 30_000;
 
 let lastPhase: BotPhase | null = null;
 let lastWasManual = false;
+let lastWasDashboardDeploy = false;
 let lastAnnouncedMessage: string | null = null;
 let openIncidentId: string | null = null;
 
@@ -66,11 +67,13 @@ async function announceManual(phase: BotPhase, message: string | null) {
   });
 }
 
-async function announceUpdating() {
+async function announceUpdating(dashboardOnly: boolean) {
   await editPrimaryStatusChannels({
     color: 0xf59e0b, // amber — matches the dashboard's updating indicator
     title: "🟡 Spartacus is Updating",
-    description: "Deploying a new version. This will refresh automatically once it's back.",
+    description: dashboardOnly
+      ? "A new version of the dashboard is being published. The bot is still running normally."
+      : "Deploying a new version. This will refresh automatically once it's back.",
     footer: { text: "Last updated" },
     timestamp: new Date().toISOString(),
   });
@@ -119,12 +122,27 @@ async function announceRecovery() {
   // the moment the bot is actually back, avoiding a race between the two.
 }
 
+// A dashboard-only update ends with the bot having been up the whole time,
+// so there's no incident to close — just flip the embed straight back to
+// online instead of leaving "Updating" up until the bot's next minute tick.
+async function announceDashboardDeployDone() {
+  await editPrimaryStatusChannels({
+    color: 0x22c55e,
+    title: "🟢 Spartacus is Online",
+    description: "Dashboard update published.",
+    footer: { text: "Last updated" },
+    timestamp: new Date().toISOString(),
+  });
+}
+
 async function checkAndAnnounce() {
   const status = await getEffectiveBotStatus();
   const previousPhase = lastPhase;
   const wasManual = lastWasManual;
+  const wasDashboardDeploy = lastWasDashboardDeploy;
   lastPhase = status.phase;
   lastWasManual = status.manual;
+  lastWasDashboardDeploy = !!status.dashboardDeployingSince;
 
   // An owner-set override fully bypasses the auto incident/recovery
   // machinery below — it's an intentional state, not something to log as
@@ -137,10 +155,13 @@ async function checkAndAnnounce() {
   }
   lastAnnouncedMessage = null;
 
-  if (previousPhase === null || previousPhase === status.phase) return; // first check, or no change
+  if (previousPhase === null) return; // first check
+  const isDashboardDeploy = !!status.dashboardDeployingSince;
+  if (previousPhase === status.phase && wasDashboardDeploy === isDashboardDeploy) return; // no change
 
-  if (status.phase === "updating") await announceUpdating();
+  if (status.phase === "updating") await announceUpdating(isDashboardDeploy);
   else if (status.phase === "offline" && previousPhase !== "offline") await announceOffline();
+  else if (status.phase === "online" && wasDashboardDeploy && !openIncidentId) await announceDashboardDeployDone();
   else if (status.phase === "online" && previousPhase !== "online") await announceRecovery();
 }
 

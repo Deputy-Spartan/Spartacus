@@ -1516,6 +1516,7 @@ model BotConfig {
   lastDeployCommit String?  // RENDER_GIT_COMMIT at last boot — comparing this on startup is how a "new deploy" is detected
   lastDeployAt     DateTime?
   deployingSince   DateTime? // set right before `prisma migrate deploy` runs, cleared by the next heartbeat — see apps/api/src/routes/botStatus.ts
+  dashboardDeployingSince DateTime? // set while a new dashboard version is building on Vercel — see apps/api/src/jobs/vercelDeployWatcher.ts
   manualStatusOverride String? // "ONLINE" | "OFFLINE" | "MAINTENANCE" | null — null means fully automatic (heartbeat-based). Owner-set, takes precedence over everything else.
   manualStatusMessage  String? // shown alongside the override everywhere the status appears
   supportServerPickerMessage String? // Support DM Intake: shown when a member shares multiple servers with the module enabled, before any one is picked — account-wide like everything else on this model, since no single server's settings could own it

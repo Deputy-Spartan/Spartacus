@@ -30,6 +30,11 @@ export function startStatusChannelPosterJob(client: Client) {
     // normal behavior below.
     const config = await prisma.botConfig.findUnique({ where: { id: "singleton" } });
     if (config?.manualStatusOverride === "OFFLINE" || config?.manualStatusOverride === "MAINTENANCE") return;
+    // Same while a dashboard deploy is in progress — the API watchdog has
+    // painted "Updating" and paints "Online" again once Vercel finishes.
+    // Mirrors isDashboardDeploying's 30-minute staleness cutoff in
+    // apps/api/src/lib/botStatus.ts.
+    if (!config?.manualStatusOverride && config?.dashboardDeployingSince && Date.now() - config.dashboardDeployingSince.getTime() < 30 * 60_000) return;
 
     let loggedThisTick = 0;
     const rows = await prisma.statusChannel.findMany({ take: 200 });

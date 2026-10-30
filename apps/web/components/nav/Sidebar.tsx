@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api, type ModuleState } from "../../lib/api";
@@ -26,6 +26,8 @@ export function Sidebar({
   isOwner?: boolean;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeSection = searchParams.get("section");
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
@@ -195,8 +197,8 @@ export function Sidebar({
                     ? section.items.map((cat) => {
                         const rawHref = cat.href as string;
                         const href = `/dashboard/${guildId}${rawHref}`;
-                        // Both the plain path and its filtered ?section= variant count as "on this category".
-                        const active = pathname + (typeof window !== "undefined" ? window.location.search : "") === href || pathname === href.split("?")[0];
+                        const basePath = href.split("?")[0];
+                        const active = pathname === basePath && activeSection === cat.label;
                         return (
                           <Link
                             key={rawHref}

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { deleteChannelMessage, resolveEmojiInput } from "../lib/discordRest";
+import { refreshPanelOrRepost } from "../lib/panelRefresh";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -62,7 +63,8 @@ router.get("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPer
 
 router.post("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
-  const { channelId, title, description, embedEnabled, embedColor, embedExtra, savedEmbedId, notifyMode, options } = req.body as {
+  const { channelId, title, description, embedEnabled, embedColor, embedExtra, savedEmbedId, notifyMode, options, adoptMessageId } = req.body as {
+    adoptMessageId?: string; // switching a button/dropdown panel to reactions reuses its message
     channelId: string;
     title?: string;
     description?: string;
@@ -96,12 +98,14 @@ router.post("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPe
       embedExtra: (embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       savedEmbedId: savedEmbedId ?? null,
       notifyMode: cleanNotify(notifyMode) ?? "PRIVATE",
+      messageId: adoptMessageId || null,
       options: {
-        create: clean.map((o) => ({ guildId, channelId, ...toRow(o) })),
+        create: clean.map((o) => ({ guildId, channelId, messageId: adoptMessageId || null, ...toRow(o) })),
       },
     },
     include: { options: true },
   });
+  if (adoptMessageId) await refreshPanelOrRepost("reaction", panel.id, channelId, adoptMessageId);
   res.status(201).json(panel);
 });
 
@@ -138,11 +142,11 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
     }
   }
 
-  // Editing invalidates whatever's already posted (channel, options, and
-  // content all affect what gets sent) — clearing messageId here makes the
-  // poster job redraw a fresh message, same as RolePanel's edit flow. The
-  // old message is deleted so edits don't pile up stale copies in the channel.
-  if (existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
+  // Same channel: keep the posted message and edit it in place after the
+  // save. Moved to another channel: delete the old message and clear
+  // messageId so the poster job sends it in the new one.
+  const keepMessageId = existing.messageId && nextChannelId === existing.channelId ? existing.messageId : null;
+  if (existing.messageId && !keepMessageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
   const panel = await prisma.$transaction(async (tx) => {
     if (clean) {
       await tx.reactionRole.deleteMany({ where: { panelId: id } });
@@ -158,14 +162,15 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
         embedExtra: embedExtra !== undefined ? ((embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue) : undefined,
         savedEmbedId: savedEmbedId !== undefined ? savedEmbedId : undefined,
         notifyMode: cleanNotify(notifyMode),
-        messageId: null,
+        messageId: keepMessageId,
         options: clean
-          ? { create: clean.map((o) => ({ guildId, channelId: nextChannelId, ...toRow(o) })) }
+          ? { create: clean.map((o) => ({ guildId, channelId: nextChannelId, messageId: keepMessageId, ...toRow(o) })) }
           : undefined,
       },
       include: { options: true },
     });
   });
+  if (keepMessageId) await refreshPanelOrRepost("reaction", id, nextChannelId, keepMessageId);
   res.json(panel);
 });
 
@@ -174,7 +179,9 @@ router.delete("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireG
   if (!existing || existing.guildId !== req.params.guildId) {
     return res.status(404).json({ error: "Reaction role panel not found" });
   }
-  if (existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
+  // ?keepMessage=1 when the dashboard is switching this panel to buttons/
+  // dropdown — the new panel has already adopted this message.
+  if (existing.messageId && req.query.keepMessage !== "1") await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
   await prisma.reactionRolePanel.delete({ where: { id: req.params.id } }); // cascades to its ReactionRole options
   res.status(204).send();
 });

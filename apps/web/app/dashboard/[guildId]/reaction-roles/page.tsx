@@ -676,16 +676,19 @@ function PanelsTab({ guildId }: { guildId: string }) {
     setError(null);
     try {
       // Reactions and buttons/dropdowns live in different tables, so
-      // switching an existing panel between them means creating it as the
-      // new kind and deleting the old one (which also removes its message).
+      // switching an existing panel between them creates it as the new kind
+      // and deletes the old one. If it stays in the same channel, the new
+      // panel adopts the old Discord message and edits it in place.
       const targetSource = form.layout === "REACTIONS" ? "reaction" : "panel";
       let done: { source: "reaction" | "panel"; id: string };
       if (targetSource !== editing.source) {
-        const payload = toApiPayload(form) as never;
+        const old = merged.find((m) => m.source === editing.source && m.id === editing.id);
+        const adoptMessageId = old?.messageId && old.channelId === form.channelId ? old.messageId : undefined;
+        const payload = { ...toApiPayload(form), adoptMessageId } as never;
         const created: { id: string } =
           targetSource === "reaction" ? await api.addReactionRolePanel(guildId, payload) : await api.addRolePanel(guildId, payload);
-        if (editing.source === "reaction") await api.deleteReactionRolePanel(guildId, editing.id);
-        else await api.deleteRolePanel(guildId, editing.id);
+        if (editing.source === "reaction") await api.deleteReactionRolePanel(guildId, editing.id, !!adoptMessageId);
+        else await api.deleteRolePanel(guildId, editing.id, !!adoptMessageId);
         done = { source: targetSource, id: created.id };
       } else {
         if (editing.source === "reaction") await api.updateReactionRolePanel(guildId, editing.id, toApiPayload(form) as never);

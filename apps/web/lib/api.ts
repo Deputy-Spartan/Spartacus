@@ -1605,8 +1605,9 @@ export const api = {
     request<ReactionRolePanelRow>(`/guilds/${guildId}/reaction-role-panels`, { method: "POST", body: JSON.stringify(body) }),
   updateReactionRolePanel: (guildId: string, id: string, body: Partial<ReactionRolePanelInput>) =>
     request<ReactionRolePanelRow>(`/guilds/${guildId}/reaction-role-panels/${id}`, { method: "PUT", body: JSON.stringify(body) }),
-  deleteReactionRolePanel: (guildId: string, id: string) =>
-    request(`/guilds/${guildId}/reaction-role-panels/${id}`, { method: "DELETE" }),
+  // keepMessage: the panel is being converted and the new one adopted its message.
+  deleteReactionRolePanel: (guildId: string, id: string, keepMessage = false) =>
+    request(`/guilds/${guildId}/reaction-role-panels/${id}${keepMessage ? "?keepMessage=1" : ""}`, { method: "DELETE" }),
 
   getJoinRoles: (guildId: string) => request<JoinRoleRow[]>(`/guilds/${guildId}/join-roles`),
   addJoinRole: (guildId: string, roleId: string) =>
@@ -1715,7 +1716,8 @@ export const api = {
     request<RolePanelRow>(`/guilds/${guildId}/role-panels`, { method: "POST", body: JSON.stringify(body) }),
   updateRolePanel: (guildId: string, id: string, body: Partial<RolePanelRow>) =>
     request<RolePanelRow>(`/guilds/${guildId}/role-panels/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
-  deleteRolePanel: (guildId: string, id: string) => request(`/guilds/${guildId}/role-panels/${id}`, { method: "DELETE" }),
+  deleteRolePanel: (guildId: string, id: string, keepMessage = false) =>
+    request(`/guilds/${guildId}/role-panels/${id}${keepMessage ? "?keepMessage=1" : ""}`, { method: "DELETE" }),
 
   getTicketPanels: (guildId: string) => request<TicketPanelRow[]>(`/guilds/${guildId}/ticket-panels`),
   addTicketPanel: (guildId: string, body: Partial<TicketPanelRow>) =>

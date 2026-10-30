@@ -147,6 +147,8 @@ export { renderPollEmbed, announcePollClosed } from "./modules/engagement/pollVo
 // Re-exported so apps/api's Rules Gate settings save can post/repost the
 // panel immediately instead of waiting up to a minute for the catch-up cron.
 export { postRulesGatePanel } from "./jobs/rulesGatePoster";
+export { refreshReactionRolePanel } from "./jobs/reactionRolePoster";
+export { refreshRolePanel } from "./jobs/rolePanelPoster";
 export { bumpRulesVersion } from "./modules/community/rulesGate";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.

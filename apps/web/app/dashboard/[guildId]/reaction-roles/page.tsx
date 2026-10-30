@@ -13,6 +13,7 @@ import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { EMPTY_EMBED_EXTRA, type EmbedExtra } from "../../../../lib/embedExtra";
 import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
+import { DiscordEmoji, DiscordRoleMention } from "../../../../components/ui/DiscordInline";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import {
   api,
@@ -241,7 +242,7 @@ function PanelFields({
   }
 
   function summary(o: PanelOption): string {
-    const r = o.roleIds.map((id) => `@${roles.find((x) => x.id === id)?.name ?? id}`);
+    const r = o.roleIds.map((id) => `@${roles.find((x) => x.id === id)?.name ?? "deleted-role"}`);
     const c = o.channelIds.map((id) => `#${channels.find((x) => x.id === id)?.name ?? id}`);
     return [...r, ...c].join(", ");
   }
@@ -357,7 +358,11 @@ function PanelFields({
         {draft.options.map((o, i) => (
           <div key={i} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-base-800 border border-white/10 text-sm">
             <span className="min-w-0 truncate">
-              {o.emoji && <span className="mr-1.5">{o.emoji}</span>}
+              {o.emoji && (
+                <span className="mr-1.5">
+                  <DiscordEmoji value={o.emoji} size={18} />
+                </span>
+              )}
               {!reactions && <span className="mr-1.5">{o.label}</span>}
               <span className="text-neon-blue text-xs">{summary(o)}</span>
             </span>
@@ -419,15 +424,34 @@ function RolePanelPreview({ draft, roles }: { draft: PanelDraft; roles: DiscordR
   const reactions = draft.layout === "REACTIONS";
   const asEmbed = !reactions || draft.embedEnabled;
 
-  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
+  // Same "emoji — @Role" lines the bot posts (apps/bot/src/jobs/reactionRolePoster.ts),
+  // drawn the way Discord renders them rather than as raw <:emoji:id>/<@&id> text.
+  const listing =
+    reactions && draft.options.length > 0 ? (
+      <div className="mt-3 space-y-0.5">
+        {draft.options.map((o, i) => (
+          <div key={i}>
+            <DiscordEmoji value={o.emoji || "❓"} /> —{" "}
+            {o.roleIds.length === 0
+              ? "(no roles)"
+              : o.roleIds.map((id, j) => (
+                  <span key={id}>
+                    {j > 0 && ", "}
+                    <DiscordRoleMention roleId={id} roles={roles} />
+                  </span>
+                ))}
+          </div>
+        ))}
+      </div>
+    ) : null;
 
-  const listing = reactions
-    ? draft.options.map((o) => `${o.emoji || "❓"} — ${o.roleIds.map((id) => `@${roleName(id)}`).join(", ") || "(no roles)"}`).join("\n")
-    : "";
-
-  const description = reactions
-    ? [draft.description || "React below to get a role.", listing].filter(Boolean).join("\n\n")
-    : draft.description || "Click below to pick your roles.";
+  const descriptionText = reactions ? draft.description || "React below to get a role." : draft.description || "Click below to pick your roles.";
+  const description = (
+    <>
+      {descriptionText}
+      {listing}
+    </>
+  );
 
   const color = draft.embedEnabled ? draft.embedColor : reactions ? "#5865f2" : "#3b82f6";
   const hasAnything = draft.name || draft.description || draft.options.length > 0;
@@ -455,7 +479,7 @@ function RolePanelPreview({ draft, roles }: { draft: PanelDraft; roles: DiscordR
               <EmbedExtraThumbnail embedExtra={draft.embedExtra} />
               <EmbedExtraAuthor embedExtra={draft.embedExtra} />
               {draft.name && <p className="text-[#f2f3f5] font-semibold text-sm mb-1">{draft.name}</p>}
-              {description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words">{description}</p>}
+              <div className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words">{description}</div>
               <EmbedExtraFieldsPreview embedExtra={draft.embedExtra} />
               <EmbedExtraImage embedExtra={draft.embedExtra} />
               <EmbedExtraFooter embedExtra={draft.embedExtra} />
@@ -463,15 +487,15 @@ function RolePanelPreview({ draft, roles }: { draft: PanelDraft; roles: DiscordR
           ) : (
             <>
               {draft.name && <p className="text-[#f2f3f5] font-semibold text-sm mt-1.5">{draft.name}</p>}
-              {description && <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words mt-0.5">{description}</p>}
+              <div className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words mt-0.5">{description}</div>
             </>
           )}
 
           {reactions && draft.options.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-2">
               {draft.options.map((o, i) => (
-                <div key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-[10px] px-2 py-0.5 text-sm text-[#dbdee1]">
-                  {o.emoji || "❓"} 1
+                <div key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-[10px] px-2 py-0.5 text-sm text-[#dbdee1] flex items-center gap-1.5">
+                  <DiscordEmoji value={o.emoji || "❓"} size={16} /> 1
                 </div>
               ))}
             </div>
@@ -481,7 +505,7 @@ function RolePanelPreview({ draft, roles }: { draft: PanelDraft; roles: DiscordR
             <div className="flex flex-wrap gap-2 mt-2">
               {draft.options.map((o, i) => (
                 <div key={i} className="bg-[#4e5058] text-[#f2f3f5] text-sm px-3 py-1.5 rounded flex items-center gap-1.5">
-                  {o.emoji && <span>{o.emoji}</span>}
+                  {o.emoji && <DiscordEmoji value={o.emoji} size={18} />}
                   {o.label && <span>{o.label}</span>}
                 </div>
               ))}

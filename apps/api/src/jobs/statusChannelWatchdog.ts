@@ -16,6 +16,7 @@ import { getEffectiveBotStatus, type BotPhase } from "../lib/botStatus";
 // owner-set manual override are deliberately NOT treated as incidents —
 // those are expected/intentional states, not outages.
 const CHECK_INTERVAL_MS = 30_000;
+const STALE_INCIDENT_MS = 24 * 60 * 60_000;
 
 let lastPhase: BotPhase | null = null;
 let lastWasManual = false;
@@ -140,8 +141,15 @@ async function announceOffline() {
 
 async function announceRecovery() {
   if (!openIncidentId) return;
-  const incident = await prisma.uptimeIncident.update({ where: { id: openIncidentId }, data: { endedAt: new Date() } });
+  const id = openIncidentId;
   openIncidentId = null;
+  // Claimed atomically (only closes if still open) so that when two copies
+  // of this process overlap — Render starts the new instance before
+  // stopping the old one on every deploy — only one of them announces it.
+  const endedAt = new Date();
+  const claimed = await prisma.uptimeIncident.updateMany({ where: { id, endedAt: null }, data: { endedAt } });
+  if (claimed.count === 0) return;
+  const incident = await prisma.uptimeIncident.findUniqueOrThrow({ where: { id } });
 
   const duration = formatDuration(incident.endedAt!.getTime() - incident.startedAt.getTime());
   await postToUptimeChannels({
@@ -186,7 +194,14 @@ async function checkAndAnnounce() {
   }
   lastAnnouncedMessage = null;
 
-  if (previousPhase === null) return; // first check
+  if (previousPhase === null) {
+    // First check after this process starts: if the bot's already up, any
+    // outage left open from before the restart ended by now — close it
+    // here, or it would sit open until the next online transition and
+    // report a wildly wrong duration then.
+    if (status.phase === "online") await announceRecovery();
+    return;
+  }
   const isDashboardDeploy = !!status.dashboardDeployingSince;
   if (previousPhase === status.phase && wasDashboardDeploy === isDashboardDeploy) return; // no change
 
@@ -207,8 +222,14 @@ export async function startStatusChannelWatchdog() {
   // Recover across a restart of this process itself (e.g. this API's own
   // deploy) — otherwise an incident opened before the restart would never
   // get closed out or announced as recovered.
-  const openIncident = await prisma.uptimeIncident.findFirst({ where: { endedAt: null }, orderBy: { startedAt: "desc" } });
-  if (openIncident) openIncidentId = openIncident.id;
+  // Only a recent one is worth announcing; anything older (or any extra
+  // open rows) is left over from a missed close, so it's closed quietly
+  // rather than posted with a bogus multi-day duration.
+  const open = await prisma.uptimeIncident.findMany({ where: { endedAt: null }, orderBy: { startedAt: "desc" } });
+  const recent = open[0] && Date.now() - open[0].startedAt.getTime() < STALE_INCIDENT_MS ? open[0] : null;
+  const stale = open.filter((i) => i !== recent).map((i) => i.id);
+  if (stale.length) await prisma.uptimeIncident.updateMany({ where: { id: { in: stale } }, data: { endedAt: new Date() } });
+  if (recent) openIncidentId = recent.id;
 
   checkAndAnnounce();
   setInterval(checkAndAnnounce, CHECK_INTERVAL_MS);

@@ -438,6 +438,15 @@ function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles
 
   // Same "emoji — @Role" lines the bot posts (apps/bot/src/jobs/reactionRolePoster.ts),
   // drawn the way Discord renders them rather than as raw <:emoji:id>/<@&id> text.
+  // Mirrors the bot (apps/bot/src/jobs/rolePanelPoster.ts): an unlabeled
+  // button is named after the first role/channel it gives, minus any
+  // leading emoji in that name so it doesn't repeat the button's own.
+  const buttonLabel = (o: PanelOption) => {
+    if (o.label) return o.label;
+    const name = (o.roleIds[0] && roles.find((r) => r.id === o.roleIds[0])?.name) || (o.channelIds[0] && channels.find((c) => c.id === o.channelIds[0])?.name) || "";
+    return name.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+  };
+
   // Every layout lists what each option gives — buttons can be emoji-only,
   // so without this a member couldn't tell what they'd get.
   const listing =
@@ -529,7 +538,7 @@ function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles
               {draft.options.map((o, i) => (
                 <div key={i} className="bg-[#4e5058] text-[#f2f3f5] text-sm px-3 py-1.5 rounded flex items-center gap-1.5">
                   {o.emoji && <DiscordEmoji value={o.emoji} size={18} />}
-                  {o.label && <span>{o.label}</span>}
+                  {buttonLabel(o) && <span>{buttonLabel(o)}</span>}
                 </div>
               ))}
             </div>

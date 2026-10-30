@@ -9,7 +9,7 @@ import { applyEmbedExtra } from "../lib/embedExtra";
 import { describeAccess, normalizeOption } from "../lib/accessGrants";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
-async function buildPayload(panel: RolePanel) {
+async function buildPayload(client: Client, panel: RolePanel) {
   const options = (Array.isArray(panel.options) ? panel.options : []).map(normalizeOption);
   if (options.length === 0) return null;
 
@@ -46,12 +46,22 @@ async function buildPayload(panel: RolePanel) {
     return { embeds, components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
   }
 
-  // Up to 5 rows of 5 buttons; a button can be just an emoji.
+  // Up to 5 rows of 5 buttons. A button with no label of its own is named
+  // after the first role (or channel) it gives, so it reads "🏀 Sports Gamer"
+  // instead of a bare emoji — minus any emoji the name itself starts with,
+  // which would otherwise show twice next to the button's emoji.
+  const guild = client.guilds.cache.get(panel.guildId);
+  const fallbackLabel = (o: (typeof options)[number]) => {
+    const name =
+      (o.roleIds[0] && guild?.roles.cache.get(o.roleIds[0])?.name) || (o.channelIds[0] && guild?.channels.cache.get(o.channelIds[0])?.name) || "";
+    return name.replace(/^[^\p{L}\p{N}]+/u, "").trim().slice(0, 80);
+  };
   const buttons = options.slice(0, 25).map((o, i) => {
     const button = new ButtonBuilder().setCustomId(`rolepanel:${panel.id}:o${i}`).setStyle(ButtonStyle.Secondary);
-    if (o.label) button.setLabel(o.label);
+    const label = o.label || fallbackLabel(o);
+    if (label) button.setLabel(label);
     if (o.emoji) button.setEmoji(o.emoji);
-    if (!o.label && !o.emoji) button.setLabel("Option");
+    if (!label && !o.emoji) button.setLabel("Option");
     return button;
   });
   const components = Array.from({ length: Math.ceil(buttons.length / 5) }, (_, r) =>
@@ -73,7 +83,7 @@ export async function refreshRolePanel(client: Client, panelId: string): Promise
   const message = await channel.messages.fetch(panel.messageId).catch(() => null);
   if (!message) return false;
 
-  const payload = await buildPayload(panel);
+  const payload = await buildPayload(client, panel);
   if (!payload) return false;
   const edited = await message.edit({ content: "", ...payload }).catch((err) => {
     logError("bot", err, panel.guildId);
@@ -106,7 +116,7 @@ export function startRolePanelPosterJob(client: Client) {
       const channel = await client.channels.fetch(panel.channelId).catch(() => null);
       if (!isSendableChannel(channel)) continue;
 
-      const payload = await buildPayload(panel);
+      const payload = await buildPayload(client, panel);
       if (!payload) continue;
 
       const message = await channel.send(payload).catch((err) => {

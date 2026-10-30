@@ -1223,6 +1223,9 @@ export interface RulesGateSettingsRow {
   reminderEnabled: boolean;
   reminderDelayHours: number;
   reminderMessage: string | null;
+  reminderRepeatEnabled: boolean;
+  reminderRepeatWeekday: number | null;
+  reminderRepeatHour: number | null;
   defaultEmbedTitle: string | null;
   defaultEmbedDescription: string | null;
 }

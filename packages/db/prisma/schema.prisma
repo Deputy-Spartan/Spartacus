@@ -1400,6 +1400,12 @@ model RulesGateSettings {
   reminderDelayHours Int     @default(24)
   reminderMessage    String?
 
+  // Optional weekly repeat — keeps nudging on the chosen day/hour (server
+  // time, UTC) until the member agrees, instead of stopping after one DM.
+  reminderRepeatEnabled Boolean @default(false)
+  reminderRepeatWeekday Int? // 0 = Sunday .. 6 = Saturday
+  reminderRepeatHour    Int? // 0-23, UTC
+
   // Used only when savedEmbedId is unset — the bare placeholder embed
   // posted to the rules channel (apps/bot/src/jobs/rulesGatePoster.ts)
   defaultEmbedTitle       String?
@@ -1428,9 +1434,11 @@ model RulesGateSection {
   sortOrder  Int               @default(0)
 }
 
-// Tracks a member from join until they agree (or the reminder job gives up
-// after one nudge) — lets the reminder job find who hasn't agreed without
-// scanning the whole member list. Created on join, deleted on agree.
+// Tracks a member from join until they agree — lets the reminder job find
+// who hasn't agreed without scanning the whole member list. Created on
+// join, deleted on agree. remindedAt holds the last time a reminder DM was
+// sent (not just the first) so the weekly-repeat option can tell whether
+// this cycle's reminder already went out.
 model RulesGatePendingMember {
   id         String    @id @default(cuid())
   guildId    String

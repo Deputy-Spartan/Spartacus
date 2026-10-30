@@ -29,6 +29,9 @@ router.get("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPerm
     reminderEnabled: row?.reminderEnabled ?? false,
     reminderDelayHours: row?.reminderDelayHours ?? 24,
     reminderMessage: row?.reminderMessage ?? null,
+    reminderRepeatEnabled: row?.reminderRepeatEnabled ?? false,
+    reminderRepeatWeekday: row?.reminderRepeatWeekday ?? null,
+    reminderRepeatHour: row?.reminderRepeatHour ?? null,
     defaultEmbedTitle: row?.defaultEmbedTitle ?? null,
     defaultEmbedDescription: row?.defaultEmbedDescription ?? null,
   });
@@ -54,6 +57,9 @@ interface RulesGateSettingsBody {
   reminderEnabled?: boolean;
   reminderDelayHours?: number;
   reminderMessage?: string | null;
+  reminderRepeatEnabled?: boolean;
+  reminderRepeatWeekday?: number | null;
+  reminderRepeatHour?: number | null;
   defaultEmbedTitle?: string | null;
   defaultEmbedDescription?: string | null;
 }
@@ -84,6 +90,9 @@ const SETTINGS_KEYS: (keyof RulesGateSettingsBody)[] = [
   "reminderEnabled",
   "reminderDelayHours",
   "reminderMessage",
+  "reminderRepeatEnabled",
+  "reminderRepeatWeekday",
+  "reminderRepeatHour",
   "defaultEmbedTitle",
   "defaultEmbedDescription",
 ];

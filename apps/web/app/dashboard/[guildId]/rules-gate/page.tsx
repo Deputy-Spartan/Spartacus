@@ -507,7 +507,8 @@ function ReminderCard({
         <ToggleSwitch enabled={settings?.reminderEnabled ?? false} onChange={(v) => update({ reminderEnabled: v })} />
       </div>
       <p className="text-xs text-slate-500 mb-4">
-        DMs members who joined but haven't agreed yet, once, after a delay — a nudge for people who miss the rules channel.
+        DMs members who joined but haven't agreed yet, after a delay — a nudge for people who miss the rules channel. Optionally keeps
+        repeating weekly until they agree.
       </p>
 
       {settings?.reminderEnabled && (
@@ -531,6 +532,60 @@ function ReminderCard({
             className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
           />
           <PlaceholderExamples items={SERVER_TOKEN} inputRef={reminderRef} value={settings.reminderMessage ?? ""} onChange={(v) => update({ reminderMessage: v || null })} />
+
+          <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Repeat Weekly</p>
+              <p className="text-xs text-slate-500 mt-0.5">Keep sending the reminder on a set day/time each week until they agree.</p>
+            </div>
+            <ToggleSwitch
+              enabled={settings.reminderRepeatEnabled}
+              onChange={(v) =>
+                update({
+                  reminderRepeatEnabled: v,
+                  reminderRepeatWeekday: v ? settings.reminderRepeatWeekday ?? 1 : settings.reminderRepeatWeekday,
+                  reminderRepeatHour: v ? settings.reminderRepeatHour ?? 12 : settings.reminderRepeatHour,
+                })
+              }
+            />
+          </div>
+
+          {settings.reminderRepeatEnabled && (
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Day</label>
+                <select
+                  value={settings.reminderRepeatWeekday ?? 1}
+                  onChange={(e) => update({ reminderRepeatWeekday: Number(e.target.value) })}
+                  className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-blue/50"
+                >
+                  {WEEKDAYS.map((label, i) => (
+                    <option key={label} value={i}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Time (UTC)</label>
+                <select
+                  value={settings.reminderRepeatHour ?? 12}
+                  onChange={(e) => update({ reminderRepeatHour: Number(e.target.value) })}
+                  className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-blue/50"
+                >
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>
+                      {h.toString().padStart(2, "0")}:00
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="col-span-2 text-xs text-slate-600">
+                Times are in UTC (server time), not your local timezone. The reminder keeps repeating on this day/time until the member
+                agrees or leaves.
+              </p>
+            </div>
+          )}
         </>
       )}
     </NeonCard>
@@ -574,6 +629,7 @@ function VersionCard({ guildId, settings }: { guildId: string; settings: RulesGa
 }
 
 const SERVER_TOKEN = [{ token: "{server}", description: "This server's name" }];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 function MessagesCard({
   settings,

@@ -248,7 +248,7 @@ function PanelFields({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-6 items-start">
       <div className="min-w-0">
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
         Panel Name
@@ -404,7 +404,7 @@ function PanelFields({
       </div>
       </div>
 
-      <div className="lg:sticky lg:top-4">
+      <div className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
         <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           Live preview
@@ -757,7 +757,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
             </div>
           </NeonCard>
         ) : (
-          <div className="space-y-3 max-w-5xl">
+          <div className="space-y-3">
             {merged.map((m) => (
               <NeonCard key={`${m.source}:${m.id}`}>
                 <div className="flex items-center justify-between gap-3">
@@ -794,7 +794,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
         ))}
 
       {tab === "create" && (
-        <NeonCard className="max-w-5xl">
+        <NeonCard>
           <p className="font-medium mb-3">New Panel</p>
           <PanelFields guildId={guildId} draft={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
           <button onClick={createPanel} disabled={creating} className="neon-button disabled:opacity-50">

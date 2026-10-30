@@ -675,6 +675,14 @@ export interface AnnouncementRow {
   createdAt: string;
   embedExtra?: EmbedExtra;
   savedEmbedId?: string | null;
+  creatorData?: Pick<EmbedCreatorState, "content" | "embeds" | "components"> | null;
+}
+// What the Embed Creator-style composer saves.
+export interface AnnouncementComposeInput {
+  channelId: string;
+  creatorData: Pick<EmbedCreatorState, "content" | "embeds" | "components">;
+  savedEmbedId: string | null;
+  scheduledFor: string | null;
 }
 export interface AnnouncementInput {
   channelId: string;
@@ -1640,9 +1648,9 @@ export const api = {
     request(`/guilds/${guildId}/temp-channels/lobbies/${id}`, { method: "DELETE" }),
 
   getAnnouncements: (guildId: string) => request<AnnouncementRow[]>(`/guilds/${guildId}/announcements`),
-  addAnnouncement: (guildId: string, body: AnnouncementInput) =>
+  addAnnouncement: (guildId: string, body: AnnouncementInput | AnnouncementComposeInput) =>
     request<AnnouncementRow>(`/guilds/${guildId}/announcements`, { method: "POST", body: JSON.stringify(body) }),
-  updateAnnouncement: (guildId: string, id: string, body: AnnouncementInput) =>
+  updateAnnouncement: (guildId: string, id: string, body: AnnouncementInput | AnnouncementComposeInput) =>
     request<AnnouncementRow>(`/guilds/${guildId}/announcements/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   publishAnnouncement: (guildId: string, id: string) =>
     request<{ ok: true }>(`/guilds/${guildId}/announcements/${id}/publish`, { method: "POST" }),

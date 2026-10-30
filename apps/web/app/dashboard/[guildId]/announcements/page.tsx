@@ -4,67 +4,119 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { StickyPreview } from "../../../../components/ui/StickyPreview";
-import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
-import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
+import { MentionTextarea } from "../../../../components/ui/MentionTextarea";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
-import { parseEmbedExtra, EMPTY_EMBED_EXTRA } from "../../../../lib/embedExtra";
-import { api, type AnnouncementInput, type AnnouncementRow, type DiscordChannelOption } from "../../../../lib/api";
+import { EmbedCard } from "../../../../components/embedCreator/EmbedCard";
+import { ComponentRowEditor } from "../../../../components/embedCreator/ComponentRowEditor";
+import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
+import { DiscordLimitsCard } from "../../../../components/embedCreator/DiscordLimitsCard";
+import { checkDiscordLimits } from "../../../../lib/discordLimits";
+import { parseEmbedExtra } from "../../../../lib/embedExtra";
+import {
+  api,
+  type AnnouncementRow,
+  type DiscordChannelOption,
+  type EmbedCreatorComponentRow,
+  type EmbedCreatorEmbed,
+  type EmbedCreatorPresetRow,
+  type EmbedCreatorState,
+} from "../../../../lib/api";
 
-type Tab = "active" | "create";
+type Tab = "compose" | "sent";
 
-const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
+function uid(prefix: string) {
+  return prefix + Math.random().toString(36).slice(2, 9);
+}
+function emptyEmbed(): EmbedCreatorEmbed {
+  return { id: uid("e"), color: "#00E5FF", fields: [] };
+}
+function emptyRow(): EmbedCreatorComponentRow {
+  return { id: uid("r"), type: null, items: [] };
+}
+// The editor reuses the Embed Creator's state shape; the delivery fields
+// are unused here (announcements always post as the bot, to the channel
+// picked above) but EmbedCreatorPreview expects them.
+function emptyState(): EmbedCreatorState {
+  return { content: "", deliveryMode: "bot", channelId: "", webhookUrl: "", profileName: "", profileAvatar: "", embeds: [emptyEmbed()], components: [] };
+}
 
-const EMPTY: AnnouncementInput = {
-  channelId: "",
-  content: "",
-  embedEnabled: false,
-  embedTitle: "",
-  embedDescription: "",
-  embedColor: "#00E5FF",
-  buttons: [],
-  scheduledFor: null,
-  embedExtra: EMPTY_EMBED_EXTRA,
-  savedEmbedId: null,
-};
-
-function rowToInput(r: AnnouncementRow): AnnouncementInput {
+// Opens any row in the editor — one composed here already has creatorData;
+// an older single-embed row is converted (its link buttons become a button
+// row) so editing or resending it carries everything over.
+function rowToState(r: AnnouncementRow): EmbedCreatorState {
+  const base = emptyState();
+  if (r.creatorData) {
+    return {
+      ...base,
+      content: r.creatorData.content ?? "",
+      embeds: r.creatorData.embeds?.length ? r.creatorData.embeds : [emptyEmbed()],
+      components: r.creatorData.components ?? [],
+    };
+  }
+  const extra = parseEmbedExtra(r.embedExtra);
+  const embed: EmbedCreatorEmbed = r.embedEnabled
+    ? {
+        id: uid("e"),
+        title: r.embedTitle ?? "",
+        description: r.embedDescription ?? "",
+        color: r.embedColor ?? "#00E5FF",
+        authorName: extra.authorName,
+        authorIconUrl: extra.authorIconUrl,
+        authorUrl: extra.authorUrl,
+        thumbnailUrl: extra.thumbnailUrl,
+        imageUrl: extra.imageUrl,
+        footerText: extra.footerText,
+        footerIconUrl: extra.footerIconUrl,
+        timestamp: extra.timestamp,
+        fields: extra.fields ?? [],
+      }
+    : emptyEmbed();
   return {
-    channelId: r.channelId,
+    ...base,
     content: r.content ?? "",
-    embedEnabled: r.embedEnabled,
-    embedTitle: r.embedTitle ?? "",
-    embedDescription: r.embedDescription ?? "",
-    embedColor: r.embedColor ?? "#00E5FF",
-    buttons: r.buttons,
-    scheduledFor: r.scheduledFor,
-    embedExtra: parseEmbedExtra(r.embedExtra),
-    savedEmbedId: r.savedEmbedId ?? null,
+    embeds: [embed],
+    components: r.buttons.length
+      ? [{ id: uid("r"), type: "buttons", items: r.buttons.map((b) => ({ id: uid("b"), kind: "link" as const, label: b.label, url: b.url })) }]
+      : [],
   };
 }
 
+function rowLabel(r: AnnouncementRow): string {
+  return r.embedTitle || r.content || r.embedDescription || "(embed only)";
+}
+
 export default function AnnouncementsPage({ params }: { params: { guildId: string } }) {
+  const guildId = params.guildId;
   const confirm = useConfirm();
-  const [tab, setTab] = useState<Tab>("active");
+  const [tab, setTab] = useState<Tab>("compose");
   const [rows, setRows] = useState<AnnouncementRow[]>([]);
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
-  const [form, setForm] = useState<AnnouncementInput>(EMPTY);
+  const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
+
+  const [channelId, setChannelId] = useState("");
+  const [state, setState] = useState<EmbedCreatorState>(emptyState);
+  const [savedEmbedId, setSavedEmbedId] = useState<string | null>(null);
   const [scheduleLocal, setScheduleLocal] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
 
   function refresh() {
-    api.getAnnouncements(params.guildId).then(setRows);
-    api.getDiscordChannels(params.guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
+    api.getAnnouncements(guildId).then(setRows);
+    api.getDiscordChannels(guildId).then((r) => setChannelOptions([...r.textChannels, ...r.voiceChannels]));
   }
-  useEffect(refresh, [params.guildId]);
+  useEffect(refresh, [guildId]);
+  useEffect(() => {
+    api.getEmbedCreatorPresets(guildId).then(setPresets);
+  }, [guildId]);
 
   function channelLabel(id: string): string {
     const c = channelOptions.find((c) => c.id === id);
@@ -73,51 +125,81 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   }
 
   function resetForm() {
-    setForm(EMPTY);
+    setChannelId("");
+    setState(emptyState());
+    setSavedEmbedId(null);
     setScheduleLocal("");
     setEditingId(null);
     setResending(false);
     setError(null);
   }
 
-  // Only a queued row can be opened for editing — Discord already has the
-  // live message for a sent one, so there'd be nothing for an edit here to
-  // actually change. Resend (below) is the equivalent for sent history.
-  function openEdit(r: AnnouncementRow) {
-    setEditingId(r.id);
-    setResending(false);
-    setForm(rowToInput(r));
-    setScheduleLocal(r.scheduledFor ? r.scheduledFor.slice(0, 16) : "");
-    setError(null);
-    setTab("create");
+  // ---- embed/row editing (same behavior as the Embed Creator) ----
+  function updateEmbed(id: string, next: EmbedCreatorEmbed) {
+    setState((s) => ({ ...s, embeds: s.embeds.map((e) => (e.id === id ? next : e)) }));
+  }
+  function duplicateEmbed(id: string) {
+    setState((s) => {
+      if (s.embeds.length >= 10) return s;
+      const i = s.embeds.findIndex((e) => e.id === id);
+      const copy = { ...s.embeds[i], id: uid("e"), fields: s.embeds[i].fields.map((f) => ({ ...f })) };
+      return { ...s, embeds: [...s.embeds.slice(0, i + 1), copy, ...s.embeds.slice(i + 1)] };
+    });
+  }
+  function removeEmbed(id: string) {
+    setState((s) => {
+      const embeds = s.embeds.filter((e) => e.id !== id);
+      return { ...s, embeds: embeds.length ? embeds : [emptyEmbed()] };
+    });
+  }
+  function moveEmbed(from: number, to: number) {
+    setState((s) => {
+      if (to < 0 || to >= s.embeds.length || from === to) return s;
+      const embeds = [...s.embeds];
+      const [moved] = embeds.splice(from, 1);
+      embeds.splice(to, 0, moved);
+      return { ...s, embeds };
+    });
+  }
+  function updateRow(id: string, next: EmbedCreatorComponentRow) {
+    setState((s) => ({ ...s, components: s.components.map((r) => (r.id === id ? next : r)) }));
   }
 
-  // Loads a past (already-sent) announcement's content into the compose
-  // form as a starting point for a brand-new queued announcement — it
-  // never touches the original sent row, which stays exactly as it was.
-  function openResend(r: AnnouncementRow) {
-    setEditingId(null);
-    setResending(true);
-    setForm(rowToInput(r));
-    setScheduleLocal("");
+  // Only a queued row can be edited — Discord already has the live message
+  // for a sent one. Resend is the equivalent for sent history: it loads a
+  // copy as a brand-new announcement and never touches the original.
+  function openRow(r: AnnouncementRow, mode: "edit" | "resend") {
+    setEditingId(mode === "edit" ? r.id : null);
+    setResending(mode === "resend");
+    setChannelId(r.channelId);
+    setState(rowToState(r));
+    setSavedEmbedId(r.savedEmbedId ?? null);
+    setScheduleLocal(mode === "edit" && r.scheduledFor ? r.scheduledFor.slice(0, 16) : "");
     setError(null);
-    setTab("create");
+    setNotice(null);
+    setTab("compose");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  const savedPreset = savedEmbedId ? presets.find((p) => p.id === savedEmbedId) ?? null : null;
+  const limits = checkDiscordLimits(savedPreset ? savedPreset.data : state);
 
   async function save() {
-    const hasEmbedContent = form.embedEnabled && (form.embedTitle.trim() || form.embedDescription.trim());
-    if (!form.channelId || !(form.content.trim() || form.savedEmbedId || hasEmbedContent)) {
-      setError("Select a channel and enter a message, build an embed, or pick a saved embed before saving.");
-      return;
-    }
+    if (!channelId) return setError("Pick a channel to post this announcement in.");
+    if (limits.hasErrors) return setError("Discord would reject this message — fix the problems listed under Discord Limits first.");
     setError(null);
     setSaving(true);
-    const body = { ...form, scheduledFor: scheduleLocal ? new Date(scheduleLocal).toISOString() : null };
+    const body = {
+      channelId,
+      creatorData: { content: state.content, embeds: state.embeds, components: state.components },
+      savedEmbedId,
+      scheduledFor: scheduleLocal ? new Date(scheduleLocal).toISOString() : null,
+    };
     try {
-      if (editingId) await api.updateAnnouncement(params.guildId, editingId, body);
-      else await api.addAnnouncement(params.guildId, body);
+      if (editingId) await api.updateAnnouncement(guildId, editingId, body);
+      else await api.addAnnouncement(guildId, body);
+      setNotice(editingId ? "✅ Queued announcement updated." : scheduleLocal ? "✅ Queued for its scheduled time." : "✅ Saved to the queue — publish it below when you're ready.");
       resetForm();
-      setTab("active");
       refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save this announcement.");
@@ -131,7 +213,8 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
       return;
     setPublishingId(r.id);
     try {
-      await api.publishAnnouncement(params.guildId, r.id);
+      await api.publishAnnouncement(guildId, r.id);
+      setNotice("✅ Published — find it under Recently Sent.");
       refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to publish this announcement.");
@@ -142,18 +225,20 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
 
   async function remove(id: string) {
     if (!(await confirm("Remove this announcement? If it hasn't published yet, it never will."))) return;
-    await api.deleteAnnouncement(params.guildId, id);
+    await api.deleteAnnouncement(guildId, id);
     if (editingId === id) resetForm();
     refresh();
   }
 
   const queued = rows.filter((r) => !r.sentAt);
   const sent = rows.filter((r) => r.sentAt);
+  const tabClass = (t: Tab) =>
+    ["px-4 py-2 text-sm border-b-2 transition-colors", tab === t ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300"].join(" ");
 
   return (
     <div>
       <ModuleHeader
-        guildId={params.guildId}
+        guildId={guildId}
         moduleKey="ANNOUNCEMENTS"
         title="Announcements"
         description="Compose a message or build an embed, queue it, then publish it when you're ready."
@@ -168,57 +253,32 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
       </div>
 
       <div className="flex gap-1 mb-5 border-b border-white/5">
-        <button
-          onClick={() => setTab("active")}
-          className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
-          ].join(" ")}
-        >
-          Queued &amp; Sent
+        <button onClick={() => setTab("compose")} className={tabClass("compose")}>
+          Announcement{queued.length > 0 ? ` (${queued.length} queued)` : ""}
         </button>
-        <button
-          onClick={() => {
-            resetForm();
-            setTab("create");
-          }}
-          className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "create" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
-          ].join(" ")}
-        >
-          + Compose New
+        <button onClick={() => setTab("sent")} className={tabClass("sent")}>
+          Recently Sent{sent.length > 0 ? ` (${sent.length})` : ""}
         </button>
       </div>
 
-      {tab === "active" && (
+      {tab === "compose" && (
         <div className="space-y-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Queued</p>
-            {queued.length === 0 ? (
-              <NeonCard>
-                <div className="text-center py-10">
-                  <p className="text-sm text-slate-400 mb-1">Nothing queued.</p>
-                  <p className="text-xs text-slate-600 mb-4">Compose one, queue it, and publish it whenever you're ready — or schedule it.</p>
-                  <button onClick={() => setTab("create")} className="neon-button-sm">
-                    + Compose New
-                  </button>
-                </div>
-              </NeonCard>
-            ) : (
+          {queued.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Queued</p>
               <NeonCard>
                 <div className="divide-y divide-white/5">
                   {queued.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                    <div key={r.id} className={`flex items-center justify-between py-2.5 text-sm gap-3 ${editingId === r.id ? "text-neon-blue" : ""}`}>
                       <div className="min-w-0">
-                        <p className="truncate">{r.embedTitle || r.content || r.embedDescription || "(embed only)"}</p>
+                        <p className="truncate">{rowLabel(r)}</p>
                         <p className="text-xs text-slate-500">
                           {channelLabel(r.channelId)} ·{" "}
                           {r.scheduledFor ? `publishes ${new Date(r.scheduledFor).toLocaleString()}` : "no schedule — publish manually"}
                         </p>
                       </div>
-                      <button onClick={() => openEdit(r)} className="text-slate-500 hover:text-neon-blue text-xs shrink-0">
-                        Edit
+                      <button onClick={() => openRow(r, "edit")} className="text-slate-500 hover:text-neon-blue text-xs shrink-0">
+                        {editingId === r.id ? "Editing…" : "Edit"}
                       </button>
                       <button
                         onClick={() => publish(r)}
@@ -234,193 +294,185 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                   ))}
                 </div>
               </NeonCard>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Recently Sent</p>
-            {sent.length === 0 ? (
-              <NeonCard>
-                <p className="text-sm text-slate-500 py-4 text-center">Nothing published yet — it'll show up here once something is.</p>
-              </NeonCard>
-            ) : (
-              <NeonCard>
-                <div className="divide-y divide-white/5">
-                  {sent.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate">{r.embedTitle || r.content || r.embedDescription || "(embed only)"}</p>
-                        <p className="text-xs text-slate-500">
-                          {channelLabel(r.channelId)} · published {new Date(r.sentAt as string).toLocaleString()}
-                        </p>
-                      </div>
-                      <button onClick={() => openResend(r)} className="text-neon-blue hover:underline text-xs shrink-0">
-                        Resend
-                      </button>
-                      <button onClick={() => remove(r.id)} className="text-slate-600 hover:text-rose-400 text-xs shrink-0">
-                        Remove
-                      </button>
-                    </div>
-                  ))}
+          {notice && <p className="text-xs text-emerald-400">{notice}</p>}
+
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-5 items-start">
+            <div className="min-w-0">
+              <NeonCard className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-medium">{editingId ? "Edit Queued Announcement" : resending ? "Resend as New Announcement" : "New Announcement"}</p>
+                  {(editingId || resending) && (
+                    <button onClick={resetForm} className="text-xs text-slate-500 hover:text-slate-300">
+                      Cancel
+                    </button>
+                  )}
                 </div>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+                  Channel
+                  <Required />
+                </label>
+                <ChannelSelect guildId={guildId} value={channelId || null} onChange={(id) => setChannelId(id)} />
               </NeonCard>
-            )}
-          </div>
-        </div>
-      )}
 
-      {tab === "create" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-          <NeonCard>
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-medium">{editingId ? "Edit Queued Announcement" : resending ? "Resend as New Announcement" : "New Announcement"}</p>
-              {(editingId || resending) && (
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setTab("active");
-                  }}
-                  className="text-xs text-slate-500 hover:text-slate-300"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-              Channel
-              <Required />
-            </label>
-            <ChannelSelect guildId={params.guildId} value={form.channelId || null} onChange={(id) => setForm({ ...form, channelId: id })} />
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message (optional)</label>
-            <textarea
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-              rows={3}
-              value={form.content}
-              onChange={(e) => setForm({ ...form, content: e.target.value })}
-              placeholder={form.embedEnabled ? "Plain text shown above the embed — not required" : "Not required if you build an embed or pick a saved embed below"}
-            />
-
-            <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium">Build an Embed</p>
-                <p className="text-xs text-slate-500">Add a title, color, and rich fields around your message above.</p>
-              </div>
-              <ToggleSwitch enabled={form.embedEnabled} onChange={(v) => setForm({ ...form, embedEnabled: v })} label="Build an embed" />
-            </div>
-
-            {form.embedEnabled && (
-              <>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Title</label>
-                <input
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-                  value={form.embedTitle}
-                  onChange={(e) => setForm({ ...form, embedTitle: e.target.value })}
-                  placeholder="Optional"
+              <NeonCard className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-medium">Message</p>
+                  <span className="text-[11px] text-slate-600 font-mono">{state.content.length}/2000</span>
+                </div>
+                <MentionTextarea
+                  guildId={guildId}
+                  value={state.content}
+                  onChange={(v) => setState((s) => ({ ...s, content: v }))}
+                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20"
+                  maxLength={2000}
+                  placeholder="Optional text above the embed(s)"
                 />
+              </NeonCard>
 
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
+              <p className="font-medium text-sm mb-3">Embeds ({state.embeds.length}/10)</p>
+              {state.embeds.map((em, i) => (
+                <EmbedCard
+                  key={em.id}
+                  guildId={guildId}
+                  embed={em}
+                  index={i}
+                  onChange={(next) => updateEmbed(em.id, next)}
+                  onDuplicate={() => duplicateEmbed(em.id)}
+                  onRemove={() => removeEmbed(em.id)}
+                  onMoveUp={i > 0 ? () => moveEmbed(i, i - 1) : undefined}
+                  onMoveDown={i < state.embeds.length - 1 ? () => moveEmbed(i, i + 1) : undefined}
+                  dropTarget={dragOver === i && dragFrom !== null && dragFrom !== i}
+                  dragProps={{
+                    draggable: true,
+                    onDragStart: (e) => {
+                      setDragFrom(i);
+                      e.dataTransfer.effectAllowed = "move";
+                    },
+                    onDragOver: (e) => {
+                      e.preventDefault();
+                      if (dragOver !== i) setDragOver(i);
+                    },
+                    onDrop: (e) => {
+                      e.preventDefault();
+                      if (dragFrom !== null) moveEmbed(dragFrom, i);
+                      setDragFrom(null);
+                      setDragOver(null);
+                    },
+                    onDragEnd: () => {
+                      setDragFrom(null);
+                      setDragOver(null);
+                    },
+                  }}
+                />
+              ))}
+              <button
+                onClick={() => setState((s) => (s.embeds.length >= 10 ? s : { ...s, embeds: [...s.embeds, emptyEmbed()] }))}
+                disabled={state.embeds.length >= 10}
+                className="w-full py-3 rounded-xl border border-dashed border-white/15 text-slate-400 text-sm font-medium hover:border-neon-blue/50 hover:text-neon-blue transition-colors disabled:opacity-40 mb-6"
+              >
+                + Add Embed
+              </button>
+
+              <p className="font-medium text-sm mb-3">Buttons &amp; Select Menus ({state.components.length}/5 rows)</p>
+              {state.components.map((row, i) => (
+                <ComponentRowEditor
+                  key={row.id}
+                  guildId={guildId}
+                  row={row}
+                  index={i}
+                  onChange={(next) => updateRow(row.id, next)}
+                  onRemove={() => setState((s) => ({ ...s, components: s.components.filter((r) => r.id !== row.id) }))}
+                />
+              ))}
+              <button
+                onClick={() => setState((s) => (s.components.length >= 5 ? s : { ...s, components: [...s.components, emptyRow()] }))}
+                disabled={state.components.length >= 5}
+                className="w-full py-3 rounded-xl border border-dashed border-white/15 text-slate-400 text-sm font-medium hover:border-neon-blue/50 hover:text-neon-blue transition-colors disabled:opacity-40 mb-6"
+              >
+                + Add Row
+              </button>
+
+              <NeonCard>
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a saved embed instead (optional)</label>
+                <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={(id) => setSavedEmbedId(id)} />
+                <p className="text-xs text-slate-600 -mt-3 mb-4">
+                  Picking one posts that saved embed instead of everything built above — it doesn't save this announcement as a template.
+                </p>
+
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
                 <div className="flex items-center gap-2 mb-2">
                   <input
-                    type="color"
-                    className="h-9 w-11 rounded-lg border border-white/10 bg-base-950 cursor-pointer shrink-0"
-                    value={form.embedColor}
-                    onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
+                    type="datetime-local"
+                    className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    value={scheduleLocal}
+                    onChange={(e) => setScheduleLocal(e.target.value)}
                   />
-                  <input
-                    className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-                    value={form.embedColor}
-                    onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                  />
-                </div>
-                <div className="flex gap-1.5 mb-4">
-                  {COLOR_PRESETS.map((c) => (
+                  {scheduleLocal && (
                     <button
-                      key={c}
                       type="button"
-                      title={c}
-                      onClick={() => setForm({ ...form, embedColor: c })}
-                      className="w-[18px] h-[18px] rounded border border-white/10 hover:scale-110 transition-transform"
-                      style={{ background: c }}
-                    />
-                  ))}
+                      onClick={() => setScheduleLocal("")}
+                      className="text-xs text-slate-500 hover:text-rose-400 px-2 py-2.5 shrink-0"
+                      title="Clear schedule"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
+                <p className="text-xs text-slate-600 mb-4">
+                  {scheduleLocal
+                    ? "Publishes automatically at this time — no need to come back and click Publish. Clear it anytime before then to publish manually instead."
+                    : "Leave blank to just queue it — you'll publish it yourself from the Queued list whenever you're ready."}
+                </p>
 
-                <EmbedExtraFields
-                  guildId={params.guildId}
-                  value={form.embedExtra ?? EMPTY_EMBED_EXTRA}
-                  onChange={(v) => setForm({ ...form, embedExtra: v })}
-                />
-
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Embed Description</label>
-                <textarea
-                  className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-                  rows={4}
-                  value={form.embedDescription}
-                  onChange={(e) => setForm({ ...form, embedDescription: e.target.value })}
-                  placeholder="The embed's own body text — separate from the plain message above"
-                />
-              </>
-            )}
-
-            <div className="mt-4 mb-4">
-              <ButtonsEditor guildId={params.guildId} buttons={form.buttons} onChange={(next) => setForm({ ...form, buttons: next })} />
-            </div>
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a saved embed instead (optional)</label>
-            <SavedEmbedPicker guildId={params.guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
-            <p className="text-xs text-slate-600 -mt-3 mb-4">
-              Picking one here uses it as this announcement's content instead of the embed built above — it doesn't save this
-              announcement as a template.
-            </p>
-
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
-            <div className="flex items-center gap-2 mb-2">
-              <input
-                type="datetime-local"
-                className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                value={scheduleLocal}
-                onChange={(e) => setScheduleLocal(e.target.value)}
-              />
-              {scheduleLocal && (
-                <button
-                  type="button"
-                  onClick={() => setScheduleLocal("")}
-                  className="text-xs text-slate-500 hover:text-rose-400 px-2 py-2.5 shrink-0"
-                  title="Clear schedule"
-                >
-                  Clear
+                <button onClick={save} disabled={!channelId || saving || limits.hasErrors} className="neon-button disabled:opacity-50">
+                  {saving ? "Saving…" : editingId ? "Save Changes" : scheduleLocal ? "Queue for Scheduled Time" : "Save to Queue"}
                 </button>
-              )}
+                <FormError message={error} />
+              </NeonCard>
             </div>
-            <p className="text-xs text-slate-600 mb-4">
-              {scheduleLocal
-                ? "Publishes automatically at this time — no need to come back and click Publish. Clear it anytime before then to publish manually instead."
-                : "Leave blank to just queue it — you'll publish it yourself from the Queued tab whenever you're ready."}
-            </p>
 
-            <button onClick={save} disabled={!form.channelId || saving} className="neon-button disabled:opacity-50">
-              {saving ? "Saving…" : editingId ? "Save Changes" : scheduleLocal ? "Queue for Scheduled Time" : "Save to Queue"}
-            </button>
-            <FormError message={error} />
-          </NeonCard>
-
-          <NeonCard>
-            <p className="font-medium mb-3">Preview</p>
-            <StickyPreview
-              content={form.content}
-              embedEnabled={form.embedEnabled}
-              embedTitle={form.embedTitle}
-              embedDescription={form.embedDescription}
-              embedColor={form.embedColor}
-              buttons={form.buttons}
-              embedExtra={form.embedExtra ?? EMPTY_EMBED_EXTRA}
-            />
-            {form.savedEmbedId && <p className="text-xs text-slate-500 mt-2">Preview reflects the saved embed once published.</p>}
-          </NeonCard>
+            <div className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+              <NeonCard>
+                <p className="font-medium mb-3">Live Preview</p>
+                <EmbedCreatorPreview guildId={guildId} state={savedPreset ? { ...state, ...savedPreset.data } : state} />
+                {savedPreset && <p className="text-xs text-slate-500 mt-2">Showing the saved embed "{savedPreset.name}" — that's what will post.</p>}
+              </NeonCard>
+              <DiscordLimitsCard report={limits} />
+            </div>
+          </div>
         </div>
       )}
+
+      {tab === "sent" &&
+        (sent.length === 0 ? (
+          <NeonCard>
+            <p className="text-sm text-slate-500 py-4 text-center">Nothing published yet — it'll show up here once something is.</p>
+          </NeonCard>
+        ) : (
+          <NeonCard>
+            <div className="divide-y divide-white/5">
+              {sent.map((r) => (
+                <div key={r.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate">{rowLabel(r)}</p>
+                    <p className="text-xs text-slate-500">
+                      {channelLabel(r.channelId)} · published {new Date(r.sentAt as string).toLocaleString()}
+                    </p>
+                  </div>
+                  <button onClick={() => openRow(r, "resend")} className="text-neon-blue hover:underline text-xs shrink-0">
+                    Resend
+                  </button>
+                  <button onClick={() => remove(r.id)} className="text-slate-600 hover:text-rose-400 text-xs shrink-0">
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </NeonCard>
+        ))}
     </div>
   );
 }

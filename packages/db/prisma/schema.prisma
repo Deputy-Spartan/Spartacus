@@ -1806,6 +1806,11 @@ model Announcement {
   buttons          Json      @default("[]")
   embedExtra       Json?
   savedEmbedId     String?
+  // Full Embed Creator message (content, up to 10 embeds, button/menu rows)
+  // — set by the current dashboard composer and posted with the same
+  // builder as saved embeds. Null on older rows, which still post from the
+  // single-embed columns above.
+  creatorData      Json?
   scheduledFor     DateTime?
   sentAt           DateTime?
   messageId        String? // the live Discord message, once sent

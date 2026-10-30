@@ -11,23 +11,35 @@ router.get("/guilds/:guildId/announcements", requireAuth, requireGuildPermission
   res.json(rows);
 });
 
+interface CreatorData {
+  content?: string;
+  embeds?: Array<{ title?: string; description?: string }>;
+}
+
+// The dashboard sends creatorData (the Embed Creator-style message). The
+// single-embed columns are filled from it only as a summary — the list
+// labels read them, and older clients/rows still use them to post —
+// while the bot posts creatorData itself whenever it's set.
+function toData(body: Record<string, unknown>) {
+  const creatorData = (body.creatorData ?? null) as CreatorData | null;
+  const first = creatorData?.embeds?.find((e) => e.title || e.description);
+  return {
+    channelId: body.channelId as string,
+    content: creatorData ? creatorData.content ?? "" : (body.content as string | undefined),
+    embedEnabled: creatorData ? false : Boolean(body.embedEnabled),
+    embedTitle: creatorData ? first?.title ?? null : (body.embedTitle as string | undefined),
+    embedDescription: creatorData ? first?.description ?? null : (body.embedDescription as string | undefined),
+    embedColor: body.embedColor as string | undefined,
+    buttons: creatorData ? [] : ((body.buttons ?? []) as Prisma.InputJsonValue),
+    scheduledFor: body.scheduledFor ? new Date(body.scheduledFor as string) : null,
+    embedExtra: (body.embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+    savedEmbedId: (body.savedEmbedId as string | null | undefined) ?? null,
+    creatorData: creatorData ? (creatorData as Prisma.InputJsonValue) : Prisma.JsonNull,
+  };
+}
+
 router.post("/guilds/:guildId/announcements", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
-  const row = await prisma.announcement.create({
-    data: {
-      guildId: req.params.guildId,
-      channelId,
-      content,
-      embedEnabled: Boolean(embedEnabled),
-      embedTitle,
-      embedDescription,
-      embedColor,
-      buttons: buttons ?? [],
-      scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-      embedExtra: embedExtra ?? Prisma.JsonNull,
-      savedEmbedId: savedEmbedId ?? null,
-    },
-  });
+  const row = await prisma.announcement.create({ data: { guildId: req.params.guildId, ...toData(req.body) } });
   res.status(201).json(row);
 });
 
@@ -41,22 +53,7 @@ router.patch("/guilds/:guildId/announcements/:id", requireAuth, requireGuildPerm
   if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Not found" });
   if (existing.sentAt) return res.status(400).json({ error: "This announcement already published and can't be edited. Use Resend instead." });
 
-  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, scheduledFor, embedExtra, savedEmbedId } = req.body;
-  const row = await prisma.announcement.update({
-    where: { id: req.params.id },
-    data: {
-      channelId,
-      content,
-      embedEnabled: Boolean(embedEnabled),
-      embedTitle,
-      embedDescription,
-      embedColor,
-      buttons: buttons ?? [],
-      scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-      embedExtra: embedExtra ?? Prisma.JsonNull,
-      savedEmbedId: savedEmbedId ?? null,
-    },
-  });
+  const row = await prisma.announcement.update({ where: { id: req.params.id }, data: toData(req.body) });
   res.json(row);
 });
 

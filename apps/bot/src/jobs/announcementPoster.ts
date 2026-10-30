@@ -5,7 +5,7 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildStickyPayload } from "../lib/stickyRender";
-import { resolveSavedEmbed } from "../lib/savedEmbedRender";
+import { resolveSavedEmbed, buildSavedEmbedPayload, type SavedEmbedData } from "../lib/savedEmbedRender";
 
 // The one place an announcement actually gets sent to Discord — used both
 // by the scheduled tick below and by the dashboard's "Publish Now" button
@@ -27,7 +27,11 @@ export async function publishAnnouncement(client: Client, announcementId: string
   }
 
   const saved = await resolveSavedEmbed(announcement.savedEmbedId);
-  const payload = await buildStickyPayload(
+  // Composed in the Embed Creator-style editor: post it with the same
+  // builder saved embeds use (multiple embeds, buttons/menus). A picked
+  // saved embed still takes precedence, same as before.
+  const creatorData = !saved && announcement.creatorData ? (announcement.creatorData as SavedEmbedData) : null;
+  const payload = creatorData ? await buildSavedEmbedPayload(announcement.guildId, creatorData) : await buildStickyPayload(
     {
       content: announcement.content ?? "",
       embedEnabled: announcement.embedEnabled,

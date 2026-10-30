@@ -36,8 +36,10 @@ services:
         sync: false
       - key: YOUTUBE_API_KEY
         sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false # optional — flips status to "Updating" the moment you push
       - key: VERCEL_TOKEN
-        sync: false # optional — shows "Updating" on the dashboard during Vercel deploys
+        sync: false # optional — keeps "Updating" until Vercel has published
       - key: VERCEL_PROJECT
         sync: false
       - key: VERCEL_TEAM_ID

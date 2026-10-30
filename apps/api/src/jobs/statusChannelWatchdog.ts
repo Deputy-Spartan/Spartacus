@@ -72,7 +72,7 @@ async function announceUpdating(dashboardOnly: boolean) {
     color: 0xf59e0b, // amber — matches the dashboard's updating indicator
     title: "🟡 Spartacus is Updating",
     description: dashboardOnly
-      ? "A new version of the dashboard is being published. The bot is still running normally."
+      ? "A new update is rolling out. The bot may restart briefly — this will flip back to Online once it's live."
       : "Deploying a new version. This will refresh automatically once it's back.",
     footer: { text: "Last updated" },
     timestamp: new Date().toISOString(),
@@ -122,14 +122,14 @@ async function announceRecovery() {
   // the moment the bot is actually back, avoiding a race between the two.
 }
 
-// A dashboard-only update ends with the bot having been up the whole time,
+// A rolled-out update ends with the bot having been up the whole time,
 // so there's no incident to close — just flip the embed straight back to
 // online instead of leaving "Updating" up until the bot's next minute tick.
 async function announceDashboardDeployDone() {
   await editPrimaryStatusChannels({
     color: 0x22c55e,
     title: "🟢 Spartacus is Online",
-    description: "Dashboard update published.",
+    description: "Update published.",
     footer: { text: "Last updated" },
     timestamp: new Date().toISOString(),
   });

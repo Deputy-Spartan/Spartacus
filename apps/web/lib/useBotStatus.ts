@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type BotStatusRow } from "./api";
 
-const POLL_MS = 15_000;
+const POLL_MS = 10_000;
 const REFRESH_EVENT = "spartacus:bot-status-changed";
 
 // Call this right after saving the manual override so every badge/card on

@@ -68,7 +68,8 @@ import { startStatusChannelWatchdog } from "./jobs/statusChannelWatchdog";
 import { announceDeployIfNew } from "./jobs/deployAnnouncer";
 import { migrateLegacyEmbeds } from "./jobs/migrateLegacyEmbeds";
 import { startErrorAlertPoller } from "./jobs/errorAlertPoller";
-import { startVercelDeployWatcher } from "./jobs/vercelDeployWatcher";
+import { startDeployTracker } from "./jobs/deployTracker";
+import githubWebhookRouter from "./routes/githubWebhook";
 import alertSettingsRouter from "./routes/alertSettings";
 import aiConfigRouter from "./routes/aiConfig";
 import serverBackupsRouter from "./routes/serverBackups";
@@ -106,6 +107,8 @@ app.use(
     credentials: true,
   })
 );
+// Before express.json() — it verifies GitHub's signature against the raw body.
+app.use(githubWebhookRouter);
 // Default 100kb limit is too small for a base64-encoded avatar upload
 // (bot-config route) — Discord itself caps avatar files at 10MB, so match that.
 app.use(express.json({ limit: "10mb" }));
@@ -225,6 +228,6 @@ if (process.env.RUN_BOT_INLINE !== "false") {
 // process was never coupled to the bot's lifecycle in the first place.
 startStatusChannelWatchdog();
 startErrorAlertPoller();
-startVercelDeployWatcher();
+startDeployTracker();
 announceDeployIfNew();
 migrateLegacyEmbeds().catch((err) => console.error("[migrateLegacyEmbeds] failed:", err));

@@ -103,12 +103,14 @@ function SettingsTab({
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
-      <div className="flex gap-1.5 lg:flex-col lg:gap-1 lg:w-[220px] lg:flex-none overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+      {/* Desktop: full step list, clickable, in a left column. */}
+      <div className="hidden lg:flex lg:flex-col lg:gap-1 lg:w-[220px] lg:flex-none">
         {STEPS.map((s, i) => (
           <button
             key={s.label}
+            type="button"
             onClick={() => setStep(i)}
-            className={`flex items-center gap-2.5 text-left px-3 py-2 rounded-lg border text-xs whitespace-nowrap lg:whitespace-normal transition-colors ${
+            className={`flex items-center gap-2.5 text-left px-3 py-2 rounded-lg border text-xs transition-colors ${
               i === step
                 ? "bg-neon-blue/15 border-neon-blue/40 text-white"
                 : i < step
@@ -123,11 +125,31 @@ function SettingsTab({
             >
               {i < step ? "✓" : i + 1}
             </span>
-            <span className="hidden lg:block">
+            <span>
               <span className="block font-medium">{s.label}</span>
               <span className="block text-[10px] text-slate-500 font-normal">{s.hint}</span>
             </span>
-            <span className="lg:hidden font-medium">{s.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Mobile: compact wrapping dot progress, no horizontal scroll to lose track of. */}
+      <div className="flex flex-wrap gap-1.5 lg:hidden w-full">
+        {STEPS.map((s, i) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => setStep(i)}
+            aria-label={`Step ${i + 1}: ${s.label}`}
+            className={`flex-none w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold border transition-colors ${
+              i === step
+                ? "bg-neon-blue/25 border-neon-blue/60 text-white"
+                : i < step
+                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                : "border-white/10 text-slate-500"
+            }`}
+          >
+            {i < step ? "✓" : i + 1}
           </button>
         ))}
       </div>
@@ -270,18 +292,20 @@ function SettingsTab({
         {step === 6 && <MessagesCard settings={settings} update={update} />}
         {step === 7 && <VersionCard guildId={guildId} settings={settings} />}
 
-        <div className="flex items-center justify-between max-w-xl mt-5">
+        <div className="flex items-center justify-between max-w-xl mt-5 gap-3">
           <button
+            type="button"
             onClick={() => setStep((s) => Math.max(0, s - 1))}
             disabled={step === 0}
-            className="text-xs font-medium px-3 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30"
+            className="text-xs font-medium px-4 py-2.5 lg:py-1.5 rounded-lg border border-white/10 text-slate-400 hover:text-white hover:border-white/20 transition-colors disabled:opacity-30"
           >
             ← Back
           </button>
           {step < lastStep ? (
             <button
+              type="button"
               onClick={() => setStep((s) => Math.min(lastStep, s + 1))}
-              className="text-xs font-medium px-4 py-1.5 rounded-lg bg-neon-blue/15 border border-neon-blue/40 text-white hover:bg-neon-blue/25 transition-colors"
+              className="flex-1 lg:flex-none text-xs font-medium px-4 py-2.5 lg:py-1.5 rounded-lg bg-neon-blue/15 border border-neon-blue/40 text-white hover:bg-neon-blue/25 transition-colors text-center"
             >
               Next →
             </button>

@@ -203,7 +203,7 @@ export function Sidebar({
                             href={href}
                             onClick={onNavigate}
                             className={[
-                              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                              "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                               active
                                 ? "bg-base-800 text-neon-blue shadow-glow-blue"
                                 : (cat as { owner?: boolean }).owner
@@ -211,6 +211,12 @@ export function Sidebar({
                                   : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
                             ].join(" ")}
                           >
+                            <span
+                              aria-hidden="true"
+                              className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
+                                active ? "h-5 opacity-100" : "h-0 opacity-0"
+                              }`}
+                            />
                             <span>{cat.icon}</span>
                             <span className="flex-1 min-w-0 truncate">{cat.label}</span>
                           </Link>
@@ -226,7 +232,7 @@ export function Sidebar({
                       <div
                         key={`${section.section ?? "top"}:${item.href}`}
                         className={[
-                          "group flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
+                          "group relative flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
                           active
                             ? "bg-base-800 text-neon-blue shadow-glow-blue"
                             : section.section === "Owner Only"
@@ -234,6 +240,12 @@ export function Sidebar({
                               : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
                         ].join(" ")}
                       >
+                        <span
+                          aria-hidden="true"
+                          className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
+                            active ? "h-5 opacity-100" : "h-0 opacity-0"
+                          }`}
+                        />
                         <Link href={href} onClick={onNavigate} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
                           <span>{item.icon}</span>
                           <span className="flex-1 min-w-0 truncate">{item.label}</span>

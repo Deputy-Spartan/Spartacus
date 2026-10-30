@@ -9,3 +9,6 @@ dist/
 # Local dev log scratch files
 apps/*/.devlog.txt
 scratchpad/
+
+# Claude Code local worktrees
+.claude/worktrees/

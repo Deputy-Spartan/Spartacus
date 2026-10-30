@@ -222,7 +222,11 @@ export function Sidebar({
                       })
                     : section.items.map((item) => {
                     const href = `/dashboard/${guildId}${item.href}`;
-                    const active = pathname === href;
+                    // The Modules link and a category link both ultimately
+                    // point at /modules, differing only by ?section= — so
+                    // Modules itself is only "active" with no section
+                    // selected (i.e. the plain All Categories view).
+                    const active = pathname === href && (item.href !== "/modules" || !activeSection);
                     const moduleKey = NAV_MODULE_KEYS[item.href];
                     const enabled = moduleKey ? (modules?.[moduleKey]?.enabled ?? false) : null;
                     const pinned = isPinned(item.href);

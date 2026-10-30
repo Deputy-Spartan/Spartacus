@@ -5,42 +5,28 @@ import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
 const router = Router();
 
+const FIELDS = ["errorChannelId", "errorPingRoleId", "errorPingUserId", "deployChannelId", "uptimeChannelId", "botUpdatesChannelId"] as const;
+type Field = (typeof FIELDS)[number];
+
 router.get("/guilds/:guildId/alert-settings", requireAuth, requireGuildPermission, async (req, res) => {
   const row = await prisma.alertSettings.findUnique({ where: { guildId: req.params.guildId } });
-  res.json({
-    errorChannelId: row?.errorChannelId ?? null,
-    deployChannelId: row?.deployChannelId ?? null,
-    uptimeChannelId: row?.uptimeChannelId ?? null,
-    botUpdatesChannelId: row?.botUpdatesChannelId ?? null,
-  });
+  res.json(Object.fromEntries(FIELDS.map((f) => [f, row?.[f] ?? null])));
 });
 
-// Partial update — the Errors page only ever sends errorChannelId/
-// deployChannelId, the Status Channel page only ever sends uptimeChannelId/
+// Partial update — the Errors page only ever sends the error*/deploy
+// fields, the Status Channel page only ever sends uptimeChannelId/
 // botUpdatesChannelId; whichever fields are omitted are left untouched.
 router.put("/guilds/:guildId/alert-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { errorChannelId, deployChannelId, uptimeChannelId, botUpdatesChannelId } = req.body as {
-    errorChannelId?: string | null;
-    deployChannelId?: string | null;
-    uptimeChannelId?: string | null;
-    botUpdatesChannelId?: string | null;
-  };
+  const body = req.body as Partial<Record<Field, string | null>>;
+  const patch: Partial<Record<Field, string | null>> = {};
+  for (const f of FIELDS) {
+    if (body[f] !== undefined) patch[f] = body[f];
+  }
 
   const row = await prisma.alertSettings.upsert({
     where: { guildId: req.params.guildId },
-    create: {
-      guildId: req.params.guildId,
-      errorChannelId: errorChannelId ?? null,
-      deployChannelId: deployChannelId ?? null,
-      uptimeChannelId: uptimeChannelId ?? null,
-      botUpdatesChannelId: botUpdatesChannelId ?? null,
-    },
-    update: {
-      ...(errorChannelId !== undefined ? { errorChannelId } : {}),
-      ...(deployChannelId !== undefined ? { deployChannelId } : {}),
-      ...(uptimeChannelId !== undefined ? { uptimeChannelId } : {}),
-      ...(botUpdatesChannelId !== undefined ? { botUpdatesChannelId } : {}),
-    },
+    create: { guildId: req.params.guildId, ...patch },
+    update: patch,
   });
 
   res.json(row);

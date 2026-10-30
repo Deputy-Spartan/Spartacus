@@ -1179,6 +1179,8 @@ export interface BotStatusRow {
 
 export interface AlertSettingsRow {
   errorChannelId: string | null;
+  errorPingRoleId: string | null;
+  errorPingUserId: string | null;
   deployChannelId: string | null;
   uptimeChannelId: string | null;
   botUpdatesChannelId: string | null;

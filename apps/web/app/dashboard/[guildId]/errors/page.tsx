@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { RoleSelect } from "../../../../components/ui/RoleSelect";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { api, type AlertSettingsRow, type ErrorLogRow } from "../../../../lib/api";
 
 export default function ErrorsPage({ params }: { params: { guildId: string } }) {
   const [rows, setRows] = useState<ErrorLogRow[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [alertSettings, setAlertSettings] = useState<AlertSettingsRow | null>(null);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
 
   function refresh() {
     api.getErrors(params.guildId).then(setRows);
@@ -17,14 +20,17 @@ export default function ErrorsPage({ params }: { params: { guildId: string } }) 
   useEffect(() => {
     api.getAlertSettings(params.guildId).then(setAlertSettings);
   }, [params.guildId]);
+  useEffect(() => {
+    api.getMe().then((me) => setMyUserId(me.id));
+  }, []);
 
   async function clearAll() {
     await api.clearErrors(params.guildId);
     refresh();
   }
 
-  async function updateChannel(field: "errorChannelId" | "deployChannelId", channelId: string) {
-    const value = channelId || null;
+  async function updateChannel(field: "errorChannelId" | "errorPingRoleId" | "errorPingUserId" | "deployChannelId", id: string | null) {
+    const value = id || null;
     setAlertSettings((prev) => (prev ? { ...prev, [field]: value } : prev));
     await api.updateAlertSettings(params.guildId, { [field]: value });
   }
@@ -54,6 +60,28 @@ export default function ErrorsPage({ params }: { params: { guildId: string } }) 
             kind="text"
             placeholder="Off — not posting anywhere"
           />
+          {alertSettings?.errorChannelId && (
+            <>
+              <div className="flex items-center justify-between gap-3 mt-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Ping Me</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Mentions you on every new error so you get a notification.</p>
+                </div>
+                <ToggleSwitch
+                  enabled={!!myUserId && alertSettings.errorPingUserId === myUserId}
+                  onChange={(on) => updateChannel("errorPingUserId", on ? myUserId : null)}
+                />
+              </div>
+              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Ping Role</label>
+              <RoleSelect
+                guildId={params.guildId}
+                value={alertSettings.errorPingRoleId}
+                onChange={(id) => updateChannel("errorPingRoleId", id)}
+                placeholder="None — no role pinged"
+              />
+              <p className="text-xs text-slate-600 mt-2">The same error repeating is only alerted once per hour.</p>
+            </>
+          )}
         </NeonCard>
         <NeonCard>
           <p className="font-medium mb-1">Deploy Announcement Channel</p>

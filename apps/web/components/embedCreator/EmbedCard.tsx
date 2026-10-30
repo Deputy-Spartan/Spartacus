@@ -33,6 +33,13 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
     if (embed.fields.length >= 25) return;
     set("fields", [...embed.fields, { name: "", value: "", inline: false }]);
   }
+  function addDivider() {
+    if (embed.fields.length >= 25) return;
+    // A zero-width-space name/value still counts as a real field to
+    // Discord, so it renders as a blank row — the standard trick for
+    // extra breathing room between two fields with no visible content.
+    set("fields", [...embed.fields, { name: "​", value: "​", inline: false }]);
+  }
   function removeField(i: number) {
     set(
       "fields",
@@ -194,13 +201,26 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
             <div className="flex items-center justify-between mb-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fields ({embed.fields.length}/25)</p>
               {embed.fields.length < 25 && (
-                <button type="button" onClick={addField} className="text-[11px] text-neon-blue hover:underline">
-                  + Add field
-                </button>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={addDivider} className="text-[11px] text-slate-500 hover:text-slate-300">
+                    + Add divider
+                  </button>
+                  <button type="button" onClick={addField} className="text-[11px] text-neon-blue hover:underline">
+                    + Add field
+                  </button>
+                </div>
               )}
             </div>
             <div className="space-y-2">
-              {embed.fields.map((f, i) => (
+              {embed.fields.map((f, i) =>
+                f.name === "​" && f.value === "​" ? (
+                  <div key={i} className="flex items-center justify-between bg-base-950 border border-dashed border-white/10 rounded-lg px-2.5 py-1.5">
+                    <span className="text-[11px] text-slate-600 italic">— blank divider —</span>
+                    <button type="button" onClick={() => removeField(i)} className="text-[11px] text-slate-500 hover:text-rose-400">
+                      Remove
+                    </button>
+                  </div>
+                ) : (
                 <div key={i} className="bg-base-950 border border-white/10 rounded-lg p-2.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                     <div>
@@ -239,7 +259,8 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              )}
               {embed.fields.length === 0 && <p className="text-[11px] text-slate-600">No fields yet.</p>}
             </div>
           </div>

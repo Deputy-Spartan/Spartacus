@@ -4,14 +4,113 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type AccessAuditEntryRow, type AccessRequestRow, type DashboardAccessRow } from "../../../../lib/api";
+import { api, type AccessAuditEntryRow, type AccessRequestRow, type BotConfigRow, type DashboardAccessRow } from "../../../../lib/api";
 import { useOwnerGuard } from "../../../../lib/useOwnerGuard";
+import { useBotStatus, notifyBotStatusChanged } from "../../../../lib/useBotStatus";
 
+type Section = "access" | "status";
 type Tab = "active" | "grant" | "audit";
+
+type OverrideValue = "" | "ONLINE" | "OFFLINE" | "MAINTENANCE";
+
+function LiveIndicator() {
+  const status = useBotStatus();
+  const phase = status === null ? "checking" : status.updating ? "updating" : status.online ? "online" : "offline";
+  const dotClass = {
+    checking: "bg-slate-600 animate-pulse",
+    updating: "bg-amber-400",
+    online: "bg-emerald-400",
+    offline: "bg-slate-500",
+  }[phase];
+  const label = { checking: "checking…", updating: "updating", online: "online", offline: "offline" }[phase];
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
+      <span className="text-xs text-slate-500">
+        Live preview: Spartacus is {label}
+        {status?.manual ? " (set manually)" : ""}
+      </span>
+      {status?.manual && status.message && <span className="text-xs text-slate-600 italic">— "{status.message}"</span>}
+    </div>
+  );
+}
+
+function ManualOverrideCard() {
+  const [override, setOverride] = useState<OverrideValue>("");
+  const [message, setMessage] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.getBotConfig().then((c: BotConfigRow) => {
+      setOverride(c.manualStatusOverride ?? "");
+      setMessage(c.manualStatusMessage ?? "");
+      setLoaded(true);
+    });
+  }, []);
+
+  async function save() {
+    setSaving(true);
+    const result = await api.setBotConfig({ manualStatusOverride: override || null, manualStatusMessage: message || null });
+    setSaving(false);
+    if (result.errors.length === 0) {
+      setSaved(true);
+      notifyBotStatusChanged();
+      setTimeout(() => setSaved(false), 2500);
+    }
+  }
+
+  return (
+    <NeonCard className="max-w-2xl">
+      <div className="flex items-start justify-between gap-4 mb-1">
+        <p className="font-medium">Manual Override</p>
+        <LiveIndicator />
+      </div>
+      <p className="text-xs text-slate-500 mb-4">
+        Forces the status shown everywhere — the Status Channel page, the dashboard header, Overview, and the live embed — instead of the
+        automatic heartbeat detection. Set back to "Auto" to return to normal.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Status</label>
+          <select
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+            value={override}
+            onChange={(e) => setOverride(e.target.value as OverrideValue)}
+            disabled={!loaded}
+          >
+            <option value="">Auto (heartbeat-based)</option>
+            <option value="ONLINE">Force Online</option>
+            <option value="MAINTENANCE">Under Maintenance</option>
+            <option value="OFFLINE">Force Offline</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message (optional)</label>
+          <input
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="e.g. Doing scheduled maintenance, back by 6pm EST"
+            disabled={!loaded}
+          />
+        </div>
+      </div>
+
+      <button onClick={save} disabled={saving || !loaded} className="neon-button-sm mt-4 disabled:opacity-50">
+        {saving ? "Saving…" : saved ? "Saved ✓" : "Save Override"}
+      </button>
+    </NeonCard>
+  );
+}
 
 export default function OwnerPanelPage({ params }: { params: { guildId: string } }) {
   const ownerAccess = useOwnerGuard(params.guildId);
   const confirm = useConfirm();
+  const [section, setSection] = useState<Section>("access");
   const [tab, setTab] = useState<Tab>("active");
   const [requests, setRequests] = useState<AccessRequestRow[] | null>(null);
   const [access, setAccess] = useState<DashboardAccessRow[] | null>(null);
@@ -109,61 +208,84 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
       <span className="inline-flex items-center gap-1 bg-purple-500/15 text-purple-300 text-[10.5px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full mb-2">
         🔑 Owner only
       </span>
-      <h1 className="text-2xl font-bold mb-1">Access Control</h1>
+      <h1 className="text-2xl font-bold mb-1">Command Center</h1>
       <p className="text-slate-400 mb-6 max-w-2xl">
-        No one can open this dashboard without your say-so. Approve requests, grant access directly, or revoke it — changes apply the next time
-        that person loads the dashboard.
+        Owner-only controls for this dashboard and the bot itself — who can get in, and what the bot shows as its live status. More
+        owner-only tools land here as their own tab over time.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-        <NeonCard>
-          <p className="text-slate-400 text-sm">Approved Users</p>
-          <p className="text-2xl font-bold mt-1">{access?.length ?? "…"}</p>
-        </NeonCard>
-        <NeonCard>
-          <p className="text-slate-400 text-sm">Pending Requests</p>
-          <p className="text-2xl font-bold mt-1 text-amber-400">{requests?.length ?? "…"}</p>
-        </NeonCard>
-        <NeonCard>
-          <p className="text-slate-400 text-sm">Paid Plan</p>
-          <p className="text-2xl font-bold mt-1 text-amber-400">{access?.filter((a) => a.plan === "PAID").length ?? "…"}</p>
-        </NeonCard>
-      </div>
-
-      <div className="flex gap-1 mb-5 border-b border-white/5">
+      <div className="flex gap-1 mb-6 border-b border-white/10">
         <button
-          onClick={() => setTab("active")}
+          onClick={() => setSection("access")}
           className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+            "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+            section === "access" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
           ].join(" ")}
         >
-          Active Access
+          Access Control
         </button>
         <button
-          onClick={() => {
-            resetDraft();
-            setTab("grant");
-          }}
+          onClick={() => setSection("status")}
           className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "grant" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+            "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+            section === "status" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
           ].join(" ")}
         >
-          + Grant Access
-        </button>
-        <button
-          onClick={() => setTab("audit")}
-          className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "audit" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
-          ].join(" ")}
-        >
-          Audit Log
+          Bot Status
         </button>
       </div>
 
-      {tab === "active" && (
+      {section === "access" && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <NeonCard>
+              <p className="text-slate-400 text-sm">Approved Users</p>
+              <p className="text-2xl font-bold mt-1">{access?.length ?? "…"}</p>
+            </NeonCard>
+            <NeonCard>
+              <p className="text-slate-400 text-sm">Pending Requests</p>
+              <p className="text-2xl font-bold mt-1 text-amber-400">{requests?.length ?? "…"}</p>
+            </NeonCard>
+            <NeonCard>
+              <p className="text-slate-400 text-sm">Paid Plan</p>
+              <p className="text-2xl font-bold mt-1 text-amber-400">{access?.filter((a) => a.plan === "PAID").length ?? "…"}</p>
+            </NeonCard>
+          </div>
+
+          <div className="flex gap-1 mb-5 border-b border-white/5">
+            <button
+              onClick={() => setTab("active")}
+              className={[
+                "px-4 py-2 text-sm border-b-2 transition-colors",
+                tab === "active" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+              ].join(" ")}
+            >
+              Active Access
+            </button>
+            <button
+              onClick={() => {
+                resetDraft();
+                setTab("grant");
+              }}
+              className={[
+                "px-4 py-2 text-sm border-b-2 transition-colors",
+                tab === "grant" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+              ].join(" ")}
+            >
+              + Grant Access
+            </button>
+            <button
+              onClick={() => setTab("audit")}
+              className={[
+                "px-4 py-2 text-sm border-b-2 transition-colors",
+                tab === "audit" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+              ].join(" ")}
+            >
+              Audit Log
+            </button>
+          </div>
+
+          {tab === "active" && (
         <>
           {requests && requests.length > 0 && (
             <NeonCard className="mb-4">
@@ -288,26 +410,30 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
         </NeonCard>
       )}
 
-      {tab === "audit" && (
-        <NeonCard className="mb-4">
-          <p className="font-medium mb-1">Recent activity</p>
-          <p className="text-xs text-slate-500 mb-3">Last 50 access-control decisions.</p>
-          {(!auditLog || auditLog.length === 0) && <p className="text-sm text-slate-500">No activity yet.</p>}
-          <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
-            {auditLog?.map((e) => (
-              <div key={e.id} className="flex items-center justify-between py-2 text-xs gap-3">
-                <div className="min-w-0">
-                  <span className="text-slate-300">{AUDIT_LABELS[e.action] ?? e.action}</span>{" "}
-                  <span className="text-slate-500">
-                    — {e.username} {e.detail ? `(${e.detail})` : ""}
-                  </span>
-                </div>
-                <span className="text-slate-600 shrink-0">{new Date(e.createdAt).toLocaleString()}</span>
+          {tab === "audit" && (
+            <NeonCard className="mb-4">
+              <p className="font-medium mb-1">Recent activity</p>
+              <p className="text-xs text-slate-500 mb-3">Last 50 access-control decisions.</p>
+              {(!auditLog || auditLog.length === 0) && <p className="text-sm text-slate-500">No activity yet.</p>}
+              <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
+                {auditLog?.map((e) => (
+                  <div key={e.id} className="flex items-center justify-between py-2 text-xs gap-3">
+                    <div className="min-w-0">
+                      <span className="text-slate-300">{AUDIT_LABELS[e.action] ?? e.action}</span>{" "}
+                      <span className="text-slate-500">
+                        — {e.username} {e.detail ? `(${e.detail})` : ""}
+                      </span>
+                    </div>
+                    <span className="text-slate-600 shrink-0">{new Date(e.createdAt).toLocaleString()}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </NeonCard>
+            </NeonCard>
+          )}
+        </>
       )}
+
+      {section === "status" && <ManualOverrideCard />}
     </div>
   );
 }

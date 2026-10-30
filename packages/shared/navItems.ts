@@ -124,7 +124,7 @@ export const OWNER_NAV_SECTION: NavSection = {
   section: "Owner Only",
   items: [
     { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
-    { href: "/owner-panel", label: "Access Control", icon: "🔑" },
+    { href: "/owner-panel", label: "Command Center", icon: "🔑" },
     { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],
 };

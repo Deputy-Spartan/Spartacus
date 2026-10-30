@@ -7,104 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { useBotStatus, notifyBotStatusChanged } from "../../../../lib/useBotStatus";
-import { api, type AlertSettingsRow, type BotConfigRow, type StatusChannelRow } from "../../../../lib/api";
-
-type OverrideValue = "" | "ONLINE" | "OFFLINE" | "MAINTENANCE";
-
-function LiveIndicator() {
-  const status = useBotStatus();
-  const phase = status === null ? "checking" : status.updating ? "updating" : status.online ? "online" : "offline";
-  const dotClass = {
-    checking: "bg-slate-600 animate-pulse",
-    updating: "bg-amber-400",
-    online: "bg-emerald-400",
-    offline: "bg-slate-500",
-  }[phase];
-  const label = { checking: "checking…", updating: "updating", online: "online", offline: "offline" }[phase];
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
-      <span className="text-xs text-slate-500">
-        Live preview: Spartacus is {label}
-        {status?.manual ? " (set manually)" : ""}
-      </span>
-      {status?.manual && status.message && <span className="text-xs text-slate-600 italic">— "{status.message}"</span>}
-    </div>
-  );
-}
-
-function ManualOverrideCard() {
-  const [override, setOverride] = useState<OverrideValue>("");
-  const [message, setMessage] = useState("");
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    api.getBotConfig().then((c: BotConfigRow) => {
-      setOverride(c.manualStatusOverride ?? "");
-      setMessage(c.manualStatusMessage ?? "");
-      setLoaded(true);
-    });
-  }, []);
-
-  async function save() {
-    setSaving(true);
-    const result = await api.setBotConfig({ manualStatusOverride: override || null, manualStatusMessage: message || null });
-    setSaving(false);
-    if (result.errors.length === 0) {
-      setSaved(true);
-      notifyBotStatusChanged();
-      setTimeout(() => setSaved(false), 2500);
-    }
-  }
-
-  return (
-    <NeonCard>
-      <div className="flex items-start justify-between gap-4 mb-1">
-        <p className="font-medium">Manual Override</p>
-        <LiveIndicator />
-      </div>
-      <p className="text-xs text-slate-500 mb-4">
-        Forces the status shown everywhere — this page, the dashboard header, Overview, and the live embed below — instead of the automatic
-        heartbeat detection. Set back to "Auto" to return to normal.
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Status</label>
-          <select
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-            value={override}
-            onChange={(e) => setOverride(e.target.value as OverrideValue)}
-            disabled={!loaded}
-          >
-            <option value="">Auto (heartbeat-based)</option>
-            <option value="ONLINE">Force Online</option>
-            <option value="MAINTENANCE">Under Maintenance</option>
-            <option value="OFFLINE">Force Offline</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message (optional)</label>
-          <input
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="e.g. Doing scheduled maintenance, back by 6pm EST"
-            disabled={!loaded}
-          />
-        </div>
-      </div>
-
-      <button onClick={save} disabled={saving || !loaded} className="neon-button-sm mt-4 disabled:opacity-50">
-        {saving ? "Saving…" : saved ? "Saved ✓" : "Save Override"}
-      </button>
-    </NeonCard>
-  );
-}
+import { api, type AlertSettingsRow, type StatusChannelRow } from "../../../../lib/api";
 
 function ActiveChannelsCard({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
@@ -240,19 +143,8 @@ function BotUpdatesChannelCard({ guildId }: { guildId: string }) {
   );
 }
 
-type Tab = "channels" | "owner";
-
 export default function StatusChannelPage({ params }: { params: { guildId: string } }) {
-  const [tab, setTab] = useState<Tab>("channels");
   const [refreshKey, setRefreshKey] = useState(0);
-  const [isOwner, setIsOwner] = useState(false);
-
-  useEffect(() => {
-    api
-      .getAccessStatus()
-      .then((s) => setIsOwner(s.status === "owner"))
-      .catch(() => setIsOwner(false));
-  }, []);
 
   return (
     <div>
@@ -263,46 +155,15 @@ export default function StatusChannelPage({ params }: { params: { guildId: strin
         description="Posts a live embed to a channel of your choosing showing whether Spartacus is online, refreshed every minute."
       />
 
-      <div className="flex gap-1 mb-5 border-b border-white/5">
-        <button
-          onClick={() => setTab("channels")}
-          className={[
-            "px-4 py-2 text-sm border-b-2 transition-colors",
-            tab === "channels" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
-          ].join(" ")}
-        >
-          Status Channels
-        </button>
-        {isOwner && (
-          <button
-            onClick={() => setTab("owner")}
-            className={[
-              "px-4 py-2 text-sm border-b-2 transition-colors flex items-center gap-1.5",
-              tab === "owner" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
-            ].join(" ")}
-          >
-            🔑 Owner Only
-          </button>
-        )}
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ActiveChannelsCard key={refreshKey} guildId={params.guildId} />
+          <AddChannelCard guildId={params.guildId} onAdded={() => setRefreshKey((k) => k + 1)} />
+        </div>
+
+        <UptimeHistoryCard guildId={params.guildId} />
+        <BotUpdatesChannelCard guildId={params.guildId} />
       </div>
-
-      {tab === "channels" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <ActiveChannelsCard key={refreshKey} guildId={params.guildId} />
-            <AddChannelCard guildId={params.guildId} onAdded={() => setRefreshKey((k) => k + 1)} />
-          </div>
-
-          <UptimeHistoryCard guildId={params.guildId} />
-          <BotUpdatesChannelCard guildId={params.guildId} />
-        </div>
-      )}
-
-      {tab === "owner" && isOwner && (
-        <div className="space-y-4">
-          <ManualOverrideCard />
-        </div>
-      )}
     </div>
   );
 }

@@ -124,8 +124,16 @@ export function AvatarCropper({ imageSrc, onCancel, onSave }: AvatarCropperProps
           )}
         </div>
 
-        <div className="flex items-center gap-3 mt-4">
-          <span className="text-xs text-slate-500 shrink-0">Zoom</span>
+        <div className="flex items-center gap-3 mt-5">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.max(1, Number((z - 0.1).toFixed(2))))}
+            disabled={zoom <= 1}
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-base-800 border border-white/10 text-slate-300 hover:bg-base-700 hover:text-white disabled:opacity-30 disabled:hover:bg-base-800 transition-colors"
+            aria-label="Zoom out"
+          >
+            −
+          </button>
           <input
             type="range"
             min="1"
@@ -133,8 +141,20 @@ export function AvatarCropper({ imageSrc, onCancel, onSave }: AvatarCropperProps
             step="0.01"
             value={zoom}
             onChange={(e) => setZoom(Number(e.target.value))}
-            className="w-full accent-neon-blue"
+            className="neon-slider"
+            style={{ "--slider-fill": `${((zoom - 1) / 2) * 100}%` } as React.CSSProperties}
+            aria-label="Zoom"
           />
+          <button
+            type="button"
+            onClick={() => setZoom((z) => Math.min(3, Number((z + 0.1).toFixed(2))))}
+            disabled={zoom >= 3}
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-base-800 border border-white/10 text-slate-300 hover:bg-base-700 hover:text-white disabled:opacity-30 disabled:hover:bg-base-800 transition-colors"
+            aria-label="Zoom in"
+          >
+            +
+          </button>
+          <span className="shrink-0 w-10 text-right text-xs tabular-nums text-slate-500">{Math.round(((zoom - 1) / 2) * 100)}%</span>
         </div>
 
         <div className="flex gap-2 mt-5">

@@ -84,6 +84,73 @@
            shadow-glow-blue transition-shadow hover:shadow-glow-blue-lg;
   }
 
+  /* A custom-styled range input — the filled portion left of the thumb is
+     painted via the --slider-fill percentage the caller sets inline, since
+     CSS can't read an input's own value to size a pseudo-element. */
+  .neon-slider {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      #7b99bc var(--slider-fill, 0%),
+      rgba(255, 255, 255, 0.08) var(--slider-fill, 0%)
+    );
+    cursor: pointer;
+    outline: none;
+  }
+
+  .neon-slider::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #ededef;
+    border: 2px solid #7b99bc;
+    box-shadow: 0 0 8px rgba(123, 153, 188, 0.8);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+
+  .neon-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 12px rgba(123, 153, 188, 1);
+  }
+
+  .neon-slider:active::-webkit-slider-thumb {
+    transform: scale(1.05);
+  }
+
+  .neon-slider::-moz-range-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .neon-slider::-moz-range-progress {
+    height: 6px;
+    border-radius: 9999px;
+    background: #7b99bc;
+  }
+
+  .neon-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    background: #ededef;
+    border: 2px solid #7b99bc;
+    box-shadow: 0 0 8px rgba(123, 153, 188, 0.8);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+
+  .neon-slider::-moz-range-thumb:hover {
+    transform: scale(1.15);
+  }
+
   .spartacus-wave {
     background-image: linear-gradient(
       90deg,

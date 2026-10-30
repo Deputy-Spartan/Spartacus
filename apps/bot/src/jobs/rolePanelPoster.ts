@@ -6,12 +6,20 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { applyEmbedExtra } from "../lib/embedExtra";
-import { normalizeOption } from "../lib/accessGrants";
+import { describeAccess, normalizeOption } from "../lib/accessGrants";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
 async function buildPayload(panel: RolePanel) {
   const options = (Array.isArray(panel.options) ? panel.options : []).map(normalizeOption);
   if (options.length === 0) return null;
+
+  // Same "emoji — @Role" key the reaction panels post, so an emoji-only
+  // button still says what it gives.
+  const listing = options
+    .slice(0, 25)
+    .map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${describeAccess(o) || "(nothing)"}`)
+    .join("\n");
+  const description = [panel.description || "Click below to pick your roles.", "", listing].join("\n").slice(0, 4096);
 
   // A saved embed only supplies the embed body — the role buttons/dropdown
   // below are always required.
@@ -23,7 +31,7 @@ async function buildPayload(panel: RolePanel) {
           new EmbedBuilder()
             .setColor(panel.embedEnabled && panel.embedColor ? (panel.embedColor as `#${string}`) : "#3b82f6")
             .setTitle(panel.name)
-            .setDescription(panel.description || "Click below to pick your roles."),
+            .setDescription(description),
           panel.embedEnabled ? panel.embedExtra : null
         ),
       ];

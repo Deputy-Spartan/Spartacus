@@ -421,7 +421,7 @@ function PanelFields({
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           Live preview
         </p>
-        <RolePanelPreview draft={draft} roles={roles} />
+        <RolePanelPreview draft={draft} roles={roles} channels={channels} />
       </div>
     </div>
   );
@@ -431,25 +431,36 @@ function PanelFields({
 // you see here is what actually shows up in Discord. Button/Dropdown
 // layouts always post as an embed regardless of the toggle (same as the
 // bot's own poster jobs) — only Reactions can be plain content.
-function RolePanelPreview({ draft, roles }: { draft: PanelDraft; roles: DiscordRoleOption[] }) {
+function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles: DiscordRoleOption[]; channels: DiscordChannelOption[] }) {
   const avatarUrl = useBotAvatar();
   const reactions = draft.layout === "REACTIONS";
   const asEmbed = !reactions || draft.embedEnabled;
 
   // Same "emoji — @Role" lines the bot posts (apps/bot/src/jobs/reactionRolePoster.ts),
   // drawn the way Discord renders them rather than as raw <:emoji:id>/<@&id> text.
+  // Every layout lists what each option gives — buttons can be emoji-only,
+  // so without this a member couldn't tell what they'd get.
   const listing =
-    reactions && draft.options.length > 0 ? (
+    draft.options.length > 0 ? (
       <div className="mt-3 space-y-0.5">
         {draft.options.map((o, i) => (
           <div key={i}>
-            <DiscordEmoji value={o.emoji || "❓"} /> —{" "}
-            {o.roleIds.length === 0
-              ? "(no roles)"
-              : o.roleIds.map((id, j) => (
-                  <span key={id}>
+            {o.emoji ? <DiscordEmoji value={o.emoji} /> : reactions ? "❓" : null}
+            {!reactions && o.label && <b className="ml-1">{o.label}</b>}
+            {!o.emoji && !(!reactions && o.label) && "•"} —{" "}
+            {o.roleIds.length === 0 && o.channelIds.length === 0
+              ? "(nothing)"
+              : [
+                  ...o.roleIds.map((id) => <DiscordRoleMention key={id} roleId={id} roles={roles} />),
+                  ...o.channelIds.map((id) => (
+                    <span key={id} className="rounded px-0.5 font-medium text-[#c9cdfb] bg-[#5865f24d]">
+                      #{channels.find((c) => c.id === id)?.name ?? "unknown"}
+                    </span>
+                  )),
+                ].map((node, j) => (
+                  <span key={j}>
                     {j > 0 && ", "}
-                    <DiscordRoleMention roleId={id} roles={roles} />
+                    {node}
                   </span>
                 ))}
           </div>

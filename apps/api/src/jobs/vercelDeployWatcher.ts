@@ -21,6 +21,7 @@ export function startVercelDeployWatcher() {
   const token = process.env.VERCEL_TOKEN;
   const project = process.env.VERCEL_PROJECT;
   if (!token || !project) {
+    console.log("[vercelDeployWatcher] off — VERCEL_TOKEN and VERCEL_PROJECT aren't both set");
     void prisma.botConfig.updateMany({ where: { dashboardDeployingSince: { not: null } }, data: { dashboardDeployingSince: null } }).catch(() => null);
     return;
   }
@@ -60,7 +61,10 @@ export function startVercelDeployWatcher() {
 
   async function poll() {
     try {
-      resolved ??= await resolveProject();
+      if (!resolved) {
+        resolved = await resolveProject();
+        console.log(`[vercelDeployWatcher] watching Vercel project "${project}" (${resolved.projectId})`);
+      }
       const { deployments } = await vercelGet<{ deployments: Array<{ state?: string; readyState?: string; created: number }> }>(
         `/v6/deployments?projectId=${resolved.projectId}&target=production&limit=1${resolved.teamQuery}`
       );

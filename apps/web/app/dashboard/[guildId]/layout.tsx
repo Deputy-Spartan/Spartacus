@@ -91,7 +91,12 @@ export default function DashboardLayout({
             onMenuClick={() => setSidebarOpen((v) => !v)}
             sidebarOpen={sidebarOpen}
           />
-          <main className="p-3 sm:p-6 overflow-x-hidden">{children}</main>
+          {/* overflow-x-clip, not -hidden — "hidden" implicitly makes this a
+              scroll container even with nothing to scroll, which breaks
+              position:sticky on descendants (e.g. the Embed Creator's live
+              preview column). "clip" prevents the horizontal overflow
+              without that side effect. */}
+          <main className="p-3 sm:p-6 overflow-x-clip">{children}</main>
         </div>
       </div>
     </ConfirmProvider>

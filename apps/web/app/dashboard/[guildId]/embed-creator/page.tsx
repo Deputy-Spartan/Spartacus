@@ -64,6 +64,36 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
     api.getEmbedCreatorPresets(guildId).then(setPresets);
   }, [guildId]);
 
+  // Mirrors `state` to any popped-out preview window (preview-popout page)
+  // over BroadcastChannel — same-browser only, no server round-trip. The
+  // popout asks for a resync right after it mounts, in case it opened after
+  // the last edit already went out.
+  const previewChannelRef = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel(`embed-creator-preview-${guildId}`);
+    previewChannelRef.current = channel;
+    channel.onmessage = (e) => {
+      if (e.data?.type === "request-sync") channel.postMessage({ type: "state", state });
+    };
+    return () => {
+      channel.close();
+      previewChannelRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guildId]);
+  useEffect(() => {
+    previewChannelRef.current?.postMessage({ type: "state", state });
+  }, [state]);
+
+  function openPreviewPopout() {
+    window.open(
+      `/embed-preview-popout/${guildId}`,
+      "spartacus-embed-preview",
+      "width=460,height=820,resizable=yes,noopener"
+    );
+  }
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3200);
@@ -504,7 +534,17 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
 
             <div className="lg:sticky lg:top-4 space-y-4">
               <NeonCard>
-                <p className="font-medium mb-3">Live Preview</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-medium">Live Preview</p>
+                  <button
+                    type="button"
+                    onClick={openPreviewPopout}
+                    className="text-[11px] text-slate-500 hover:text-neon-blue flex items-center gap-1"
+                    title="Open the preview in its own window — handy on a second monitor"
+                  >
+                    ↗ Pop out
+                  </button>
+                </div>
                 <EmbedCreatorPreview guildId={guildId} state={state} />
               </NeonCard>
 

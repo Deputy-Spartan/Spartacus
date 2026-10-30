@@ -409,6 +409,14 @@ export async function setChannelSlowmode(channelId: string, seconds: number): Pr
   return {};
 }
 
+export async function getChannelName(channelId: string): Promise<string | null> {
+  const res = await fetch(`${DISCORD_API}/channels/${channelId}`, {
+    headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
+  });
+  if (!res.ok) return null;
+  return ((await res.json()) as { name?: string }).name ?? null;
+}
+
 // Discord rate-limits a single channel to ~2 renames per 10 minutes — this
 // surfaces that as a real error message instead of the caller having to
 // guess why a rename silently did nothing.

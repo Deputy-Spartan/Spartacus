@@ -1,5 +1,5 @@
 import { prisma } from "@spartacus/db";
-import { editChannelMessage, postChannelMessage } from "../lib/discordRest";
+import { editChannelMessage, getChannelName, postChannelMessage, setChannelName } from "../lib/discordRest";
 import { getEffectiveBotStatus, type BotPhase } from "../lib/botStatus";
 
 // Runs inside the API process, not the bot's gateway connection — the whole
@@ -39,6 +39,36 @@ async function editPrimaryStatusChannels(embed: Record<string, unknown>) {
     if (!enabled?.enabled) continue;
 
     await editChannelMessage(row.channelId, row.messageId as string, { embeds: [embed] }).catch(() => null);
+  }
+}
+
+// Prefixes each status channel's name with a colored dot (🟢・spartacus)
+// that follows the phase. Runs every tick but only calls Discord when the
+// name actually needs to change — Discord allows ~2 renames per channel
+// per 10 minutes, so a rate-limited rename just retries on a later tick
+// and the name catches up a few minutes behind the embed.
+const PHASE_DOT: Record<BotPhase, string> = { online: "🟢", updating: "🟡", offline: "🔴" };
+const LEADING_DOT = /^(?:🟢|🟡|🔴)[・\-│|\s]*/u;
+const knownChannelNames = new Map<string, string>();
+
+async function syncStatusChannelNames(phase: BotPhase) {
+  const rows = await prisma.statusChannel.findMany({ take: 200 });
+  for (const row of rows) {
+    const enabled = await prisma.moduleToggle
+      .findUnique({ where: { guildId_key: { guildId: row.guildId, key: "STATUS_CHANNEL" } } })
+      .catch(() => null);
+    if (!enabled?.enabled) continue;
+
+    const current = knownChannelNames.get(row.channelId) ?? (await getChannelName(row.channelId));
+    if (!current) continue;
+    const desired = `${PHASE_DOT[phase]}・${current.replace(LEADING_DOT, "")}`;
+    if (current === desired) {
+      knownChannelNames.set(row.channelId, current);
+      continue;
+    }
+    const result = await setChannelName(row.channelId, desired);
+    if (result.error) knownChannelNames.delete(row.channelId); // re-read and retry next tick
+    else knownChannelNames.set(row.channelId, desired);
   }
 }
 
@@ -143,6 +173,7 @@ async function checkAndAnnounce() {
   lastPhase = status.phase;
   lastWasManual = status.manual;
   lastWasDashboardDeploy = !!status.dashboardDeployingSince;
+  await syncStatusChannelNames(status.phase).catch(() => null);
 
   // An owner-set override fully bypasses the auto incident/recovery
   // machinery below — it's an intentional state, not something to log as

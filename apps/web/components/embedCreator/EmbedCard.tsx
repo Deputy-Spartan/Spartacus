@@ -14,9 +14,16 @@ interface EmbedCardProps {
   onChange: (next: EmbedCreatorEmbed) => void;
   onDuplicate: () => void;
   onRemove: () => void;
+  // Omitted at the ends of the list, which hides that arrow.
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  // Spread onto the header only, so dragging never fights text selection
+  // inside the card's inputs.
+  dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
+  dropTarget?: boolean;
 }
 
-export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemove }: EmbedCardProps) {
+export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemove, onMoveUp, onMoveDown, dragProps, dropTarget }: EmbedCardProps) {
   const [open, setOpen] = useState(index === 0);
   const descRef = useRef<HTMLTextAreaElement>(null);
 
@@ -50,10 +57,36 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
   const label = embed.title || embed.description || `Embed ${index + 1}`;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-base-900 mb-3 overflow-hidden" style={{ borderLeftWidth: 4, borderLeftColor: embed.color || "#7B99BC" }}>
-      <div className="flex items-center gap-2.5 px-4 py-3 cursor-pointer select-none" onClick={() => setOpen((o) => !o)}>
+    <div
+      className={`rounded-xl border bg-base-900 mb-3 overflow-hidden transition-colors ${dropTarget ? "border-neon-blue/60" : "border-white/10"}`}
+      style={{ borderLeftWidth: 4, borderLeftColor: embed.color || "#7B99BC" }}
+    >
+      <div className="flex items-center gap-2.5 px-4 py-3 cursor-pointer select-none" onClick={() => setOpen((o) => !o)} {...dragProps}>
+        {dragProps && (
+          <span className="text-slate-600 hover:text-slate-300 cursor-grab active:cursor-grabbing text-sm leading-none" title="Drag to reorder">
+            ⠿
+          </span>
+        )}
         <span className={`text-[10px] text-slate-500 transition-transform ${open ? "rotate-90" : ""}`}>▸</span>
         <span className="text-sm font-medium flex-1 min-w-0 truncate">{label}</span>
+        {[
+          { title: "Move up", glyph: "▲", fn: onMoveUp },
+          { title: "Move down", glyph: "▼", fn: onMoveDown },
+        ].map((b) => (
+          <button
+            key={b.title}
+            type="button"
+            title={b.title}
+            disabled={!b.fn}
+            onClick={(e) => {
+              e.stopPropagation();
+              b.fn?.();
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:bg-base-800 hover:text-slate-200 text-[10px] disabled:opacity-20 disabled:hover:bg-transparent"
+          >
+            {b.glyph}
+          </button>
+        ))}
         <button
           type="button"
           title="Duplicate"

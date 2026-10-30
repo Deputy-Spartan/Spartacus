@@ -12,6 +12,8 @@ import { usePrompt } from "../../../../components/ui/ConfirmDialog";
 import { EmbedCard } from "../../../../components/embedCreator/EmbedCard";
 import { ComponentRowEditor } from "../../../../components/embedCreator/ComponentRowEditor";
 import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
+import { DiscordLimitsCard } from "../../../../components/embedCreator/DiscordLimitsCard";
+import { checkDiscordLimits } from "../../../../lib/discordLimits";
 import {
   api,
   type EmbedCreatorState,
@@ -55,6 +57,8 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
   const [messageLink, setMessageLink] = useState("");
   const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
   const [sending, setSending] = useState(false);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -118,6 +122,15 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
       return { ...s, embeds: embeds.length ? embeds : [emptyEmbed()] };
     });
   }
+  function moveEmbed(from: number, to: number) {
+    setState((s) => {
+      if (to < 0 || to >= s.embeds.length || from === to) return s;
+      const embeds = [...s.embeds];
+      const [moved] = embeds.splice(from, 1);
+      embeds.splice(to, 0, moved);
+      return { ...s, embeds };
+    });
+  }
   function addEmbed() {
     setState((s) => (s.embeds.length >= 10 ? s : { ...s, embeds: [...s.embeds, emptyEmbed()] }));
   }
@@ -160,6 +173,10 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
   }
 
   async function handleSend() {
+    if (limits.hasErrors) {
+      setError("Discord would reject this message — fix the problems listed under Discord Limits first.");
+      return;
+    }
     setSending(true);
     setError(null);
     try {
@@ -302,6 +319,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
     showToast("Cleared");
   }
 
+  const limits = checkDiscordLimits(state);
   const sendLabel = editingMessage ? "Update Message" : state.deliveryMode === "webhook" ? "Send via Webhook" : "Send to channel";
   const showBuilder = pageTab === "create" || (pageTab === "saved" && editingPreset);
 
@@ -511,7 +529,39 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                 <p className="font-medium text-sm">Embeds ({state.embeds.length}/10)</p>
               </div>
               {state.embeds.map((em, i) => (
-                <EmbedCard key={em.id} guildId={guildId} embed={em} index={i} onChange={(next) => updateEmbed(em.id, next)} onDuplicate={() => duplicateEmbed(em.id)} onRemove={() => removeEmbed(em.id)} />
+                <EmbedCard
+                  key={em.id}
+                  guildId={guildId}
+                  embed={em}
+                  index={i}
+                  onChange={(next) => updateEmbed(em.id, next)}
+                  onDuplicate={() => duplicateEmbed(em.id)}
+                  onRemove={() => removeEmbed(em.id)}
+                  onMoveUp={i > 0 ? () => moveEmbed(i, i - 1) : undefined}
+                  onMoveDown={i < state.embeds.length - 1 ? () => moveEmbed(i, i + 1) : undefined}
+                  dropTarget={dragOver === i && dragFrom !== null && dragFrom !== i}
+                  dragProps={{
+                    draggable: true,
+                    onDragStart: (e) => {
+                      setDragFrom(i);
+                      e.dataTransfer.effectAllowed = "move";
+                    },
+                    onDragOver: (e) => {
+                      e.preventDefault();
+                      if (dragOver !== i) setDragOver(i);
+                    },
+                    onDrop: (e) => {
+                      e.preventDefault();
+                      if (dragFrom !== null) moveEmbed(dragFrom, i);
+                      setDragFrom(null);
+                      setDragOver(null);
+                    },
+                    onDragEnd: () => {
+                      setDragFrom(null);
+                      setDragOver(null);
+                    },
+                  }}
+                />
               ))}
               <button onClick={addEmbed} disabled={state.embeds.length >= 10} className="w-full py-3 rounded-xl border border-dashed border-white/15 text-slate-400 text-sm font-medium hover:border-neon-blue/50 hover:text-neon-blue transition-colors disabled:opacity-40 mb-6">
                 + Add Embed
@@ -548,13 +598,15 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                 <EmbedCreatorPreview guildId={guildId} state={state} />
               </NeonCard>
 
+              <DiscordLimitsCard report={limits} />
+
               {pageTab === "saved" && editingPreset ? (
                 <div className="flex gap-2 flex-wrap">
                   <button onClick={handleUpdatePreset} className="neon-button flex-1">
                     Save &amp; Update
                   </button>
                   <div className="basis-full"><SaveStatus status={autoSave} /></div>
-                  <button onClick={handleSend} disabled={sending} className="neon-button-sm disabled:opacity-50">
+                  <button onClick={handleSend} disabled={sending || limits.hasErrors} title={limits.hasErrors ? "Fix the Discord Limits problems first" : undefined} className="neon-button-sm disabled:opacity-50">
                     {sending ? "Sending…" : sendLabel}
                   </button>
                   <button onClick={() => deletePreset(editingPreset.id, editingPreset.name)} className="text-xs text-slate-500 hover:text-rose-400 px-3">
@@ -566,7 +618,7 @@ export default function EmbedCreatorPage({ params }: { params: { guildId: string
                   <button onClick={handleSaveAsNew} className="neon-button flex-1">
                     Save to Library
                   </button>
-                  <button onClick={handleSend} disabled={sending} className="neon-button-sm disabled:opacity-50">
+                  <button onClick={handleSend} disabled={sending || limits.hasErrors} title={limits.hasErrors ? "Fix the Discord Limits problems first" : undefined} className="neon-button-sm disabled:opacity-50">
                     {sending ? "Sending…" : sendLabel}
                   </button>
                   <button onClick={handleClearAll} className="text-xs text-slate-500 hover:text-rose-400 px-3">

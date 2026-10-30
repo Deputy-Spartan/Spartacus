@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
-import { resolveEmojiInput } from "../lib/discordRest";
+import { deleteChannelMessage, resolveEmojiInput } from "../lib/discordRest";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -141,9 +141,8 @@ router.put("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireGuil
   // Editing invalidates whatever's already posted (channel, options, and
   // content all affect what gets sent) — clearing messageId here makes the
   // poster job redraw a fresh message, same as RolePanel's edit flow. The
-  // old message is left as-is in Discord (not deleted) but its reactions
-  // stop doing anything the moment the old ReactionRole rows are replaced
-  // below, since the add/remove listener can no longer find a matching row.
+  // old message is deleted so edits don't pile up stale copies in the channel.
+  if (existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
   const panel = await prisma.$transaction(async (tx) => {
     if (clean) {
       await tx.reactionRole.deleteMany({ where: { panelId: id } });
@@ -175,6 +174,7 @@ router.delete("/guilds/:guildId/reaction-role-panels/:id", requireAuth, requireG
   if (!existing || existing.guildId !== req.params.guildId) {
     return res.status(404).json({ error: "Reaction role panel not found" });
   }
+  if (existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
   await prisma.reactionRolePanel.delete({ where: { id: req.params.id } }); // cascades to its ReactionRole options
   res.status(204).send();
 });

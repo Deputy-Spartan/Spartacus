@@ -227,7 +227,12 @@ function PanelFields({
   }, [guildId]);
 
   const reactions = draft.layout === "REACTIONS";
+  // Each role belongs to one option only — a second copy would just be a
+  // duplicate button/reaction toggling the same thing.
+  const duplicateRole = pick.roleIds.find((id) => draft.options.some((o) => o.roleIds.includes(id)));
+  const duplicateEmoji = reactions && !!pick.emoji.trim() && draft.options.some((o) => o.emoji === pick.emoji.trim());
   const canAdd =
+    !duplicateRole &&
     (pick.roleIds.length > 0 || pick.channelIds.length > 0) &&
     (reactions
       ? !!pick.emoji.trim() && !draft.options.some((o) => o.emoji === pick.emoji.trim())
@@ -398,6 +403,13 @@ function PanelFields({
           Pick roles, channels, or both. Channel access works by giving the member their own view permission, so hide the channel from @everyone and make sure the
           bot can Manage Channels.
         </p>
+        {(duplicateRole || duplicateEmoji) && (
+          <p className="text-xs text-amber-400 mb-2">
+            {duplicateRole
+              ? `@${roles.find((r) => r.id === duplicateRole)?.name ?? "That role"} is already in this panel.`
+              : "That emoji is already used in this panel — each reaction needs its own emoji."}
+          </p>
+        )}
         <button onClick={addOption} disabled={!canAdd} className="neon-button-sm disabled:opacity-50">
           Add
         </button>
@@ -647,6 +659,13 @@ function PanelsTab({ guildId }: { guildId: string }) {
     if (!d.name.trim()) return "Enter a panel name.";
     if (!d.channelId) return "Pick a channel to post this panel in.";
     if (d.options.length === 0) return "Add at least one option that gives a role or channel.";
+    const roleIds = d.options.flatMap((o) => o.roleIds);
+    if (new Set(roleIds).size !== roleIds.length) return "Some roles are in this panel twice — remove the duplicate options (×) and save again.";
+    if (d.layout === "REACTIONS") {
+      const emojis = d.options.map((o) => o.emoji);
+      if (new Set(emojis).size !== emojis.length) return "Two options use the same emoji — each reaction needs its own emoji.";
+    }
+    if (d.layout === "DROPDOWN" && d.options.some((o) => !o.label.trim())) return "Every dropdown option needs a label — add one to each option.";
     return null;
   }
 
@@ -656,12 +675,23 @@ function PanelsTab({ guildId }: { guildId: string }) {
     if (validationError) return setError(validationError);
     setError(null);
     try {
-      if (editing.source === "reaction") {
-        await api.updateReactionRolePanel(guildId, editing.id, toApiPayload(form) as never);
+      // Reactions and buttons/dropdowns live in different tables, so
+      // switching an existing panel between them means creating it as the
+      // new kind and deleting the old one (which also removes its message).
+      const targetSource = form.layout === "REACTIONS" ? "reaction" : "panel";
+      let done: { source: "reaction" | "panel"; id: string };
+      if (targetSource !== editing.source) {
+        const payload = toApiPayload(form) as never;
+        const created: { id: string } =
+          targetSource === "reaction" ? await api.addReactionRolePanel(guildId, payload) : await api.addRolePanel(guildId, payload);
+        if (editing.source === "reaction") await api.deleteReactionRolePanel(guildId, editing.id);
+        else await api.deleteRolePanel(guildId, editing.id);
+        done = { source: targetSource, id: created.id };
       } else {
-        await api.updateRolePanel(guildId, editing.id, toApiPayload(form) as never);
+        if (editing.source === "reaction") await api.updateReactionRolePanel(guildId, editing.id, toApiPayload(form) as never);
+        else await api.updateRolePanel(guildId, editing.id, toApiPayload(form) as never);
+        done = editing;
       }
-      const done = editing;
       setEditing(null);
       refresh();
       void watchPosting(done.source, done.id, "Updated");

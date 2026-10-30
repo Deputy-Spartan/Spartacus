@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
-import { resolveEmojiInput } from "../lib/discordRest";
+import { deleteChannelMessage, resolveEmojiInput } from "../lib/discordRest";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -46,9 +46,13 @@ router.post("/guilds/:guildId/role-panels", requireAuth, requireGuildPermission,
 });
 
 router.patch("/guilds/:guildId/role-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, description, layout, options, embedEnabled, embedColor, embedExtra, savedEmbedId, notifyMode } = req.body;
+  const existing = await prisma.rolePanel.findUnique({ where: { id: req.params.id } });
+  if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Role panel not found" });
+
+  const { name, channelId, description, layout, options, embedEnabled, embedColor, embedExtra, savedEmbedId, notifyMode } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
+  if (channelId) data.channelId = channelId;
   if (description !== undefined) data.description = description;
   if (layout !== undefined) data.layout = layout;
   if (options !== undefined) {
@@ -61,13 +65,20 @@ router.patch("/guilds/:guildId/role-panels/:id", requireAuth, requireGuildPermis
   if (embedExtra !== undefined) data.embedExtra = embedExtra ?? Prisma.JsonNull;
   if (savedEmbedId !== undefined) data.savedEmbedId = savedEmbedId;
   if (["PRIVATE", "DM", "NONE"].includes(notifyMode)) data.notifyMode = notifyMode;
-  // Editing content invalidates the posted message so the poster job redraws it.
-  if (Object.keys(data).length > 0) data.messageId = null;
+  // Editing content invalidates the posted message so the poster job redraws
+  // it — the old one is deleted so edits don't leave stale copies behind.
+  if (Object.keys(data).length > 0) {
+    data.messageId = null;
+    if (existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
+  }
   const row = await prisma.rolePanel.update({ where: { id: req.params.id }, data });
   res.json(row);
 });
 
 router.delete("/guilds/:guildId/role-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const existing = await prisma.rolePanel.findUnique({ where: { id: req.params.id } });
+  if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Role panel not found" });
+  if (existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
   await prisma.rolePanel.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

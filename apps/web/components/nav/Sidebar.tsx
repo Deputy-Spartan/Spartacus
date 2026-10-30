@@ -142,11 +142,7 @@ export function Sidebar({
         ].join(" ")}
       >
       <div className="px-5 py-6 flex items-center gap-3 shrink-0">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
-        ) : (
-          <span className="text-3xl">⚡</span>
-        )}
+        <img src={avatarUrl ?? "/icon-192.png"} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
         <span className="spartacus-wave inline-block text-2xl font-bold">Spartacus</span>
       </div>
 

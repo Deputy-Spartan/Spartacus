@@ -8,6 +8,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
+import { MatchmakingGuide } from "../../../../components/matchmaking/MatchmakingGuide";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
@@ -1410,7 +1411,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
   const [setups, setSetups] = useState<MatchSetupRow[] | null>(null);
   const [builder, setBuilder] = useState<{ editing: MatchSetupRow | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"setups" | "board" | "queue" | "games" | "voice" | "messages">("setups");
+  const [tab, setTab] = useState<"setups" | "board" | "queue" | "games" | "voice" | "messages" | "guide">("setups");
   const [roster, setRoster] = useState<Array<{ team: string; players: string[] }>>([]);
   const [results, setResults] = useState<MatchResultRow[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1466,7 +1467,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
       />
 
       <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
-        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["games", "Games"], ["voice", "Voice"], ["messages", "Messages"]] as const).map(([key, label]) => (
+        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["games", "Games"], ["voice", "Voice"], ["messages", "Messages"], ["guide", "Guide"]] as const).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -1478,7 +1479,15 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
         ))}
       </div>
 
-      {tab === "games" ? (
+      {tab === "guide" ? (
+        <MatchmakingGuide
+          guildId={guildId}
+          onOpen={(next) => {
+            setTab(next);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      ) : tab === "games" ? (
         <SettingsTab guildId={guildId} />
       ) : tab === "voice" ? (
         <VoiceSettings guildId={guildId} />

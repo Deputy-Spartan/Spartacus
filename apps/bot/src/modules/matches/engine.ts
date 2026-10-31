@@ -44,7 +44,7 @@ export interface MatchState {
   winner: Side | null;
   score: string | null;
   champion: number | null;
-  notInVoice: string[];
+  voiceIds: string[]; // temporary team channels, deleted when the match ends
   pingIds: string[];
 }
 
@@ -67,7 +67,7 @@ export function emptyState(signups: string[] = []): MatchState {
     winner: null,
     score: null,
     champion: null,
-    notInVoice: [],
+    voiceIds: [],
     pingIds: [],
   };
 }

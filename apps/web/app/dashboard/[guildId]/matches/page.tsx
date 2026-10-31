@@ -31,8 +31,7 @@ const BLANK: MatchSetupInput = {
   autoMove: true,
   reportBy: "BOTH",
   lobbyVoiceId: null,
-  team1VoiceId: null,
-  team2VoiceId: null,
+  rewardsEnabled: true,
   winCoins: 100,
   lossCoins: 25,
   championCoins: 500,
@@ -79,12 +78,12 @@ function stepError(step: number, d: MatchSetupInput): string | null {
   }
   if (step === 4) {
     if (d.checkIn && d.format === "SINGLE" && (d.checkInSeconds < 15 || d.checkInSeconds > 600)) return "Check-in time must be from 15 to 600 seconds.";
-    if (d.autoMove && !!d.team1VoiceId !== !!d.team2VoiceId) return "Pick a voice channel for both teams, or neither.";
+    if (d.autoMove && !d.lobbyVoiceId) return "Pick the main voice channel, or turn off moving players.";
   }
   if (step === 5) {
     if (!d.panelChannelId || !d.resultsChannelId) return "Pick a panel channel and a results channel.";
     if (d.panelChannelId === d.resultsChannelId) return "The panel and results need different channels.";
-    if ([d.winCoins, d.lossCoins, d.championCoins].some((c) => !Number.isInteger(c) || c < 0)) return "Coin rewards must be whole numbers of 0 or more.";
+    if (d.rewardsEnabled && [d.winCoins, d.lossCoins, d.championCoins].some((c) => !Number.isInteger(c) || c < 0)) return "Coin rewards must be whole numbers of 0 or more.";
   }
   return null;
 }
@@ -421,21 +420,12 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                   <input {...num("checkInSeconds")} min={15} max={600} />
                 </div>
               )}
-              <Toggle on={d.autoMove} label="Move players to voice" hint="Moves teams into voice and back. Players must already be in a voice channel." onChange={(autoMove) => set({ autoMove })} />
+              <Toggle on={d.autoMove} label="Team voice channels" hint="Creates a voice channel for each team, capped at the team size, and deletes them after the match." onChange={(autoMove) => set({ autoMove })} />
               {d.autoMove && (
-                <div className="grid grid-cols-1 gap-1">
-                  <div>
-                    <Label>First team voice channel</Label>
-                    <ChannelSelect guildId={guildId} kind="voice" value={d.team1VoiceId} onChange={(id) => set({ team1VoiceId: id || null })} />
-                  </div>
-                  <div>
-                    <Label>Second team voice channel</Label>
-                    <ChannelSelect guildId={guildId} kind="voice" value={d.team2VoiceId} onChange={(id) => set({ team2VoiceId: id || null })} />
-                  </div>
-                  <div>
-                    <Label>Lobby voice channel (players return here)</Label>
-                    <ChannelSelect guildId={guildId} kind="voice" value={d.lobbyVoiceId} onChange={(id) => set({ lobbyVoiceId: id || null })} />
-                  </div>
+                <div>
+                  <Label>Main voice channel</Label>
+                  <ChannelSelect guildId={guildId} kind="voice" value={d.lobbyVoiceId} onChange={(id) => set({ lobbyVoiceId: id || null })} />
+                  <Hint>Players wait here. Team channels appear beside it, and everyone returns here after the match. Spartacus needs Manage Channels and Move Members.</Hint>
                 </div>
               )}
               <div>
@@ -461,27 +451,32 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                 <ChannelSelect guildId={guildId} value={d.resultsChannelId || null} onChange={(resultsChannelId) => set({ resultsChannelId })} />
                 <Hint>Holds the leaderboard, every result and the bracket.</Hint>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label>Coins for a win</Label>
-                  <input {...num("winCoins")} min={0} />
-                </div>
-                <div>
-                  <Label>Coins for a loss</Label>
-                  <input {...num("lossCoins")} min={0} />
-                </div>
-              </div>
-              <Hint>Coins are paid while the Economy module is on.</Hint>
-              {tournament && (
+              <Toggle on={d.rewardsEnabled} label="Rewards" hint="Coins, the champion role and match achievements. Wins and the leaderboard still count when this is off." onChange={(rewardsEnabled) => set({ rewardsEnabled })} />
+              {d.rewardsEnabled && (
                 <>
-                  <div>
-                    <Label>Champion bonus coins</Label>
-                    <input {...num("championCoins")} min={0} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Coins for a win</Label>
+                      <input {...num("winCoins")} min={0} />
+                    </div>
+                    <div>
+                      <Label>Coins for a loss</Label>
+                      <input {...num("lossCoins")} min={0} />
+                    </div>
                   </div>
-                  <div>
-                    <Label>Champion role (optional)</Label>
-                    <RoleSelect guildId={guildId} value={d.championRoleId} onChange={(id) => set({ championRoleId: id || null })} placeholder="No role" />
-                  </div>
+                  <Hint>Coins are paid while the Economy module is on.</Hint>
+                  {tournament && (
+                    <>
+                      <div>
+                        <Label>Champion bonus coins</Label>
+                        <input {...num("championCoins")} min={0} />
+                      </div>
+                      <div>
+                        <Label>Champion role (optional)</Label>
+                        <RoleSelect guildId={guildId} value={d.championRoleId} onChange={(id) => set({ championRoleId: id || null })} placeholder="No role" />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               <div>
@@ -529,7 +524,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
             ["Teams", { BALANCED: "Balanced", CAPTAINS: tournament ? "Balanced" : "Captains draft", RANDOM: "Random" }[d.balance]],
             [`${word}s`, mapSummary(d)],
             ["Ranks", d.useRanks ? `${d.ranks.length} ranks` : "Off"],
-            ["Rewards", `${d.winCoins} coins for a win, ${d.lossCoins} for a loss`],
+            ["Rewards", d.rewardsEnabled ? `${d.winCoins} coins for a win, ${d.lossCoins} for a loss` : "Off"],
           ].map(([label, value]) => (
             <div key={label}>
               <p className="text-[11px] uppercase tracking-wide text-slate-600">{label}</p>

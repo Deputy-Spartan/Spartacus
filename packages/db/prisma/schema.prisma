@@ -2291,9 +2291,8 @@ model MatchSetup {
   checkInSeconds       Int      @default(120)
   autoMove             Boolean  @default(true)
   reportBy             String   @default("BOTH") // BOTH | CAPTAIN | STAFF
-  lobbyVoiceId         String?
-  team1VoiceId         String?
-  team2VoiceId         String?
+  lobbyVoiceId         String? // team voice channels are created beside this one for each match
+  rewardsEnabled       Boolean  @default(true)
   winCoins             Int      @default(100)
   lossCoins            Int      @default(25)
   championCoins        Int      @default(500)

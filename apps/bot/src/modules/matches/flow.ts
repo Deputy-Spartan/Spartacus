@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
   ChatInputCommandInteraction,
   Client,
   GuildMember,
@@ -302,62 +303,84 @@ async function banMap(ctx: Ctx, map: string) {
 }
 
 async function goLive(ctx: Ctx, map: string | null, note: string | null) {
-  const { setup, state } = ctx;
+  const { state } = ctx;
   state.map = map;
   state.mapNote = note;
   state.report = null;
   if (state.tie) state.bracket[state.tie[0]][state.tie[1]].map = map;
   await save(ctx, "LIVE");
-  await moveToVoice(ctx);
-  if (state.notInVoice.length) {
-    const voice = setup.team1VoiceId ? ` Join <#${setup.team1VoiceId}> or <#${setup.team2VoiceId}>.` : "";
-    await ping(ctx, `${state.notInVoice.map((id) => `<@${id}>`).join(" ")} Your match started.${voice}`.slice(0, 2000));
-    await save(ctx, "LIVE");
-  }
+  const pings = await openTeamRooms(ctx);
+  if (pings.length) await ping(ctx, pings.join("\n").slice(0, 2000));
+  await save(ctx, "LIVE");
 }
 
-// A bot can only move someone already connected to voice. Everyone else is
-// listed so the panel can ping them a link instead.
-async function moveToVoice(ctx: Ctx) {
+// Creates a voice channel per team beside the main one, capped at the team
+// size, and moves everyone in. A bot can only move someone already connected
+// to voice, so anyone else gets pinged a link to their team's channel.
+async function openTeamRooms(ctx: Ctx): Promise<string[]> {
   const { client, setup, state } = ctx;
-  state.notInVoice = [];
   const teams = currentTeams(state);
-  if (!setup.autoMove || !teams || !setup.team1VoiceId || !setup.team2VoiceId) return;
+  if (!setup.autoMove || !setup.lobbyVoiceId || !teams) return [];
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
-  if (!guild) return;
-  const targets: Array<[MatchTeam, string]> = [[teams[0], setup.team1VoiceId], [teams[1], setup.team2VoiceId]];
-  for (const [team, channelId] of targets) {
+  const main = await guild?.channels.fetch(setup.lobbyVoiceId).catch(() => null);
+  if (!guild || !main?.isVoiceBased()) return ["The main voice channel for this match is gone. Pick a new one on the dashboard."];
+
+  const pings: string[] = [];
+  for (const team of teams) {
+    const room = await guild.channels
+      .create({
+        name: team.name.slice(0, 100),
+        type: ChannelType.GuildVoice,
+        parent: main.parentId ?? undefined,
+        userLimit: Math.min(99, setup.teamSize),
+        permissionOverwrites: main.permissionOverwrites.cache,
+      })
+      .catch((err) => {
+        logError("bot", err, setup.guildId);
+        return null;
+      });
+    if (!room) {
+      pings.push(`I couldn't create a voice channel for ${team.name}. Check that I have Manage Channels.`);
+      continue;
+    }
+    state.voiceIds.push(room.id);
+    const missing: string[] = [];
     for (const id of team.players) {
       const member = await guild.members.fetch({ user: id, force: true }).catch(() => null);
-      if (!member?.voice.channelId) {
-        state.notInVoice.push(id);
-        continue;
-      }
-      await member.voice.setChannel(channelId).catch((err) => {
-        logError("bot", err, setup.guildId);
-        state.notInVoice.push(id);
-      });
+      const moved = member?.voice.channelId
+        ? await member.voice.setChannel(room.id).catch((err) => {
+            logError("bot", err, setup.guildId);
+            return null;
+          })
+        : null;
+      if (!moved) missing.push(id);
     }
+    if (missing.length) pings.push(`${missing.map((id) => `<@${id}>`).join(" ")} Your match started. Join <#${room.id}>.`);
   }
+  return pings;
 }
 
-async function returnToLobby(ctx: Ctx, teams: [MatchTeam, MatchTeam] | null) {
-  const { client, setup } = ctx;
-  if (!setup.autoMove || !setup.lobbyVoiceId || !teams) return;
+// Moves everyone back to the main channel, then deletes the team channels.
+async function closeTeamRooms(ctx: Ctx) {
+  const { client, setup, state } = ctx;
+  if (state.voiceIds.length === 0) return;
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
-  if (!guild) return;
-  const teamRooms = [setup.team1VoiceId, setup.team2VoiceId];
-  for (const id of [...teams[0].players, ...teams[1].players]) {
-    const member = await guild.members.fetch({ user: id, force: true }).catch(() => null);
-    if (member?.voice.channelId && teamRooms.includes(member.voice.channelId)) {
-      await member.voice.setChannel(setup.lobbyVoiceId).catch((err) => logError("bot", err, setup.guildId));
+  for (const id of state.voiceIds) {
+    const room = await guild?.channels.fetch(id).catch(() => null);
+    if (!room?.isVoiceBased()) continue;
+    if (setup.lobbyVoiceId) {
+      for (const member of room.members.values()) {
+        await member.voice.setChannel(setup.lobbyVoiceId).catch((err) => logError("bot", err, setup.guildId));
+      }
     }
+    await room.delete().catch((err) => logError("bot", err, setup.guildId));
   }
+  state.voiceIds = [];
 }
 
 async function payPlayers(ctx: Ctx, ids: string[], won: boolean) {
   const { client, setup } = ctx;
-  const coins = won ? setup.winCoins : setup.lossCoins;
+  const coins = !setup.rewardsEnabled ? 0 : won ? setup.winCoins : setup.lossCoins;
   const economyOn = await isModuleEnabled(setup.guildId, "ECONOMY");
   const economy = economyOn ? await getConfig(setup.guildId) : null;
   for (const userId of ids) {
@@ -368,7 +391,7 @@ async function payPlayers(ctx: Ctx, ids: string[], won: boolean) {
       update: { rating: { increment: change }, wins: { increment: won ? 1 : 0 }, losses: { increment: won ? 0 : 1 }, coinsEarned: { increment: coins }, streak: won ? { increment: 1 } : 0 },
     });
     if (economy && coins > 0) await addBalance(setup.guildId, userId, coins, "match", economy.maxBalance);
-    if (won) await awardAchievement(client, setup.guildId, userId, `MATCH_FIRST_WIN:${setup.id}`, `First ${setup.game} match win`, setup.resultsChannelId).catch((err) => logError("bot", err, setup.guildId));
+    if (won && setup.rewardsEnabled) await awardAchievement(client, setup.guildId, userId, `MATCH_FIRST_WIN:${setup.id}`, `First ${setup.game} match win`, setup.resultsChannelId).catch((err) => logError("bot", err, setup.guildId));
   }
 }
 
@@ -393,14 +416,14 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
       loserScore: report.loserScore,
       winners: winner.players,
       losers: loser.players,
-      winCoins: setup.winCoins,
-      lossCoins: setup.lossCoins,
+      winCoins: setup.rewardsEnabled ? setup.winCoins : 0,
+      lossCoins: setup.rewardsEnabled ? setup.lossCoins : 0,
     },
   });
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
   if (isSendableChannel(channel)) await channel.send({ embeds: [buildResult(setup, result)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
   await syncLeaderboard(client, setup);
-  await returnToLobby(ctx, teams);
+  await closeTeamRooms(ctx);
 
   if (state.tie) {
     const champion = recordTie(state.bracket, state.tie, report.winner, report.winnerScore, report.loserScore);
@@ -422,9 +445,10 @@ async function crownChampion(ctx: Ctx, team: MatchTeam) {
   const economyOn = await isModuleEnabled(setup.guildId, "ECONOMY");
   const economy = economyOn ? await getConfig(setup.guildId) : null;
   for (const userId of team.players) {
-    await prisma.matchPlayer.update({ where: { setupId_userId: { setupId: setup.id, userId } }, data: { tournamentWins: { increment: 1 }, coinsEarned: { increment: setup.championCoins } } });
-    if (economy && setup.championCoins > 0) await addBalance(setup.guildId, userId, setup.championCoins, "match_champion", economy.maxBalance);
-    if (setup.championRoleId) {
+    const bonus = setup.rewardsEnabled ? setup.championCoins : 0;
+    await prisma.matchPlayer.update({ where: { setupId_userId: { setupId: setup.id, userId } }, data: { tournamentWins: { increment: 1 }, coinsEarned: { increment: bonus } } });
+    if (economy && bonus > 0) await addBalance(setup.guildId, userId, bonus, "match_champion", economy.maxBalance);
+    if (setup.rewardsEnabled && setup.championRoleId) {
       const member = await guild?.members.fetch(userId).catch(() => null);
       await member?.roles.add(setup.championRoleId).catch((err) => logError("bot", err, setup.guildId));
     }
@@ -641,7 +665,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
 }
 
 async function cancelCtx(ctx: Ctx) {
-  await returnToLobby(ctx, currentTeams(ctx.state));
+  await closeTeamRooms(ctx);
   await replaceSession(ctx);
   await save(ctx, "SIGNUP");
 }
@@ -852,6 +876,13 @@ export async function cancelMatch(client: Client, setupId: string) {
   await withLock(setupId, async () => {
     const ctx = await loadCtx(client, setupId);
     if (ctx) await cancelCtx(ctx);
+  });
+}
+
+export async function closeMatchRooms(client: Client, setupId: string) {
+  await withLock(setupId, async () => {
+    const ctx = await loadCtx(client, setupId);
+    if (ctx) await closeTeamRooms(ctx);
   });
 }
 

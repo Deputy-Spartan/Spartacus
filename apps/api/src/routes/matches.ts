@@ -26,8 +26,7 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   const mapMethod = pick(b.mapMethod, ["VOTE", "RANDOM", "BANS"], "VOTE");
   const format = pick(b.format, ["SINGLE", "TOURNAMENT"], "SINGLE");
   const autoMove = Boolean(b.autoMove);
-  const team1VoiceId = optionalId(b.team1VoiceId);
-  const team2VoiceId = optionalId(b.team2VoiceId);
+  const lobbyVoiceId = optionalId(b.lobbyVoiceId);
 
   if (!name) return { error: "Give this setup a name." };
   if (!game) return { error: "Enter the game this setup is for." };
@@ -43,7 +42,7 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
     if (!whole(b.skipRecent, 0, Math.max(0, maps.length - 1))) return { error: "Skip recent is too high for this list." };
   }
   if (Boolean(b.checkIn) && !whole(b.checkInSeconds, 15, 600)) return { error: "Check-in time must be from 15 to 600 seconds." };
-  if (autoMove && !!team1VoiceId !== !!team2VoiceId) return { error: "Pick a voice channel for both teams, or neither." };
+  if (autoMove && !lobbyVoiceId) return { error: "Pick the main voice channel, or turn off moving players." };
   if (![b.winCoins, b.lossCoins, b.championCoins].every((c) => whole(c, 0, 1_000_000))) return { error: "Coin rewards must be whole numbers of 0 or more." };
 
   return {
@@ -72,9 +71,8 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       checkInSeconds: Boolean(b.checkIn) ? (b.checkInSeconds as number) : 120,
       autoMove,
       reportBy: pick(b.reportBy, ["BOTH", "CAPTAIN", "STAFF"], "BOTH"),
-      lobbyVoiceId: optionalId(b.lobbyVoiceId),
-      team1VoiceId,
-      team2VoiceId,
+      lobbyVoiceId,
+      rewardsEnabled: b.rewardsEnabled === undefined ? true : Boolean(b.rewardsEnabled),
       winCoins: b.winCoins as number,
       lossCoins: b.lossCoins as number,
       championCoins: b.championCoins as number,
@@ -183,6 +181,11 @@ router.patch("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermi
 router.delete("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermission, async (req, res) => {
   const existing = await findSetup(req.params.guildId, req.params.id);
   if (!existing) return res.status(404).json({ error: "Match setup not found" });
+  const client = getBotClient();
+  if (client) {
+    const { closeMatchRooms } = await import("@spartacus/bot");
+    await closeMatchRooms(client, existing.id).catch(() => null);
+  }
   if (existing.panelMessageId) await deleteChannelMessage(existing.panelChannelId, existing.panelMessageId).catch(() => null);
   if (existing.leaderboardMessageId) await deleteChannelMessage(existing.resultsChannelId, existing.leaderboardMessageId).catch(() => null);
   await prisma.matchSetup.delete({ where: { id: existing.id } });

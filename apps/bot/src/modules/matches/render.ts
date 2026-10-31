@@ -161,7 +161,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       const winner = state.winner === "b" ? state.teams[1] : state.teams[0];
       embed
         .setTitle(`🏆 ${winner?.name} wins ${state.score ?? ""}${state.map ? ` on ${state.map}` : ""}`.slice(0, 256))
-        .setDescription(`+${setup.winCoins} coins to the winners, +${setup.lossCoins} to the other team. Leaderboard updated.`);
+        .setDescription(setup.rewardsEnabled ? `+${setup.winCoins} coins to the winners, +${setup.lossCoins} to the other team. Leaderboard updated.` : "Leaderboard updated.");
       buttons = [button(setup, "runback", "Run It Back", ButtonStyle.Success), button(setup, "new", "New Sign-Ups", ButtonStyle.Primary)];
     }
   }

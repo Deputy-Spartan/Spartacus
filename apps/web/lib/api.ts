@@ -585,8 +585,7 @@ export interface MatchSetupInput {
   autoMove: boolean;
   reportBy: "BOTH" | "CAPTAIN" | "STAFF";
   lobbyVoiceId: string | null;
-  team1VoiceId: string | null;
-  team2VoiceId: string | null;
+  rewardsEnabled: boolean;
   winCoins: number;
   lossCoins: number;
   championCoins: number;

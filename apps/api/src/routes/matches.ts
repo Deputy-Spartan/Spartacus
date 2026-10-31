@@ -87,6 +87,49 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   };
 }
 
+const STARTER_PRESETS = [
+  { game: "Rainbow Six Siege", teamSize: 5, useRanks: true, ranks: ["Copper", "Bronze", "Silver", "Gold", "Platinum", "Emerald", "Diamond", "Champion"], useMaps: true, maps: ["Bank", "Border", "Chalet", "Clubhouse", "Consulate", "Kafe Dostoyevsky", "Oregon", "Skyscraper", "Villa"], mapWord: "Map", scoreName: "Rounds" },
+  { game: "Valorant", teamSize: 5, useRanks: true, ranks: ["Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ascendant", "Immortal", "Radiant"], useMaps: true, maps: ["Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split", "Sunset"], mapWord: "Map", scoreName: "Rounds" },
+  { game: "Rocket League", teamSize: 2, useRanks: true, ranks: ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Champion", "Grand Champion", "Supersonic Legend"], useMaps: true, maps: ["Champions Field", "DFH Stadium", "Mannfield", "Neo Tokyo", "Utopia Coliseum"], mapWord: "Arena", scoreName: "Goals" },
+];
+
+type SetupData = NonNullable<ReturnType<typeof readSetup>["data"]>;
+
+const presetFields = (d: SetupData) => ({ teamSize: d.teamSize as number, useRanks: d.useRanks, ranks: d.ranks as Prisma.InputJsonValue, useMaps: d.useMaps, maps: d.maps as Prisma.InputJsonValue, mapWord: d.mapWord, scoreName: d.scoreName });
+
+// A server's first visit gets the starters plus any games it has already set up.
+async function seedPresets(guildId: string) {
+  if ((await prisma.matchPreset.count({ where: { guildId } })) > 0) return;
+  const setups = await prisma.matchSetup.findMany({ where: { guildId }, orderBy: { createdAt: "asc" } });
+  const fromSetups = setups.map((s) => ({ game: s.game, teamSize: s.teamSize, useRanks: s.useRanks, ranks: s.ranks as Prisma.InputJsonValue, useMaps: s.useMaps, maps: s.maps as Prisma.InputJsonValue, mapWord: s.mapWord, scoreName: s.scoreName }));
+  await prisma.matchPreset.createMany({ data: [...STARTER_PRESETS, ...fromSetups].map((p) => ({ ...p, guildId })), skipDuplicates: true });
+}
+
+// A new setup puts its game on the list, even one removed earlier. Editing an
+// old setup only refreshes a preset that's still listed, so it can't bring
+// back one that was removed on purpose.
+async function syncPreset(guildId: string, data: SetupData, isNew: boolean) {
+  await seedPresets(guildId);
+  const existing = await prisma.matchPreset.findFirst({ where: { guildId, game: { equals: data.game as string, mode: "insensitive" } } });
+  if (!existing) {
+    await prisma.matchPreset.create({ data: { guildId, game: data.game as string, ...presetFields(data) } });
+  } else if (isNew || !existing.deleted) {
+    await prisma.matchPreset.update({ where: { id: existing.id }, data: { ...presetFields(data), deleted: false } });
+  }
+}
+
+router.get("/guilds/:guildId/match-presets", requireAuth, requireGuildPermission, async (req, res) => {
+  await seedPresets(req.params.guildId);
+  res.json(await prisma.matchPreset.findMany({ where: { guildId: req.params.guildId, deleted: false }, orderBy: { createdAt: "asc" } }));
+});
+
+router.delete("/guilds/:guildId/match-presets/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const preset = await prisma.matchPreset.findUnique({ where: { id: req.params.id } });
+  if (!preset || preset.guildId !== req.params.guildId) return res.status(404).json({ error: "Preset not found" });
+  await prisma.matchPreset.update({ where: { id: preset.id }, data: { deleted: true } });
+  res.status(204).send();
+});
+
 async function findSetup(guildId: string, id: string) {
   const setup = await prisma.matchSetup.findUnique({ where: { id } });
   return setup && setup.guildId === guildId ? setup : null;
@@ -105,6 +148,7 @@ router.post("/guilds/:guildId/match-setups", requireAuth, requireGuildPermission
   const { data, error } = readSetup(req.body);
   if (!data) return res.status(400).json({ error });
   const row = await prisma.matchSetup.create({ data: { ...data, guildId: req.params.guildId } });
+  await syncPreset(req.params.guildId, data, true);
   res.status(201).json(row);
 });
 
@@ -125,6 +169,8 @@ router.patch("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermi
     where: { id: existing.id },
     data: { ...data, ...(movedPanel ? { panelMessageId: null } : {}), ...(movedResults ? { leaderboardMessageId: null, bracketMessageId: null } : {}) },
   });
+
+  await syncPreset(req.params.guildId, data, false);
 
   const client = getBotClient();
   if (client && !movedPanel) {

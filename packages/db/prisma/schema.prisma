@@ -109,6 +109,7 @@ model Guild {
   supportSettings   SupportSettings?
   welcomeGreetings  WelcomeGreeting[]
   matchSetups       MatchSetup[]
+  matchPresets      MatchPreset[]
   createdAt         DateTime             @default(now())
 }
 
@@ -2239,6 +2240,26 @@ model SupportTicket {
 }
 
 // ---- Matches: single matches and tournaments for any game ----
+
+// A game on the builder's "Start from" list. Removing one keeps the row with
+// deleted set, so the starter list doesn't come back on the next visit.
+model MatchPreset {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  game      String
+  teamSize  Int      @default(5)
+  useRanks  Boolean  @default(false)
+  ranks     Json     @default("[]")
+  useMaps   Boolean  @default(false)
+  maps      Json     @default("[]")
+  mapWord   String   @default("Map")
+  scoreName String   @default("Points")
+  deleted   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, game])
+}
 
 // All the rules for one game and format, built step by step on the
 // dashboard. Every setup has its own panel, results channel and leaderboard.

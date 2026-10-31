@@ -8,28 +8,10 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
-import { api, type MatchResultRow, type MatchSetupInput, type MatchSetupRow } from "../../../../lib/api";
+import { api, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Match Flow", "Rewards", "Review"];
-const SIEGE_RANKS = ["Copper", "Bronze", "Silver", "Gold", "Platinum", "Emerald", "Diamond", "Champion"];
-
-type Starter = Pick<MatchSetupInput, "game" | "teamSize" | "useRanks" | "ranks" | "useMaps" | "maps" | "mapWord" | "scoreName">;
-
-const STARTERS: Array<{ label: string; fields: Starter }> = [
-  {
-    label: "Rainbow Six Siege",
-    fields: { game: "Rainbow Six Siege", teamSize: 5, useRanks: true, ranks: SIEGE_RANKS, useMaps: true, maps: ["Bank", "Border", "Chalet", "Clubhouse", "Consulate", "Kafe Dostoyevsky", "Oregon", "Skyscraper", "Villa"], mapWord: "Map", scoreName: "Rounds" },
-  },
-  {
-    label: "Valorant",
-    fields: { game: "Valorant", teamSize: 5, useRanks: true, ranks: ["Iron", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Ascendant", "Immortal", "Radiant"], useMaps: true, maps: ["Ascent", "Bind", "Haven", "Icebox", "Lotus", "Split", "Sunset"], mapWord: "Map", scoreName: "Rounds" },
-  },
-  {
-    label: "Rocket League",
-    fields: { game: "Rocket League", teamSize: 2, useRanks: true, ranks: ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Champion", "Grand Champion", "Supersonic Legend"], useMaps: true, maps: ["Champions Field", "DFH Stadium", "Mannfield", "Neo Tokyo", "Utopia Coliseum"], mapWord: "Arena", scoreName: "Goals" },
-  },
-  { label: "Start blank", fields: { game: "", teamSize: 5, useRanks: false, ranks: [], useMaps: false, maps: [], mapWord: "Map", scoreName: "Points" } },
-];
+const BLANK_GAME = { game: "", teamSize: 5, useRanks: false, ranks: [] as string[], useMaps: false, maps: [] as string[], mapWord: "Map", scoreName: "Points" };
 
 const BLANK: MatchSetupInput = {
   name: "",
@@ -59,7 +41,7 @@ const BLANK: MatchSetupInput = {
   staffRoleId: null,
   panelChannelId: "",
   resultsChannelId: "",
-  ...STARTERS[STARTERS.length - 1].fields,
+  ...BLANK_GAME,
 };
 
 const PHASES: Record<string, string> = { SIGNUP: "Sign-ups open", CHECKIN: "Check-in running", DRAFT: "Captains drafting", TEAMS: "Teams set", MAP: "Picking the map", LIVE: "Match live", CONFIRM: "Waiting for confirmation", DONE: "Finished" };
@@ -117,12 +99,19 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-slate-600 mt-1">{children}</p>;
 }
 
-function Choice({ on, title, hint, onClick }: { on: boolean; title: string; hint: string; onClick: () => void }) {
+function Choice({ on, title, hint, onClick, onRemove }: { on: boolean; title: string; hint: string; onClick: () => void; onRemove?: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={`text-left rounded-lg border p-3 transition-colors ${on ? "border-neon-blue bg-base-800" : "border-white/10 bg-base-950 hover:border-white/25"}`}>
-      <span className="block text-sm font-medium">{title}</span>
-      <span className="block text-xs text-slate-500 mt-0.5">{hint}</span>
-    </button>
+    <div className="relative">
+      <button type="button" onClick={onClick} className={`w-full h-full text-left rounded-lg border p-3 ${onRemove ? "pr-16" : ""} transition-colors ${on ? "border-neon-blue bg-base-800" : "border-white/10 bg-base-950 hover:border-white/25"}`}>
+        <span className="block text-sm font-medium break-words">{title}</span>
+        <span className="block text-xs text-slate-500 mt-0.5">{hint}</span>
+      </button>
+      {onRemove && (
+        <button type="button" onClick={onRemove} aria-label={`Remove ${title}`} className="absolute top-2 right-2 px-1.5 py-1 text-[11px] text-slate-500 hover:text-rose-400">
+          Remove
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -145,6 +134,27 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
   const [mapDraft, setMapDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [presets, setPresets] = useState<MatchPresetRow[]>([]);
+  const confirm = useConfirm();
+
+  useEffect(() => {
+    api.getMatchPresets(guildId).then(setPresets);
+  }, [guildId]);
+
+  async function removePreset(p: MatchPresetRow) {
+    if (!(await confirm(`Remove ${p.game} from this list? Setups you already saved won't change.`, { confirmLabel: "Remove" }))) return;
+    try {
+      await api.deleteMatchPreset(guildId, p.id);
+      setPresets((list) => list.filter((x) => x.id !== p.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove this preset.");
+    }
+  }
+
+  function applyPreset({ game, teamSize, useRanks, ranks, useMaps, maps, mapWord, scoreName }: typeof BLANK_GAME) {
+    set({ game, teamSize, useRanks, ranks, useMaps, maps, mapWord, scoreName });
+    setRanksText(ranks.join(", "));
+  }
 
   const set = (patch: Partial<MatchSetupInput>) => {
     setD((prev) => ({ ...prev, ...patch }));
@@ -223,18 +233,17 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
               <div>
                 <Label>Start from</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                  {STARTERS.map((s) => (
+                  {presets.map((p) => (
                     <Choice
-                      key={s.label}
-                      on={!!s.fields.game && d.game === s.fields.game}
-                      title={s.label}
-                      hint={s.fields.game ? `${s.fields.maps.length} ${s.fields.mapWord.toLowerCase()}s to start. You can edit them.` : "Fill in everything yourself"}
-                      onClick={() => {
-                        set(s.fields);
-                        setRanksText(s.fields.ranks.join(", "));
-                      }}
+                      key={p.id}
+                      on={d.game === p.game}
+                      title={p.game}
+                      hint={p.useMaps && p.maps.length ? `${p.maps.length} ${p.mapWord.toLowerCase()}s to start. You can edit them.` : "No maps. You can add them."}
+                      onClick={() => applyPreset(p)}
+                      onRemove={() => removePreset(p)}
                     />
                   ))}
+                  <Choice on={false} title="Start blank" hint="Fill in everything yourself" onClick={() => applyPreset(BLANK_GAME)} />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

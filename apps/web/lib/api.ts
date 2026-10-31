@@ -597,6 +597,18 @@ export interface MatchSetupInput {
   resultsChannelId: string;
 }
 
+export interface MatchPresetRow {
+  id: string;
+  game: string;
+  teamSize: number;
+  useRanks: boolean;
+  ranks: string[];
+  useMaps: boolean;
+  maps: string[];
+  mapWord: string;
+  scoreName: string;
+}
+
 export interface MatchSetupRow extends MatchSetupInput {
   id: string;
   season: number;
@@ -1665,6 +1677,8 @@ export const api = {
   setAntiRaid: (guildId: string, config: Partial<AntiRaidConfig>) =>
     request<AntiRaidConfig>(`/guilds/${guildId}/anti-raid`, { method: "PUT", body: JSON.stringify(config) }),
 
+  getMatchPresets: (guildId: string) => request<MatchPresetRow[]>(`/guilds/${guildId}/match-presets`),
+  deleteMatchPreset: (guildId: string, id: string) => request<void>(`/guilds/${guildId}/match-presets/${id}`, { method: "DELETE" }),
   getMatchSetups: (guildId: string) => request<MatchSetupRow[]>(`/guilds/${guildId}/match-setups`),
   addMatchSetup: (guildId: string, body: MatchSetupInput) =>
     request<MatchSetupRow>(`/guilds/${guildId}/match-setups`, { method: "POST", body: JSON.stringify(body) }),

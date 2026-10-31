@@ -348,6 +348,9 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["Private channels", "Only that match's players can join"],
                   ["User limit", "Match players only, players plus extra spots, or no limit"],
                   ["1v1 and Team categories", "Where each type of channel goes. Left empty, channels appear under the Lobby"],
+                  ["Temporary match text channels", "Each tournament match or team match gets a text channel for votes, scores and pings, deleted after the result"],
+                  ["Who can see it", "Players and staff only, or everyone can read while only players and staff type"],
+                  ["Close the room after", "How long the room stays up after the result. The next tournament match opens once it closes"],
                 ]}
               />
               <Tip>A bot can only move someone already connected to voice. Anyone who isn't gets pinged a link instead.</Tip>
@@ -620,6 +623,8 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["Event shows the wrong time", "Discord needs a start time, so matches staff start are listed an hour ahead and go live when they begin"],
                   ["Nobody gets moved to voice", "Spartacus needs Move Members, and players must be connected. With Lobby Only, they must be in the Lobby"],
                   ["Voice channels aren't created", "Spartacus needs Manage Channels on the category, and Manage Roles if private channels are on"],
+                  ["Match text channel isn't created", "Spartacus needs View Channel and Manage Channels on the category, plus Send Messages, Embed Links and Read Message History. The match runs on the panel until that's fixed"],
+                  ["A sub can't see the match room", "Spartacus needs Manage Roles to add a sub to a private room"],
                   ["Match threads are public", "Spartacus falls back to public threads if it can't create private ones"],
                   ["Role ping doesn't notify", "Turn on \"Allow anyone to @mention this role\" for that role"],
                   ["Champion role isn't given", "Rewards must be on, and Spartacus's role must sit above the champion role"],

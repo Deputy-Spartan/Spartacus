@@ -12,7 +12,7 @@ import { MatchmakingGuide } from "../../../../components/matchmaking/Matchmaking
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, rankListProblem, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
+import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, rankListProblem, renderTextRoomName, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
@@ -63,7 +63,7 @@ const BLANK: MatchSetupInput = {
   ...BLANK_GAME,
 };
 
-const PHASES: Record<string, string> = { SIGNUP: "Sign-ups open", CHECKIN: "Check-in running", DRAFT: "Captains drafting", TEAMS: "Teams set", MAP: "Picking the map", LIVE: "Match live", CONFIRM: "Waiting for confirmation", DONE: "Finished" };
+const PHASES: Record<string, string> = { SIGNUP: "Sign-ups open", CHECKIN: "Check-in running", DRAFT: "Captains drafting", TEAMS: "Teams set", MAP: "Picking the map", LIVE: "Match live", CONFIRM: "Waiting for confirmation", CLOSING: "Match room closing", DONE: "Finished" };
 
 function formatSummary(s: MatchSetupInput): string {
   const size = s.flexTeams && s.format === "TOURNAMENT" ? `Up to ${s.teamSize}v${s.teamSize}` : `${s.teamSize}v${s.teamSize}`;
@@ -956,15 +956,15 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   const players = sample === "duel" ? 2 : 5;
   const limit = config.voiceLimit === "NONE" ? null : Math.min(99, players + (config.voiceLimit === "EXTRA" ? config.voiceExtra : 0));
   const rooms = sample === "duel" ? [renderVoiceName(config.duelVoiceName, values)] : [renderVoiceName(config.teamVoiceName, { ...values, team: values.a }), renderVoiceName(config.teamVoiceName, { ...values, team: values.b })];
-  const row = (name: string, live: boolean) => (
+  const row = (name: string, live: boolean, icon = live && config.voicePrivate ? "🔒" : "🔊") => (
     <div key={name + live} className={`flex items-center gap-1.5 rounded px-2 py-1 text-sm ${live ? "bg-white/5 text-slate-100" : "text-slate-500"}`}>
-      <span aria-hidden>{live && config.voicePrivate ? "🔒" : "🔊"}</span>
+      <span aria-hidden>{icon}</span>
       <span className="min-w-0 flex-1 truncate">{name}</span>
-      {live && <span className="text-[11px] rounded bg-base-950 px-1.5 text-slate-400">{limit === null ? "No limit" : `0/${limit}`}</span>}
+      {live && icon !== "#" && <span className="text-[11px] rounded bg-base-950 px-1.5 text-slate-400">{limit === null ? "No limit" : `0/${limit}`}</span>}
     </div>
   );
   const lobbyRow = row(lobbyName, false);
-  const roomRows = rooms.map((r) => row(r, true));
+  const roomRows = [...(config.textRooms ? [row(renderTextRoomName(config.textRoomName, values), true, "#")] : []), ...rooms.map((r) => row(r, true))];
   const otherRows = others.map((n) => row(n, false));
   const list = sharesCategory ? [lobbyRow, ...roomRows, ...otherRows] : [...otherRows, ...roomRows];
 
@@ -1023,6 +1023,26 @@ function VoiceSettings({ guildId }: { guildId: string }) {
             <Label>Team category</Label>
             <ChannelSelect guildId={guildId} kind="category" value={config.teamCategoryId} onChange={(teamCategoryId) => set({ teamCategoryId: teamCategoryId || null })} placeholder="Same as the Lobby" />
             <Hint>Keep 1v1 and team channels in their own categories. New channels go at the bottom of a dedicated category. Left empty, they appear right under the Lobby.</Hint>
+          </div>
+          <div className="border-t border-white/5 pt-4 space-y-4">
+            <Toggle on={config.textRooms} label="Temporary match text channels" hint="Tournaments and matches get a text channel next to their voice channels. Votes, scores and pings happen there, then it's deleted. Matchmaking board matches keep using threads." onChange={(textRooms) => set({ textRooms })} />
+            {config.textRooms && (
+              <>
+                <NameBuilder label="Text channel name" value={config.textRoomName} onChange={(textRoomName) => set({ textRoomName })} tokens={["{number}", "{a}", "{b}", "{game}"]} />
+                <div>
+                  <Label>Who can see it</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Choice on={config.textRoomView === "PLAYERS"} title="Players and Staff" hint="Only that match's players and staff." onClick={() => set({ textRoomView: "PLAYERS" })} />
+                    <Choice on={config.textRoomView === "ALL"} title="Everyone Can Read" hint="Everyone can watch, only players and staff can type." onClick={() => set({ textRoomView: "ALL" })} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Close the room after (seconds)</Label>
+                  <input type="number" min={0} max={600} className={inputClass} value={config.roomCloseSeconds} onChange={(e) => set({ roomCloseSeconds: Math.min(600, Math.max(0, Number(e.target.value) || 0)) })} />
+                  <Hint>Gives players time to see the result. Chat in the room is deleted with it.</Hint>
+                </div>
+              </>
+            )}
           </div>
           <FormError message={error} />
           <SaveStatus status={autoSave} />
@@ -1658,26 +1678,26 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
     else setRoster([]);
   }, [guildId, selected?.id]);
 
-  async function run(action: () => Promise<unknown>, done: string) {
+  async function run(action: () => Promise<unknown>, done: string, removed = false) {
     setError(null);
     try {
       await action();
       setNotice(done);
       refresh();
-      if (selected) setResults(await api.getMatchResults(guildId, selected.id));
+      if (selected && !removed) setResults(await api.getMatchResults(guildId, selected.id));
     } catch (e) {
       setError(e instanceof Error ? e.message : "That didn't work.");
     }
   }
 
   async function remove(s: MatchSetupRow) {
-    if (!(await confirm(`Delete ${s.name}? Its panel, leaderboard and match history will be removed.`))) return;
-    await run(() => api.deleteMatchSetup(guildId, s.id), `${s.name} deleted.`);
+    if (!(await confirm(`Delete ${s.name}? Its panel, Discord event and match channels are removed. Finished matches stay on the Leaderboard.`))) return;
+    await run(() => api.deleteMatchSetup(guildId, s.id), `${s.name} deleted.`, true);
   }
 
   async function cancelLive(s: MatchSetupRow) {
-    if (!(await confirm(`Cancel the current match for ${s.name}? Sign-ups reopen and nothing is recorded.`, { confirmLabel: "Cancel Match" }))) return;
-    await run(() => api.cancelMatch(guildId, s.id), "Match canceled.");
+    if (!(await confirm(`Cancel ${s.name}? Its panel, Discord event and match channels are removed, and it's deleted from this list. Finished matches stay on the Leaderboard.`, { confirmLabel: "Cancel and Remove" }))) return;
+    await run(() => api.cancelMatch(guildId, s.id), `${s.name} canceled and removed.`, true);
   }
 
   async function voidResult(r: MatchResultRow) {
@@ -1783,7 +1803,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={() => cancelLive(selected)} className="rounded-lg border border-rose-500/40 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/10">
-                    Cancel Current Match
+                    Cancel and Remove
                   </button>
                 </div>
               </NeonCard>

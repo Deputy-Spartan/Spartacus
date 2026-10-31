@@ -45,6 +45,9 @@ export interface MatchState {
   score: string | null;
   champion: number | null;
   voiceIds: string[]; // temporary team channels, deleted when the match ends
+  roomId: string | null; // the match's temporary text channel
+  roomMessageId: string | null;
+  closing: { winner: string; score: string } | null; // the result shown while a room closes
   named: number[]; // teams whose captain has picked a name
   reminded: boolean;
   disputes: number;
@@ -78,6 +81,9 @@ export function emptyState(signups: string[] = []): MatchState {
     score: null,
     champion: null,
     voiceIds: [],
+    roomId: null,
+    roomMessageId: null,
+    closing: null,
     named: [],
     reminded: false,
     disputes: 0,
@@ -219,6 +225,11 @@ export function ratingChange(won: boolean): number {
 }
 
 // The two teams playing right now: the match itself, or the bracket's live tie.
+// A tournament counts its matches, skipping byes. Anything else uses its own number.
+export function matchNumber(state: MatchState, number: number): number {
+  return state.tie ? state.bracket.flat().filter((tie) => tie.scoreA !== null).length + 1 : number;
+}
+
 export function currentTeams(state: MatchState): [MatchTeam, MatchTeam] | null {
   if (state.tie) {
     const tie = state.bracket[state.tie[0]][state.tie[1]];

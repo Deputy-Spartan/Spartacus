@@ -22,6 +22,18 @@ export const VOICE_TOKENS = [
 export const DEFAULT_DUEL_VOICE_NAME = "{a} vs {b}";
 export const DEFAULT_TEAM_VOICE_NAME = "{team}";
 
+export const DEFAULT_TEXT_ROOM_NAME = "match-{number}-{a}-vs-{b}";
+
+// Text channels can't have spaces or capitals, so Discord would change them anyway.
+export function renderTextRoomName(template: string, v: VoiceNameValues): string {
+  const name = renderVoiceName(template, v)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}_-]+/gu, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return (name || "match").slice(0, 100);
+}
+
 export function renderVoiceName(template: string, v: VoiceNameValues): string {
   const name = template
     .replace(/\{a\}/g, v.a)

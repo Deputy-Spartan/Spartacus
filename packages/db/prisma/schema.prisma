@@ -2423,6 +2423,10 @@ model MatchmakingConfig {
   voiceNumberPad   Int       @default(1)
   duelVoiceName    String    @default("{a} vs {b}")
   teamVoiceName    String    @default("{team}")
+  textRooms        Boolean   @default(true) // each match gets its own temporary text channel
+  textRoomName     String    @default("match-{number}-{a}-vs-{b}")
+  textRoomView     String    @default("PLAYERS") // PLAYERS | ALL
+  roomCloseSeconds Int       @default(60)
   texts            Json      @default("{}") // custom wording and embed styles, by MATCH_TEXTS key
   gameTexts        Json      @default("{}") // the same, per game, on top of texts
   ranked           Boolean   @default(true)

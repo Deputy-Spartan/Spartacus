@@ -652,6 +652,10 @@ export interface MatchmakingConfigRow {
   voiceNumberPad: number;
   duelVoiceName: string;
   teamVoiceName: string;
+  textRooms: boolean;
+  textRoomName: string;
+  textRoomView: "PLAYERS" | "ALL";
+  roomCloseSeconds: number;
   texts: TextOverrides;
   gameTexts: Record<string, TextOverrides>;
   ranked: boolean;

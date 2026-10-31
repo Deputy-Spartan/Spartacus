@@ -111,6 +111,11 @@ export const MATCH_TEXTS = {
 
   pingCheckIn: line("Pings", "Check-in ping", "Sent when check-in starts.", "{players} Lobby is full. Check in on the panel.", { players: "@Kuro @FrostByte" }),
   pingReveal: line("Pings", "Rosters revealed ping", "Sent when registration closes.", "Registration closed. Rosters are revealed."),
+  matchRoomWelcome: embed("Match Rooms", "Match room welcome", "The first post in a match's text channel. Teams appear below it.", { title: "⚔️ Match {number}: {a} vs {b}", description: "This channel is for this match only. Use the buttons here to play.", color: STEEL }, { ...gameTokens, number: "1", a: "Night Crew", b: "Red Line" }),
+  matchRoomReady: embed("Match Rooms", "Ready to start", "Shown in the match room until the match starts.", { title: "Ready?", description: "Join your team's voice channel. A captain or staff starts {next}.{auto}", color: STEEL }, { ...gameTokens, next: "the map vote", auto: "" }),
+  matchRoomClosing: embed("Match Rooms", "Room closing", "Shown in the match room once the result is saved.", { title: "🏆 {winner} won {score}", description: "Saved to the results channel and leaderboard. This channel and its voice channels close {time}.", color: GOLD }, { ...gameTokens, winner: "Night Crew", score: "4-2", time: "in 60 seconds" }),
+  matchRoomNotice: embed("Match Rooms", "Panel during a match", "The main panel while a match plays in its room.", { title: "🏆 {setup}", description: "🔴 **{match}** is being played in {room}.", color: GOLD }, { ...gameTokens, match: "Night Crew vs Red Line", room: "#match-1-night-crew-vs-red-line" }),
+  matchRoomNoticeDone: embed("Match Rooms", "Panel after a match", "The main panel while a finished match's room closes.", { title: "🏆 {setup}", description: "**{winner}** won {score}.{next}", color: GOLD }, { ...gameTokens, winner: "Night Crew", score: "4-2", next: " The next match opens when this room closes." }),
   pingVoice: line("Pings", "Join voice ping", "Sent to players who weren't in voice.", "{players} Your match started. Join {channel}.", { players: "@Kuro", channel: "#Kuro vs FrostByte" }),
 
   btnSignUp: buttonLabel("Sign Up", "On match sign-ups."),
@@ -119,6 +124,7 @@ export const MATCH_TEXTS = {
   btnMyTeam: buttonLabel("My Team", "On team sign-ups."),
   btnReady: buttonLabel("Ready Up", "During check-in."),
   btnStart: buttonLabel("Start Match", "Once teams are set."),
+  btnStartVote: buttonLabel("Start Map Vote", "In a match room, when the map is voted on."),
   btnNameTeam: buttonLabel("Name Team", "When captains name teams."),
   btnConfirm: buttonLabel("Confirm", "When a result needs confirming."),
   btnDispute: buttonLabel("Dispute", "When a result needs confirming."),
@@ -169,7 +175,7 @@ export const MATCH_TEXTS = {
 
 export type MatchTextKey = keyof typeof MATCH_TEXTS;
 
-export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Match Steps", "Results", "Pings", "Buttons", "Labels and Notes"];
+export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Match Steps", "Match Rooms", "Results", "Pings", "Buttons", "Labels and Notes"];
 
 export function fillText(template: string, values: Record<string, string | number | null | undefined>): string {
   return template.replace(/\{([a-zA-Z]+)\}/g, (whole, key: string) => (key in values ? String(values[key] ?? "") : whole));

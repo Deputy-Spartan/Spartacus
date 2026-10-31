@@ -267,13 +267,9 @@ router.patch("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermi
 router.delete("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermission, async (req, res) => {
   const existing = await findSetup(req.params.guildId, req.params.id);
   if (!existing) return res.status(404).json({ error: "Match setup not found" });
-  const client = getBotClient();
-  if (client) {
-    const { closeMatchRooms } = await import("@spartacus/bot");
-    await closeMatchRooms(client, existing.id).catch(() => null);
-  }
-  if (existing.panelMessageId) await deleteChannelMessage(existing.panelChannelId, existing.panelMessageId).catch(() => null);
-  await prisma.matchSetup.delete({ where: { id: existing.id } });
+  const live = await withBot(res);
+  if (!live) return;
+  await live.bot.deleteMatch(live.client, existing.id);
   res.status(204).send();
 });
 
@@ -297,7 +293,7 @@ router.post("/guilds/:guildId/match-setups/:id/cancel", requireAuth, requireGuil
   if (!existing) return res.status(404).json({ error: "Match setup not found" });
   const live = await withBot(res);
   if (!live) return;
-  await live.bot.cancelMatch(live.client, existing.id);
+  await live.bot.deleteMatch(live.client, existing.id);
   res.json({ ok: true });
 });
 
@@ -311,7 +307,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "textRooms", "textRoomName", "textRoomView", "roomCloseSeconds", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
@@ -332,7 +328,9 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   if (b.boardStyle !== undefined && !["COMBINED", "SEPARATE"].includes(b.boardStyle as string)) return res.status(400).json({ error: "Pick a leaderboard style." });
   if (b.voiceExtra !== undefined && !whole(b.voiceExtra, 0, 20)) return res.status(400).json({ error: "Extra spots must be from 0 to 20." });
   if (b.voiceNumberPad !== undefined && !whole(b.voiceNumberPad, 1, 4)) return res.status(400).json({ error: "Number digits must be from 1 to 4." });
-  for (const key of ["duelVoiceName", "teamVoiceName"]) if (b[key] !== undefined && !text(b[key], 100)) return res.status(400).json({ error: "Voice channel names can't be empty." });
+  for (const key of ["duelVoiceName", "teamVoiceName", "textRoomName"]) if (b[key] !== undefined && !text(b[key], 100)) return res.status(400).json({ error: "Channel names can't be empty." });
+  if (b.roomCloseSeconds !== undefined && !whole(b.roomCloseSeconds, 0, 600)) return res.status(400).json({ error: "Close time must be from 0 to 600 seconds." });
+  if (b.textRoomView !== undefined && !["PLAYERS", "ALL"].includes(b.textRoomView as string)) return res.status(400).json({ error: "Pick who can see match channels." });
   if (b.requireLobby && !b.lobbyVoiceId) return res.status(400).json({ error: "Pick a Lobby before requiring it." });
 
   const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });

@@ -159,9 +159,16 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
   } else if (phase === "TEAMS") {
     const naming = setup.teamNaming === "CAPTAIN" && setup.teamSize > 1;
     const wait = endsAt ? say("noteTeamsAuto", { time: until }) : say("noteTeamsWait");
-    style(naming ? "nameTeams" : "teams", { auto: wait });
-    if (!tournament) embed.addFields(...teamFields(setup, players, state.teams));
-    buttons = [button(setup, "start", say("btnStart"), ButtonStyle.Success), ...(naming ? [button(setup, "name", say("btnNameTeam"), ButtonStyle.Primary)] : [])];
+    if (state.roomId) {
+      const voting = setup.useMaps && setup.mapMethod === "VOTE" && stringList(setup.maps).length > 0;
+      style("matchRoomReady", { next: voting ? `the ${word.toLowerCase()} vote` : "the match", auto: endsAt ? wait : "" });
+      if (teams) embed.addFields(...teamFields(setup, players, teams));
+      buttons = [button(setup, "start", say(voting ? "btnStartVote" : "btnStart"), ButtonStyle.Success)];
+    } else {
+      style(naming ? "nameTeams" : "teams", { auto: wait });
+      if (!tournament) embed.addFields(...teamFields(setup, players, state.teams));
+      buttons = [button(setup, "start", say("btnStart"), ButtonStyle.Success), ...(naming ? [button(setup, "name", say("btnNameTeam"), ButtonStyle.Primary)] : [])];
+    }
   } else if (phase === "MAP") {
     const labels = teams ? teamFields(setup, players, teams) : [];
     if (setup.mapMethod === "BANS") {
@@ -186,6 +193,8 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       embed.addFields({ name: say("labelConfirm"), value: `<@${r.by}> reported **${(r.winner === "a" ? teams[0] : teams[1]).name}** won ${r.winnerScore}-${r.loserScore} ${setup.scoreName}. Accepted ${until}.` });
       buttons = [button(setup, "confirm", say("btnConfirm"), ButtonStyle.Success), button(setup, "dispute", say("btnDispute"), ButtonStyle.Danger)];
     }
+  } else if (phase === "CLOSING") {
+    style("matchRoomClosing", { winner: state.closing?.winner, score: state.closing?.score, time: until });
   } else if (phase === "DONE") {
     if (tournament && state.champion !== null) {
       style("champion", { winner: state.teams[state.champion].name, players: state.teams[state.champion].players.map((id) => `<@${id}>`).join(" ") });
@@ -197,9 +206,28 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
     }
   }
 
-  if (tournament && state.bracket.length) embed.addFields(...bracketFields(state, texts));
+  if (tournament && state.bracket.length && !state.roomId) embed.addFields(...bracketFields(state, texts));
   if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: say("labelSubs"), value: say("labelSubsNote", { count: state.subsNeeded.length }) });
   return { content: "", embeds: [embed], components: [...rows(buttons).slice(0, extra.length ? 3 : 4), ...extra, navRow(setup, phase, say)].slice(0, 5) };
+}
+
+// The first post in a match room, which pings the players once.
+export function buildRoomWelcome(setup: MatchSetup, teams: [MatchTeam, MatchTeam], players: PlayerMap, number: number, texts: unknown = {}) {
+  return styleEmbed(new EmbedBuilder(), texts, "matchRoomWelcome", { game: setup.game, setup: setup.name, number, a: teams[0].name, b: teams[1].name }).addFields(...teamFields(setup, players, teams));
+}
+
+// The main panel while a match plays in its room. Subs and staff stay here, so
+// people who can't see a private room can still help.
+export function buildRoomNotice(setup: MatchSetup, phase: string, number: number, state: MatchState, texts: unknown = {}) {
+  const say = (key: MatchTextKey) => resolveText(texts, key).text;
+  const teams = currentTeams(state);
+  const values = { game: setup.game, setup: setup.name, number };
+  const embed = new EmbedBuilder();
+  if (phase === "CLOSING") styleEmbed(embed, texts, "matchRoomNoticeDone", { ...values, winner: state.closing?.winner, score: state.closing?.score, next: state.tie ? " The next match opens when this room closes." : "" });
+  else styleEmbed(embed, texts, "matchRoomNotice", { ...values, match: teams ? `${teams[0].name} vs ${teams[1].name}` : setup.name, room: `<#${state.roomId}>` });
+  if (state.bracket.length) embed.addFields(...bracketFields(state, texts));
+  if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: say("labelSubs"), value: resolveText(texts, "labelSubsNote", { count: state.subsNeeded.length }).text });
+  return { content: "", embeds: [embed], components: [navRow(setup, phase, say)] };
 }
 
 export function buildLeaderboard(setup: MatchSetup, rows: MatchPlayer[]) {

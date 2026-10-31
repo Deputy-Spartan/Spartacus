@@ -169,7 +169,7 @@ export { postWeeklyRecap } from "./jobs/weeklyRecap";
 export { sendBirthdayTest } from "./jobs/birthdayAnnouncer";
 // Re-exported so apps/api's Matches page can refresh a panel, cancel a match,
 // start a season or void a result through the same queue players' clicks use.
-export { refreshMatchPanel, cancelMatch, closeMatchRooms, matchRoster, voidMatchResult } from "./modules/matches/flow";
+export { refreshMatchPanel, deleteMatch, matchRoster, voidMatchResult } from "./modules/matches/flow";
 export { cancelRoom, syncMatchmakingPanel } from "./modules/matches/matchmaking";
 export { startBoardSeason, syncBoard } from "./modules/matches/leaderboard";
 

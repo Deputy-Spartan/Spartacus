@@ -37,6 +37,7 @@ import {
   mapPool,
   nextTie,
   countsAsNamedTeam,
+  matchNumber,
   onTeam,
   teamSlotName,
   cleanTeamName,
@@ -54,8 +55,8 @@ import {
   type MatchTeam,
   type Side,
 } from "./engine";
-import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
-import { closeVoiceRooms, openVoiceRooms } from "./voice";
+import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildRoomNotice, buildRoomWelcome, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
+import { closeVoiceRooms, nameVoiceForMap, openTextRoom, openVoiceRooms, swapRoomAccess } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
 import { syncMatchmakingPanel, tickMatchmaking } from "./matchmaking";
@@ -65,6 +66,7 @@ const DONE_RESET_MS = 30 * 60_000;
 const POST_ERROR_GAP_MS = 10 * 60_000;
 const REMINDER_GRACE_MS = 15 * 60_000;
 const ACTIVE_PHASES = ["TEAMS", "MAP", "LIVE"];
+const ROOM_PHASES = ["TEAMS", "MAP", "LIVE", "CONFIRM", "CLOSING"];
 const fromNow = (ms: number) => (ms > 0 ? new Date(Date.now() + ms) : null);
 const lastPostError = new Map<string, number>();
 
@@ -145,13 +147,45 @@ async function draftNames(client: Client, setup: MatchSetup, state: MatchState):
   return Object.fromEntries(state.draftPool.map((id, i) => [id, members[i]?.displayName ?? "Unknown player"]));
 }
 
+const saveState = async (ctx: Ctx) => {
+  ctx.session = await prisma.matchSession.update({ where: { id: ctx.session.id }, data: { state: ctx.state as unknown as Prisma.InputJsonValue } });
+};
+
+// Runs the match from its room. If someone deleted the room, the match
+// carries on from the main panel.
+async function syncRoom(ctx: Ctx, players: PlayerMap): Promise<boolean> {
+  const { client, setup, session, state } = ctx;
+  const room = await client.channels.fetch(state.roomId!).catch(() => null);
+  if (!isSendableChannel(room)) {
+    state.roomId = null;
+    state.roomMessageId = null;
+    await saveState(ctx);
+    return false;
+  }
+  const payload = buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, players, {}, ctx.texts);
+  if (state.roomMessageId) {
+    const message = await room.messages.fetch(state.roomMessageId).catch(() => null);
+    if (await message?.edit(payload).catch((err) => logError("bot", err, setup.guildId))) return true;
+  }
+  const sent = await room.send({ ...payload, content: undefined, allowedMentions: { parse: [] } }).catch((err) => {
+    logError("bot", err, setup.guildId);
+    return null;
+  });
+  if (!sent) return false;
+  state.roomMessageId = sent.id;
+  await saveState(ctx);
+  return true;
+}
+
 async function syncPanel(ctx: Ctx) {
   const { client, setup, session, state } = ctx;
   const channel = await client.channels.fetch(setup.panelChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
   if (!state.eventId && session.phase !== "DONE") await createEvent(ctx);
   const ids = [...new Set([...state.signups, ...state.teams.flatMap((t) => t.players), ...state.draftPool])];
-  const payload = buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, await fetchPlayers(setup, ids), await draftNames(client, setup, state), ctx.texts);
+  const players = await fetchPlayers(setup, ids);
+  const inRoom = !!state.roomId && ROOM_PHASES.includes(session.phase) && (await syncRoom(ctx, players));
+  const payload = inRoom ? buildRoomNotice(setup, session.phase, matchNumber(state, session.number), state, ctx.texts) : buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, players, await draftNames(client, setup, state), ctx.texts);
 
   if (setup.panelMessageId) {
     const message = await channel.messages.fetch(setup.panelMessageId).catch(() => null);
@@ -229,24 +263,28 @@ async function endEvent(ctx: Ctx) {
 }
 
 // Editing a message doesn't notify anyone, so steps that need attention send
-// a short ping, removed once that step is over.
-async function ping(ctx: Ctx, text: string) {
-  const channel = await ctx.client.channels.fetch(ctx.setup.panelChannelId).catch(() => null);
+// a short ping, removed once that step is over. Pings go to the match room
+// unless they're for people outside it.
+async function ping(ctx: Ctx, text: string, onPanel = false) {
+  const channelId = (!onPanel && ctx.state.roomId) || ctx.setup.panelChannelId;
+  const channel = await ctx.client.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
   const sent = await channel.send({ content: text, allowedMentions: { parse: ["users", "roles"] } }).catch(() => null);
-  if (sent) ctx.state.pingIds.push(sent.id);
+  if (sent) ctx.state.pingIds.push(`${channelId}:${sent.id}`);
 }
 
 async function clearPings(ctx: Ctx) {
-  const channel = await ctx.client.channels.fetch(ctx.setup.panelChannelId).catch(() => null);
-  if (isSendableChannel(channel)) {
-    for (const id of ctx.state.pingIds) {
-      const message = await channel.messages.fetch(id).catch(() => null);
-      await message?.delete().catch(() => null);
-    }
+  for (const entry of ctx.state.pingIds) {
+    const [channelId, id] = entry.includes(":") ? entry.split(":") : [ctx.setup.panelChannelId, entry];
+    const channel = await ctx.client.channels.fetch(channelId).catch(() => null);
+    if (!isSendableChannel(channel)) continue;
+    const message = await channel.messages.fetch(id).catch(() => null);
+    await message?.delete().catch(() => null);
   }
   ctx.state.pingIds = [];
 }
+
+const here = (ctx: Ctx) => (ctx.state.roomId ? "here" : "on the panel");
 
 const roleMention = (setup: MatchSetup) => (setup.pingRoleId ? `<@&${setup.pingRoleId}> ` : "");
 const lobbySize = (setup: MatchSetup, kind: string) => (kind === "TOURNAMENT" && setup.tournamentTeams === 0 ? Infinity : setup.teamSize * (kind === "TOURNAMENT" ? setup.tournamentTeams : 2));
@@ -261,7 +299,14 @@ async function teamLabel(ctx: Ctx, players: string[], fallback: string): Promise
 // ---- Steps ----
 
 // Teams wait a set time for captains, then the match starts on its own.
-const saveTeams = (ctx: Ctx) => save(ctx, "TEAMS", ctx.setup.useTimers ? fromNow(ctx.setup.autoStartSeconds * 1000) : null);
+const teamsDeadline = (setup: MatchSetup) => (setup.useTimers ? fromNow(setup.autoStartSeconds * 1000) : null);
+
+// Captains name their teams on the panel, so the room waits until that's done.
+async function saveTeams(ctx: Ctx) {
+  const { setup } = ctx;
+  const naming = setup.teamNaming === "CAPTAIN" && setup.teamSize > 1;
+  if (naming || !(await openMatchRoom(ctx))) await save(ctx, "TEAMS", teamsDeadline(setup));
+}
 
 // Hidden rosters go public once registration closes.
 async function revealRosters(ctx: Ctx) {
@@ -366,7 +411,66 @@ async function startTournament(ctx: Ctx): Promise<string | void> {
     await ping(ctx, `${state.teams.map((t) => `<@${t.captain}>`).join(" ")} Name your team on the panel.`.slice(0, 2000));
     return void (await saveTeams(ctx));
   }
-  await startMapStep(ctx);
+  await beginMatch(ctx);
+}
+
+// Opens the room and voice channels when the match's teams are final. Returns
+// false when rooms are off or can't be made, so the match runs on the panel.
+async function openMatchRoom(ctx: Ctx): Promise<boolean> {
+  const { client, setup, session, state } = ctx;
+  const teams = currentTeams(state);
+  if (state.roomId || !teams) return false;
+  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+  if (!config?.textRooms) return false;
+  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
+  if (!guild) return false;
+  const number = matchNumber(state, session.number);
+  const room = await openTextRoom({
+    guild,
+    config,
+    lobbyId: setup.lobbyVoiceId ?? config.lobbyVoiceId,
+    categoryId: setup.voiceCategoryId,
+    game: setup.game,
+    number,
+    a: teams[0],
+    b: teams[1],
+    shared: setup.teamSize === 1,
+    staffRoleId: setup.staffRoleId ?? config.staffRoleId,
+  }).catch((err) => {
+    logError("bot", err, setup.guildId);
+    return null;
+  });
+  if (!room) {
+    await ping(ctx, "I couldn't create the match channel, so this match runs here. Check that I have Manage Channels.");
+    return false;
+  }
+  state.roomId = room.id;
+  state.roomMessageId = null;
+  const ids = [...teams[0].players, ...teams[1].players];
+  await room.send({ content: ids.map((id) => `<@${id}>`).join(" ").slice(0, 2000), embeds: [buildRoomWelcome(setup, teams, await fetchPlayers(setup, ids), number, ctx.texts)], allowedMentions: { users: ids } }).catch((err) => logError("bot", err, setup.guildId));
+  const pings = await openTeamRooms(ctx);
+  if (pings.length) await ping(ctx, pings.join("\n").slice(0, 2000));
+  await save(ctx, "TEAMS", teamsDeadline(setup));
+  return true;
+}
+
+async function beginMatch(ctx: Ctx) {
+  if (!(await openMatchRoom(ctx))) await startMapStep(ctx);
+}
+
+// Leaves the room up long enough to see the result, then the timer closes it.
+async function holdRoom(ctx: Ctx, winner: string, score: string): Promise<boolean> {
+  const { setup, state } = ctx;
+  if (!state.roomId) return false;
+  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+  const seconds = config?.roomCloseSeconds ?? 60;
+  if (seconds === 0) {
+    await closeTeamRooms(ctx);
+    return false;
+  }
+  state.closing = { winner, score };
+  await save(ctx, "CLOSING", fromNow(seconds * 1000));
+  return true;
 }
 
 async function syncBracket(ctx: Ctx, fresh = false) {
@@ -431,9 +535,19 @@ async function goLive(ctx: Ctx, map: string | null, note: string | null) {
   const deadline = setup.useTimers ? fromNow(setup.reportMinutes * 60_000) : null;
   await startEvent(ctx);
   await save(ctx, "LIVE", deadline);
+  if (state.voiceIds.length) return renameVoiceForMap(ctx);
   const pings = await openTeamRooms(ctx);
   if (pings.length) await ping(ctx, pings.join("\n").slice(0, 2000));
   await save(ctx, "LIVE", deadline);
+}
+
+async function renameVoiceForMap(ctx: Ctx) {
+  const { client, setup, session, state } = ctx;
+  const teams = currentTeams(state);
+  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
+  if (!teams || !guild) return;
+  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+  await nameVoiceForMap({ guild, config, game: setup.game, map: state.map, number: matchNumber(state, session.number), a: teams[0], b: teams[1], shared: setup.teamSize === 1 }, state.voiceIds);
 }
 
 // Team matches get a channel per team, and a 1v1 shares one, using the voice
@@ -453,7 +567,7 @@ async function openTeamRooms(ctx: Ctx): Promise<string[]> {
     categoryId: setup.voiceCategoryId,
     game: setup.game,
     map: state.map,
-    number: session.number,
+    number: matchNumber(state, session.number),
     a: teams[0],
     b: teams[1],
     shared: setup.teamSize === 1,
@@ -465,10 +579,17 @@ async function openTeamRooms(ctx: Ctx): Promise<string[]> {
 
 async function closeTeamRooms(ctx: Ctx) {
   const { client, setup, state } = ctx;
-  if (state.voiceIds.length === 0) return;
-  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
-  await closeVoiceRooms(client, config, state.voiceIds, setup.lobbyVoiceId ?? config?.lobbyVoiceId ?? null, setup.guildId);
-  state.voiceIds = [];
+  if (state.voiceIds.length) {
+    const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+    await closeVoiceRooms(client, config, state.voiceIds, setup.lobbyVoiceId ?? config?.lobbyVoiceId ?? null, setup.guildId);
+    state.voiceIds = [];
+  }
+  if (state.roomId) {
+    const room = await client.channels.fetch(state.roomId).catch(() => null);
+    await room?.delete().catch((err) => logError("bot", err, setup.guildId));
+    state.roomId = null;
+    state.roomMessageId = null;
+  }
 }
 
 async function payPlayers(ctx: Ctx, ids: string[], won: boolean) {
@@ -521,21 +642,26 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
   if (isSendableChannel(channel)) await channel.send({ embeds: [buildResult(setup, result, ctx.texts)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
   await syncBoard(client, setup.guildId, setup.game);
-  await closeTeamRooms(ctx);
+  if (!state.roomId) await closeTeamRooms(ctx);
+  const score = `${report.winnerScore}-${report.loserScore}`;
 
   if (state.tie) {
     const champion = recordTie(state.bracket, state.tie, report.winner, report.winnerScore, report.loserScore);
     state.tie = nextTie(state.bracket);
     await syncBracket(ctx);
-    if (champion === null) return startMapStep(ctx);
+    if (champion === null) {
+      if (await holdRoom(ctx, winner.name, score)) return;
+      return beginMatch(ctx);
+    }
     state.champion = champion;
     await crownChampion(ctx, state.teams[champion]);
     await endEvent(ctx);
   } else {
     await endEvent(ctx);
     state.winner = report.winner;
-    state.score = `${report.winnerScore}-${report.loserScore}`;
+    state.score = score;
   }
+  if (await holdRoom(ctx, winner.name, score)) return;
   await save(ctx, "DONE");
 }
 
@@ -589,7 +715,13 @@ async function expirePhase(ctx: Ctx) {
     const ratings = await ratingsFor(setup, state.draftPool);
     return draftPick(ctx, pickCaptain(state.draftPool, ratings, "TOP"));
   }
-  if (session.phase === "TEAMS") return startMapStep(ctx);
+  if (session.phase === "TEAMS") return beginMatch(ctx);
+  if (session.phase === "CLOSING") {
+    await closeTeamRooms(ctx);
+    state.closing = null;
+    if (state.tie) return beginMatch(ctx);
+    return save(ctx, "DONE");
+  }
   if (session.phase === "MAP") {
     if (setup.mapMethod === "BANS") return banMap(ctx, pickOne(state.mapOptions.filter((m) => !state.banned.includes(m))));
     return closeVote(ctx);
@@ -606,11 +738,11 @@ async function chaseScore(ctx: Ctx) {
   const teams = currentTeams(state);
   if (!state.reminded) {
     state.reminded = true;
-    await ping(ctx, `${teams?.map((t) => `<@${t.captain}>`).join(" ")} Please report your score on the panel.`);
+    await ping(ctx, `${teams?.map((t) => `<@${t.captain}>`).join(" ")} Please report your score ${here(ctx)}.`);
     return save(ctx, "LIVE", fromNow(REMINDER_GRACE_MS));
   }
   if (session.kind === "TOURNAMENT" || setup.noReportAction === "ALERT") {
-    await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}Nobody reported this match. Staff can report the score on the panel or cancel it.`);
+    await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}Nobody reported this match. Staff can report the score ${here(ctx)} or cancel it.`);
     return save(ctx, "LIVE");
   }
   await cancelCtx(ctx);
@@ -623,14 +755,15 @@ async function swapPlayer(ctx: Ctx, out: string, sub: string): Promise<string> {
   const team = replacePlayer(state, out, sub);
   if (!team) return "That player isn't on a team.";
   const room = state.voiceIds[Math.min(currentTeams(state)?.indexOf(team) ?? -1, state.voiceIds.length - 1)];
+  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
+  if (guild) await swapRoomAccess(guild, await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } }), state.roomId, state.voiceIds, out, sub);
   if (room) {
-    const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
     const member = await guild?.members.fetch({ user: sub, force: true }).catch(() => null);
     const moved = member?.voice.channelId ? await member.voice.setChannel(room).catch(() => null) : null;
     if (!moved) await ping(ctx, `<@${sub}> You're subbing in for ${team.name}. Join <#${room}>.`);
   }
   await save(ctx, session.phase, session.phaseEndsAt);
-  return `<@${sub}> is in for <@${out}> on ${team.name}.`;
+  return `<@${sub}> is in for <@${out}> on ${team.name}.${state.roomId ? ` The match is in <#${state.roomId}>.` : ""}`;
 }
 
 // ---- Member actions ----
@@ -720,7 +853,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
     case "start":
       if (session.phase !== "TEAMS") return "The match isn't ready to start.";
       if (!staff && !isCaptain(ctx, userId)) return "Only captains or staff can start the match.";
-      await startMapStep(ctx);
+      await beginMatch(ctx);
       return "Match started.";
     case "vote": {
       if (session.phase !== "MAP" || setup.mapMethod !== "VOTE") return "Voting is closed.";
@@ -788,7 +921,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (!ACTIVE_PHASES.includes(session.phase) || !state.teams.some((t) => t.players.includes(userId))) return "You can't do that right now.";
       if (state.subsNeeded.includes(userId)) return "Your slot is already open.";
       state.subsNeeded.push(userId);
-      await ping(ctx, `${roleMention(setup)}A sub is needed. Tap Subs on the panel to jump in.`);
+      await ping(ctx, `${roleMention(setup)}A sub is needed. Tap Subs on the panel to jump in.`, true);
       await save(ctx, session.phase, session.phaseEndsAt);
       return "Your slot is open. You'll be replaced when someone takes it.";
     }
@@ -836,6 +969,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (session.phase !== "TEAMS") return "Teams can only be rerolled before the match starts.";
       if (usesPicks(setup)) return "Players chose these teams, so they can't be rerolled.";
       const ids = state.teams.flatMap((t) => t.players);
+      await closeTeamRooms(ctx);
       await buildTeams(ctx, shuffle(ids), await ratingsFor(setup, ids));
       await saveTeams(ctx);
       return "Teams rerolled.";
@@ -927,7 +1061,7 @@ export async function handleMatchName(interaction: ModalSubmitInteraction) {
       state.teams[index].name = name;
       if (!state.named.includes(index)) state.named.push(index);
       if (state.tie) await syncBracket(ctx);
-      if (session.kind === "TOURNAMENT" && state.named.length === state.teams.length) await startMapStep(ctx);
+      if (session.kind === "TOURNAMENT" && state.named.length === state.teams.length) await beginMatch(ctx);
       else await save(ctx, "TEAMS", session.phaseEndsAt);
       return `Your team is now ${name}.`;
     });
@@ -963,7 +1097,7 @@ export async function handleMatchScore(interaction: ModalSubmitInteraction) {
       }
       state.report = report;
       const other = currentTeams(state)?.find((t) => t.captain !== interaction.user.id);
-      await ping(ctx, `<@${other?.captain}> Please confirm the result on the panel.`);
+      await ping(ctx, `<@${other?.captain}> Please confirm the result ${here(ctx)}.`);
       await save(ctx, "CONFIRM", new Date(Date.now() + CONFIRM_MS));
       return "Result sent. The other captain has 5 minutes to respond.";
     });
@@ -1203,17 +1337,28 @@ export async function matchRoster(client: Client, setupId: string): Promise<Arra
   return [{ team: "Registered", players: await Promise.all(state.signups.map(name)) }];
 }
 
-export async function cancelMatch(client: Client, setupId: string) {
-  await withLock(setupId, async () => {
-    const ctx = await loadCtx(client, setupId);
-    if (ctx) await cancelCtx(ctx);
-  });
+async function removeMessage(client: Client, channelId: string, messageId: string | null) {
+  if (!messageId) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!isSendableChannel(channel)) return;
+  const message = await channel.messages.fetch(messageId).catch(() => null);
+  await message?.delete().catch(() => null);
 }
 
-export async function closeMatchRooms(client: Client, setupId: string) {
+// Removes everything a setup has in Discord, then the setup itself. Finished
+// results stay for the leaderboard, and a finished bracket stays as a record.
+export async function deleteMatch(client: Client, setupId: string) {
   await withLock(setupId, async () => {
     const ctx = await loadCtx(client, setupId);
-    if (ctx) await closeTeamRooms(ctx);
+    if (!ctx) return;
+    const { setup, state } = ctx;
+    await closeTeamRooms(ctx);
+    await clearPings(ctx);
+    const event = await fetchEvent(ctx);
+    await event?.delete().catch((err) => logError("bot", err, setup.guildId));
+    await removeMessage(client, setup.panelChannelId, setup.panelMessageId);
+    if (state.bracket.length && state.champion === null) await removeMessage(client, setup.resultsChannelId, setup.bracketMessageId);
+    await prisma.matchSetup.delete({ where: { id: setup.id } });
   });
 }
 

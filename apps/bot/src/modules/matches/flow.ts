@@ -193,7 +193,7 @@ async function syncPanel(ctx: Ctx) {
       logError("bot", err, setup.guildId);
       return null;
     });
-    if (edited) return;
+    if (edited) return linkEvent(ctx);
   }
   const sent = await channel.send({ ...payload, content: undefined, allowedMentions: { parse: [] } }).catch((err) => {
     // The timer retries every few seconds, so a missing permission shouldn't
@@ -207,6 +207,7 @@ async function syncPanel(ctx: Ctx) {
   if (sent) {
     setup.panelMessageId = sent.id;
     await prisma.matchSetup.update({ where: { id: setup.id }, data: { panelMessageId: sent.id } });
+    await linkEvent(ctx);
   }
 }
 
@@ -215,6 +216,27 @@ async function syncPanel(ctx: Ctx) {
 const EVENT_LEAD_MS = 60 * 60_000;
 const EVENT_LENGTH_MS = 2 * 60 * 60_000;
 
+function eventDetails({ setup, session }: Ctx): string {
+  const kind = session.kind === "TOURNAMENT" ? "tournament" : setup.teamSize === 1 ? "1v1" : "team match";
+  const link = setup.panelMessageId ? ` Sign-ups are here: https://discord.com/channels/${setup.guildId}/${setup.panelChannelId}/${setup.panelMessageId}` : "";
+  return `${setup.game} ${kind}.${link}`;
+}
+
+// The event is created before its panel posts, and a panel can move, so the
+// link is added once the message exists.
+async function linkEvent(ctx: Ctx) {
+  const { setup, state } = ctx;
+  if (!state.eventId || !setup.panelMessageId || state.eventPanelId === setup.panelMessageId) return;
+  const event = await fetchEvent(ctx);
+  const edited = await event?.edit({ description: eventDetails(ctx) }).catch((err) => {
+    logError("bot", err, setup.guildId);
+    return null;
+  });
+  if (!edited) return;
+  state.eventPanelId = setup.panelMessageId;
+  await saveState(ctx);
+}
+
 async function createEvent(ctx: Ctx) {
   const { client, setup, session, state } = ctx;
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
@@ -222,7 +244,7 @@ async function createEvent(ctx: Ctx) {
   const start = setup.startMode === "SCHEDULED" && setup.startAt && setup.startAt > new Date() ? setup.startAt : new Date(Date.now() + EVENT_LEAD_MS);
   const lobbyId = setup.lobbyVoiceId ?? (await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } }))?.lobbyVoiceId;
   const voice = lobbyId ? await guild.channels.fetch(lobbyId).catch(() => null) : null;
-  const details = `${session.kind === "TOURNAMENT" ? "Tournament" : setup.teamSize === 1 ? "1v1" : "Team match"} · ${setup.game}. Sign up in the panel channel.`;
+  const details = eventDetails(ctx);
   const name = (session.kind === "TOURNAMENT" ? setup.name : `${setup.name} #${session.number}`).slice(0, 100);
   const event = await guild.scheduledEvents
     .create(

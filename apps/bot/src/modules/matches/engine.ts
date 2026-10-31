@@ -57,6 +57,7 @@ export interface MatchState {
   eventId: string | null;
   eventAt: string | null;
   eventLive: boolean;
+  eventPanelId: string | null; // the panel message the event links to
   fullPinged: boolean;
   pingIds: string[];
 }
@@ -93,6 +94,7 @@ export function emptyState(signups: string[] = []): MatchState {
     eventId: null,
     eventAt: null,
     eventLive: false,
+    eventPanelId: null,
     fullPinged: false,
     pingIds: [],
   };

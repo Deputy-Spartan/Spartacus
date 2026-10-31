@@ -2301,7 +2301,8 @@ model MatchSetup {
   checkInSeconds       Int      @default(120)
   autoMove             Boolean  @default(true)
   reportBy             String   @default("BOTH") // BOTH | CAPTAIN | STAFF
-  lobbyVoiceId         String? // team voice channels are created beside this one for each match
+  lobbyVoiceId         String? // only on older setups, newer ones use the Voice tab's Lobby
+  voiceCategoryId      String? // where this setup's temporary voice channels go
   rewardsEnabled       Boolean  @default(false)
   teamNaming           String   @default("SET") // SET | CAPTAIN
   autoStartSeconds     Int      @default(120) // 0 waits for a captain or staff

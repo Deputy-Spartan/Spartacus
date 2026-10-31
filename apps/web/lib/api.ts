@@ -587,6 +587,7 @@ export interface MatchSetupInput {
   autoMove: boolean;
   reportBy: "BOTH" | "CAPTAIN" | "STAFF";
   lobbyVoiceId: string | null;
+  voiceCategoryId: string | null;
   rewardsEnabled: boolean;
   joinMode: "ASSIGN" | "PICK";
   rosterView: "PUBLIC" | "HIDDEN";

@@ -38,6 +38,7 @@ const BLANK: MatchSetupInput = {
   autoMove: true,
   reportBy: "BOTH",
   lobbyVoiceId: null,
+  voiceCategoryId: null,
   rewardsEnabled: false,
   joinMode: "ASSIGN",
   rosterView: "PUBLIC",
@@ -104,7 +105,7 @@ function stepError(step: number, d: MatchSetupInput): string | null {
     if (d.panelChannelId === d.resultsChannelId) return "The panel and results need different channels.";
   }
   if (step === 5) {
-    if (d.autoMove && !d.lobbyVoiceId) return "Pick the main voice channel, or turn off team voice channels.";
+    if (d.autoMove && !d.lobbyVoiceId && !d.voiceCategoryId) return "Pick a category for team voice channels, or turn them off.";
     if (d.useTimers) {
       const offOr = (v: number, min: number, max: number) => v === 0 || (Number.isInteger(v) && v >= min && v <= max);
       if (d.checkIn && d.format === "SINGLE" && (d.checkInSeconds < 15 || d.checkInSeconds > 600)) return "Check-in time must be from 15 to 600 seconds.";
@@ -612,12 +613,12 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                   <input {...num("checkInSeconds")} min={15} max={600} />
                 </div>
               )}
-              <Toggle on={d.autoMove} label="Team voice channels" hint="Creates a voice channel for each team, capped at the team size, and deletes them after the match." onChange={(autoMove) => set({ autoMove })} />
+              <Toggle on={d.autoMove} label="Team voice channels" hint="Creates a temporary voice channel for each team, capped at the team size, and deletes them after the match." onChange={(autoMove) => set({ autoMove })} />
               {d.autoMove && (
                 <div>
-                  <Label>Main voice channel</Label>
-                  <ChannelSelect guildId={guildId} kind="voice" value={d.lobbyVoiceId} onChange={(id) => set({ lobbyVoiceId: id || null })} />
-                  <Hint>Players wait here, and the Discord event points here. Spartacus needs Manage Channels and Move Members.</Hint>
+                  <Label>Category for team voice channels</Label>
+                  <ChannelSelect guildId={guildId} kind="category" value={d.voiceCategoryId} onChange={(id) => set({ voiceCategoryId: id || null })} />
+                  <Hint>Temporary channels are created here for each match, then deleted. Players move in from the Lobby on the Voice tab. Names, limits and privacy come from that tab too.</Hint>
                 </div>
               )}
               <div>
@@ -970,7 +971,7 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   return (
     <NeonCard>
       <p className="font-medium mb-1">Voice Channels</p>
-      <p className="text-xs text-slate-500 mb-3">Players wait in one Lobby. When a match starts, the bot creates temporary channels and moves everyone in. These settings also apply to tournaments and team matches.</p>
+      <p className="text-xs text-slate-500 mb-3">Players wait in one Lobby. When a match starts, the bot creates temporary channels and moves everyone in. Names, limits and privacy also apply to tournaments and team matches, which pick their own category in Step 6 of the builder.</p>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-5 items-start">
         <div className="min-w-0 space-y-4">
           <Toggle on={config.createVoice} label="Create voice channels for Matchmaking" hint="A 1v1 shares one channel, and each team gets its own." onChange={(createVoice) => set({ createVoice })} />

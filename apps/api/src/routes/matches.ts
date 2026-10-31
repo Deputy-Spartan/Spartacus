@@ -52,7 +52,8 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   }
   const useTimers = Boolean(b.useTimers);
   if (useTimers && Boolean(b.checkIn) && !whole(b.checkInSeconds, 15, 600)) return { error: "Check-in time must be from 15 to 600 seconds." };
-  if (autoMove && !lobbyVoiceId) return { error: "Pick the main voice channel, or turn off moving players." };
+  const voiceCategoryId = optionalId(b.voiceCategoryId);
+  if (autoMove && !lobbyVoiceId && !voiceCategoryId) return { error: "Pick a category for team voice channels, or turn them off." };
   const offOr = (v: unknown, min: number, max: number) => v === 0 || whole(v, min, max);
   if (useTimers) {
     if (!offOr(b.autoStartSeconds, 15, 600)) return { error: "Auto-start must be 0 (off) or from 15 to 600 seconds." };
@@ -90,6 +91,7 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       autoMove,
       reportBy: pick(b.reportBy, ["BOTH", "CAPTAIN", "STAFF"], "BOTH"),
       lobbyVoiceId,
+      voiceCategoryId,
       rewardsEnabled: Boolean(b.rewardsEnabled),
       joinMode: pick(b.joinMode, ["ASSIGN", "PICK"], "ASSIGN"),
       rosterView: pick(b.rosterView, ["PUBLIC", "HIDDEN"], "PUBLIC"),

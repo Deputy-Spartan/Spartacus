@@ -20,6 +20,7 @@ interface OpenOptions {
   b: VoiceSide;
   shared: boolean; // a 1v1 shares one channel, teams get one each
   texts: TextOverrides;
+  categoryId?: string | null; // a setup's own category, ahead of the Voice tab's
 }
 
 const cap = (config: MatchmakingConfig | null, players: number) => {
@@ -29,10 +30,10 @@ const cap = (config: MatchmakingConfig | null, players: number) => {
 
 // Creates the match's voice channels and moves players in. A bot can only move
 // someone already connected, so anyone else is returned to be sent a link.
-export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryId, game, map, number, a, b, shared, texts }: OpenOptions) {
+export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryId, game, map, number, a, b, shared, texts, categoryId }: OpenOptions) {
   const lobby = lobbyId ? await guild.channels.fetch(lobbyId).catch(() => null) : null;
   const main = lobby?.isVoiceBased() ? lobby : null;
-  const parent = (shared ? config?.duelCategoryId : config?.teamCategoryId) ?? main?.parentId ?? fallbackCategoryId ?? undefined;
+  const parent = categoryId ?? (shared ? config?.duelCategoryId : config?.teamCategoryId) ?? main?.parentId ?? fallbackCategoryId ?? undefined;
   const values = { a: a.name, b: b.name, game, map, number, pad: config?.voiceNumberPad ?? 1 };
   const rooms = shared
     ? [{ name: renderVoiceName(config?.duelVoiceName ?? DEFAULT_DUEL_VOICE_NAME, values), players: [...a.players, ...b.players] }]

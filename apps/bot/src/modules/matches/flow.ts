@@ -186,7 +186,8 @@ async function createEvent(ctx: Ctx) {
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
   if (!guild) return;
   const start = setup.startMode === "SCHEDULED" && setup.startAt && setup.startAt > new Date() ? setup.startAt : new Date(Date.now() + EVENT_LEAD_MS);
-  const voice = setup.lobbyVoiceId ? await guild.channels.fetch(setup.lobbyVoiceId).catch(() => null) : null;
+  const lobbyId = setup.lobbyVoiceId ?? (await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } }))?.lobbyVoiceId;
+  const voice = lobbyId ? await guild.channels.fetch(lobbyId).catch(() => null) : null;
   const details = `${session.kind === "TOURNAMENT" ? "Tournament" : setup.teamSize === 1 ? "1v1" : "Team match"} · ${setup.game}. Sign up in the panel channel.`;
   const name = (session.kind === "TOURNAMENT" ? setup.name : `${setup.name} #${session.number}`).slice(0, 100);
   const event = await guild.scheduledEvents
@@ -440,12 +441,24 @@ async function goLive(ctx: Ctx, map: string | null, note: string | null) {
 async function openTeamRooms(ctx: Ctx): Promise<string[]> {
   const { client, setup, session, state } = ctx;
   const teams = currentTeams(state);
-  if (!setup.autoMove || !setup.lobbyVoiceId || !teams) return [];
+  if (!setup.autoMove || !teams) return [];
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
-  const main = await guild?.channels.fetch(setup.lobbyVoiceId).catch(() => null);
-  if (!guild || !main?.isVoiceBased()) return ["The main voice channel for this match is gone. Pick a new one on the dashboard."];
+  if (!guild) return [];
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
-  const { voiceIds, pings } = await openVoiceRooms({ guild, config, lobbyId: setup.lobbyVoiceId, fallbackCategoryId: main.parentId, game: setup.game, map: state.map, number: session.number, a: teams[0], b: teams[1], shared: setup.teamSize === 1, texts: ctx.texts as TextOverrides });
+  const { voiceIds, pings } = await openVoiceRooms({
+    guild,
+    config,
+    lobbyId: setup.lobbyVoiceId ?? config?.lobbyVoiceId ?? null,
+    fallbackCategoryId: null,
+    categoryId: setup.voiceCategoryId,
+    game: setup.game,
+    map: state.map,
+    number: session.number,
+    a: teams[0],
+    b: teams[1],
+    shared: setup.teamSize === 1,
+    texts: ctx.texts as TextOverrides,
+  });
   state.voiceIds.push(...voiceIds);
   return pings;
 }
@@ -454,7 +467,7 @@ async function closeTeamRooms(ctx: Ctx) {
   const { client, setup, state } = ctx;
   if (state.voiceIds.length === 0) return;
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
-  await closeVoiceRooms(client, config, state.voiceIds, setup.lobbyVoiceId, setup.guildId);
+  await closeVoiceRooms(client, config, state.voiceIds, setup.lobbyVoiceId ?? config?.lobbyVoiceId ?? null, setup.guildId);
   state.voiceIds = [];
 }
 

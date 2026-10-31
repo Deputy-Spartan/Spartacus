@@ -351,7 +351,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 ]}
               />
               <Tip>A bot can only move someone already connected to voice. Anyone who isn't gets pinged a link instead.</Tip>
-              <Text>The Lobby here is for the Matchmaking board. Each tournament or match setup picks its own main voice channel, and you can use the same Lobby. Names, limits, categories and privacy apply to both.</Text>
+              <Text>This Lobby is used everywhere, including tournaments and team matches. Each setup picks its own category in Step 6 of the builder. Names, limits and privacy apply to both.</Text>
               <GoTo tab="voice" label="Voice" onOpen={onOpen} />
             </div>
           </NeonCard>
@@ -371,7 +371,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["3. Teams", "Team size, how players join, how teams split, captains, roster visibility, and team names"],
                     ["4. Maps", "The map list, and whether players vote, the bot picks, or captains ban"],
                     ["5. Schedule", "Staff start it, a set time, or when the lobby fills, plus the panel and results channels"],
-                    ["6. Match Flow", "Timers, check-in, team voice channels, and who reports scores"],
+                    ["6. Match Flow", "Timers, check-in, the category for temporary voice channels, and who reports scores"],
                     ["7. Rewards", "Coins and the champion role (off by default), plus ping and staff roles"],
                     ["8. Review", "Check everything, then save"],
                   ]}

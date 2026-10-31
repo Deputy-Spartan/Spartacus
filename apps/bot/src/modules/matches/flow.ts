@@ -658,6 +658,7 @@ async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
   const { setup, session, state } = ctx;
   if (session.phase !== "SIGNUP") return "Sign-ups are closed for this match.";
   if (state.signups.includes(userId)) return "You're already in.";
+  if (state.signups.length >= lobbySize(setup, session.kind)) return "This lobby is full.";
   const picking = usesPicks(setup);
   if (picking && (slot === undefined || slot >= slotCount(setup, session.kind))) return "Pick a team on the panel.";
   if (picking && onTeam(state, slot!).length >= setup.teamSize) return "That team is full. Pick another one.";

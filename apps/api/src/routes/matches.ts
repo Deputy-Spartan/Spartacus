@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { cleanGameOverrides, cleanOverrides } from "@spartacus/shared";
+import { MAX_RANKS, cleanGameOverrides, cleanOverrides, rankListProblem } from "@spartacus/shared";
 import { Prisma, prisma } from "@spartacus/db";
 import { deleteChannelMessage } from "../lib/discordRest";
 import { getBotClient } from "../lib/botClient";
@@ -20,7 +20,7 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   const game = text(b.game, 80);
   const panelChannelId = optionalId(b.panelChannelId);
   const resultsChannelId = optionalId(b.resultsChannelId);
-  const ranks = list(b.ranks, 25);
+  const ranks = list(b.ranks, MAX_RANKS);
   const maps = list(b.maps, 100);
   const useRanks = Boolean(b.useRanks);
   const useMaps = Boolean(b.useMaps);
@@ -36,6 +36,7 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   if (!whole(b.teamSize, 1, 10)) return { error: "Team size must be from 1 to 10." };
   if (format === "TOURNAMENT" && ![4, 8, 16].includes(b.tournamentTeams as number)) return { error: "Tournaments run with 4, 8 or 16 teams." };
   if (useRanks && ranks.length < 2) return { error: "Add at least 2 ranks, or turn ranks off." };
+  if (useRanks && rankListProblem(ranks)) return { error: rankListProblem(ranks) ?? "" };
   const startMode = pick(b.startMode, ["MANUAL", "SCHEDULED", "FULL"], "MANUAL");
   const startAt = typeof b.startAt === "string" && b.startAt ? new Date(b.startAt) : null;
   if (startMode === "SCHEDULED" && (!startAt || Number.isNaN(startAt.getTime()))) return { error: "Pick a start date and time." };
@@ -145,7 +146,7 @@ async function setGameListed(guildId: string, game: string, listed: boolean) {
 
 function readGame(b: Record<string, unknown>) {
   const game = text(b.game, 80);
-  const ranks = list(b.ranks, 25);
+  const ranks = list(b.ranks, MAX_RANKS);
   const maps = list(b.maps, 100);
   const useRanks = Boolean(b.useRanks);
   const useMaps = Boolean(b.useMaps);
@@ -153,6 +154,7 @@ function readGame(b: Record<string, unknown>) {
   if (game.toUpperCase() === "ALL") return { error: "That name is reserved. Pick another one." };
   if (!whole(b.teamSize, 1, 10)) return { error: "Team size must be from 1 to 10." };
   if (useRanks && ranks.length < 2) return { error: "Add at least 2 ranks, or turn ranks off." };
+  if (useRanks && rankListProblem(ranks)) return { error: rankListProblem(ranks) ?? "" };
   if (useMaps && maps.length < 1) return { error: "Add at least 1 map, or turn maps off." };
   return { data: { game, teamSize: b.teamSize as number, useRanks, ranks, useMaps, maps, mapWord: text(b.mapWord, 30) || "Map", scoreName: text(b.scoreName, 30) || "Points" } };
 }

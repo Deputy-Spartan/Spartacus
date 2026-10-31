@@ -20,7 +20,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 import { Prisma, type MatchPlayer, type MatchSession, type MatchSetup } from "@prisma/client";
-import { resolveText, textsForGame, type TextOverrides } from "@spartacus/shared";
+import { rankGroups, resolveText, textsForGame, type TextOverrides } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -626,12 +626,16 @@ function memberIsStaff(member: GuildMember | null, setup: MatchSetup): boolean {
 
 const isCaptain = (ctx: Ctx, userId: string) => !!currentTeams(ctx.state)?.some((t) => t.captain === userId);
 
-function rankPicker(setup: MatchSetup, slot?: number): InteractionEditReplyOptions {
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`matchrank:${setup.id}${slot === undefined ? "" : `:${slot}`}`)
-    .setPlaceholder("Your rank")
-    .addOptions(stringList(setup.ranks).slice(0, 25).map((r, i) => ({ label: r.slice(0, 100), value: String(i) })));
-  return { content: `Pick your ${setup.game} rank to continue. It's used to balance teams.`, components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
+function rankPicker(setup: MatchSetup, slot?: number, group?: number): InteractionEditReplyOptions {
+  const ranks = stringList(setup.ranks);
+  const groups = rankGroups(ranks);
+  const customId = `matchrank:${setup.id}${slot === undefined ? "" : `:${slot}`}`;
+  const pickTier = ranks.length > 25 && group === undefined;
+  const options = pickTier
+    ? groups.map((g, i) => ({ label: g.name.slice(0, 100), value: g.indexes.length === 1 ? String(g.indexes[0]) : `tier:${i}` }))
+    : (group === undefined ? ranks.map((_, i) => i) : groups[group].indexes).map((i) => ({ label: ranks[i].slice(0, 100), value: String(i) }));
+  const menu = new StringSelectMenuBuilder().setCustomId(customId).setPlaceholder("Your rank").addOptions(options);
+  return { content: pickTier ? `Pick your ${setup.game} rank tier. It's used to balance teams.` : `Pick your ${setup.game} rank to continue. It's used to balance teams.`, components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
 }
 
 async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
@@ -955,12 +959,14 @@ export async function handleMatchScore(interaction: ModalSubmitInteraction) {
 
 export async function handleMatchRank(interaction: StringSelectMenuInteraction) {
   const [, setupId, slotArg] = interaction.customId.split(":");
-  const rank = Number(interaction.values[0]);
+  const picked = interaction.values[0];
+  const rank = Number(picked);
   await interaction.deferUpdate();
   try {
     const reply = await withLock(setupId, async () => {
       const ctx = await loadCtx(interaction.client, setupId);
       if (!ctx) return "This match setup no longer exists.";
+      if (picked.startsWith("tier:")) return rankPicker(ctx.setup, slotArg === undefined ? undefined : Number(slotArg), Number(picked.slice(5)));
       await setPlayerRank(ctx.setup, interaction.user.id, rank);
       if (ctx.session.phase === "SIGNUP") return join(ctx, interaction.user.id, slotArg === undefined ? undefined : Number(slotArg));
       return "Rank saved. Tap Subs on the panel again to jump in.";

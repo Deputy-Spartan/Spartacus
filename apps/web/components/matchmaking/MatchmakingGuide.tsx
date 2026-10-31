@@ -306,7 +306,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 items={[
                   <>Tap <strong>+ Add Game</strong>.</>,
                   <>Enter the name, players per team, and what the score counts, like Rounds or Goals.</>,
-                  <>Turn on <strong>Use ranks</strong> if the game has them, then list them lowest to highest, separated by commas. Up to 25.</>,
+                  <>Turn on <strong>Use ranks</strong> if the game has them, then list them lowest to highest, separated by commas. With over 25, name them like Gold III and players pick Gold, then Gold III.</>,
                   <>Turn on <strong>Use maps</strong> if the game has maps. You can call them something else, like Stage or Arena.</>,
                   <>Tap <strong>Add Game</strong>.</>,
                 ]}

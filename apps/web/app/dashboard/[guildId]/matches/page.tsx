@@ -12,7 +12,7 @@ import { MatchmakingGuide } from "../../../../components/matchmaking/Matchmaking
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
+import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, rankListProblem, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
@@ -81,7 +81,7 @@ function stepError(step: number, d: MatchSetupInput): string | null {
     if (!d.name.trim()) return "Give this setup a name, like Friday Night 5v5.";
     if (!d.game.trim()) return "Pick the game this setup is for.";
     if (d.useRanks && d.ranks.length < 2) return "Add at least 2 ranks, or turn ranks off.";
-    if (d.useRanks && d.ranks.length > 25) return "Discord menus hold up to 25 ranks.";
+    if (d.useRanks && rankListProblem(d.ranks)) return rankListProblem(d.ranks);
   }
   if (step === 2 && (!Number.isInteger(d.teamSize) || d.teamSize < 1 || d.teamSize > 10)) return "Team size must be from 1 to 10.";
   if (step === 3 && d.useMaps) {
@@ -353,7 +353,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                       set({ ranks: e.target.value.split(",").map((r) => r.trim()).filter(Boolean) });
                     }}
                   />
-                  <Hint>Separate them with commas. Up to 25.</Hint>
+                  <Hint>Separate them with commas, up to 100. With over 25, name them like Gold III and players pick Gold, then Gold III.</Hint>
                 </div>
               )}
             </>
@@ -801,7 +801,7 @@ function GameForm({ start, onSave, onCancel }: { start: MatchPresetRow | null; o
                 set({ ranks: e.target.value.split(",").map((r) => r.trim()).filter(Boolean) });
               }}
             />
-            <Hint>Separate them with commas. Up to 25.</Hint>
+            <Hint>Separate them with commas, up to 100. With over 25, name them like Gold III and players pick Gold, then Gold III.</Hint>
           </div>
         )}
         <Toggle on={d.useMaps} label="Use maps" hint="Turn off for games with no maps or stages." onChange={(useMaps) => set({ useMaps })} />

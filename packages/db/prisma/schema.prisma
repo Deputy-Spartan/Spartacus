@@ -2400,8 +2400,8 @@ model MatchmakingConfig {
   guild            Guild     @relation(fields: [guildId], references: [id])
   guildId          String    @unique
   boardChannelId   String?
-  boardMessageId   String?
-  boardGame        String    @default("ALL")
+  boardGames       Json      @default("[\"ALL\"]") // ALL and/or game names, one post each
+  boardMessages    Json      @default("{}") // posted message id per entry above
   boardSince       DateTime?
   enabled          Boolean   @default(false)
   channelId        String?

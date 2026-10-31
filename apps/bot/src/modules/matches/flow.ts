@@ -541,7 +541,7 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
   });
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
   if (isSendableChannel(channel)) await channel.send({ embeds: [buildResult(setup, result)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
-  await syncBoard(client, setup.guildId);
+  await syncBoard(client, setup.guildId, setup.game);
   await closeTeamRooms(ctx);
 
   if (state.tie) {
@@ -1220,7 +1220,7 @@ export async function voidMatchResult(client: Client, resultId: string): Promise
   const { setup } = result;
   if (!setup) {
     await prisma.matchResult.update({ where: { id: result.id }, data: { voided: true } });
-    await syncBoard(client, result.guildId);
+    await syncBoard(client, result.guildId, result.game);
     return true;
   }
   await withLock(setup.id, async () => {
@@ -1247,7 +1247,7 @@ export async function voidMatchResult(client: Client, resultId: string): Promise
     await undo(stringList(result.winners), true);
     await undo(stringList(result.losers), false);
     await prisma.matchResult.update({ where: { id: result.id }, data: { voided: true } });
-    await syncBoard(client, setup.guildId);
+    await syncBoard(client, setup.guildId, result.game);
   });
   return true;
 }

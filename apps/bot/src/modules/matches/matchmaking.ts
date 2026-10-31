@@ -256,7 +256,7 @@ async function finishRoom(client: Client, room: MatchRoom, side: string, high: n
     },
   });
   await closeRoom(client, { ...done, voiceIds: room.voiceIds }, `🏆 **${winner}** won ${high}-${low}. This match is closed.`);
-  await syncBoard(client, room.guildId);
+  await syncBoard(client, room.guildId, room.game);
   await syncMatchmakingPanel(client, room.guildId);
 }
 

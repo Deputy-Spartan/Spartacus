@@ -729,7 +729,8 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
   }
 
   if (!config || !data) return <p className="text-sm text-slate-500">Loading…</p>;
-  const games = [...new Set([...presets.map((p) => p.game), ...setups.map((s) => s.game)])];
+  const games = [...new Set([...presets.map((p) => p.game), ...setups.map((s) => s.game), ...config.boardGames.filter((g) => g !== "ALL")])];
+  const toggleBoard = (key: string, on: boolean) => set({ boardGames: on ? [...config.boardGames, key] : config.boardGames.filter((g) => g !== key) });
   const num = (key: "challengeMinutes" | "queueMinutes" | "reportHours", label: string, hint: string) => (
     <div>
       <Label>{label}</Label>
@@ -743,18 +744,16 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
       <div className="space-y-5">
         <NeonCard>
           <p className="font-medium mb-1">Leaderboard</p>
-          <p className="text-xs text-slate-500 mb-3">Two embeds stay in one text channel: top 10 players and top 10 teams. Spartacus edits them after every match, using each player's server name.</p>
+          <p className="text-xs text-slate-500 mb-3">Each game you switch on gets its own post in one text channel, with a top 10 players embed and a top 10 teams embed. Spartacus edits them after every match, using each player's server name.</p>
           <Label>Category and text channel</Label>
           <ChannelSelect guildId={guildId} value={config.boardChannelId} onChange={(boardChannelId) => set({ boardChannelId: boardChannelId || null })} />
-          <Label>Game</Label>
-          <select className={inputClass} value={config.boardGame} onChange={(e) => set({ boardGame: e.target.value })}>
-            <option value="ALL">All Games</option>
+          <Label>Games to post</Label>
+          <div className="space-y-3 mb-3">
+            <Toggle on={config.boardGames.includes("ALL")} label="All Games" hint="Combines every game into one leaderboard." onChange={(on) => toggleBoard("ALL", on)} />
             {games.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
+              <Toggle key={g} on={config.boardGames.includes(g)} label={g} hint="Its own leaderboard post." onChange={(on) => toggleBoard(g, on)} />
             ))}
-          </select>
+          </div>
           <Hint>Teams count once they have a saved name: Matchmaking teams, players' chosen teams, and captain-named teams. Default names like Team Blue are skipped.</Hint>
           <FormError message={error} />
           <SaveStatus status={autoSave} />

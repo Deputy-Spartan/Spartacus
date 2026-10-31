@@ -247,7 +247,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGame", "channelId", "voiceCategoryId", "enabled", "createVoice", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["boardChannelId", "boardGames", "channelId", "voiceCategoryId", "enabled", "createVoice", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
@@ -267,14 +267,16 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   if (b.enabled && !b.channelId) return res.status(400).json({ error: "Pick a text channel for Matchmaking." });
 
   const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
-  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "games" ? list(b[k], 25) : b[k] === "" ? null : b[k]]));
+  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "games" || k === "boardGames" ? list(b[k], 40) : b[k] === "" ? null : b[k]]));
   const movedBoard = b.boardChannelId !== undefined && (b.boardChannelId || null) !== existing.boardChannelId;
   const movedPanel = b.channelId !== undefined && (b.channelId || null) !== existing.channelId;
   const switchedOff = b.enabled === false && existing.enabled;
-  if (movedBoard && existing.boardChannelId && existing.boardMessageId) await deleteChannelMessage(existing.boardChannelId, existing.boardMessageId).catch(() => null);
+  if (movedBoard && existing.boardChannelId) {
+    for (const id of Object.values((existing.boardMessages ?? {}) as Record<string, string>)) await deleteChannelMessage(existing.boardChannelId, id).catch(() => null);
+  }
   if ((movedPanel || switchedOff) && existing.channelId && existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
 
-  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessageId: null } : {}), ...(movedPanel || switchedOff ? { messageId: null } : {}) } });
+  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessages: {} } : {}), ...(movedPanel || switchedOff ? { messageId: null } : {}) } });
   const client = getBotClient();
   if (client) {
     const { syncBoard, syncMatchmakingPanel } = await import("@spartacus/bot");

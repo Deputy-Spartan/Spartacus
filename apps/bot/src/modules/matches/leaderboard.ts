@@ -38,22 +38,37 @@ export async function buildBoard(client: Client, guildId: string, game: string, 
   ];
 }
 
-export async function syncBoard(client: Client, guildId: string) {
+const readMessages = (value: unknown) => (value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, string>) : {});
+
+// Every switched-on game gets its own post. Passing a game only refreshes that
+// game and All Games, so one finished match doesn't edit every post.
+export async function syncBoard(client: Client, guildId: string, game?: string) {
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId } });
   if (!config?.boardChannelId) return;
   const channel = await client.channels.fetch(config.boardChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
 
-  const embeds = await buildBoard(client, guildId, config.boardGame, config.boardSince);
-  if (config.boardMessageId) {
-    const message = await channel.messages.fetch(config.boardMessageId).catch(() => null);
-    if (await message?.edit({ embeds }).catch(() => null)) return;
+  const wanted = stringList(config.boardGames);
+  const messages = { ...readMessages(config.boardMessages) };
+  for (const [key, id] of Object.entries(messages)) {
+    if (wanted.includes(key)) continue;
+    const old = await channel.messages.fetch(id).catch(() => null);
+    await old?.delete().catch(() => null);
+    delete messages[key];
   }
-  const sent = await channel.send({ embeds, allowedMentions: { parse: [] } }).catch((err) => {
-    logError("bot", err, guildId);
-    return null;
-  });
-  if (sent) await prisma.matchmakingConfig.update({ where: { guildId }, data: { boardMessageId: sent.id } });
+
+  for (const key of wanted) {
+    if (game && key !== "ALL" && key !== game && messages[key]) continue;
+    const embeds = await buildBoard(client, guildId, key, config.boardSince);
+    const message = messages[key] ? await channel.messages.fetch(messages[key]).catch(() => null) : null;
+    if (await message?.edit({ embeds }).catch(() => null)) continue;
+    const sent = await channel.send({ embeds, allowedMentions: { parse: [] } }).catch((err) => {
+      logError("bot", err, guildId);
+      return null;
+    });
+    if (sent) messages[key] = sent.id;
+  }
+  await prisma.matchmakingConfig.update({ where: { guildId }, data: { boardMessages: messages } });
 }
 
 export async function startBoardSeason(client: Client, guildId: string) {

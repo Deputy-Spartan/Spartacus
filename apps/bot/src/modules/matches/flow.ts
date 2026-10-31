@@ -3,6 +3,9 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ChannelType,
+  GuildScheduledEventEntityType,
+  GuildScheduledEventPrivacyLevel,
+  GuildScheduledEventStatus,
   ChatInputCommandInteraction,
   Client,
   GuildMember,
@@ -31,6 +34,9 @@ import {
   emptyState,
   mapPool,
   nextTie,
+  countsAsNamedTeam,
+  onTeam,
+  teamSlotName,
   cleanTeamName,
   replacePlayer,
   pickCaptain,
@@ -46,7 +52,10 @@ import {
   type MatchTeam,
   type Side,
 } from "./engine";
-import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildStats, stringList, type PlayerMap } from "./render";
+import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
+import { syncBoard } from "./leaderboard";
+import { withLock } from "./lock";
+import { syncMatchmakingPanel, tickMatchmaking } from "./matchmaking";
 
 const CONFIRM_MS = 5 * 60_000;
 const DONE_RESET_MS = 30 * 60_000;
@@ -65,15 +74,6 @@ interface Ctx {
   state: MatchState;
 }
 
-// Two people clicking at once would otherwise both load the same state and
-// the second save would wipe the first, so each setup's actions run in turn.
-const queues = new Map<string, Promise<unknown>>();
-function withLock<T>(setupId: string, run: () => Promise<T>): Promise<T> {
-  const next = (queues.get(setupId) ?? Promise.resolve()).then(run, run);
-  queues.set(setupId, next.catch(() => null));
-  return next;
-}
-
 const readState = (session: MatchSession): MatchState => ({ ...emptyState(), ...(session.state as unknown as Partial<MatchState>) });
 
 async function openSession(setup: MatchSetup, signups: string[] = []): Promise<MatchSession> {
@@ -86,6 +86,7 @@ async function openSession(setup: MatchSetup, signups: string[] = []): Promise<M
       kind: setup.format,
       phase: "SIGNUP",
       state: emptyState(signups) as unknown as Prisma.InputJsonValue,
+      phaseEndsAt: signups.length || setup.startMode === "SCHEDULED" ? signupDeadline(setup) : null,
     },
   });
 }
@@ -102,6 +103,16 @@ async function loadCtx(client: Client, setupId: string): Promise<Ctx | null> {
   session ??= await openSession(setup);
   return { client, setup, session, state: readState(session) };
 }
+
+// Scheduled setups run off their start time. Otherwise sign-ups only have a
+// deadline when timers are on.
+function signupDeadline(setup: MatchSetup): Date | null {
+  if (setup.startMode === "SCHEDULED") return setup.startAt && setup.startAt > new Date() ? setup.startAt : null;
+  return setup.useTimers ? fromNow(setup.signupMinutes * 60_000) : null;
+}
+const usesPicks = (setup: MatchSetup) => setup.joinMode === "PICK" && setup.teamSize > 1;
+const slotCount = (setup: MatchSetup, kind: string) => (kind === "TOURNAMENT" ? setup.tournamentTeams : 2);
+const slotName = (setup: MatchSetup, kind: string, slot: number) => teamSlotName(stringList(setup.teamNames), kind === "TOURNAMENT", slot, setup.team1Name, setup.team2Name);
 
 async function fetchPlayers(setup: MatchSetup, ids: string[]): Promise<PlayerMap> {
   const rows = await prisma.matchPlayer.findMany({ where: { setupId: setup.id, userId: { in: ids } } });
@@ -129,9 +140,11 @@ async function draftNames(client: Client, setup: MatchSetup, state: MatchState):
   return Object.fromEntries(state.draftPool.map((id, i) => [id, members[i]?.displayName ?? "Unknown player"]));
 }
 
-async function syncPanel({ client, setup, session, state }: Ctx) {
+async function syncPanel(ctx: Ctx) {
+  const { client, setup, session, state } = ctx;
   const channel = await client.channels.fetch(setup.panelChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
+  if (!state.eventId && session.phase !== "DONE") await createEvent(ctx);
   const ids = [...new Set([...state.signups, ...state.teams.flatMap((t) => t.players), ...state.draftPool])];
   const payload = buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, await fetchPlayers(setup, ids), await draftNames(client, setup, state));
 
@@ -156,6 +169,57 @@ async function syncPanel({ client, setup, session, state }: Ctx) {
     setup.panelMessageId = sent.id;
     await prisma.matchSetup.update({ where: { id: setup.id }, data: { panelMessageId: sent.id } });
   }
+}
+
+// Discord events need a start time, so one with no schedule is listed an hour
+// ahead and updated when it actually begins.
+const EVENT_LEAD_MS = 60 * 60_000;
+const EVENT_LENGTH_MS = 2 * 60 * 60_000;
+
+async function createEvent(ctx: Ctx) {
+  const { client, setup, session, state } = ctx;
+  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
+  if (!guild) return;
+  const start = setup.startMode === "SCHEDULED" && setup.startAt && setup.startAt > new Date() ? setup.startAt : new Date(Date.now() + EVENT_LEAD_MS);
+  const voice = setup.lobbyVoiceId ? await guild.channels.fetch(setup.lobbyVoiceId).catch(() => null) : null;
+  const details = `${session.kind === "TOURNAMENT" ? "Tournament" : setup.teamSize === 1 ? "1v1" : "Team match"} · ${setup.game}. Sign up in the panel channel.`;
+  const name = (session.kind === "TOURNAMENT" ? setup.name : `${setup.name} #${session.number}`).slice(0, 100);
+  const event = await guild.scheduledEvents
+    .create(
+      voice?.isVoiceBased()
+        ? { name, description: details, scheduledStartTime: start, privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly, entityType: GuildScheduledEventEntityType.Voice, channel: voice.id }
+        : { name, description: details, scheduledStartTime: start, scheduledEndTime: new Date(start.getTime() + EVENT_LENGTH_MS), privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly, entityType: GuildScheduledEventEntityType.External, entityMetadata: { location: "Discord" } }
+    )
+    .catch((err) => {
+      if (Date.now() - (lastPostError.get(`event:${setup.id}`) ?? 0) > POST_ERROR_GAP_MS) {
+        lastPostError.set(`event:${setup.id}`, Date.now());
+        logError("bot", err, setup.guildId);
+      }
+      return null;
+    });
+  if (!event) return;
+  state.eventId = event.id;
+  state.eventAt = start.toISOString();
+  ctx.session = await prisma.matchSession.update({ where: { id: session.id }, data: { state: state as unknown as Prisma.InputJsonValue } });
+}
+
+async function fetchEvent(ctx: Ctx) {
+  if (!ctx.state.eventId) return null;
+  const guild = await ctx.client.guilds.fetch(ctx.setup.guildId).catch(() => null);
+  return (await guild?.scheduledEvents.fetch(ctx.state.eventId).catch(() => null)) ?? null;
+}
+
+async function startEvent(ctx: Ctx) {
+  if (ctx.state.eventLive) return;
+  const event = await fetchEvent(ctx);
+  await event?.setStatus(GuildScheduledEventStatus.Active).catch((err) => logError("bot", err, ctx.setup.guildId));
+  ctx.state.eventLive = true;
+}
+
+async function endEvent(ctx: Ctx) {
+  const event = await fetchEvent(ctx);
+  await event?.setStatus(ctx.state.eventLive ? GuildScheduledEventStatus.Completed : GuildScheduledEventStatus.Canceled).catch(() => null);
+  ctx.state.eventId = null;
 }
 
 // Editing a message doesn't notify anyone, so steps that need attention send
@@ -191,14 +255,24 @@ async function teamLabel(ctx: Ctx, players: string[], fallback: string): Promise
 // ---- Steps ----
 
 // Teams wait a set time for captains, then the match starts on its own.
-const saveTeams = (ctx: Ctx) => save(ctx, "TEAMS", fromNow(ctx.setup.autoStartSeconds * 1000));
-const signupDeadline = (setup: MatchSetup) => fromNow(setup.signupMinutes * 60_000);
+const saveTeams = (ctx: Ctx) => save(ctx, "TEAMS", ctx.setup.useTimers ? fromNow(ctx.setup.autoStartSeconds * 1000) : null);
+
+// Hidden rosters go public once registration closes.
+async function revealRosters(ctx: Ctx) {
+  const { client, setup, state } = ctx;
+  if (!state.reveal) return;
+  state.reveal = false;
+  const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
+  if (isSendableChannel(channel)) await channel.send({ embeds: [buildRosters(state.teams)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
+  await ping(ctx, "Registration closed. Rosters are revealed.");
+}
 
 async function closeSignups(ctx: Ctx) {
+  ctx.state.reveal = ctx.setup.rosterView === "HIDDEN";
   if (ctx.session.kind === "TOURNAMENT") return startTournament(ctx);
   if (!ctx.setup.checkIn) return enterTeams(ctx);
   ctx.state.ready = [];
-  const endsAt = new Date(Date.now() + ctx.setup.checkInSeconds * 1000);
+  const endsAt = ctx.setup.useTimers ? fromNow(ctx.setup.checkInSeconds * 1000) : null;
   await ping(ctx, `${roleMention(ctx.setup)}${ctx.state.signups.map((id) => `<@${id}>`).join(" ")} Lobby is full. Check in on the panel.`.slice(0, 2000));
   await save(ctx, "CHECKIN", endsAt);
 }
@@ -210,6 +284,18 @@ async function enterTeams(ctx: Ctx) {
   const ids = state.signups.slice(0, perTeam * 2);
   const ratings = await ratingsFor(setup, ids);
 
+  if (usesPicks(setup)) {
+    const groups = [onTeam(state, 0), onTeam(state, 1)];
+    if (!groups[0].length || !groups[1].length) {
+      await ping(ctx, "Both teams need at least one player, so sign-ups are still open.");
+      return save(ctx, "SIGNUP", ctx.session.phaseEndsAt);
+    }
+    const all = await ratingsFor(setup, state.signups);
+    state.teams = groups.map((players, i) => ({ name: slotName(setup, "SINGLE", i), players, captain: pickCaptain(players, all, setup.captainRule) }));
+    await revealRosters(ctx);
+    return saveTeams(ctx);
+  }
+
   if (setup.balance === "CAPTAINS" && perTeam > 1) {
     const first = pickCaptain(ids, ratings, setup.captainRule);
     const second = pickCaptain(ids.filter((id) => id !== first), ratings, setup.captainRule);
@@ -219,10 +305,11 @@ async function enterTeams(ctx: Ctx) {
     ];
     state.draftPool = ids.filter((id) => id !== first && id !== second);
     state.draftPick = 0;
-    return save(ctx, "DRAFT", new Date(Date.now() + setup.voteSeconds * 1000));
+    return save(ctx, "DRAFT", fromNow(setup.voteSeconds * 1000));
   }
 
   await buildTeams(ctx, ids, ratings);
+  await revealRosters(ctx);
   await saveTeams(ctx);
 }
 
@@ -240,23 +327,32 @@ async function draftPick(ctx: Ctx, userId: string) {
   state.draftPool = state.draftPool.filter((id) => id !== userId);
   state.teams[draftSide(state.draftPick) === "a" ? 0 : 1].players.push(userId);
   state.draftPick++;
-  if (state.draftPool.length === 0) await saveTeams(ctx);
-  else await save(ctx, "DRAFT", new Date(Date.now() + ctx.setup.voteSeconds * 1000));
+  if (state.draftPool.length > 0) return save(ctx, "DRAFT", fromNow(ctx.setup.voteSeconds * 1000));
+  await revealRosters(ctx);
+  await saveTeams(ctx);
 }
 
 async function startTournament(ctx: Ctx): Promise<string | void> {
   const { setup, state } = ctx;
-  const teamCount = bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams);
-  if (teamCount < 2) return `A bracket needs at least ${setup.teamSize * 2} players.`;
-  const ids = shuffle(state.signups).slice(0, teamCount * setup.teamSize);
-  const ratings = await ratingsFor(setup, ids);
-  const split = splitTeams(ids, ratings, teamCount, setup.teamSize, setup.balance === "RANDOM" ? "RANDOM" : "BALANCED");
-  state.teams = await Promise.all(
-    split.map(async (players, i): Promise<MatchTeam> => ({ name: await teamLabel(ctx, players, `Team ${i + 1}`), players, captain: pickCaptain(players, ratings, setup.captainRule) }))
-  );
+  const ratings = await ratingsFor(setup, state.signups);
+  const groups = usesPicks(setup)
+    ? Array.from({ length: setup.tournamentTeams }, (_, i) => ({ name: slotName(setup, "TOURNAMENT", i), players: onTeam(state, i) })).filter((g) => g.players.length).sort((x, y) => y.players.length - x.players.length)
+    : null;
+  let teamCount = bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams);
+  if (groups) teamCount = bracketTeamCount(groups.length, 1, setup.tournamentTeams);
+  if (teamCount < 2) return groups ? "A bracket needs at least 2 teams with players." : `A bracket needs at least ${setup.teamSize * 2} players.`;
+  if (groups) state.teams = groups.slice(0, teamCount).map((g) => ({ ...g, captain: pickCaptain(g.players, ratings, setup.captainRule) }));
+  else {
+    const ids = shuffle(state.signups).slice(0, teamCount * setup.teamSize);
+    const split = splitTeams(ids, ratings, teamCount, setup.teamSize, setup.balance === "RANDOM" ? "RANDOM" : "BALANCED");
+    state.teams = await Promise.all(
+      split.map(async (players, i): Promise<MatchTeam> => ({ name: await teamLabel(ctx, players, slotName(setup, "TOURNAMENT", i)), players, captain: pickCaptain(players, ratings, setup.captainRule) }))
+    );
+  }
   state.bracket = buildBracket(teamCount);
   state.tie = nextTie(state.bracket);
   await clearPings(ctx);
+  await revealRosters(ctx);
   await syncBracket(ctx, true);
   if (setup.teamNaming === "CAPTAIN" && setup.teamSize > 1) {
     await ping(ctx, `${state.teams.map((t) => `<@${t.captain}>`).join(" ")} Name your team on the panel.`.slice(0, 2000));
@@ -298,7 +394,7 @@ async function startMapStep(ctx: Ctx) {
   if (setup.mapMethod === "RANDOM") return goLive(ctx, pickOne(mapPool(maps, recent, 1)), "Picked at random by the bot");
 
   state.mapOptions = shuffle(mapPool(maps, recent, setup.mapChoices)).slice(0, setup.mapChoices);
-  await save(ctx, "MAP", new Date(Date.now() + setup.voteSeconds * 1000));
+  await save(ctx, "MAP", fromNow(setup.voteSeconds * 1000));
 }
 
 async function closeVote(ctx: Ctx) {
@@ -312,7 +408,7 @@ async function banMap(ctx: Ctx, map: string) {
   state.banTurn = state.banTurn === "a" ? "b" : "a";
   const left = state.mapOptions.filter((m) => !state.banned.includes(m));
   if (left.length === 1) return goLive(ctx, left[0], `Last one left after ${state.banned.length} bans`);
-  await save(ctx, "MAP", new Date(Date.now() + setup.voteSeconds * 1000));
+  await save(ctx, "MAP", fromNow(setup.voteSeconds * 1000));
 }
 
 async function goLive(ctx: Ctx, map: string | null, note: string | null) {
@@ -324,7 +420,8 @@ async function goLive(ctx: Ctx, map: string | null, note: string | null) {
   state.reminded = false;
   state.disputes = 0;
   if (state.tie) state.bracket[state.tie[0]][state.tie[1]].map = map;
-  const deadline = fromNow(setup.reportMinutes * 60_000);
+  const deadline = setup.useTimers ? fromNow(setup.reportMinutes * 60_000) : null;
+  await startEvent(ctx);
   await save(ctx, "LIVE", deadline);
   const pings = await openTeamRooms(ctx);
   if (pings.length) await ping(ctx, pings.join("\n").slice(0, 2000));
@@ -418,6 +515,8 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
   if (!teams) return;
   await clearPings(ctx);
   const [winner, loser] = report.winner === "a" ? teams : [teams[1], teams[0]];
+  const trackTeams = setup.teamSize > 1 && (usesPicks(setup) || setup.teamNaming === "CAPTAIN");
+  const named = (name: string) => (trackTeams && countsAsNamedTeam(name, setup.team1Name, setup.team2Name) ? name : null);
   await payPlayers(ctx, winner.players, true);
   await payPlayers(ctx, loser.players, false);
   const result = await prisma.matchResult.create({
@@ -426,6 +525,9 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
       guildId: setup.guildId,
       sessionId: session.id,
       number: session.number,
+      game: setup.game,
+      winnerTeam: named(winner.name),
+      loserTeam: named(loser.name),
       map: state.map,
       winnerName: winner.name,
       loserName: loser.name,
@@ -439,7 +541,7 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
   });
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
   if (isSendableChannel(channel)) await channel.send({ embeds: [buildResult(setup, result)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
-  await syncLeaderboard(client, setup);
+  await syncBoard(client, setup.guildId);
   await closeTeamRooms(ctx);
 
   if (state.tie) {
@@ -449,7 +551,9 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
     if (champion === null) return startMapStep(ctx);
     state.champion = champion;
     await crownChampion(ctx, state.teams[champion]);
+    await endEvent(ctx);
   } else {
+    await endEvent(ctx);
     state.winner = report.winner;
     state.score = `${report.winnerScore}-${report.loserScore}`;
   }
@@ -470,30 +574,11 @@ async function crownChampion(ctx: Ctx, team: MatchTeam) {
       await member?.roles.add(setup.championRoleId).catch((err) => logError("bot", err, setup.guildId));
     }
   }
-  await syncLeaderboard(client, setup);
-}
-
-async function syncLeaderboard(client: Client, setup: MatchSetup) {
-  const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
-  if (!isSendableChannel(channel)) return;
-  const rows = await prisma.matchPlayer.findMany({ where: { setupId: setup.id, OR: [{ wins: { gt: 0 } }, { losses: { gt: 0 } }] }, orderBy: [{ wins: "desc" }, { rating: "desc" }], take: 15 });
-  const embed = buildLeaderboard(setup, rows);
-  if (setup.leaderboardMessageId) {
-    const message = await channel.messages.fetch(setup.leaderboardMessageId).catch(() => null);
-    if (await message?.edit({ embeds: [embed] }).catch(() => null)) return;
-  }
-  const sent = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch((err) => {
-    logError("bot", err, setup.guildId);
-    return null;
-  });
-  if (!sent) return;
-  await sent.pin().catch(() => null);
-  setup.leaderboardMessageId = sent.id;
-  await prisma.matchSetup.update({ where: { id: setup.id }, data: { leaderboardMessageId: sent.id } });
 }
 
 async function replaceSession(ctx: Ctx, signups: string[] = []) {
   await clearPings(ctx);
+  await endEvent(ctx);
   await prisma.matchSession.update({ where: { id: ctx.session.id }, data: { closedAt: new Date(), phaseEndsAt: null, state: ctx.state as unknown as Prisma.InputJsonValue } });
   ctx.session = await openSession(ctx.setup, signups);
   ctx.state = readState(ctx.session);
@@ -502,8 +587,13 @@ async function replaceSession(ctx: Ctx, signups: string[] = []) {
 async function expirePhase(ctx: Ctx) {
   const { session, state, setup } = ctx;
   if (session.phase === "SIGNUP") {
-    if (session.kind === "TOURNAMENT" && bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams) >= 2) return void (await startTournament(ctx));
+    const enough = session.kind === "TOURNAMENT" ? bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams) >= 2 : state.signups.length >= 2 && setup.startMode === "SCHEDULED";
+    if (enough) {
+      const problem = await closeSignups(ctx);
+      if (!problem) return;
+    }
     state.signups = [];
+    state.picks = {};
     await clearPings(ctx);
     await ping(ctx, "Not enough players joined in time, so sign-ups were reset.");
     return save(ctx, "SIGNUP");
@@ -513,6 +603,7 @@ async function expirePhase(ctx: Ctx) {
     await clearPings(ctx);
     if (state.signups.length >= lobbySize(setup, session.kind)) return enterTeams(ctx);
     await ping(ctx, `${roleMention(setup)}Not everyone checked in, so sign-ups are open again.`);
+    state.picks = Object.fromEntries(Object.entries(state.picks).filter(([id]) => state.signups.includes(id)));
     return save(ctx, "SIGNUP", state.signups.length ? signupDeadline(setup) : null);
   }
   if (session.phase === "DRAFT") {
@@ -572,25 +663,40 @@ function memberIsStaff(member: GuildMember | null, setup: MatchSetup): boolean {
 
 const isCaptain = (ctx: Ctx, userId: string) => !!currentTeams(ctx.state)?.some((t) => t.captain === userId);
 
-function rankPicker(setup: MatchSetup): InteractionEditReplyOptions {
+function rankPicker(setup: MatchSetup, slot?: number): InteractionEditReplyOptions {
   const menu = new StringSelectMenuBuilder()
-    .setCustomId(`matchrank:${setup.id}`)
+    .setCustomId(`matchrank:${setup.id}${slot === undefined ? "" : `:${slot}`}`)
     .setPlaceholder("Your rank")
     .addOptions(stringList(setup.ranks).slice(0, 25).map((r, i) => ({ label: r.slice(0, 100), value: String(i) })));
   return { content: `Pick your ${setup.game} rank to continue. It's used to balance teams.`, components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
 }
 
-async function join(ctx: Ctx, userId: string): Promise<Reply> {
+async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
   const { setup, session, state } = ctx;
   if (session.phase !== "SIGNUP") return "Sign-ups are closed for this match.";
   if (state.signups.includes(userId)) return "You're already in.";
+  const picking = usesPicks(setup);
+  if (picking && (slot === undefined || slot >= slotCount(setup, session.kind))) return "Pick a team on the panel.";
+  if (picking && onTeam(state, slot!).length >= setup.teamSize) return "That team is full. Pick another one.";
   if (setup.useRanks) {
     const player = await prisma.matchPlayer.findUnique({ where: { setupId_userId: { setupId: setup.id, userId } } });
-    if (player?.rank === null || player?.rank === undefined) return rankPicker(setup);
+    if (player?.rank === null || player?.rank === undefined) return rankPicker(setup, slot);
   }
   state.signups.push(userId);
-  if (state.signups.length >= lobbySize(setup, session.kind)) await closeSignups(ctx);
-  else await save(ctx, "SIGNUP", session.phaseEndsAt ?? signupDeadline(setup));
+  if (picking) state.picks[userId] = slot!;
+  const full = state.signups.length >= lobbySize(setup, session.kind);
+  if (full && setup.startMode === "FULL") await closeSignups(ctx);
+  else {
+    if (full && !state.fullPinged) {
+      state.fullPinged = true;
+      await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}${setup.pingRoleId ? `<@&${setup.pingRoleId}> ` : ""}The lobby is full.${setup.startMode === "MANUAL" ? " Staff can start it from the panel." : ""}`);
+    }
+    await save(ctx, "SIGNUP", session.phaseEndsAt ?? signupDeadline(setup));
+  }
+  if (picking) {
+    const name = slotName(setup, session.kind, slot!);
+    return setup.rosterView === "HIDDEN" ? `You're on ${name}. Your teammates stay hidden until registration closes.` : `You're on ${name}.`;
+  }
   return session.kind === "TOURNAMENT" ? "You're registered." : `You're in for Match #${session.number}.`;
 }
 
@@ -604,11 +710,21 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
   switch (action) {
     case "join":
       return join(ctx, userId);
+    case "pick":
+      return join(ctx, userId, Number(arg));
+    case "myteam": {
+      const slot = state.picks[userId];
+      if (slot === undefined) return "You aren't on a team.";
+      const name = slotName(setup, session.kind, slot);
+      return setup.rosterView === "HIDDEN" ? `You're on ${name}. ${onTeam(state, slot).length}/${setup.teamSize} slots are filled, and names stay hidden until registration closes.` : `You're on ${name}.`;
+    }
     case "leave":
       if (session.phase !== "SIGNUP") return "You can't leave once sign-ups have closed. Ask staff to cancel the match.";
       if (!state.signups.includes(userId)) return "You aren't signed up.";
       state.signups = state.signups.filter((id) => id !== userId);
-      await save(ctx, "SIGNUP", state.signups.length ? session.phaseEndsAt : null);
+      delete state.picks[userId];
+      state.fullPinged = false;
+      await save(ctx, "SIGNUP", state.signups.length || setup.startMode === "SCHEDULED" ? session.phaseEndsAt : null);
       return "You left the sign-ups.";
     case "ready":
       if (session.phase !== "CHECKIN") return "Check-in isn't running.";
@@ -658,7 +774,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       state.reminded = true;
       await clearPings(ctx);
       await ping(ctx, state.disputes >= 2 ? `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}Captains disagreed twice. Only staff can report this score now.` : "Result disputed. Captains can report once more, then it goes to staff.");
-      await save(ctx, "LIVE", fromNow(setup.reportMinutes * 60_000));
+      await save(ctx, "LIVE", setup.useTimers ? fromNow(setup.reportMinutes * 60_000) : null);
       return "Result disputed.";
     }
     case "runback": {
@@ -713,7 +829,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (!staff) return staffOnly;
       const buttons: ButtonBuilder[] = [];
       const add = (id: string, label: string, style = ButtonStyle.Primary) => buttons.push(new ButtonBuilder().setCustomId(`match:${setup.id}:${id}`).setLabel(label).setStyle(style));
-      if (session.phase === "SIGNUP") add("force", "Start With Fewer");
+      if (session.phase === "SIGNUP") add("force", state.signups.length >= lobbySize(setup, session.kind) ? "Start Now" : "Start With Fewer");
       if (session.phase === "CHECKIN") add("skipcheck", "Skip Check-In");
       if (session.phase === "TEAMS") add("reroll", "Reroll Teams");
       if (session.phase === "MAP" && setup.mapMethod === "VOTE") add("endvote", "End Vote Now");
@@ -725,9 +841,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (!staff) return staffOnly;
       if (session.phase !== "SIGNUP") return "Sign-ups are already closed.";
       if (state.signups.length < 2) return "You need at least 2 players.";
-      if (session.kind === "TOURNAMENT") return (await startTournament(ctx)) ?? "Bracket created.";
-      await closeSignups(ctx);
-      return "Starting with the players signed up.";
+      return (await closeSignups(ctx)) ?? "Starting with the players signed up.";
     case "skipcheck":
       if (!staff) return staffOnly;
       if (session.phase !== "CHECKIN") return "Check-in isn't running.";
@@ -736,6 +850,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
     case "reroll": {
       if (!staff) return staffOnly;
       if (session.phase !== "TEAMS") return "Teams can only be rerolled before the match starts.";
+      if (usesPicks(setup)) return "Players chose these teams, so they can't be rerolled.";
       const ids = state.teams.flatMap((t) => t.players);
       await buildTeams(ctx, shuffle(ids), await ratingsFor(setup, ids));
       await saveTeams(ctx);
@@ -876,7 +991,7 @@ export async function handleMatchScore(interaction: ModalSubmitInteraction) {
 }
 
 export async function handleMatchRank(interaction: StringSelectMenuInteraction) {
-  const setupId = interaction.customId.split(":")[1];
+  const [, setupId, slotArg] = interaction.customId.split(":");
   const rank = Number(interaction.values[0]);
   await interaction.deferUpdate();
   try {
@@ -884,7 +999,7 @@ export async function handleMatchRank(interaction: StringSelectMenuInteraction) 
       const ctx = await loadCtx(interaction.client, setupId);
       if (!ctx) return "This match setup no longer exists.";
       await setPlayerRank(ctx.setup, interaction.user.id, rank);
-      if (ctx.session.phase === "SIGNUP") return join(ctx, interaction.user.id);
+      if (ctx.session.phase === "SIGNUP") return join(ctx, interaction.user.id, slotArg === undefined ? undefined : Number(slotArg));
       return "Rank saved. Tap Subs on the panel again to jump in.";
     });
     await respond(interaction, reply);
@@ -974,7 +1089,45 @@ export async function handleMatchCommand(interaction: ChatInputCommandInteractio
 
 // ---- Timer ----
 
+// Discord drops an event left past its start time, so unstarted ones stay ahead.
+let lastEventSweep = 0;
+async function keepEventsAhead(client: Client) {
+  if (Date.now() - lastEventSweep < 60_000) return;
+  lastEventSweep = Date.now();
+  const open = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "SIGNUP" }, include: { setup: true }, take: 50 });
+  for (const row of open) {
+    if (row.setup.startMode === "SCHEDULED" && row.phaseEndsAt) continue;
+    const state = readState(row);
+    if (!state.eventId || !state.eventAt || new Date(state.eventAt).getTime() > Date.now() + 10 * 60_000) continue;
+    await withLock(row.setupId, async () => {
+      const ctx = await loadCtx(client, row.setupId);
+      if (!ctx || ctx.session.id !== row.id) return;
+      const event = await fetchEvent(ctx);
+      const next = new Date(Date.now() + EVENT_LEAD_MS);
+      await event?.edit({ scheduledStartTime: next }).catch((err) => logError("bot", err, row.guildId));
+      ctx.state.eventAt = next.toISOString();
+      await prisma.matchSession.update({ where: { id: row.id }, data: { state: ctx.state as unknown as Prisma.InputJsonValue } });
+    }).catch((err) => logError("bot", err, row.guildId));
+  }
+}
+
+// The old per-setup leaderboard message is replaced by the Leaderboard tab.
+async function removeOldBoards(client: Client) {
+  const old = await prisma.matchSetup.findMany({ where: { leaderboardMessageId: { not: null } }, take: 10 });
+  for (const setup of old) {
+    const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
+    if (isSendableChannel(channel)) {
+      const message = await channel.messages.fetch(setup.leaderboardMessageId!).catch(() => null);
+      await message?.delete().catch(() => null);
+    }
+    await prisma.matchSetup.update({ where: { id: setup.id }, data: { leaderboardMessageId: null } });
+  }
+}
+
 export async function tickMatches(client: Client) {
+  await removeOldBoards(client);
+  await keepEventsAhead(client);
+  await tickMatchmaking(client);
   const pending = await prisma.matchSetup.findMany({ where: { enabled: true, panelMessageId: null }, take: 10 });
   for (const setup of pending) {
     if (!(await isModuleEnabled(setup.guildId, "MATCHES"))) continue;
@@ -982,7 +1135,6 @@ export async function tickMatches(client: Client) {
       const ctx = await loadCtx(client, setup.id);
       if (!ctx) return;
       await syncPanel(ctx);
-      if (ctx.setup.panelMessageId && !ctx.setup.leaderboardMessageId) await syncLeaderboard(client, ctx.setup);
     }).catch((err) => logError("bot", err, setup.guildId));
   }
 
@@ -995,7 +1147,7 @@ export async function tickMatches(client: Client) {
     }).catch((err) => logError("bot", err, row.guildId));
   }
 
-  const finished = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "SINGLE", doneAt: { lte: new Date(now.getTime() - DONE_RESET_MS) } }, take: 20 });
+  const finished = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "SINGLE", setup: { useTimers: true }, doneAt: { lte: new Date(now.getTime() - DONE_RESET_MS) } }, take: 20 });
   for (const row of finished) {
     await withLock(row.setupId, async () => {
       const ctx = await loadCtx(client, row.setupId);
@@ -1007,7 +1159,7 @@ export async function tickMatches(client: Client) {
 
   const tournaments = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "TOURNAMENT" }, include: { setup: true }, take: 20 });
   for (const row of tournaments) {
-    const hours = row.setup.autoReopenHours;
+    const hours = row.setup.useTimers ? row.setup.autoReopenHours : 0;
     if (!hours || !row.doneAt || row.doneAt.getTime() + hours * 3_600_000 > now.getTime()) continue;
     await withLock(row.setupId, async () => {
       const ctx = await loadCtx(client, row.setupId);
@@ -1023,8 +1175,29 @@ export async function tickMatches(client: Client) {
 export async function refreshMatchPanel(client: Client, setupId: string) {
   await withLock(setupId, async () => {
     const ctx = await loadCtx(client, setupId);
-    if (ctx) await syncPanel(ctx);
+    if (!ctx) return;
+    if (ctx.session.phase === "SIGNUP") {
+      const deadline = signupDeadline(ctx.setup);
+      ctx.session = await prisma.matchSession.update({ where: { id: ctx.session.id }, data: { phaseEndsAt: ctx.setup.startMode === "SCHEDULED" || !ctx.state.signups.length ? deadline : ctx.session.phaseEndsAt ?? deadline } });
+      if (ctx.state.eventId && ctx.setup.startMode === "SCHEDULED" && ctx.setup.startAt) {
+        const event = await fetchEvent(ctx);
+        await event?.edit({ scheduledStartTime: ctx.setup.startAt }).catch((err) => logError("bot", err, ctx.setup.guildId));
+      }
+    }
+    await syncPanel(ctx);
   });
+}
+
+// Who's on each team, for staff, while rosters are hidden from players.
+export async function matchRoster(client: Client, setupId: string): Promise<Array<{ team: string; players: string[] }>> {
+  const ctx = await loadCtx(client, setupId);
+  if (!ctx) return [];
+  const { setup, session, state } = ctx;
+  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
+  const name = async (id: string) => (await guild?.members.fetch(id).catch(() => null))?.displayName ?? id;
+  if (state.teams.length) return Promise.all(state.teams.map(async (t) => ({ team: t.name, players: await Promise.all(t.players.map(name)) })));
+  if (usesPicks(setup)) return Promise.all(Array.from({ length: slotCount(setup, session.kind) }, async (_, i) => ({ team: slotName(setup, session.kind, i), players: await Promise.all(onTeam(state, i).map(name)) })));
+  return [{ team: "Registered", players: await Promise.all(state.signups.map(name)) }];
 }
 
 export async function cancelMatch(client: Client, setupId: string) {
@@ -1041,18 +1214,15 @@ export async function closeMatchRooms(client: Client, setupId: string) {
   });
 }
 
-export async function startMatchSeason(client: Client, setupId: string) {
-  await withLock(setupId, async () => {
-    const setup = await prisma.matchSetup.update({ where: { id: setupId }, data: { season: { increment: 1 } } });
-    await prisma.matchPlayer.updateMany({ where: { setupId }, data: { wins: 0, losses: 0, streak: 0, tournamentWins: 0 } });
-    await syncLeaderboard(client, setup);
-  });
-}
-
 export async function voidMatchResult(client: Client, resultId: string): Promise<boolean> {
   const result = await prisma.matchResult.findUnique({ where: { id: resultId }, include: { setup: true } });
   if (!result || result.voided) return false;
   const { setup } = result;
+  if (!setup) {
+    await prisma.matchResult.update({ where: { id: result.id }, data: { voided: true } });
+    await syncBoard(client, result.guildId);
+    return true;
+  }
   await withLock(setup.id, async () => {
     const economyOn = await isModuleEnabled(setup.guildId, "ECONOMY");
     const economy = economyOn ? await getConfig(setup.guildId) : null;
@@ -1077,7 +1247,7 @@ export async function voidMatchResult(client: Client, resultId: string): Promise
     await undo(stringList(result.winners), true);
     await undo(stringList(result.losers), false);
     await prisma.matchResult.update({ where: { id: result.id }, data: { voided: true } });
-    await syncLeaderboard(client, setup);
+    await syncBoard(client, setup.guildId);
   });
   return true;
 }

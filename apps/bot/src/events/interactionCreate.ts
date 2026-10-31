@@ -35,6 +35,16 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && /^mm[a-z]*:/.test(interaction.customId)) {
+    if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "MATCHES"))) {
+      await interaction.reply({ content: "⚠️ Matchmaking is disabled for this server.", ephemeral: true });
+      return;
+    }
+    const { handleMatchmaking } = await import("../modules/matches/matchmaking");
+    await handleMatchmaking(interaction);
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId === "verify:click") {
     const { handleVerifyButton } = await import("../modules/security/verification");
     await handleVerifyButton(interaction);

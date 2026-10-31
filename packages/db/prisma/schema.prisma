@@ -110,6 +110,9 @@ model Guild {
   welcomeGreetings  WelcomeGreeting[]
   matchSetups       MatchSetup[]
   matchPresets      MatchPreset[]
+  matchmakingConfig MatchmakingConfig?
+  matchTeams        MatchTeam[]
+  matchRooms        MatchRoom[]
   createdAt         DateTime             @default(now())
 }
 
@@ -2272,6 +2275,12 @@ model MatchSetup {
   enabled              Boolean  @default(true)
   format               String   @default("SINGLE") // SINGLE | TOURNAMENT
   teamSize             Int      @default(5)
+  joinMode             String   @default("ASSIGN") // ASSIGN | PICK
+  rosterView           String   @default("PUBLIC") // PUBLIC | HIDDEN until registration closes
+  teamNames            Json     @default("[]") // tournament slots when players pick a team
+  startMode            String   @default("MANUAL") // MANUAL | SCHEDULED | FULL
+  startAt              DateTime?
+  useTimers            Boolean  @default(false)
   tournamentTeams      Int      @default(4) // 4 | 8 | 16
   balance              String   @default("BALANCED") // BALANCED | CAPTAINS | RANDOM
   captainRule          String   @default("TOP") // TOP | RANDOM
@@ -2285,14 +2294,14 @@ model MatchSetup {
   maps                 Json     @default("[]")
   mapMethod            String   @default("VOTE") // VOTE | RANDOM | BANS
   mapChoices           Int      @default(3)
-  voteSeconds          Int      @default(60) // whole vote, or each captain's ban turn
+  voteSeconds          Int      @default(0) // whole vote, or each captain's ban turn. 0 has no limit
   skipRecent           Int      @default(0)
-  checkIn              Boolean  @default(true)
+  checkIn              Boolean  @default(false)
   checkInSeconds       Int      @default(120)
   autoMove             Boolean  @default(true)
   reportBy             String   @default("BOTH") // BOTH | CAPTAIN | STAFF
   lobbyVoiceId         String? // team voice channels are created beside this one for each match
-  rewardsEnabled       Boolean  @default(true)
+  rewardsEnabled       Boolean  @default(false)
   teamNaming           String   @default("SET") // SET | CAPTAIN
   autoStartSeconds     Int      @default(120) // 0 waits for a captain or staff
   reportMinutes        Int      @default(90) // 0 never chases a missing score
@@ -2360,11 +2369,14 @@ model MatchPlayer {
 }
 
 model MatchResult {
-  id          String     @id @default(cuid())
-  setup       MatchSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
-  setupId     String
+  id          String      @id @default(cuid())
+  setup       MatchSetup? @relation(fields: [setupId], references: [id], onDelete: SetNull) // null for Matchmaking, and kept for the leaderboard if a setup is deleted
+  setupId     String?
   guildId     String
-  sessionId   String
+  sessionId   String?
+  game        String      @default("")
+  winnerTeam  String? // set when the team counts on the team leaderboard
+  loserTeam   String?
   number      Int
   map         String?
   winnerName  String
@@ -2379,4 +2391,102 @@ model MatchResult {
   createdAt   DateTime   @default(now())
 
   @@index([setupId, createdAt])
+  @@index([guildId, createdAt])
+}
+
+// The Leaderboard and Matchmaking tabs. One per server, across every game.
+model MatchmakingConfig {
+  id               String    @id @default(cuid())
+  guild            Guild     @relation(fields: [guildId], references: [id])
+  guildId          String    @unique
+  boardChannelId   String?
+  boardMessageId   String?
+  boardGame        String    @default("ALL")
+  boardSince       DateTime?
+  enabled          Boolean   @default(false)
+  channelId        String?
+  messageId        String?
+  voiceCategoryId  String?
+  createVoice      Boolean   @default(true)
+  ranked           Boolean   @default(true)
+  games            Json      @default("[]")
+  challengeMinutes Int       @default(5)
+  queueMinutes     Int       @default(60)
+  reportHours      Int       @default(3)
+  staffRoleId      String?
+  nextRoomNumber   Int       @default(1)
+}
+
+// A saved team for one game. Its name is what the team leaderboard tracks.
+model MatchTeam {
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  game      String
+  name      String
+  captainId String
+  players   Json     @default("[]")
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, game, name])
+  @@index([guildId, captainId])
+}
+
+model MatchQueue {
+  id       String   @id @default(cuid())
+  guildId  String
+  game     String
+  kind     String // SOLO | TEAM
+  userId   String // the player, or the team's captain
+  teamId   String?
+  joinedAt DateTime @default(now())
+
+  @@unique([guildId, game, kind, userId])
+  @@index([joinedAt])
+}
+
+model MatchChallenge {
+  id        String   @id @default(cuid())
+  guildId   String
+  game      String
+  kind      String // SOLO | TEAM
+  fromId    String
+  toId      String // the player, or the other team's captain
+  fromTeam  String?
+  toTeam    String?
+  messageId String?
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+// One Matchmaking match: its private thread, voice channels and result.
+model MatchRoom {
+  id          String    @id @default(cuid())
+  guild       Guild     @relation(fields: [guildId], references: [id])
+  guildId     String
+  number      Int
+  kind        String // SOLO | TEAM
+  game        String
+  aName       String
+  bName       String
+  aPlayers    Json
+  bPlayers    Json
+  aCaptain    String
+  bCaptain    String
+  map         String?
+  threadId    String?
+  voiceIds    Json      @default("[]")
+  messageId   String?
+  status      String    @default("LIVE") // LIVE | CONFIRM | DONE | CANCELED
+  reportSide  String?
+  reportHigh  Int?
+  reportLow   Int?
+  reportedBy  String?
+  disputes    Int       @default(0)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([guildId, status])
+  @@index([status, expiresAt])
 }

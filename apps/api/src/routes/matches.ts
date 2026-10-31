@@ -35,19 +35,25 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   if (!whole(b.teamSize, 1, 10)) return { error: "Team size must be from 1 to 10." };
   if (format === "TOURNAMENT" && ![4, 8, 16].includes(b.tournamentTeams as number)) return { error: "Tournaments run with 4, 8 or 16 teams." };
   if (useRanks && ranks.length < 2) return { error: "Add at least 2 ranks, or turn ranks off." };
+  const startMode = pick(b.startMode, ["MANUAL", "SCHEDULED", "FULL"], "MANUAL");
+  const startAt = typeof b.startAt === "string" && b.startAt ? new Date(b.startAt) : null;
+  if (startMode === "SCHEDULED" && (!startAt || Number.isNaN(startAt.getTime()))) return { error: "Pick a start date and time." };
   if (useMaps) {
     if (maps.length < 1) return { error: "Add at least 1 option to the list, or turn maps off." };
     if (mapMethod !== "RANDOM" && (maps.length < 2 || !whole(b.mapChoices, 2, Math.min(20, maps.length)))) return { error: `Options to pick must be from 2 to ${Math.min(20, maps.length)}.` };
-    if (mapMethod !== "RANDOM" && !whole(b.voteSeconds, 10, 300)) return { error: "Voting time must be from 10 to 300 seconds." };
+    if (mapMethod !== "RANDOM" && b.voteSeconds !== 0 && !whole(b.voteSeconds, 10, 300)) return { error: "Voting time must be 0 (no limit) or from 10 to 300 seconds." };
     if (!whole(b.skipRecent, 0, Math.max(0, maps.length - 1))) return { error: "Skip recent is too high for this list." };
   }
-  if (Boolean(b.checkIn) && !whole(b.checkInSeconds, 15, 600)) return { error: "Check-in time must be from 15 to 600 seconds." };
+  const useTimers = Boolean(b.useTimers);
+  if (useTimers && Boolean(b.checkIn) && !whole(b.checkInSeconds, 15, 600)) return { error: "Check-in time must be from 15 to 600 seconds." };
   if (autoMove && !lobbyVoiceId) return { error: "Pick the main voice channel, or turn off moving players." };
   const offOr = (v: unknown, min: number, max: number) => v === 0 || whole(v, min, max);
-  if (!offOr(b.autoStartSeconds, 15, 600)) return { error: "Auto-start must be 0 (off) or from 15 to 600 seconds." };
-  if (!offOr(b.reportMinutes, 5, 720)) return { error: "Score deadline must be 0 (off) or from 5 to 720 minutes." };
-  if (!offOr(b.signupMinutes, 5, 10080)) return { error: "Sign-up time must be 0 (off) or from 5 to 10080 minutes." };
-  if (!whole(b.autoReopenHours, 0, 720)) return { error: "Reopen time must be from 0 to 720 hours." };
+  if (useTimers) {
+    if (!offOr(b.autoStartSeconds, 15, 600)) return { error: "Auto-start must be 0 (off) or from 15 to 600 seconds." };
+    if (!offOr(b.reportMinutes, 5, 720)) return { error: "Score deadline must be 0 (off) or from 5 to 720 minutes." };
+    if (!offOr(b.signupMinutes, 5, 10080)) return { error: "Sign-up time must be 0 (off) or from 5 to 10080 minutes." };
+    if (!whole(b.autoReopenHours, 0, 720)) return { error: "Reopen time must be from 0 to 720 hours." };
+  }
   if (![b.winCoins, b.lossCoins, b.championCoins].every((c) => whole(c, 0, 1_000_000))) return { error: "Coin rewards must be whole numbers of 0 or more." };
 
   return {
@@ -70,20 +76,26 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       maps,
       mapMethod,
       mapChoices: useMaps && mapMethod !== "RANDOM" ? (b.mapChoices as number) : 3,
-      voteSeconds: useMaps && mapMethod !== "RANDOM" ? (b.voteSeconds as number) : 60,
+      voteSeconds: useMaps && mapMethod !== "RANDOM" ? (b.voteSeconds as number) : 0,
       skipRecent: useMaps ? (b.skipRecent as number) : 0,
       checkIn: Boolean(b.checkIn),
-      checkInSeconds: Boolean(b.checkIn) ? (b.checkInSeconds as number) : 120,
+      checkInSeconds: useTimers && Boolean(b.checkIn) ? (b.checkInSeconds as number) : 120,
       autoMove,
       reportBy: pick(b.reportBy, ["BOTH", "CAPTAIN", "STAFF"], "BOTH"),
       lobbyVoiceId,
-      rewardsEnabled: b.rewardsEnabled === undefined ? true : Boolean(b.rewardsEnabled),
+      rewardsEnabled: Boolean(b.rewardsEnabled),
+      joinMode: pick(b.joinMode, ["ASSIGN", "PICK"], "ASSIGN"),
+      rosterView: pick(b.rosterView, ["PUBLIC", "HIDDEN"], "PUBLIC"),
+      teamNames: list(b.teamNames, 16),
+      startMode,
+      startAt,
+      useTimers,
       teamNaming: pick(b.teamNaming, ["SET", "CAPTAIN"], "SET"),
-      autoStartSeconds: b.autoStartSeconds as number,
-      reportMinutes: b.reportMinutes as number,
+      autoStartSeconds: useTimers ? (b.autoStartSeconds as number) : 120,
+      reportMinutes: useTimers ? (b.reportMinutes as number) : 90,
       noReportAction: pick(b.noReportAction, ["CANCEL", "ALERT"], "CANCEL"),
-      signupMinutes: b.signupMinutes as number,
-      autoReopenHours: b.autoReopenHours as number,
+      signupMinutes: useTimers ? (b.signupMinutes as number) : 240,
+      autoReopenHours: useTimers ? (b.autoReopenHours as number) : 24,
       winCoins: b.winCoins as number,
       lossCoins: b.lossCoins as number,
       championCoins: b.championCoins as number,
@@ -172,11 +184,10 @@ router.patch("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermi
   const movedPanel = data.panelChannelId !== existing.panelChannelId;
   const movedResults = data.resultsChannelId !== existing.resultsChannelId;
   if (movedPanel && existing.panelMessageId) await deleteChannelMessage(existing.panelChannelId, existing.panelMessageId).catch(() => null);
-  if (movedResults && existing.leaderboardMessageId) await deleteChannelMessage(existing.resultsChannelId, existing.leaderboardMessageId).catch(() => null);
 
   const row = await prisma.matchSetup.update({
     where: { id: existing.id },
-    data: { ...data, ...(movedPanel ? { panelMessageId: null } : {}), ...(movedResults ? { leaderboardMessageId: null, bracketMessageId: null } : {}) },
+    data: { ...data, ...(movedPanel ? { panelMessageId: null } : {}), ...(movedResults ? { bracketMessageId: null } : {}) },
   });
 
   await syncPreset(req.params.guildId, data, false);
@@ -198,7 +209,6 @@ router.delete("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPerm
     await closeMatchRooms(client, existing.id).catch(() => null);
   }
   if (existing.panelMessageId) await deleteChannelMessage(existing.panelChannelId, existing.panelMessageId).catch(() => null);
-  if (existing.leaderboardMessageId) await deleteChannelMessage(existing.resultsChannelId, existing.leaderboardMessageId).catch(() => null);
   await prisma.matchSetup.delete({ where: { id: existing.id } });
   res.status(204).send();
 });
@@ -227,13 +237,75 @@ router.post("/guilds/:guildId/match-setups/:id/cancel", requireAuth, requireGuil
   res.json({ ok: true });
 });
 
-router.post("/guilds/:guildId/match-setups/:id/new-season", requireAuth, requireGuildPermission, async (req, res) => {
+router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuildPermission, async (req, res) => {
   const existing = await findSetup(req.params.guildId, req.params.id);
   if (!existing) return res.status(404).json({ error: "Match setup not found" });
   const live = await withBot(res);
   if (!live) return;
-  await live.bot.startMatchSeason(live.client, existing.id);
+  res.json(await live.bot.matchRoster(live.client, existing.id));
+});
+
+// ---- Leaderboard and Matchmaking tabs ----
+
+const CONFIG_FIELDS = ["boardChannelId", "boardGame", "channelId", "voiceCategoryId", "enabled", "createVoice", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+
+router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const config = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
+  const [rooms, teams, results] = await Promise.all([
+    prisma.matchRoom.findMany({ where: { guildId, status: { in: ["LIVE", "CONFIRM"] } }, orderBy: { createdAt: "desc" } }),
+    prisma.matchTeam.findMany({ where: { guildId }, orderBy: { createdAt: "desc" }, take: 50 }),
+    prisma.matchResult.findMany({ where: { guildId, setupId: null }, orderBy: { createdAt: "desc" }, take: 30 }),
+  ]);
+  res.json({ config, rooms, teams, results });
+});
+
+router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const b = req.body as Record<string, unknown>;
+  for (const key of ["challengeMinutes", "queueMinutes", "reportHours"]) if (b[key] !== undefined && !whole(b[key], 1, 1000)) return res.status(400).json({ error: "Time limits must be from 1 to 1000." });
+  if (b.enabled && !b.channelId) return res.status(400).json({ error: "Pick a text channel for Matchmaking." });
+
+  const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
+  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "games" ? list(b[k], 25) : b[k] === "" ? null : b[k]]));
+  const movedBoard = b.boardChannelId !== undefined && (b.boardChannelId || null) !== existing.boardChannelId;
+  const movedPanel = b.channelId !== undefined && (b.channelId || null) !== existing.channelId;
+  const switchedOff = b.enabled === false && existing.enabled;
+  if (movedBoard && existing.boardChannelId && existing.boardMessageId) await deleteChannelMessage(existing.boardChannelId, existing.boardMessageId).catch(() => null);
+  if ((movedPanel || switchedOff) && existing.channelId && existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
+
+  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessageId: null } : {}), ...(movedPanel || switchedOff ? { messageId: null } : {}) } });
+  const client = getBotClient();
+  if (client) {
+    const { syncBoard, syncMatchmakingPanel } = await import("@spartacus/bot");
+    await syncBoard(client, guildId).catch(() => null);
+    await syncMatchmakingPanel(client, guildId).catch(() => null);
+  }
+  res.json(config);
+});
+
+router.post("/guilds/:guildId/matchmaking/new-season", requireAuth, requireGuildPermission, async (req, res) => {
+  const live = await withBot(res);
+  if (!live) return;
+  await live.bot.startBoardSeason(live.client, req.params.guildId);
   res.json({ ok: true });
+});
+
+router.post("/guilds/:guildId/match-rooms/:id/cancel", requireAuth, requireGuildPermission, async (req, res) => {
+  const room = await prisma.matchRoom.findUnique({ where: { id: req.params.id } });
+  if (!room || room.guildId !== req.params.guildId) return res.status(404).json({ error: "Match not found" });
+  const live = await withBot(res);
+  if (!live) return;
+  await live.bot.cancelRoom(live.client, room.id);
+  res.json({ ok: true });
+});
+
+router.delete("/guilds/:guildId/match-teams/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const team = await prisma.matchTeam.findUnique({ where: { id: req.params.id } });
+  if (!team || team.guildId !== req.params.guildId) return res.status(404).json({ error: "Team not found" });
+  await prisma.matchQueue.deleteMany({ where: { teamId: team.id } });
+  await prisma.matchTeam.delete({ where: { id: team.id } });
+  res.status(204).send();
 });
 
 router.post("/guilds/:guildId/match-results/:id/void", requireAuth, requireGuildPermission, async (req, res) => {

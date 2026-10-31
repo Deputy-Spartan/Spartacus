@@ -586,6 +586,12 @@ export interface MatchSetupInput {
   reportBy: "BOTH" | "CAPTAIN" | "STAFF";
   lobbyVoiceId: string | null;
   rewardsEnabled: boolean;
+  joinMode: "ASSIGN" | "PICK";
+  rosterView: "PUBLIC" | "HIDDEN";
+  teamNames: string[];
+  startMode: "MANUAL" | "SCHEDULED" | "FULL";
+  startAt: string | null;
+  useTimers: boolean;
   teamNaming: "SET" | "CAPTAIN";
   autoStartSeconds: number;
   reportMinutes: number;
@@ -619,6 +625,43 @@ export interface MatchSetupRow extends MatchSetupInput {
   season: number;
   livePhase: string | null;
   liveNumber: number | null;
+}
+
+export interface MatchmakingConfigRow {
+  boardChannelId: string | null;
+  boardGame: string;
+  enabled: boolean;
+  channelId: string | null;
+  voiceCategoryId: string | null;
+  createVoice: boolean;
+  ranked: boolean;
+  games: string[];
+  challengeMinutes: number;
+  queueMinutes: number;
+  reportHours: number;
+  staffRoleId: string | null;
+}
+
+export interface MatchRoomRow {
+  id: string;
+  game: string;
+  aName: string;
+  bName: string;
+  status: string;
+}
+
+export interface MatchTeamRow {
+  id: string;
+  game: string;
+  name: string;
+  players: string[];
+}
+
+export interface MatchmakingOverview {
+  config: MatchmakingConfigRow;
+  rooms: MatchRoomRow[];
+  teams: MatchTeamRow[];
+  results: MatchResultRow[];
 }
 
 export interface MatchResultRow {
@@ -1692,7 +1735,12 @@ export const api = {
   deleteMatchSetup: (guildId: string, id: string) => request<void>(`/guilds/${guildId}/match-setups/${id}`, { method: "DELETE" }),
   getMatchResults: (guildId: string, id: string) => request<MatchResultRow[]>(`/guilds/${guildId}/match-setups/${id}/results`),
   cancelMatch: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-setups/${id}/cancel`, { method: "POST" }),
-  startMatchSeason: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-setups/${id}/new-season`, { method: "POST" }),
+  getMatchRoster: (guildId: string, id: string) => request<Array<{ team: string; players: string[] }>>(`/guilds/${guildId}/match-setups/${id}/roster`),
+  getMatchmaking: (guildId: string) => request<MatchmakingOverview>(`/guilds/${guildId}/matchmaking`),
+  saveMatchmaking: (guildId: string, body: Partial<MatchmakingConfigRow>) => request<MatchmakingConfigRow>(`/guilds/${guildId}/matchmaking`, { method: "PUT", body: JSON.stringify(body) }),
+  startMatchSeason: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/matchmaking/new-season`, { method: "POST" }),
+  cancelMatchRoom: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-rooms/${id}/cancel`, { method: "POST" }),
+  deleteMatchTeam: (guildId: string, id: string) => request<void>(`/guilds/${guildId}/match-teams/${id}`, { method: "DELETE" }),
   voidMatchResult: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-results/${id}/void`, { method: "POST" }),
   getReactionRolePanels: (guildId: string) => request<ReactionRolePanelRow[]>(`/guilds/${guildId}/reaction-role-panels`),
   addReactionRolePanel: (guildId: string, body: ReactionRolePanelInput) =>

@@ -121,7 +121,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   LFG: "Looking For Group",
   EMBED_CREATOR: "Embed Creator",
   SUPPORT_INTAKE: "Support DM Intake",
-  MATCHES: "Matches",
+  MATCHES: "Matchmaking",
 };
 
 export const SIGNUP_ROLES = [

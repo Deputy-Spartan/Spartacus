@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, type MessageActionRowComponentBuilder } from "discord.js";
 import type { MatchPlayer, MatchResult, MatchSetup } from "@prisma/client";
-import { currentTeams, draftSide, type BracketTie, type MatchState, type MatchTeam } from "./engine";
+import { currentTeams, draftSide, onTeam, teamSlotName, type BracketTie, type MatchState, type MatchTeam } from "./engine";
 
 export type PlayerMap = Record<string, MatchPlayer | undefined>;
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
@@ -20,8 +20,10 @@ function rows(buttons: ButtonBuilder[]): Row[] {
 }
 
 function navRow(setup: MatchSetup, phase: string): Row {
+  const picking = setup.joinMode === "PICK" && setup.teamSize > 1;
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
     ...(["TEAMS", "MAP", "LIVE"].includes(phase) ? [button(setup, "subs", "Subs", ButtonStyle.Secondary)] : []),
+    ...(phase === "SIGNUP" && picking ? [button(setup, "myteam", "My Team", ButtonStyle.Secondary)] : []),
     button(setup, "stats", "My Stats", ButtonStyle.Secondary),
     button(setup, "board", "Leaderboard", ButtonStyle.Secondary),
     new ButtonBuilder().setLabel("All Results").setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${setup.guildId}/${setup.resultsChannelId}`),
@@ -90,22 +92,42 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
   let extra: Row[] = [];
 
   if (phase === "SIGNUP") {
+    const hidden = setup.rosterView === "HIDDEN";
+    const picking = setup.joinMode === "PICK" && setup.teamSize > 1;
+    const names = stringList(setup.teamNames);
+    const slots = tournament ? setup.tournamentTeams : 2;
+    const slotLabel = (slot: number) => teamSlotName(names, tournament, slot, setup.team1Name, setup.team2Name);
+    const starts = setup.startMode === "SCHEDULED" && setup.startAt && setup.startAt > new Date() ? `Starts <t:${Math.floor(setup.startAt.getTime() / 1000)}:F>.` : setup.startMode === "FULL" ? "Starts when the lobby fills." : setup.startMode === "MANUAL" ? "Starts when staff start it." : "";
+    const wait = endsAt && setup.startMode !== "SCHEDULED" ? ` ${tournament ? "Starts with whoever joined" : "Resets"} ${until}.` : "";
+    const event = state.eventId ? `\n📅 [Discord event](https://discord.com/events/${setup.guildId}/${state.eventId})` : "";
     embed
       .setTitle(tournament ? `🏆 ${setup.name}: Registration` : `⚔️ Match #${number}: ${setup.teamSize}v${setup.teamSize} ${setup.game} Sign-Ups`)
-      .setDescription(`${tournament ? "Register solo and the bot builds the teams." : "Hit Sign Up to play. Teams are built when the lobby fills."}${endsAt ? ` ${tournament ? "Starts with whoever joined" : "Resets"} ${until}.` : ""}\n${progress(state.signups.length, needed)} **${state.signups.length}/${needed}**`)
-      .addFields({ name: "Players", value: playerList(setup, players, state.signups) });
-    buttons = [button(setup, "join", tournament ? "Register" : "Sign Up", ButtonStyle.Success), button(setup, "leave", "Leave", ButtonStyle.Danger)];
+      .setDescription(`${starts}${wait}${event}\n${progress(state.signups.length, needed)} **${state.signups.length}/${needed}**${hidden ? "\n🔒 Rosters stay hidden until registration closes." : ""}`);
+    if (picking) {
+      embed.addFields(
+        ...Array.from({ length: Math.min(slots, 8) }, (_, slot) => ({
+          name: `${slotLabel(slot)} (${onTeam(state, slot).length}/${setup.teamSize})`.slice(0, 256),
+          value: hidden ? (onTeam(state, slot).length ? "🔒 Hidden" : "Open") : playerList(setup, players, onTeam(state, slot)),
+          inline: true,
+        }))
+      );
+      buttons = Array.from({ length: slots }, (_, slot) => button(setup, "pick", `${slotLabel(slot)} (${onTeam(state, slot).length}/${setup.teamSize})`, ButtonStyle.Primary, slot).setDisabled(onTeam(state, slot).length >= setup.teamSize));
+      extra = [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(button(setup, "leave", "Leave", ButtonStyle.Danger))];
+    } else {
+      if (!hidden) embed.addFields({ name: "Players", value: playerList(setup, players, state.signups) });
+      buttons = [button(setup, "join", tournament ? "Register" : "Sign Up", ButtonStyle.Success), button(setup, "leave", "Leave", ButtonStyle.Danger)];
+    }
   } else if (phase === "CHECKIN") {
     embed
       .setColor(COLOR.gold)
       .setTitle("✅ Lobby Full: Check In")
-      .setDescription(`Ready up ${until} or your slot opens for the next player.\n${progress(state.ready.length, state.signups.length)} **${state.ready.length}/${state.signups.length}** ready`);
+      .setDescription(`${endsAt ? `Ready up ${until} or your slot opens for the next player.` : "Ready up to continue. Staff can skip this."}\n${progress(state.ready.length, state.signups.length)} **${state.ready.length}/${state.signups.length}** ready`);
     buttons = [button(setup, "ready", "Ready Up", ButtonStyle.Success)];
   } else if (phase === "DRAFT") {
     const side = draftSide(state.draftPick) === "a" ? 0 : 1;
     embed
       .setTitle(`🎯 Match #${number}: Captains Draft`)
-      .setDescription(`<@${state.teams[side].captain}> is picking. Auto-picks ${until}.`)
+      .setDescription(`<@${state.teams[side].captain}> is picking.${endsAt ? ` Auto-picks ${until}.` : ""}`)
       .addFields(...teamFields(setup, players, state.teams), { name: "Still to pick", value: playerList(setup, players, state.draftPool) });
     const menu = new StringSelectMenuBuilder()
       .setCustomId(`matchdraft:${setup.id}`)
@@ -114,7 +136,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
     extra = [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu)];
   } else if (phase === "TEAMS") {
     const naming = setup.teamNaming === "CAPTAIN" && setup.teamSize > 1;
-    const wait = endsAt ? ` Starts by itself ${until}.` : "";
+    const wait = endsAt ? ` Starts by itself ${until}.` : " Waiting for a captain or staff to start.";
     embed
       .setTitle(tournament ? `🏆 ${setup.name}: Name Your Teams` : `🎯 Match #${number}: Teams`)
       .setDescription(`${naming ? "Captains can name their team." : "Captains can start when both sides are ready."}${wait}`)
@@ -127,7 +149,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       const captain = teams?.[state.banTurn === "a" ? 0 : 1].captain;
       embed
         .setTitle(`🚫 Captains Ban ${word}s`)
-        .setDescription(`<@${captain}> bans next, ${until}.${state.banned.length ? `\nBanned: ${state.banned.join(", ")}` : ""}`)
+        .setDescription(`<@${captain}> bans next${endsAt ? `, ${until}` : ""}.${state.banned.length ? `\nBanned: ${state.banned.join(", ")}` : ""}`)
         .addFields(...labels)
         .setFooter({ text: `The last ${word.toLowerCase()} left gets played` });
       buttons = state.mapOptions.flatMap((m, i) => (state.banned.includes(m) ? [] : [button(setup, "ban", m, ButtonStyle.Danger, i)]));
@@ -135,7 +157,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       const count = (m: string) => Object.values(state.votes).filter((v) => v === m).length;
       embed
         .setTitle(`🗺️ Vote for the ${word}`)
-        .setDescription(`Voting closes ${until}. Ties are picked at random.`)
+        .setDescription(endsAt ? `Voting closes ${until}. Ties are picked at random.` : "Voting stays open until everyone votes or staff end it.")
         .addFields(...labels);
       buttons = state.mapOptions.map((m, i) => button(setup, "vote", `${m} (${count(m)})`, ButtonStyle.Primary, i));
     }
@@ -171,7 +193,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
 
   if (tournament && state.bracket.length) embed.addFields(...bracketFields(state));
   if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: "Subs needed", value: `${state.subsNeeded.length} open. Tap Subs to jump in.` });
-  return { content: "", embeds: [embed], components: [...extra, ...rows(buttons), navRow(setup, phase)].slice(0, 5) };
+  return { content: "", embeds: [embed], components: [...rows(buttons).slice(0, 3), ...extra, navRow(setup, phase)].slice(0, 5) };
 }
 
 export function buildLeaderboard(setup: MatchSetup, rows: MatchPlayer[]) {
@@ -217,6 +239,14 @@ export function buildResult(setup: MatchSetup, result: MatchResult) {
     .setTimestamp(result.createdAt);
   if (result.map) embed.setDescription(`${setup.mapWord}: ${result.map} · ${setup.scoreName}`);
   return embed;
+}
+
+export function buildRosters(teams: MatchTeam[]) {
+  return new EmbedBuilder()
+    .setColor(COLOR.open)
+    .setTitle("🔓 Rosters Revealed")
+    .setDescription("Registration closed.")
+    .addFields(...teams.slice(0, 24).map((team) => ({ name: team.name.slice(0, 256), value: fitLines(team.players.map((id) => `${id === team.captain ? "👑 " : ""}<@${id}>`)) || "Open", inline: true })));
 }
 
 export function buildBracket(setup: MatchSetup, state: MatchState) {

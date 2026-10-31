@@ -49,6 +49,12 @@ export interface MatchState {
   reminded: boolean;
   disputes: number;
   subsNeeded: string[]; // players who can't play and want replacing
+  picks: Record<string, number>; // player to team slot, when players choose a team
+  reveal: boolean; // rosters were hidden, so post them when registration closes
+  eventId: string | null;
+  eventAt: string | null;
+  eventLive: boolean;
+  fullPinged: boolean;
   pingIds: string[];
 }
 
@@ -76,6 +82,12 @@ export function emptyState(signups: string[] = []): MatchState {
     reminded: false,
     disputes: 0,
     subsNeeded: [],
+    picks: {},
+    reveal: false,
+    eventId: null,
+    eventAt: null,
+    eventLive: false,
+    fullPinged: false,
     pingIds: [],
   };
 }
@@ -214,4 +226,55 @@ export function currentTeams(state: MatchState): [MatchTeam, MatchTeam] | null {
     return [state.teams[tie.a], state.teams[tie.b]];
   }
   return state.teams.length === 2 ? [state.teams[0], state.teams[1]] : null;
+}
+
+export const onTeam = (state: MatchState, slot: number) => state.signups.filter((id) => state.picks[id] === slot);
+
+export function teamSlotName(names: string[], tournament: boolean, slot: number, first: string, second: string): string {
+  if (!tournament) return slot === 0 ? first : second;
+  return names[slot]?.trim() || `Team ${slot + 1}`;
+}
+
+// Default names say nothing about who's on a team, so they stay off the leaderboard.
+export function countsAsNamedTeam(name: string, first: string, second: string): boolean {
+  return name !== first && name !== second && !/^Team \d+$/.test(name);
+}
+
+export interface BoardRow {
+  winners: string[];
+  losers: string[];
+  winnerTeam: string | null;
+  loserTeam: string | null;
+}
+
+export interface BoardEntry {
+  key: string;
+  wins: number;
+  losses: number;
+}
+
+const rate = (e: BoardEntry) => (e.wins + e.losses ? e.wins / (e.wins + e.losses) : 0);
+
+function topTen(records: Map<string, BoardEntry>): BoardEntry[] {
+  return [...records.values()].sort((x, y) => y.wins - x.wins || rate(y) - rate(x) || x.losses - y.losses).slice(0, 10);
+}
+
+// Built from results rather than running totals, so a void or a new season is
+// always right without undoing anything.
+export function tallyBoard(rows: BoardRow[]): { players: BoardEntry[]; teams: BoardEntry[] } {
+  const players = new Map<string, BoardEntry>();
+  const teams = new Map<string, BoardEntry>();
+  const add = (map: Map<string, BoardEntry>, key: string, won: boolean) => {
+    const entry = map.get(key) ?? { key, wins: 0, losses: 0 };
+    if (won) entry.wins++;
+    else entry.losses++;
+    map.set(key, entry);
+  };
+  for (const row of rows) {
+    row.winners.forEach((id) => add(players, id, true));
+    row.losers.forEach((id) => add(players, id, false));
+    if (row.winnerTeam) add(teams, row.winnerTeam, true);
+    if (row.loserTeam) add(teams, row.loserTeam, false);
+  }
+  return { players: topTen(players), teams: topTen(teams) };
 }

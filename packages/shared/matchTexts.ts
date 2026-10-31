@@ -58,7 +58,15 @@ const gameTokens = { game: "Rainbow Six Siege", setup: "Friday Night 5v5", numbe
 const samplePlayers = "🥇 Kuro: 12W 3L · 80%\n🥈 FrostByte: 10W 4L · 71%\n🥉 Deimos: 9W 5L · 64%";
 const sampleTeams = "🥇 Night Crew: 7W 1L · 88%\n🥈 Red Line: 5W 3L · 63%";
 const countTokens = { progress: "🟩🟩🟩⬛⬛", count: "6", needed: "10" };
-const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it." };
+const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it.", startTime: "Friday, November 6 at 10:00 PM (in 6 days)", format: "Tournament · Single Elimination", teams: "Up to 4 teams · Up to 5 per team", maps: "Player vote on 3 maps", signedUp: "**6** signed up", eventLink: "[View event](https://discord.com)" };
+const signupPlayers = [{ name: "Players", value: "Nobody yet. Be the first!" }];
+const signupRows = [
+  { name: "📅 Starts", value: "{startTime}\n{eventLink}", inline: false },
+  { name: "🎮 Format", value: "{format}", inline: true },
+  { name: "👥 Teams", value: "{teams}", inline: true },
+  { name: "🗺️ Maps", value: "{maps}", inline: true },
+  { name: "📣 Sign-Ups", value: "{signedUp}", inline: true },
+];
 const matchTokens = { ...gameTokens, onMap: " on Bank", mapWord: "Map" };
 
 const embed = (group: string, label: string, hint: string, defaults: TextOverride, tokens: Record<string, string> = {}): MatchTextEntry => ({ group, label, hint, defaults, tokens });
@@ -78,8 +86,8 @@ export const MATCH_TEXTS = {
   boardPlayers: embed("Leaderboard", "Separate: top 10 players", "The player embed in the Separate Embeds style.", { title: "🏅 Top 10 Players: {game}", description: "{list}", footer: "Updates after every match", color: GOLD }, { game: "Rainbow Six Siege", list: samplePlayers }),
   boardTeams: embed("Leaderboard", "Separate: top 10 teams", "The team embed in the Separate Embeds style.", { title: "👥 Top 10 Teams: {game}", description: "{list}", footer: "Saved and named teams · Updates after every match", color: STEEL }, { game: "Rainbow Six Siege", list: sampleTeams }),
 
-  signup: embed("Sign-Ups", "Match sign-ups", "The panel while a match or 1v1 is open.", { title: "⚔️ Match #{number}: {size} {game} Sign-Ups", description: "{start}\n{progress} **{count}/{needed}**", color: STEEL }, signupTokens),
-  registration: embed("Sign-Ups", "Tournament registration", "The panel while a tournament is open.", { title: "🏆 {setup}: Registration", description: "{start}\n{progress} **{count}/{needed}**", color: STEEL }, signupTokens),
+  signup: { ...embed("Sign-Ups", "Match sign-ups", "The panel while a match or 1v1 is open.", { title: "⚔️ Match #{number}: {size} {game} Sign-Ups", description: "Sign up below to play **{game}**.", fields: signupRows, color: STEEL }, signupTokens), previewFields: signupPlayers },
+  registration: { ...embed("Sign-Ups", "Tournament registration", "The panel while a tournament is open.", { title: "🏆 {setup}", description: "Register below to play **{game}**.", fields: signupRows, color: GOLD }, signupTokens), previewFields: signupPlayers },
   noteManual: line("Sign-Ups", "Start note: staff", "Fills in {start} when staff start it.", "Starts when staff start it."),
   noteFull: line("Sign-Ups", "Start note: when full", "Fills in {start} when it starts on a full lobby.", "Starts when the lobby fills."),
   noteTime: line("Sign-Ups", "Start note: set time", "Fills in {start} for a scheduled start.", "Starts {time}.", { time: "Saturday at 8:00 PM" }),
@@ -138,6 +146,7 @@ export const MATCH_TEXTS = {
   labelNoPlayers: note("No matches yet", "When a leaderboard has no players.", "No matches played yet."),
   labelNoTeams: note("No team matches yet", "When a leaderboard has no teams.", "No team matches played yet."),
   labelPlayers: note("Players heading", "Above the sign-up list.", "Players"),
+  labelNoSignups: note("No sign-ups yet", "In the player list before anyone joins.", "Nobody yet. Be the first!"),
   labelPicking: note("Draft heading", "Above players still to pick.", "Still to pick"),
   labelConfirm: note("Confirmation heading", "Above a reported score.", "Waiting for confirmation"),
   labelSubs: note("Subs heading", "When a sub is needed.", "Subs needed"),
@@ -204,7 +213,7 @@ export function resolveText(overrides: unknown, key: MatchTextKey, values: Recor
     image: custom.image ?? "",
     footerIcon: custom.footerIcon ?? "",
     timestamp: custom.timestamp ?? false,
-    fields: (custom.fields ?? []).map((f) => ({ name: fill(f.name), value: fill(f.value), inline: f.inline })).filter((f) => f.name && f.value),
+    fields: (custom.fields ?? entry.defaults.fields ?? []).map((f) => ({ name: fill(f.name), value: fill(f.value), inline: f.inline })).filter((f) => f.name && f.value),
   };
 }
 

@@ -1109,7 +1109,8 @@ function MessagesTab({ guildId }: { guildId: string }) {
     const { [key]: _removed, ...rest } = texts;
     setTexts(rest);
   };
-  const fields = shown.fields ?? [];
+  const fields = shown.fields ?? entry.defaults.fields ?? [];
+  const showMore = more || !!entry.defaults.fields;
   const setField = (index: number, patch: Partial<TextField>) => change("fields", fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
   const moveField = (index: number, by: number) => {
     const next = [...fields];
@@ -1200,10 +1201,12 @@ function MessagesTab({ guildId }: { guildId: string }) {
                     <span className="text-xs text-slate-500">{preview.color}</span>
                   </div>
                 </div>
-                <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="text-xs text-neon-blue hover:underline">
-                  {more ? "Hide" : "Show"} links, images, author and fields
-                </button>
-                {more && (
+                {!entry.defaults.fields && (
+                  <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="text-xs text-neon-blue hover:underline">
+                    {more ? "Hide" : "Show"} links, images, author and fields
+                  </button>
+                )}
+                {showMore && (
                   <div className="space-y-3 rounded-lg border border-white/10 p-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1234,7 +1237,7 @@ function MessagesTab({ guildId }: { guildId: string }) {
                     <Hint>Links must start with http:// or https://. Discord may not show an image link it can't load.</Hint>
                     <Toggle on={shown.timestamp ?? false} label="Show the time" hint="Adds the current time beside the footer." onChange={(on) => change("timestamp", on)} />
                     <div>
-                      <Label>Your own fields ({fields.length}/10)</Label>
+                      <Label>Rows ({fields.length}/10)</Label>
                       <div className="space-y-2">
                         {fields.map((f, i) => (
                           <div key={i} className="rounded-lg border border-white/10 p-2 space-y-2">
@@ -1263,7 +1266,7 @@ function MessagesTab({ guildId }: { guildId: string }) {
                           + Add Field
                         </button>
                       )}
-                      <Hint>Your fields appear before the ones Spartacus adds, like player lists.</Hint>
+                      <Hint>Use fill-ins like {"{startTime}"} in any row. These appear before what Spartacus adds, like player lists.</Hint>
                     </div>
                   </div>
                 )}
@@ -1285,7 +1288,7 @@ function MessagesTab({ guildId }: { guildId: string }) {
                     </button>
                   ))}
                 </div>
-                <Hint>Tap one to add it. Spartacus swaps it for the real value.</Hint>
+                <Hint>Tap one to add it to the {isEmbed ? "description" : "wording"}, or type it into any box. Spartacus swaps it for the real value.</Hint>
               </div>
             )}
             <FormError message={error} />

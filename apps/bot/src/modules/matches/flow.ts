@@ -1110,8 +1110,25 @@ async function removeOldBoards(client: Client) {
   }
 }
 
+// After a restart, panels catch up to any change in how they look.
+const refreshedPanels = new Set<string>();
+async function refreshPanelsOnce(client: Client) {
+  const setups = await prisma.matchSetup.findMany({ where: { enabled: true, panelMessageId: { not: null } }, select: { id: true, guildId: true } });
+  for (const setup of setups) {
+    if (refreshedPanels.has(setup.id)) continue;
+    refreshedPanels.add(setup.id);
+    if (!(await isModuleEnabled(setup.guildId, "MATCHES"))) continue;
+    // Only the look changes here. Timers and events stay as they are.
+    await withLock(setup.id, async () => {
+      const ctx = await loadCtx(client, setup.id);
+      if (ctx) await syncPanel(ctx);
+    }).catch((err) => logError("bot", err, setup.guildId));
+  }
+}
+
 export async function tickMatches(client: Client) {
   await removeOldBoards(client);
+  await refreshPanelsOnce(client);
   await keepEventsAhead(client);
   await tickMatchmaking(client);
   const pending = await prisma.matchSetup.findMany({ where: { enabled: true, panelMessageId: null }, take: 10 });

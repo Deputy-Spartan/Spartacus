@@ -120,9 +120,15 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
     const slotLabel = (slot: number) => teamSlotName(names, tournament, slot, setup.team1Name, setup.team2Name);
     const starts = setup.startMode === "SCHEDULED" && setup.startAt && setup.startAt > new Date() ? say("noteTime", { time: `<t:${Math.floor(setup.startAt.getTime() / 1000)}:F>` }) : setup.startMode === "FULL" ? say("noteFull") : setup.startMode === "MANUAL" ? say("noteManual") : "";
     const wait = endsAt && setup.startMode !== "SCHEDULED" ? ` ${tournament ? "Starts with whoever joined" : "Resets"} ${until}.` : "";
-    const event = state.eventId ? `\n📅 [Discord event](https://discord.com/events/${setup.guildId}/${state.eventId})` : "";
-    style(tournament ? "registration" : "signup", { size: `${setup.teamSize}v${setup.teamSize}`, start: `${starts}${wait}`, progress: unlimited ? "Open to everyone" : progress(state.signups.length, needed), count: state.signups.length, needed: unlimited ? "∞" : needed });
-    const notes = [event.trim(), hidden ? say("noteHidden") : ""].filter(Boolean).join("\n");
+    const unix = setup.startAt ? Math.floor(setup.startAt.getTime() / 1000) : 0;
+    const startTime = setup.startMode === "SCHEDULED" && unix ? `<t:${unix}:F> (<t:${unix}:R>)` : setup.startMode === "FULL" ? "When the lobby fills" : "When staff start it";
+    const eachTeam = setup.teamSize === 1 ? "Solo" : `${setup.flexTeams ? "Up to " : ""}${setup.teamSize} per team`;
+    const mapText = !setup.useMaps ? "None" : setup.mapMethod === "RANDOM" ? `Picked at random from ${stringList(setup.maps).length}` : setup.mapMethod === "BANS" ? `Captains ban from ${setup.mapChoices}` : `Player vote on ${setup.mapChoices} ${word.toLowerCase()}s`;
+    const formatName = tournament ? `${setup.teamSize === 1 ? "1v1 " : ""}Tournament · Single Elimination` : setup.teamSize === 1 ? "1v1" : "Team Match";
+    const teamText = tournament ? `${setup.tournamentTeams ? `Up to ${setup.tournamentTeams}` : "Unlimited"} ${setup.teamSize === 1 ? "players" : "teams"}${setup.teamSize === 1 ? "" : ` · ${eachTeam}`}` : eachTeam;
+    const signedUp = unlimited ? `**${state.signups.length}** signed up` : `${progress(state.signups.length, needed)}\n**${state.signups.length}/${needed}** signed up`;
+    style(tournament ? "registration" : "signup", { size: `${setup.teamSize}v${setup.teamSize}`, start: `${starts}${wait}`, progress: unlimited ? "Open to everyone" : progress(state.signups.length, needed), count: state.signups.length, needed: unlimited ? "∞" : needed, startTime: `${startTime}${wait}`, format: formatName, teams: teamText, maps: mapText, signedUp, eventLink: state.eventId ? `[View event](https://discord.com/events/${setup.guildId}/${state.eventId})` : "" });
+    const notes = hidden ? say("noteHidden") : "";
     if (notes) embed.setDescription([embed.data.description, notes].filter(Boolean).join("\n").slice(0, 4096));
     if (picking) {
       embed.addFields(
@@ -134,7 +140,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       );
       buttons = [...Array.from({ length: slots }, (_, slot) => button(setup, "pick", `${slotLabel(slot)} (${onTeam(state, slot).length}/${setup.teamSize})`, ButtonStyle.Primary, slot).setDisabled(onTeam(state, slot).length >= setup.teamSize)), button(setup, "leave", say("btnLeave"), ButtonStyle.Danger)];
     } else {
-      if (!hidden) embed.addFields({ name: say("labelPlayers"), value: playerList(setup, players, state.signups) });
+      if (!hidden) embed.addFields({ name: say("labelPlayers"), value: state.signups.length ? playerList(setup, players, state.signups) : say("labelNoSignups") });
       buttons = [button(setup, "join", say(tournament ? "btnRegister" : "btnSignUp"), ButtonStyle.Success), button(setup, "leave", say("btnLeave"), ButtonStyle.Danger)];
     }
   } else if (phase === "CHECKIN") {

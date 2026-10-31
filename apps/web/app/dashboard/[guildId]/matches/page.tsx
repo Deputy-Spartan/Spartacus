@@ -1051,11 +1051,25 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   );
 }
 
-// Shows **bold** the way Discord does, so the preview reads like the real post.
-function Formatted({ text }: { text: string }) {
+const HEADING_SIZE: Record<number, string> = { 1: "text-2xl", 2: "text-xl", 3: "text-base" };
+
+// Shows bold, links and # headings the way Discord does, so the preview reads like the real post.
+function Formatted({ text, headings = false }: { text: string; headings?: boolean }) {
+  const inline = (line: string) =>
+    line.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/).map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
+      const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (link) return <span key={i} className="text-[#00A8FC]">{link[1]}</span>;
+      return <span key={i}>{part}</span>;
+    });
+  const lines = text.split("\n");
   return (
     <>
-      {text.split(/(\*\*[^*]+\*\*)/).map((part, i) => (part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : <span key={i}>{part}</span>))}
+      {lines.map((line, i) => {
+        const heading = headings ? line.match(/^(#{1,3}) (.+)$/) : null;
+        if (heading) return <span key={i} className={`block font-bold text-white leading-tight ${HEADING_SIZE[heading[1].length]}`}>{inline(heading[2])}</span>;
+        return <span key={i}>{inline(line)}{i < lines.length - 1 ? "\n" : ""}</span>;
+      })}
     </>
   );
 }
@@ -1188,7 +1202,7 @@ function MessagesTab({ guildId }: { guildId: string }) {
                 <div>
                   <Label>Description</Label>
                   <textarea className={`${inputClass} min-h-24`} maxLength={4000} value={value("description")} onChange={(e) => change("description", e.target.value)} />
-                  <Hint>Use **two stars** for bold. Leave a box empty to hide that part.</Hint>
+                  <Hint>Use **two stars** for bold. Start a description line with # and a space for big text. Leave a box empty to hide that part.</Hint>
                 </div>
                 <div>
                   <Label>Footer</Label>
@@ -1317,7 +1331,7 @@ function MessagesTab({ guildId }: { guildId: string }) {
                   )}
                   {preview.description && (
                     <p className="whitespace-pre-wrap break-words">
-                      <Formatted text={preview.description} />
+                      <Formatted text={preview.description} headings />
                     </p>
                   )}
                   {[...preview.fields, ...(entry.previewFields ?? []).map((f) => ({ ...f, inline: true }))].length > 0 && (

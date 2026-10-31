@@ -22,14 +22,14 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^match(rank|draft|score)?:/.test(interaction.customId)) {
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^match(rank|draft|score|name)?:/.test(interaction.customId)) {
     if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "MATCHES"))) {
       await interaction.reply({ content: "⚠️ Matches is disabled for this server.", ephemeral: true });
       return;
     }
-    const { handleMatchButton, handleMatchDraft, handleMatchRank, handleMatchScore } = await import("../modules/matches/flow");
+    const { handleMatchButton, handleMatchDraft, handleMatchName, handleMatchRank, handleMatchScore } = await import("../modules/matches/flow");
     if (interaction.isButton()) await handleMatchButton(interaction);
-    else if (interaction.isModalSubmit()) await handleMatchScore(interaction);
+    else if (interaction.isModalSubmit()) await (interaction.customId.startsWith("matchname:") ? handleMatchName(interaction) : handleMatchScore(interaction));
     else if (interaction.customId.startsWith("matchrank:")) await handleMatchRank(interaction);
     else await handleMatchDraft(interaction);
     return;

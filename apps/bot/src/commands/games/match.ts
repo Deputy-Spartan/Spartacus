@@ -13,6 +13,13 @@ const command: CommandModule = {
     .addSubcommand((s) => s.setName("leaderboard").setDescription("See the season leaderboard"))
     .addSubcommand((s) =>
       s
+        .setName("sub")
+        .setDescription("Staff: replace a player")
+        .addUserOption((o) => o.setName("out").setDescription("The player leaving").setRequired(true))
+        .addUserOption((o) => o.setName("in").setDescription("The replacement").setRequired(true))
+    )
+    .addSubcommand((s) =>
+      s
         .setName("setrank")
         .setDescription("Staff: correct a player's rank")
         .addUserOption((o) => o.setName("user").setDescription("The player").setRequired(true))

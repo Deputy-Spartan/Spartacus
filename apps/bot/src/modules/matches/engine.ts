@@ -45,6 +45,10 @@ export interface MatchState {
   score: string | null;
   champion: number | null;
   voiceIds: string[]; // temporary team channels, deleted when the match ends
+  named: number[]; // teams whose captain has picked a name
+  reminded: boolean;
+  disputes: number;
+  subsNeeded: string[]; // players who can't play and want replacing
   pingIds: string[];
 }
 
@@ -68,6 +72,10 @@ export function emptyState(signups: string[] = []): MatchState {
     score: null,
     champion: null,
     voiceIds: [],
+    named: [],
+    reminded: false,
+    disputes: 0,
+    subsNeeded: [],
     pingIds: [],
   };
 }
@@ -176,6 +184,22 @@ export function tallyVotes(options: string[], votes: Record<string, string>): { 
 // Starting rating from a member's chosen rank, on a 1000 to 1800 scale.
 export function ratingFromRank(rank: number, rankCount: number): number {
   return 1000 + Math.round((rank / Math.max(1, rankCount - 1)) * 800);
+}
+
+// Team names show in embeds and channel names, so mentions and markup are removed.
+export function cleanTeamName(raw: string): string {
+  return raw.replace(/[<>@#*_`~|\\:]/g, "").replace(/\s+/g, " ").trim().slice(0, 32);
+}
+
+export function replacePlayer(state: MatchState, out: string, sub: string): MatchTeam | null {
+  const team = state.teams.find((t) => t.players.includes(out));
+  if (!team) return null;
+  team.players = team.players.map((id) => (id === out ? sub : id));
+  if (team.captain === out) team.captain = sub;
+  state.signups = state.signups.map((id) => (id === out ? sub : id));
+  state.subsNeeded = state.subsNeeded.filter((id) => id !== out);
+  delete state.votes[out];
+  return team;
 }
 
 export function ratingChange(won: boolean): number {

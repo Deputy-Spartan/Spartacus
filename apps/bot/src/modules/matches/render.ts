@@ -19,8 +19,9 @@ function rows(buttons: ButtonBuilder[]): Row[] {
   return Array.from({ length: Math.ceil(buttons.length / 5) }, (_, r) => new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(buttons.slice(r * 5, r * 5 + 5)));
 }
 
-function navRow(setup: MatchSetup): Row {
+function navRow(setup: MatchSetup, phase: string): Row {
   return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+    ...(["TEAMS", "MAP", "LIVE"].includes(phase) ? [button(setup, "subs", "Subs", ButtonStyle.Secondary)] : []),
     button(setup, "stats", "My Stats", ButtonStyle.Secondary),
     button(setup, "board", "Leaderboard", ButtonStyle.Secondary),
     new ButtonBuilder().setLabel("All Results").setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${setup.guildId}/${setup.resultsChannelId}`),
@@ -91,7 +92,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
   if (phase === "SIGNUP") {
     embed
       .setTitle(tournament ? `🏆 ${setup.name}: Registration` : `⚔️ Match #${number}: ${setup.teamSize}v${setup.teamSize} ${setup.game} Sign-Ups`)
-      .setDescription(`${tournament ? "Register solo and the bot builds the teams." : "Hit Sign Up to play. Teams are built when the lobby fills."}\n${progress(state.signups.length, needed)} **${state.signups.length}/${needed}**`)
+      .setDescription(`${tournament ? "Register solo and the bot builds the teams." : "Hit Sign Up to play. Teams are built when the lobby fills."}${endsAt ? ` ${tournament ? "Starts with whoever joined" : "Resets"} ${until}.` : ""}\n${progress(state.signups.length, needed)} **${state.signups.length}/${needed}**`)
       .addFields({ name: "Players", value: playerList(setup, players, state.signups) });
     buttons = [button(setup, "join", tournament ? "Register" : "Sign Up", ButtonStyle.Success), button(setup, "leave", "Leave", ButtonStyle.Danger)];
   } else if (phase === "CHECKIN") {
@@ -112,12 +113,14 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       .addOptions(state.draftPool.slice(0, 25).map((id, i) => ({ label: (names[id] ?? `Player ${i + 1}`).slice(0, 100), description: players[id]?.rank != null ? stringList(setup.ranks)[players[id]!.rank!] : undefined, value: id })));
     extra = [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu)];
   } else if (phase === "TEAMS") {
+    const naming = setup.teamNaming === "CAPTAIN" && setup.teamSize > 1;
+    const wait = endsAt ? ` Starts by itself ${until}.` : "";
     embed
-      .setTitle(`🎯 Match #${number}: Teams`)
-      .setDescription("Captains can start when both sides are ready.")
-      .addFields(...teamFields(setup, players, state.teams))
+      .setTitle(tournament ? `🏆 ${setup.name}: Name Your Teams` : `🎯 Match #${number}: Teams`)
+      .setDescription(`${naming ? "Captains can name their team." : "Captains can start when both sides are ready."}${wait}`)
       .setFooter({ text: "Captains are marked with 👑" });
-    buttons = [button(setup, "start", "Start Match", ButtonStyle.Success)];
+    if (!tournament) embed.addFields(...teamFields(setup, players, state.teams));
+    buttons = [button(setup, "start", "Start Match", ButtonStyle.Success), ...(naming ? [button(setup, "name", "Name Team", ButtonStyle.Primary)] : [])];
   } else if (phase === "MAP") {
     const labels = teams ? teamFields(setup, players, teams) : [];
     if (setup.mapMethod === "BANS") {
@@ -144,7 +147,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
     if (state.mapNote) embed.setDescription(`${word} pick: ${state.mapNote}`);
     if (phase === "LIVE") {
       buttons = [button(setup, "report", `${teams[0].name} Won`, ButtonStyle.Primary, "a"), button(setup, "report", `${teams[1].name} Won`, ButtonStyle.Secondary, "b")];
-      embed.setFooter({ text: setup.reportBy === "BOTH" ? "One captain reports, the other confirms" : setup.reportBy === "STAFF" ? "Staff report the result" : "Either captain reports the result" });
+      embed.setFooter({ text: state.disputes >= 2 || setup.reportBy === "STAFF" ? "Staff report the result" : setup.reportBy === "BOTH" ? "One captain reports, the other confirms" : "Either captain reports the result" });
     } else if (state.report) {
       const r = state.report;
       embed.setFooter({ text: "Accepted automatically if nobody responds" }).addFields({ name: "Waiting for confirmation", value: `<@${r.by}> reported **${(r.winner === "a" ? teams[0] : teams[1]).name}** won ${r.winnerScore}-${r.loserScore} ${setup.scoreName}. Accepted ${until}.` });
@@ -167,7 +170,8 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
   }
 
   if (tournament && state.bracket.length) embed.addFields(...bracketFields(state));
-  return { content: "", embeds: [embed], components: [...extra, ...rows(buttons), navRow(setup)].slice(0, 5) };
+  if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: "Subs needed", value: `${state.subsNeeded.length} open. Tap Subs to jump in.` });
+  return { content: "", embeds: [embed], components: [...extra, ...rows(buttons), navRow(setup, phase)].slice(0, 5) };
 }
 
 export function buildLeaderboard(setup: MatchSetup, rows: MatchPlayer[]) {

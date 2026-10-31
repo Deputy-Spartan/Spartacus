@@ -43,6 +43,11 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   }
   if (Boolean(b.checkIn) && !whole(b.checkInSeconds, 15, 600)) return { error: "Check-in time must be from 15 to 600 seconds." };
   if (autoMove && !lobbyVoiceId) return { error: "Pick the main voice channel, or turn off moving players." };
+  const offOr = (v: unknown, min: number, max: number) => v === 0 || whole(v, min, max);
+  if (!offOr(b.autoStartSeconds, 15, 600)) return { error: "Auto-start must be 0 (off) or from 15 to 600 seconds." };
+  if (!offOr(b.reportMinutes, 5, 720)) return { error: "Score deadline must be 0 (off) or from 5 to 720 minutes." };
+  if (!offOr(b.signupMinutes, 5, 10080)) return { error: "Sign-up time must be 0 (off) or from 5 to 10080 minutes." };
+  if (!whole(b.autoReopenHours, 0, 720)) return { error: "Reopen time must be from 0 to 720 hours." };
   if (![b.winCoins, b.lossCoins, b.championCoins].every((c) => whole(c, 0, 1_000_000))) return { error: "Coin rewards must be whole numbers of 0 or more." };
 
   return {
@@ -73,6 +78,12 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       reportBy: pick(b.reportBy, ["BOTH", "CAPTAIN", "STAFF"], "BOTH"),
       lobbyVoiceId,
       rewardsEnabled: b.rewardsEnabled === undefined ? true : Boolean(b.rewardsEnabled),
+      teamNaming: pick(b.teamNaming, ["SET", "CAPTAIN"], "SET"),
+      autoStartSeconds: b.autoStartSeconds as number,
+      reportMinutes: b.reportMinutes as number,
+      noReportAction: pick(b.noReportAction, ["CANCEL", "ALERT"], "CANCEL"),
+      signupMinutes: b.signupMinutes as number,
+      autoReopenHours: b.autoReopenHours as number,
       winCoins: b.winCoins as number,
       lossCoins: b.lossCoins as number,
       championCoins: b.championCoins as number,

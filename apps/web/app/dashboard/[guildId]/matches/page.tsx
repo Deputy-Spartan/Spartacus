@@ -32,6 +32,12 @@ const BLANK: MatchSetupInput = {
   reportBy: "BOTH",
   lobbyVoiceId: null,
   rewardsEnabled: true,
+  teamNaming: "SET",
+  autoStartSeconds: 120,
+  reportMinutes: 90,
+  noReportAction: "CANCEL",
+  signupMinutes: 240,
+  autoReopenHours: 24,
   winCoins: 100,
   lossCoins: 25,
   championCoins: 500,
@@ -79,6 +85,11 @@ function stepError(step: number, d: MatchSetupInput): string | null {
   if (step === 4) {
     if (d.checkIn && d.format === "SINGLE" && (d.checkInSeconds < 15 || d.checkInSeconds > 600)) return "Check-in time must be from 15 to 600 seconds.";
     if (d.autoMove && !d.lobbyVoiceId) return "Pick the main voice channel, or turn off moving players.";
+    const offOr = (v: number, min: number, max: number) => v === 0 || (Number.isInteger(v) && v >= min && v <= max);
+    if (!offOr(d.signupMinutes, 5, 10080)) return "Sign-up time must be 0 or from 5 to 10080 minutes.";
+    if (!offOr(d.autoStartSeconds, 15, 600)) return "Auto-start must be 0 or from 15 to 600 seconds.";
+    if (!offOr(d.reportMinutes, 5, 720)) return "Score deadline must be 0 or from 5 to 720 minutes.";
+    if (!Number.isInteger(d.autoReopenHours) || d.autoReopenHours < 0 || d.autoReopenHours > 720) return "Reopen time must be from 0 to 720 hours.";
   }
   if (step === 5) {
     if (!d.panelChannelId || !d.resultsChannelId) return "Pick a panel channel and a results channel.";
@@ -322,6 +333,15 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                   <option value="RANDOM">Random player on each team</option>
                 </select>
               </div>
+              {d.teamSize > 1 && (
+                <div>
+                  <Label>Team names</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Choice on={d.teamNaming === "SET"} title={tournament ? "Numbered" : "Set Names"} hint={tournament ? "Team 1, Team 2 and so on." : "Uses the names below."} onClick={() => set({ teamNaming: "SET" })} />
+                    <Choice on={d.teamNaming === "CAPTAIN"} title="Captains Name Them" hint="Captains pick a name on the panel before the match." onClick={() => set({ teamNaming: "CAPTAIN" })} />
+                  </div>
+                </div>
+              )}
               {!tournament && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
@@ -428,6 +448,40 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                   <Hint>Players wait here. Team channels appear beside it, and everyone returns here after the match. Spartacus needs Manage Channels and Move Members.</Hint>
                 </div>
               )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label>{tournament ? "Sign-up minutes" : "Clear sign-ups after (minutes)"}</Label>
+                  <input {...num("signupMinutes")} min={0} />
+                  <Hint>{tournament ? "Counts from the first sign-up, then starts with whoever joined. If too few joined, it resets." : "Counts from the first sign-up. Clears an unfilled lobby."} 0 turns it off.</Hint>
+                </div>
+                <div>
+                  <Label>Auto-start seconds</Label>
+                  <input {...num("autoStartSeconds")} min={0} />
+                  <Hint>Starts after teams are set if nobody taps Start. 0 waits for a captain or staff.</Hint>
+                </div>
+                <div>
+                  <Label>Score deadline (minutes)</Label>
+                  <input {...num("reportMinutes")} min={0} />
+                  <Hint>Captains get a reminder, then 15 more minutes. 0 turns it off.</Hint>
+                </div>
+                {tournament ? (
+                  <div>
+                    <Label>Reopen sign-ups after (hours)</Label>
+                    <input {...num("autoReopenHours")} min={0} />
+                    <Hint>Counts from the final. 0 waits for staff.</Hint>
+                  </div>
+                ) : (
+                  <div>
+                    <Label>If no score comes in</Label>
+                    <select className={inputClass} value={d.noReportAction} onChange={(e) => set({ noReportAction: e.target.value as MatchSetupInput["noReportAction"] })}>
+                      <option value="CANCEL">Cancel the match</option>
+                      <option value="ALERT">Alert staff</option>
+                    </select>
+                    <Hint>Canceled matches record nothing.</Hint>
+                  </div>
+                )}
+              </div>
+              {tournament && <Hint>A tournament match with no score always alerts staff, since canceling it would end the bracket.</Hint>}
               <div>
                 <Label>Who reports the score</Label>
                 <select className={inputClass} value={d.reportBy} onChange={(e) => set({ reportBy: e.target.value as MatchSetupInput["reportBy"] })}>

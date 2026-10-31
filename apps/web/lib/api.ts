@@ -586,6 +586,12 @@ export interface MatchSetupInput {
   reportBy: "BOTH" | "CAPTAIN" | "STAFF";
   lobbyVoiceId: string | null;
   rewardsEnabled: boolean;
+  teamNaming: "SET" | "CAPTAIN";
+  autoStartSeconds: number;
+  reportMinutes: number;
+  noReportAction: "CANCEL" | "ALERT";
+  signupMinutes: number;
+  autoReopenHours: number;
   winCoins: number;
   lossCoins: number;
   championCoins: number;

@@ -31,6 +31,8 @@ import {
   emptyState,
   mapPool,
   nextTie,
+  cleanTeamName,
+  replacePlayer,
   pickCaptain,
   pickOne,
   ratingChange,
@@ -49,6 +51,9 @@ import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult
 const CONFIRM_MS = 5 * 60_000;
 const DONE_RESET_MS = 30 * 60_000;
 const POST_ERROR_GAP_MS = 10 * 60_000;
+const REMINDER_GRACE_MS = 15 * 60_000;
+const ACTIVE_PHASES = ["TEAMS", "MAP", "LIVE"];
+const fromNow = (ms: number) => (ms > 0 ? new Date(Date.now() + ms) : null);
 const lastPostError = new Map<string, number>();
 
 type Reply = string | InteractionEditReplyOptions | null;
@@ -185,6 +190,10 @@ async function teamLabel(ctx: Ctx, players: string[], fallback: string): Promise
 
 // ---- Steps ----
 
+// Teams wait a set time for captains, then the match starts on its own.
+const saveTeams = (ctx: Ctx) => save(ctx, "TEAMS", fromNow(ctx.setup.autoStartSeconds * 1000));
+const signupDeadline = (setup: MatchSetup) => fromNow(setup.signupMinutes * 60_000);
+
 async function closeSignups(ctx: Ctx) {
   if (ctx.session.kind === "TOURNAMENT") return startTournament(ctx);
   if (!ctx.setup.checkIn) return enterTeams(ctx);
@@ -214,7 +223,7 @@ async function enterTeams(ctx: Ctx) {
   }
 
   await buildTeams(ctx, ids, ratings);
-  await save(ctx, "TEAMS");
+  await saveTeams(ctx);
 }
 
 async function buildTeams(ctx: Ctx, ids: string[], ratings: Record<string, number>) {
@@ -231,7 +240,7 @@ async function draftPick(ctx: Ctx, userId: string) {
   state.draftPool = state.draftPool.filter((id) => id !== userId);
   state.teams[draftSide(state.draftPick) === "a" ? 0 : 1].players.push(userId);
   state.draftPick++;
-  if (state.draftPool.length === 0) await save(ctx, "TEAMS");
+  if (state.draftPool.length === 0) await saveTeams(ctx);
   else await save(ctx, "DRAFT", new Date(Date.now() + ctx.setup.voteSeconds * 1000));
 }
 
@@ -249,6 +258,10 @@ async function startTournament(ctx: Ctx): Promise<string | void> {
   state.tie = nextTie(state.bracket);
   await clearPings(ctx);
   await syncBracket(ctx, true);
+  if (setup.teamNaming === "CAPTAIN" && setup.teamSize > 1) {
+    await ping(ctx, `${state.teams.map((t) => `<@${t.captain}>`).join(" ")} Name your team on the panel.`.slice(0, 2000));
+    return void (await saveTeams(ctx));
+  }
   await startMapStep(ctx);
 }
 
@@ -303,15 +316,19 @@ async function banMap(ctx: Ctx, map: string) {
 }
 
 async function goLive(ctx: Ctx, map: string | null, note: string | null) {
-  const { state } = ctx;
+  const { setup, state } = ctx;
+  await clearPings(ctx);
   state.map = map;
   state.mapNote = note;
   state.report = null;
+  state.reminded = false;
+  state.disputes = 0;
   if (state.tie) state.bracket[state.tie[0]][state.tie[1]].map = map;
-  await save(ctx, "LIVE");
+  const deadline = fromNow(setup.reportMinutes * 60_000);
+  await save(ctx, "LIVE", deadline);
   const pings = await openTeamRooms(ctx);
   if (pings.length) await ping(ctx, pings.join("\n").slice(0, 2000));
-  await save(ctx, "LIVE");
+  await save(ctx, "LIVE", deadline);
 }
 
 // Creates a voice channel per team beside the main one, capped at the team
@@ -484,22 +501,66 @@ async function replaceSession(ctx: Ctx, signups: string[] = []) {
 
 async function expirePhase(ctx: Ctx) {
   const { session, state, setup } = ctx;
+  if (session.phase === "SIGNUP") {
+    if (session.kind === "TOURNAMENT" && bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams) >= 2) return void (await startTournament(ctx));
+    state.signups = [];
+    await clearPings(ctx);
+    await ping(ctx, "Not enough players joined in time, so sign-ups were reset.");
+    return save(ctx, "SIGNUP");
+  }
   if (session.phase === "CHECKIN") {
     state.signups = state.signups.filter((id) => state.ready.includes(id));
     await clearPings(ctx);
     if (state.signups.length >= lobbySize(setup, session.kind)) return enterTeams(ctx);
     await ping(ctx, `${roleMention(setup)}Not everyone checked in, so sign-ups are open again.`);
-    return save(ctx, "SIGNUP");
+    return save(ctx, "SIGNUP", state.signups.length ? signupDeadline(setup) : null);
   }
   if (session.phase === "DRAFT") {
     const ratings = await ratingsFor(setup, state.draftPool);
     return draftPick(ctx, pickCaptain(state.draftPool, ratings, "TOP"));
   }
+  if (session.phase === "TEAMS") return startMapStep(ctx);
   if (session.phase === "MAP") {
     if (setup.mapMethod === "BANS") return banMap(ctx, pickOne(state.mapOptions.filter((m) => !state.banned.includes(m))));
     return closeVote(ctx);
   }
+  if (session.phase === "LIVE") return chaseScore(ctx);
   if (session.phase === "CONFIRM" && state.report) return finishMatch(ctx, state.report);
+}
+
+// A missing score gets one reminder. After that a single match follows the
+// setup's rule, while a tournament goes to staff since canceling a tie would
+// end everyone's bracket.
+async function chaseScore(ctx: Ctx) {
+  const { setup, session, state } = ctx;
+  const teams = currentTeams(state);
+  if (!state.reminded) {
+    state.reminded = true;
+    await ping(ctx, `${teams?.map((t) => `<@${t.captain}>`).join(" ")} Please report your score on the panel.`);
+    return save(ctx, "LIVE", fromNow(REMINDER_GRACE_MS));
+  }
+  if (session.kind === "TOURNAMENT" || setup.noReportAction === "ALERT") {
+    await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}Nobody reported this match. Staff can report the score on the panel or cancel it.`);
+    return save(ctx, "LIVE");
+  }
+  await cancelCtx(ctx);
+  await ping(ctx, "That match had no score reported, so it was canceled and nothing was recorded.");
+  await save(ctx, "SIGNUP");
+}
+
+async function swapPlayer(ctx: Ctx, out: string, sub: string): Promise<string> {
+  const { client, setup, session, state } = ctx;
+  const team = replacePlayer(state, out, sub);
+  if (!team) return "That player isn't on a team.";
+  const room = state.voiceIds[currentTeams(state)?.indexOf(team) ?? -1];
+  if (room) {
+    const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
+    const member = await guild?.members.fetch({ user: sub, force: true }).catch(() => null);
+    const moved = member?.voice.channelId ? await member.voice.setChannel(room).catch(() => null) : null;
+    if (!moved) await ping(ctx, `<@${sub}> You're subbing in for ${team.name}. Join <#${room}>.`);
+  }
+  await save(ctx, session.phase, session.phaseEndsAt);
+  return `<@${sub}> is in for <@${out}> on ${team.name}.`;
 }
 
 // ---- Member actions ----
@@ -529,7 +590,7 @@ async function join(ctx: Ctx, userId: string): Promise<Reply> {
   }
   state.signups.push(userId);
   if (state.signups.length >= lobbySize(setup, session.kind)) await closeSignups(ctx);
-  else await save(ctx, "SIGNUP");
+  else await save(ctx, "SIGNUP", session.phaseEndsAt ?? signupDeadline(setup));
   return session.kind === "TOURNAMENT" ? "You're registered." : `You're in for Match #${session.number}.`;
 }
 
@@ -547,7 +608,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (session.phase !== "SIGNUP") return "You can't leave once sign-ups have closed. Ask staff to cancel the match.";
       if (!state.signups.includes(userId)) return "You aren't signed up.";
       state.signups = state.signups.filter((id) => id !== userId);
-      await save(ctx, "SIGNUP");
+      await save(ctx, "SIGNUP", state.signups.length ? session.phaseEndsAt : null);
       return "You left the sign-ups.";
     case "ready":
       if (session.phase !== "CHECKIN") return "Check-in isn't running.";
@@ -593,10 +654,12 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
         return "Result confirmed.";
       }
       state.report = null;
+      state.disputes++;
+      state.reminded = true;
       await clearPings(ctx);
-      await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}A match result was disputed. Staff can report the correct score on the panel.`);
-      await save(ctx, "LIVE");
-      return "Result disputed. The match is back to live.";
+      await ping(ctx, state.disputes >= 2 ? `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}Captains disagreed twice. Only staff can report this score now.` : "Result disputed. Captains can report once more, then it goes to staff.");
+      await save(ctx, "LIVE", fromNow(setup.reportMinutes * 60_000));
+      return "Result disputed.";
     }
     case "runback": {
       if (session.phase !== "DONE" || session.kind !== "SINGLE") return "This match is still going.";
@@ -611,6 +674,33 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       await replaceSession(ctx);
       await save(ctx, "SIGNUP");
       return "Sign-ups are open.";
+    case "subs": {
+      if (!ACTIVE_PHASES.includes(session.phase)) return "Subs open once teams are set.";
+      const playing = state.teams.some((t) => t.players.includes(userId));
+      if (!playing && state.subsNeeded.length === 0) return "No open slots right now.";
+      const choice = playing ? ["subout", "I Can't Play", ButtonStyle.Danger] : ["subin", "Sub In", ButtonStyle.Success];
+      return {
+        content: playing ? "Can't play? This opens your slot for a sub. You stay in until someone takes it." : `${state.subsNeeded.length} slot open.`,
+        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`match:${setup.id}:${choice[0]}`).setLabel(choice[1] as string).setStyle(choice[2] as ButtonStyle))],
+      };
+    }
+    case "subout": {
+      if (!ACTIVE_PHASES.includes(session.phase) || !state.teams.some((t) => t.players.includes(userId))) return "You can't do that right now.";
+      if (state.subsNeeded.includes(userId)) return "Your slot is already open.";
+      state.subsNeeded.push(userId);
+      await ping(ctx, `${roleMention(setup)}A sub is needed. Tap Subs on the panel to jump in.`);
+      await save(ctx, session.phase, session.phaseEndsAt);
+      return "Your slot is open. You'll be replaced when someone takes it.";
+    }
+    case "subin": {
+      if (!ACTIVE_PHASES.includes(session.phase) || state.subsNeeded.length === 0) return "No open slots right now.";
+      if (state.teams.some((t) => t.players.includes(userId))) return "You're already on a team.";
+      if (setup.useRanks) {
+        const player = await prisma.matchPlayer.findUnique({ where: { setupId_userId: { setupId: setup.id, userId } } });
+        if (player?.rank === null || player?.rank === undefined) return rankPicker(setup);
+      }
+      return swapPlayer(ctx, state.subsNeeded[0], userId);
+    }
     case "stats": {
       const player = await prisma.matchPlayer.findUnique({ where: { setupId_userId: { setupId: setup.id, userId } } });
       return { embeds: [buildStats(setup, player)] };
@@ -648,7 +738,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (session.phase !== "TEAMS") return "Teams can only be rerolled before the match starts.";
       const ids = state.teams.flatMap((t) => t.players);
       await buildTeams(ctx, shuffle(ids), await ratingsFor(setup, ids));
-      await save(ctx, "TEAMS");
+      await saveTeams(ctx);
       return "Teams rerolled.";
     }
     case "endvote":
@@ -683,6 +773,7 @@ export async function handleMatchButton(interaction: ButtonInteraction) {
   const [, setupId, action, arg] = interaction.customId.split(":");
   const member = await interaction.guild?.members.fetch(interaction.user.id).catch(() => null);
   if (action === "report") return openScoreModal(interaction, setupId, arg as Side, member ?? null);
+  if (action === "name") return openNameModal(interaction, setupId);
 
   await interaction.deferReply({ ephemeral: true });
   try {
@@ -699,8 +790,9 @@ async function openScoreModal(interaction: ButtonInteraction, setupId: string, s
   const { setup, session } = ctx;
   if (session.phase !== "LIVE") return void interaction.reply({ content: "This match isn't waiting for a result.", ephemeral: true });
   const staff = memberIsStaff(member, setup);
-  if (setup.reportBy === "STAFF" ? !staff : !staff && !isCaptain(ctx, interaction.user.id)) {
-    return void interaction.reply({ content: setup.reportBy === "STAFF" ? "Only staff can report results." : "Only captains or staff can report results.", ephemeral: true });
+  const staffOnly = setup.reportBy === "STAFF" || ctx.state.disputes >= 2;
+  if (staffOnly ? !staff : !staff && !isCaptain(ctx, interaction.user.id)) {
+    return void interaction.reply({ content: staffOnly ? "Only staff can report this result." : "Only captains or staff can report results.", ephemeral: true });
   }
   const winner = currentTeams(ctx.state)?.[side === "a" ? 0 : 1].name ?? "Winner";
   const field = (id: string, label: string) => new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId(id).setLabel(label.slice(0, 45)).setStyle(TextInputStyle.Short).setMaxLength(4).setRequired(true));
@@ -710,6 +802,41 @@ async function openScoreModal(interaction: ButtonInteraction, setupId: string, s
       .setTitle(`Report: ${winner} Won`.slice(0, 45))
       .addComponents(field("winner", `Winner ${setup.scoreName}`), field("loser", `Loser ${setup.scoreName}`))
   );
+}
+
+async function openNameModal(interaction: ButtonInteraction, setupId: string) {
+  const ctx = await loadCtx(interaction.client, setupId);
+  const team = ctx?.state.teams.find((t) => t.captain === interaction.user.id);
+  if (!ctx || ctx.session.phase !== "TEAMS" || !team) return void interaction.reply({ content: "Only a team captain can do that, before the match starts.", ephemeral: true });
+  const field = new TextInputBuilder().setCustomId("name").setLabel("Team name").setStyle(TextInputStyle.Short).setMinLength(2).setMaxLength(32).setRequired(true).setValue(team.name.slice(0, 32));
+  await interaction.showModal(new ModalBuilder().setCustomId(`matchname:${setupId}`).setTitle("Name Your Team").addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(field)));
+}
+
+export async function handleMatchName(interaction: ModalSubmitInteraction) {
+  const setupId = interaction.customId.split(":")[1];
+  await interaction.deferReply({ ephemeral: true });
+  const name = cleanTeamName(interaction.fields.getTextInputValue("name"));
+  try {
+    const reply = await withLock(setupId, async () => {
+      const ctx = await loadCtx(interaction.client, setupId);
+      if (!ctx || ctx.session.phase !== "TEAMS") return "It's too late to change the name.";
+      const { state, session } = ctx;
+      const index = state.teams.findIndex((t) => t.captain === interaction.user.id);
+      if (index < 0) return "Only a team captain can do that.";
+      if (name.length < 2) return "Use at least 2 letters or numbers.";
+      if (state.teams.some((t, i) => i !== index && t.name.toLowerCase() === name.toLowerCase())) return "Another team already has that name.";
+      state.teams[index].name = name;
+      if (!state.named.includes(index)) state.named.push(index);
+      if (state.tie) await syncBracket(ctx);
+      if (session.kind === "TOURNAMENT" && state.named.length === state.teams.length) await startMapStep(ctx);
+      else await save(ctx, "TEAMS", session.phaseEndsAt);
+      return `Your team is now ${name}.`;
+    });
+    await interaction.editReply(reply);
+  } catch (err) {
+    logError("bot", err, interaction.guildId ?? undefined);
+    await interaction.editReply(failed).catch(() => null);
+  }
 }
 
 export async function handleMatchScore(interaction: ModalSubmitInteraction) {
@@ -729,7 +856,9 @@ export async function handleMatchScore(interaction: ModalSubmitInteraction) {
       if (!ctx || ctx.session.phase !== "LIVE") return "This match isn't waiting for a result.";
       const report: MatchReport = { winner: side, winnerScore, loserScore, by: interaction.user.id };
       const { setup, state } = ctx;
-      if (memberIsStaff(member ?? null, setup) || setup.reportBy !== "BOTH") {
+      const staff = memberIsStaff(member ?? null, setup);
+      if (!staff && state.disputes >= 2) return "Only staff can report this result.";
+      if (staff || setup.reportBy !== "BOTH") {
         await finishMatch(ctx, report);
         return "Result saved.";
       }
@@ -755,7 +884,8 @@ export async function handleMatchRank(interaction: StringSelectMenuInteraction) 
       const ctx = await loadCtx(interaction.client, setupId);
       if (!ctx) return "This match setup no longer exists.";
       await setPlayerRank(ctx.setup, interaction.user.id, rank);
-      return join(ctx, interaction.user.id);
+      if (ctx.session.phase === "SIGNUP") return join(ctx, interaction.user.id);
+      return "Rank saved. Tap Subs on the panel again to jump in.";
     });
     await respond(interaction, reply);
   } catch (err) {
@@ -821,6 +951,19 @@ export async function handleMatchCommand(interaction: ChatInputCommandInteractio
       await interaction.editReply(`Set ${target}'s rank to ${ranks[rank]}.`);
       return;
     }
+    if (sub === "sub") {
+      if (!memberIsStaff(member ?? null, setup)) return void (await interaction.editReply("Only staff can do that."));
+      const out = interaction.options.getUser("out", true);
+      const replacement = interaction.options.getUser("in", true);
+      const reply = await withLock(setup.id, async () => {
+        const ctx = await loadCtx(interaction.client, setup.id);
+        if (!ctx || !ACTIVE_PHASES.includes(ctx.session.phase)) return "Subs open once teams are set.";
+        if (ctx.state.teams.some((t) => t.players.includes(replacement.id))) return `${replacement} is already on a team.`;
+        return swapPlayer(ctx, out.id, replacement.id);
+      });
+      await interaction.editReply(reply);
+      return;
+    }
     const action = { join: "join", leave: "leave", stats: "stats", leaderboard: "board" }[sub] ?? "stats";
     await respond(interaction, await withLock(setup.id, () => runAction(interaction.client, setup.id, action, undefined, interaction.user.id, member ?? null)));
   } catch (err) {
@@ -854,6 +997,18 @@ export async function tickMatches(client: Client) {
 
   const finished = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "SINGLE", doneAt: { lte: new Date(now.getTime() - DONE_RESET_MS) } }, take: 20 });
   for (const row of finished) {
+    await withLock(row.setupId, async () => {
+      const ctx = await loadCtx(client, row.setupId);
+      if (!ctx || ctx.session.id !== row.id) return;
+      await replaceSession(ctx);
+      await save(ctx, "SIGNUP");
+    }).catch((err) => logError("bot", err, row.guildId));
+  }
+
+  const tournaments = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "TOURNAMENT" }, include: { setup: true }, take: 20 });
+  for (const row of tournaments) {
+    const hours = row.setup.autoReopenHours;
+    if (!hours || !row.doneAt || row.doneAt.getTime() + hours * 3_600_000 > now.getTime()) continue;
     await withLock(row.setupId, async () => {
       const ctx = await loadCtx(client, row.setupId);
       if (!ctx || ctx.session.id !== row.id) return;

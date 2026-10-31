@@ -2293,6 +2293,12 @@ model MatchSetup {
   reportBy             String   @default("BOTH") // BOTH | CAPTAIN | STAFF
   lobbyVoiceId         String? // team voice channels are created beside this one for each match
   rewardsEnabled       Boolean  @default(true)
+  teamNaming           String   @default("SET") // SET | CAPTAIN
+  autoStartSeconds     Int      @default(120) // 0 waits for a captain or staff
+  reportMinutes        Int      @default(90) // 0 never chases a missing score
+  noReportAction       String   @default("CANCEL") // CANCEL | ALERT
+  signupMinutes        Int      @default(240) // from the first sign-up, 0 stays open
+  autoReopenHours      Int      @default(24) // tournaments, 0 waits for staff
   winCoins             Int      @default(100)
   lossCoins            Int      @default(25)
   championCoins        Int      @default(500)

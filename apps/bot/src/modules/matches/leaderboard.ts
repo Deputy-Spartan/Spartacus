@@ -1,5 +1,5 @@
 import { Client, EmbedBuilder } from "discord.js";
-import { textsForGame } from "@spartacus/shared";
+import { gameColor, resolveText, textsForGame, type MatchTextKey, type TextOverrides } from "@spartacus/shared";
 import { styleEmbed } from "./render";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
@@ -16,7 +16,14 @@ function line(entry: BoardEntry, index: number, name: string): string {
   return `${MEDALS[index] ?? `**${index + 1}.**`} ${name}: ${entry.wins}W ${entry.losses}L · ${percent}%`;
 }
 
-export async function buildBoard(client: Client, guildId: string, game: string, since: Date | null, texts: unknown = {}) {
+// Your own description stays, with the ranked list always below it.
+function withList(embed: EmbedBuilder, list: string) {
+  const description = embed.data.description ?? "";
+  if (!description.includes(list)) embed.setDescription([description, list].filter(Boolean).join("\n\n").slice(0, 4096));
+  return embed;
+}
+
+export async function buildBoard(client: Client, guildId: string, game: string, since: Date | null, texts: TextOverrides = {}, style = "COMBINED") {
   const results = await prisma.matchResult.findMany({
     where: { guildId, voided: false, ...(game === "ALL" ? {} : { game }), ...(since ? { createdAt: { gte: since } } : {}) },
     orderBy: { createdAt: "desc" },
@@ -27,10 +34,19 @@ export async function buildBoard(client: Client, guildId: string, game: string, 
   const guild = await client.guilds.fetch(guildId).catch(() => null);
   const members = await Promise.all(players.map((p) => guild?.members.fetch(p.key).catch(() => null)));
   const label = game === "ALL" ? "All Games" : game;
-  return [
-    styleEmbed(new EmbedBuilder(), texts, "boardPlayers", { game: label }).setDescription(players.map((p, i) => line(p, i, members[i]?.displayName ?? "Former member")).join("\n") || "No matches played yet."),
-    styleEmbed(new EmbedBuilder(), texts, "boardTeams", { game: label }).setDescription(teams.map((t, i) => line(t, i, t.key)).join("\n") || "No team matches played yet."),
-  ];
+  const say = (key: MatchTextKey) => resolveText(texts, key).text;
+  const color = (key: MatchTextKey, embed: EmbedBuilder) => (texts[key]?.color ? embed : embed.setColor(parseInt(gameColor(game).slice(1), 16)));
+  const playerList = players.map((p, i) => line(p, i, members[i]?.displayName ?? "Former member")).join("\n") || say("labelNoPlayers");
+  const teamList = teams.map((t, i) => line(t, i, t.key)).join("\n") || say("labelNoTeams");
+
+  if (style === "SEPARATE") {
+    return [
+      color("boardPlayers", withList(styleEmbed(new EmbedBuilder(), texts, "boardPlayers", { game: label, list: playerList }), playerList)),
+      color("boardTeams", withList(styleEmbed(new EmbedBuilder(), texts, "boardTeams", { game: label, list: teamList }), teamList)),
+    ];
+  }
+  const embed = styleEmbed(new EmbedBuilder(), texts, "boardCombined", { game: label }).addFields({ name: say("labelTopPlayers"), value: playerList.slice(0, 1024), inline: true }, { name: say("labelTopTeams"), value: teamList.slice(0, 1024), inline: true });
+  return [color("boardCombined", embed)];
 }
 
 const readMessages = (value: unknown) => (value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, string>) : {});
@@ -58,7 +74,7 @@ async function postBoards(client: Client, guildId: string, game?: string) {
 
   for (const key of wanted) {
     if (game && key !== "ALL" && key !== game && messages[key]) continue;
-    const embeds = await buildBoard(client, guildId, key, config.boardSince, textsForGame(config.texts, config.gameTexts, key === "ALL" ? null : key));
+    const embeds = await buildBoard(client, guildId, key, config.boardSince, textsForGame(config.texts, config.gameTexts, key === "ALL" ? null : key), config.boardStyle);
     const message = messages[key] ? await channel.messages.fetch(messages[key]).catch(() => null) : null;
     if (await message?.edit({ embeds }).catch(() => null)) continue;
     const sent = await channel.send({ embeds, allowedMentions: { parse: [] } }).catch((err) => {

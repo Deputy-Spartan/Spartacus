@@ -47,6 +47,7 @@ export interface MatchTextEntry {
   defaults: TextOverride;
   tokens: Record<string, string>; // token to example value
   global?: boolean; // shared by every game, so it can't differ per game
+  previewFields?: Array<{ name: string; value: string }>; // what the bot adds below, for the preview
 }
 
 const GOLD = "#F0B232";
@@ -54,6 +55,8 @@ const STEEL = "#7B99BC";
 const GREEN = "#3BA55D";
 
 const gameTokens = { game: "Rainbow Six Siege", setup: "Friday Night 5v5", number: "12" };
+const samplePlayers = "🥇 Kuro: 12W 3L · 80%\n🥈 FrostByte: 10W 4L · 71%\n🥉 Deimos: 9W 5L · 64%";
+const sampleTeams = "🥇 Night Crew: 7W 1L · 88%\n🥈 Red Line: 5W 3L · 63%";
 const countTokens = { progress: "🟩🟩🟩⬛⬛", count: "6", needed: "10" };
 const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it." };
 const matchTokens = { ...gameTokens, onMap: " on Bank", mapWord: "Map" };
@@ -71,8 +74,9 @@ export const MATCH_TEXTS = {
   roomWon: line("Matchmaking", "Match finished", "Posted in the thread when a match ends.", "🏆 **{winner}** won {score}. This match is closed.", { winner: "Kuro", score: "4-2" }),
   roomCanceled: line("Matchmaking", "Match canceled", "Posted in the thread when a match is canceled.", "This match was canceled and nothing was recorded."),
 
-  boardPlayers: embed("Leaderboard", "Top 10 players", "The player leaderboard embed.", { title: "🏅 Top 10 Players: {game}", footer: "Updates after every match", color: GOLD }, { game: "All Games" }),
-  boardTeams: embed("Leaderboard", "Top 10 teams", "The team leaderboard embed.", { title: "👥 Top 10 Teams: {game}", footer: "Saved and named teams · Updates after every match", color: STEEL }, { game: "All Games" }),
+  boardCombined: { ...embed("Leaderboard", "One Clean Post", "Each game's post in the One Clean Post style.", { title: "🏆 {game}", footer: "Updates after every match", color: GOLD }, { game: "Rainbow Six Siege" }), previewFields: [{ name: "🏅 Top 10 Players", value: samplePlayers }, { name: "👥 Top 10 Teams", value: sampleTeams }] },
+  boardPlayers: embed("Leaderboard", "Separate: top 10 players", "The player embed in the Separate Embeds style.", { title: "🏅 Top 10 Players: {game}", description: "{list}", footer: "Updates after every match", color: GOLD }, { game: "Rainbow Six Siege", list: samplePlayers }),
+  boardTeams: embed("Leaderboard", "Separate: top 10 teams", "The team embed in the Separate Embeds style.", { title: "👥 Top 10 Teams: {game}", description: "{list}", footer: "Saved and named teams · Updates after every match", color: STEEL }, { game: "Rainbow Six Siege", list: sampleTeams }),
 
   signup: embed("Sign-Ups", "Match sign-ups", "The panel while a match or 1v1 is open.", { title: "⚔️ Match #{number}: {size} {game} Sign-Ups", description: "{start}\n{progress} **{count}/{needed}**", color: STEEL }, signupTokens),
   registration: embed("Sign-Ups", "Tournament registration", "The panel while a tournament is open.", { title: "🏆 {setup}: Registration", description: "{start}\n{progress} **{count}/{needed}**", color: STEEL }, signupTokens),
@@ -129,6 +133,10 @@ export const MATCH_TEXTS = {
   btnAccept: buttonLabel("Accept", "On challenges."),
   btnDecline: buttonLabel("Decline", "On challenges."),
 
+  labelTopPlayers: note("Top players heading", "In the One Clean Post leaderboard.", "🏅 Top 10 Players"),
+  labelTopTeams: note("Top teams heading", "In the One Clean Post leaderboard.", "👥 Top 10 Teams"),
+  labelNoPlayers: note("No matches yet", "When a leaderboard has no players.", "No matches played yet."),
+  labelNoTeams: note("No team matches yet", "When a leaderboard has no teams.", "No team matches played yet."),
   labelPlayers: note("Players heading", "Above the sign-up list.", "Players"),
   labelPicking: note("Draft heading", "Above players still to pick.", "Still to pick"),
   labelConfirm: note("Confirmation heading", "Above a reported score.", "Waiting for confirmation"),
@@ -156,6 +164,15 @@ export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Mat
 
 export function fillText(template: string, values: Record<string, string | number | null | undefined>): string {
   return template.replace(/\{([a-zA-Z]+)\}/g, (whole, key: string) => (key in values ? String(values[key] ?? "") : whole));
+}
+
+// Gives each game its own steady color, so posts are easy to tell apart.
+const GAME_COLORS = ["#F0B232", "#5865F2", "#3BA55D", "#ED4245", "#EB459E", "#1ABC9C", "#E67E22", "#9B59B6", "#3498DB", "#2ECC71"];
+export function gameColor(game: string): string {
+  if (game === "ALL") return GOLD;
+  let hash = 0;
+  for (const letter of game) hash = (hash * 31 + letter.charCodeAt(0)) % 9973;
+  return GAME_COLORS[hash % GAME_COLORS.length];
 }
 
 // A game's edits sit on top of All Games, one box at a time.

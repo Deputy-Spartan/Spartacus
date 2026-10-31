@@ -645,8 +645,18 @@ export async function handleMatchmaking(interaction: Interaction) {
 
 // ---- Timer ----
 
+const refreshedBoards = new Set<string>();
+
 export async function tickMatchmaking(client: Client) {
   const now = new Date();
+  // After a restart, posts catch up to any change in how they look.
+  const boards = await prisma.matchmakingConfig.findMany({ where: { boardChannelId: { not: null } }, select: { guildId: true } });
+  for (const { guildId } of boards) {
+    if (refreshedBoards.has(guildId)) continue;
+    refreshedBoards.add(guildId);
+    await syncBoard(client, guildId).catch((err) => logError("bot", err, guildId));
+  }
+
   const configs = await prisma.matchmakingConfig.findMany({ where: { enabled: true } });
   for (const config of configs) {
     const { guildId } = config;

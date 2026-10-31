@@ -302,7 +302,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGames", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
@@ -320,6 +320,7 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   const b = req.body as Record<string, unknown>;
   for (const key of ["challengeMinutes", "queueMinutes", "reportHours"]) if (b[key] !== undefined && !whole(b[key], 1, 1000)) return res.status(400).json({ error: "Time limits must be from 1 to 1000." });
   if (b.enabled && !b.channelId) return res.status(400).json({ error: "Pick a text channel for Matchmaking." });
+  if (b.boardStyle !== undefined && !["COMBINED", "SEPARATE"].includes(b.boardStyle as string)) return res.status(400).json({ error: "Pick a leaderboard style." });
   if (b.voiceExtra !== undefined && !whole(b.voiceExtra, 0, 20)) return res.status(400).json({ error: "Extra spots must be from 0 to 20." });
   if (b.voiceNumberPad !== undefined && !whole(b.voiceNumberPad, 1, 4)) return res.status(400).json({ error: "Number digits must be from 1 to 4." });
   for (const key of ["duelVoiceName", "teamVoiceName"]) if (b[key] !== undefined && !text(b[key], 100)) return res.status(400).json({ error: "Voice channel names can't be empty." });

@@ -633,6 +633,7 @@ export interface MatchSetupRow extends MatchSetupInput {
 export interface MatchmakingConfigRow {
   boardChannelId: string | null;
   boardGames: string[];
+  boardStyle: "COMBINED" | "SEPARATE";
   enabled: boolean;
   channelId: string | null;
   activityChannelId: string | null;

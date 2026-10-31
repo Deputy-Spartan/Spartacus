@@ -12,7 +12,7 @@ import { MatchmakingGuide } from "../../../../components/matchmaking/Matchmaking
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
+import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
@@ -1036,7 +1036,9 @@ function MessagesTab({ guildId }: { guildId: string }) {
   const shown = merged[key] ?? {};
   const isEmbed = entry.defaults.text === undefined;
   const edited = Object.keys(custom).length > 0;
-  const preview = resolveText(merged, key, entry.tokens);
+  const isBoard = key === "boardCombined" || key === "boardPlayers" || key === "boardTeams";
+  const resolved = resolveText(merged, key, entry.tokens);
+  const preview = isBoard && !shown.color ? { ...resolved, color: gameColor(scope) } : resolved;
   const value = (field: "title" | "description" | "footer" | "color" | "text" | "url" | "authorName" | "authorIcon" | "thumbnail" | "image" | "footerIcon") => shown[field] ?? entry.defaults[field] ?? "";
   const change = (field: keyof TextOverride, next: string | boolean | TextField[]) => setTexts({ ...texts, [key]: { ...custom, [field]: next } });
   const insert = (token: string) => {
@@ -1255,9 +1257,9 @@ function MessagesTab({ guildId }: { guildId: string }) {
                       <Formatted text={preview.description} />
                     </p>
                   )}
-                  {preview.fields.length > 0 && (
+                  {[...preview.fields, ...(entry.previewFields ?? []).map((f) => ({ ...f, inline: true }))].length > 0 && (
                     <div className="grid grid-cols-3 gap-2">
-                      {preview.fields.map((f, i) => (
+                      {[...preview.fields, ...(entry.previewFields ?? []).map((f) => ({ ...f, inline: true }))].map((f, i) => (
                         <div key={i} className={`min-w-0 ${f.inline ? "" : "col-span-3"}`}>
                           <p className="text-xs font-semibold text-white break-words">{f.name}</p>
                           <p className="text-xs whitespace-pre-wrap break-words">
@@ -1424,6 +1426,13 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
           <p className="text-xs text-slate-500 mb-3">Each game you switch on gets its own post in one text channel, with a top 10 players embed and a top 10 teams embed. Spartacus edits them after every match, using each player's server name.</p>
           <Label>Category and text channel</Label>
           <ChannelSelect guildId={guildId} value={config.boardChannelId} onChange={(boardChannelId) => set({ boardChannelId: boardChannelId || null })} />
+          <Label>Post style</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+            <Choice on={config.boardStyle === "COMBINED"} title="One Clean Post" hint="One embed per game, with its name on top and Players and Teams side by side." onClick={() => set({ boardStyle: "COMBINED" })} />
+            <Choice on={config.boardStyle === "SEPARATE"} title="Separate Embeds" hint="A Players embed and a Teams embed for each game." onClick={() => set({ boardStyle: "SEPARATE" })} />
+          </div>
+          <Hint>Each game gets its own color automatically. To change a game's color, wording or logo, open Messages, pick the game, then choose Leaderboard.</Hint>
+          <div className="h-3" />
           <Label>Games to post</Label>
           <div className="space-y-3 mb-3">
             <Toggle on={config.boardGames.includes("ALL")} label="All Games" hint="Combines every game into one leaderboard." onChange={(on) => toggleBoard("ALL", on)} />

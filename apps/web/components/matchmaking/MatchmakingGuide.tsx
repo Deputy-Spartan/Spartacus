@@ -441,21 +441,17 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
           <NeonCard>
             <div className="space-y-3">
               <Heading>Leaderboard tab</Heading>
-              <Text>Each game you switch on gets its own post in one channel, with a top 10 players embed and a top 10 teams embed. Spartacus edits them after every match, using each player's server name.</Text>
+              <Text>Each game you switch on gets its own post in one channel, showing the top 10 players and teams. Spartacus edits it after every match, using each player's server name.</Text>
               <Steps
                 items={[
                   <>Pick the <strong>category and text channel</strong>.</>,
+                  <>Pick a <strong>Post style</strong>. One Clean Post shows a game's Players and Teams side by side. Separate Embeds splits them.</>,
                   <>Under <strong>Games to post</strong>, turn on <strong>All Games</strong>, any single games, or both.</>,
                   <>Check the channel. Posts appear within a few seconds.</>,
                 ]}
               />
               <Frame label="Preview: one game's post">
-                <Embed texts={texts} item="boardPlayers">
-                  <p className="whitespace-pre-wrap">{"🥇 Kuro: 12W 3L · 80%\n🥈 FrostByte: 10W 4L · 71%\n🥉 Deimos: 9W 5L · 64%"}</p>
-                </Embed>
-                <Embed texts={texts} item="boardTeams">
-                  <p className="whitespace-pre-wrap">{"🥇 Night Crew: 7W 1L · 88%\n🥈 Red Line: 5W 3L · 63%"}</p>
-                </Embed>
+                <Embed texts={texts} item="boardCombined" fields={MATCH_TEXTS.boardCombined.previewFields} />
               </Frame>
               <Bullets
                 items={[
@@ -464,6 +460,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   <>Voiding a result takes it off the leaderboard.</>,
                   <><strong>Start New Season</strong> resets the leaderboard to zero and keeps past results. Ranks and ratings stay.</>,
                   <>Turning a game off deletes its post.</>,
+                  <>Each game gets its own color automatically. To change a game's color, wording or logo, open Messages, pick the game, then choose Leaderboard.</>,
                 ]}
               />
               <GoTo tab="board" label="Leaderboard" onOpen={onOpen} />

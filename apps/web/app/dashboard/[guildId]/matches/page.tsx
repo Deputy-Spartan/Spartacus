@@ -28,10 +28,6 @@ const STARTERS: Array<{ label: string; fields: Starter }> = [
     label: "Rocket League",
     fields: { game: "Rocket League", teamSize: 2, useRanks: true, ranks: ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Champion", "Grand Champion", "Supersonic Legend"], useMaps: true, maps: ["Champions Field", "DFH Stadium", "Mannfield", "Neo Tokyo", "Utopia Coliseum"], mapWord: "Arena", scoreName: "Goals" },
   },
-  {
-    label: "Super Smash Bros",
-    fields: { game: "Super Smash Bros", teamSize: 1, useRanks: false, ranks: [], useMaps: true, maps: ["Battlefield", "Final Destination", "Pokémon Stadium 2", "Smashville", "Town and City"], mapWord: "Stage", scoreName: "Stocks" },
-  },
   { label: "Start blank", fields: { game: "", teamSize: 5, useRanks: false, ranks: [], useMaps: false, maps: [], mapWord: "Map", scoreName: "Points" } },
 ];
 

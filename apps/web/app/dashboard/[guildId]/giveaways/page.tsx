@@ -7,6 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { Required } from "../../../../components/ui/Required";
+import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { FormError } from "../../../../components/ui/FormError";
 import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import { api, type GiveawayInput, type GiveawayRow, type StickyButton } from "../../../../lib/api";
@@ -113,7 +114,7 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
             <ButtonsEditor guildId={params.guildId} buttons={form.buttons ?? []} onChange={(next: StickyButton[]) => setForm({ ...form, buttons: next })} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Winners</label>
               <input
@@ -129,12 +130,7 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
                 Ends At
                 <Required />
               </label>
-              <input
-                type="datetime-local"
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                value={form.endsAt}
-                onChange={(e) => setForm({ ...form, endsAt: e.target.value })}
-              />
+              <DateTimeZoneField value={form.endsAt} onChange={(endsAt) => setForm({ ...form, endsAt })} />
             </div>
           </div>
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { MentionTextarea } from "../../../../components/ui/MentionTextarea";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
+import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { FormError } from "../../../../components/ui/FormError";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { EmbedCard } from "../../../../components/embedCreator/EmbedCard";
@@ -15,6 +16,7 @@ import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCr
 import { DiscordLimitsCard } from "../../../../components/embedCreator/DiscordLimitsCard";
 import { checkDiscordLimits } from "../../../../lib/discordLimits";
 import { parseEmbedExtra } from "../../../../lib/embedExtra";
+import { formatDateTime } from "../../../../lib/timeZones";
 import {
   api,
   type AnnouncementRow,
@@ -99,7 +101,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   const [channelId, setChannelId] = useState("");
   const [state, setState] = useState<EmbedCreatorState>(emptyState);
   const [savedEmbedId, setSavedEmbedId] = useState<string | null>(null);
-  const [scheduleLocal, setScheduleLocal] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -108,6 +110,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   const [notice, setNotice] = useState<string | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
 
   function refresh() {
     api.getAnnouncements(guildId).then(setRows);
@@ -128,7 +131,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
     setChannelId("");
     setState(emptyState());
     setSavedEmbedId(null);
-    setScheduleLocal("");
+    setScheduledFor("");
     setEditingId(null);
     setResending(false);
     setError(null);
@@ -174,11 +177,12 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
     setChannelId(r.channelId);
     setState(rowToState(r));
     setSavedEmbedId(r.savedEmbedId ?? null);
-    setScheduleLocal(mode === "edit" && r.scheduledFor ? r.scheduledFor.slice(0, 16) : "");
+    setScheduledFor(mode === "edit" && r.scheduledFor ? r.scheduledFor : "");
     setError(null);
     setNotice(null);
     setTab("compose");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Waits a frame so the form exists when coming from the Recently Sent tab.
+    requestAnimationFrame(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   const savedPreset = savedEmbedId ? presets.find((p) => p.id === savedEmbedId) ?? null : null;
@@ -193,12 +197,12 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
       channelId,
       creatorData: { content: state.content, embeds: state.embeds, components: state.components },
       savedEmbedId,
-      scheduledFor: scheduleLocal ? new Date(scheduleLocal).toISOString() : null,
+      scheduledFor: scheduledFor || null,
     };
     try {
       if (editingId) await api.updateAnnouncement(guildId, editingId, body);
       else await api.addAnnouncement(guildId, body);
-      setNotice(editingId ? "✅ Queued announcement updated." : scheduleLocal ? "✅ Queued for its scheduled time." : "✅ Saved to the queue — publish it below when you're ready.");
+      setNotice(scheduledFor ? `✅ Scheduled for ${formatDateTime(scheduledFor)}.` : editingId ? "✅ Queued announcement updated." : "✅ Saved to the queue — publish it below when you're ready.");
       resetForm();
       refresh();
     } catch (e) {
@@ -209,7 +213,8 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   }
 
   async function publish(r: AnnouncementRow) {
-    if (!(await confirm(`Publish this to ${channelLabel(r.channelId)} right now? Once sent it can't be edited.`, { confirmLabel: "Publish" })))
+    const skipsSchedule = r.scheduledFor ? ` It's scheduled for ${formatDateTime(r.scheduledFor)}, and this sends it now instead.` : "";
+    if (!(await confirm(`Publish this to ${channelLabel(r.channelId)} right now?${skipsSchedule} Once sent it can't be edited.`, { confirmLabel: "Publish" })))
       return;
     setPublishingId(r.id);
     try {
@@ -233,7 +238,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
   const queued = rows.filter((r) => !r.sentAt);
   const sent = rows.filter((r) => r.sentAt);
   const tabClass = (t: Tab) =>
-    ["px-4 py-2 text-sm border-b-2 transition-colors", tab === t ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300"].join(" ");
+    ["px-4 py-2 text-sm border-b-2 transition-colors whitespace-nowrap shrink-0", tab === t ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300"].join(" ");
 
   return (
     <div>
@@ -252,7 +257,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
         </p>
       </div>
 
-      <div className="flex gap-1 mb-5 border-b border-white/5">
+      <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
         <button onClick={() => setTab("compose")} className={tabClass("compose")}>
           Announcement{queued.length > 0 ? ` (${queued.length} queued)` : ""}
         </button>
@@ -269,25 +274,28 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
               <NeonCard>
                 <div className="divide-y divide-white/5">
                   {queued.map((r) => (
-                    <div key={r.id} className={`flex items-center justify-between py-2.5 text-sm gap-3 ${editingId === r.id ? "text-neon-blue" : ""}`}>
-                      <div className="min-w-0">
+                    <div key={r.id} className={`flex flex-wrap items-center justify-between py-2.5 text-sm gap-x-4 gap-y-2 ${editingId === r.id ? "text-neon-blue" : ""}`}>
+                      <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
                         <p className="truncate">{rowLabel(r)}</p>
                         <p className="text-xs text-slate-500">
                           {channelLabel(r.channelId)} ·{" "}
-                          {r.scheduledFor ? `publishes ${new Date(r.scheduledFor).toLocaleString()}` : "no schedule — publish manually"}
+                          {r.scheduledFor ? `publishes ${formatDateTime(r.scheduledFor)}` : "no schedule — publish manually"}
                         </p>
                       </div>
-                      <button onClick={() => openRow(r, "edit")} className="text-slate-500 hover:text-neon-blue text-xs shrink-0">
+                      <button onClick={() => openRow(r, "edit")} className="text-slate-500 hover:text-neon-blue text-xs shrink-0 py-1">
                         {editingId === r.id ? "Editing…" : "Edit"}
                       </button>
-                      <button
-                        onClick={() => publish(r)}
-                        disabled={publishingId === r.id}
-                        className="text-neon-blue hover:underline text-xs shrink-0 disabled:opacity-50"
-                      >
-                        {publishingId === r.id ? "Publishing…" : "Publish Now"}
-                      </button>
-                      <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
+                      {/* Publishing sends what's saved, so it's hidden while unsaved edits are open. */}
+                      {editingId !== r.id && (
+                        <button
+                          onClick={() => publish(r)}
+                          disabled={publishingId === r.id}
+                          className="text-neon-blue hover:underline text-xs shrink-0 py-1 disabled:opacity-50"
+                        >
+                          {publishingId === r.id ? "Publishing…" : "Publish Now"}
+                        </button>
+                      )}
+                      <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0 py-1">
                         Remove
                       </button>
                     </div>
@@ -299,7 +307,7 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
 
           {notice && <p className="text-xs text-emerald-400">{notice}</p>}
 
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-5 items-start">
+          <div ref={composerRef} className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-5 items-start scroll-mt-4">
             <div className="min-w-0">
               <NeonCard className="mb-4">
                 <div className="flex items-center justify-between mb-3">
@@ -315,6 +323,16 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                   <Required />
                 </label>
                 <ChannelSelect guildId={guildId} value={channelId || null} onChange={(id) => setChannelId(id)} />
+              </NeonCard>
+
+              <NeonCard className="mb-4">
+                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
+                <DateTimeZoneField value={scheduledFor} onChange={setScheduledFor} clearable />
+                <p className="text-xs text-slate-600 mt-2">
+                  {scheduledFor
+                    ? `Hit ${editingId ? "Save & Schedule" : "Queue for Scheduled Time"} at the bottom of this page and it publishes automatically at this time. Don't click Publish Now, which sends it right away. Clear this anytime before then to publish manually instead.`
+                    : "Leave blank to just queue it — you'll publish it yourself from the Queued list whenever you're ready."}
+                </p>
               </NeonCard>
 
               <NeonCard className="mb-4">
@@ -402,33 +420,8 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                   Picking one posts that saved embed instead of everything built above — it doesn't save this announcement as a template.
                 </p>
 
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Schedule (optional)</label>
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    type="datetime-local"
-                    className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                    value={scheduleLocal}
-                    onChange={(e) => setScheduleLocal(e.target.value)}
-                  />
-                  {scheduleLocal && (
-                    <button
-                      type="button"
-                      onClick={() => setScheduleLocal("")}
-                      className="text-xs text-slate-500 hover:text-rose-400 px-2 py-2.5 shrink-0"
-                      title="Clear schedule"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                <p className="text-xs text-slate-600 mb-4">
-                  {scheduleLocal
-                    ? "Publishes automatically at this time — no need to come back and click Publish. Clear it anytime before then to publish manually instead."
-                    : "Leave blank to just queue it — you'll publish it yourself from the Queued list whenever you're ready."}
-                </p>
-
                 <button onClick={save} disabled={!channelId || saving || limits.hasErrors} className="neon-button disabled:opacity-50">
-                  {saving ? "Saving…" : editingId ? "Save Changes" : scheduleLocal ? "Queue for Scheduled Time" : "Save to Queue"}
+                  {saving ? "Saving…" : editingId ? (scheduledFor ? "Save & Schedule" : "Save Changes") : scheduledFor ? "Queue for Scheduled Time" : "Save to Queue"}
                 </button>
                 <FormError message={error} />
               </NeonCard>

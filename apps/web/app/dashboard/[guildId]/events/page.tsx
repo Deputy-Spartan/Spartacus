@@ -13,6 +13,7 @@ import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm, usePrompt } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
+import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { FormError } from "../../../../components/ui/FormError";
 import {
   api,
@@ -97,7 +98,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
       title: event.title,
       description: event.description ?? "",
       channelId: event.channelId,
-      startTime: event.startTime.slice(0, 16),
+      startTime: event.startTime,
       reminderMinutesBefore: event.reminderMinutesBefore,
       embedEnabled: event.embedEnabled,
       embedColor: event.embedColor ?? "#00E5FF",
@@ -233,18 +234,13 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
                 placeholder="Select a channel…"
               />
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
                     Start Time
                     <Required />
                   </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                    value={form.startTime}
-                    onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                  />
+                  <DateTimeZoneField value={form.startTime} onChange={(startTime) => setForm({ ...form, startTime })} />
                 </div>
                 <div>
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Reminder (min before)</label>

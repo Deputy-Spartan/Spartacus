@@ -123,13 +123,18 @@ function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-slate-600 mt-1">{children}</p>;
 }
 
-function Choice({ on, title, hint, onClick, onRemove }: { on: boolean; title: string; hint: string; onClick: () => void; onRemove?: () => void }) {
+function Choice({ on, title, hint, onClick, onRemove, check }: { on: boolean; title: string; hint: string; onClick: () => void; onRemove?: () => void; check?: boolean }) {
   return (
     <div className="relative">
-      <button type="button" onClick={onClick} className={`w-full h-full text-left rounded-lg border p-3 ${onRemove ? "pr-16" : ""} transition-colors ${on ? "border-neon-blue bg-base-800" : "border-white/10 bg-base-950 hover:border-white/25"}`}>
+      <button type="button" onClick={onClick} className={`w-full h-full text-left rounded-lg border p-3 ${onRemove ? "pr-16" : check ? "pr-9" : ""} transition-colors ${on ? "border-neon-blue bg-base-800" : "border-white/10 bg-base-950 hover:border-white/25"}`}>
         <span className="block text-sm font-medium break-words">{title}</span>
         <span className="block text-xs text-slate-500 mt-0.5">{hint}</span>
       </button>
+      {check && (
+        <span aria-label="Active" className="absolute top-2 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white">
+          ✓
+        </span>
+      )}
       {onRemove && (
         <button type="button" onClick={onRemove} aria-label={`Remove ${title}`} className="absolute top-2 right-2 px-1.5 py-1 text-[11px] text-slate-500 hover:text-rose-400">
           Remove
@@ -1465,11 +1470,11 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
         <div className="h-3" />
         <Label>Games on the board</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 mb-1">
-          {presets.map((p) => (
-            <Choice key={p.id} on={config.games.includes(p.game)} title={p.game} hint={`${Math.max(2, p.teamSize)} per team`} onClick={() => set({ games: config.games.includes(p.game) ? config.games.filter((g) => g !== p.game) : [...config.games, p.game] })} />
+          {[...presets.map((p) => ({ game: p.game, hint: `${Math.max(2, p.teamSize)} per team` })), ...config.games.filter((g) => !presets.some((p) => p.game === g)).map((game) => ({ game, hint: "Not in your Games tab. Tap to remove it." }))].map((g) => (
+            <Choice key={g.game} on={config.games.includes(g.game)} check={config.games.includes(g.game)} title={g.game} hint={g.hint} onClick={() => set({ games: config.games.includes(g.game) ? config.games.filter((x) => x !== g.game) : [...config.games, g.game] })} />
           ))}
         </div>
-        <Hint>Maps and team size come from each game's preset.</Hint>
+        <Hint>A green check means the game is on the board. Tap a game to turn it on or off. Maps and team size come from its preset.</Hint>
         <div className="space-y-4 mt-4">
           <Toggle on={config.ranked} label="Count on the leaderboard" hint="Turn off to keep these matches casual." onChange={(ranked) => set({ ranked })} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

@@ -326,7 +326,7 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   if (b.requireLobby && !b.lobbyVoiceId) return res.status(400).json({ error: "Pick a Lobby before requiring it." });
 
   const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
-  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 40) : b[k] === "" ? null : b[k]]));
+  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 500) : b[k] === "" ? null : b[k]]));
   const movedBoard = b.boardChannelId !== undefined && (b.boardChannelId || null) !== existing.boardChannelId;
   const movedPanel = b.channelId !== undefined && (b.channelId || null) !== existing.channelId;
   const switchedOff = b.enabled === false && existing.enabled;

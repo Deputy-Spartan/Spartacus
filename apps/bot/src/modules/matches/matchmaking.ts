@@ -284,9 +284,19 @@ async function chooseGame(interaction: Choosing, config: MatchmakingConfig, acti
     await interaction.editReply("Staff haven't added any games yet.");
     return null;
   }
-  const menu = new StringSelectMenuBuilder().setCustomId(`mmgame:${action}:${kind}`).setPlaceholder("Pick a game").addOptions(games.slice(0, 25).map((g, i) => ({ label: g.slice(0, 100), value: String(i) })));
-  await interaction.editReply({ content: "Which game?", components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] });
+  await interaction.editReply(gameMenu(games, action, kind, 0));
   return null;
+}
+
+// Discord menus hold 25 options, so longer lists page through in A to Z order.
+const GAMES_PER_PAGE = 23;
+function gameMenu(games: string[], action: string, kind: string, page: number): InteractionEditReplyOptions {
+  const sorted = games.map((game, index) => ({ game, index })).sort((x, y) => x.game.localeCompare(y.game));
+  const pages = Math.ceil(sorted.length / GAMES_PER_PAGE);
+  const shown = sorted.slice(page * GAMES_PER_PAGE, (page + 1) * GAMES_PER_PAGE).map((g) => ({ label: g.game.slice(0, 100), value: String(g.index) }));
+  const options = [...(page > 0 ? [{ label: "◀ Previous games", value: `page:${page - 1}` }] : []), ...shown, ...(page + 1 < pages ? [{ label: "More games ▶", value: `page:${page + 1}` }] : [])];
+  const menu = new StringSelectMenuBuilder().setCustomId(`mmgame:${action}:${kind}`).setPlaceholder("Pick a game").addOptions(options);
+  return { content: pages > 1 ? `Which game? Page ${page + 1} of ${pages}.` : "Which game?", components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
 }
 
 const readyTeam = async (guildId: string, game: string, captainId: string) => {
@@ -482,7 +492,12 @@ export async function handleMatchmaking(interaction: Interaction) {
 
     if (prefix === "mmgame" && interaction.isStringSelectMenu()) {
       const [, action, kind] = parts;
-      const game = games[Number(interaction.values[0])];
+      const picked = interaction.values[0];
+      if (picked.startsWith("page:")) {
+        await interaction.deferUpdate();
+        return void (await reply(interaction, gameMenu(games, action, kind, Number(picked.slice(5)))));
+      }
+      const game = games[Number(picked)];
       if (action === "newteam") return void (await teamNameModal(interaction, Number(interaction.values[0])));
       await interaction.deferUpdate();
       await reply(interaction, await run(async () => (action === "find" ? find(client, config, kind as Kind, game, user.id, interaction.guild) : challengePicker(config, kind as Kind, game, user.id))));

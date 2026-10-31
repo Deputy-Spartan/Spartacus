@@ -116,6 +116,36 @@ function stepError(step: number, d: MatchSetupInput): string | null {
 
 const inputClass = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
 
+const SCORE_TYPES = ["Rounds", "Maps", "Games", "Goals", "Points", "Kills", "Wins", "Stocks", "Sets"];
+
+// Common answers in a list, with a box for anything else.
+function ScoreSelect({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const [custom, setCustom] = useState(false);
+  const typing = custom || !SCORE_TYPES.includes(value);
+  return (
+    <>
+      <select
+        className={inputClass}
+        aria-label="What the score counts"
+        value={typing ? "__custom__" : value}
+        onChange={(e) => {
+          const next = e.target.value;
+          setCustom(next === "__custom__");
+          onChange(next === "__custom__" ? "" : next);
+        }}
+      >
+        {SCORE_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+        <option value="__custom__">+ Custom</option>
+      </select>
+      {typing && <input className={`${inputClass} mt-2`} aria-label="Custom score name" value={value} maxLength={30} onChange={(e) => onChange(e.target.value)} placeholder="What does the score count?" />}
+    </>
+  );
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">{children}</label>;
 }
@@ -309,8 +339,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
               </div>
               <div>
                 <Label>What does the score count?</Label>
-                <input className={inputClass} value={d.scoreName} maxLength={30} onChange={(e) => set({ scoreName: e.target.value })} />
-                <Hint>Rounds, Goals, Kills, Points, or anything else.</Hint>
+                <ScoreSelect value={d.scoreName} onChange={(scoreName) => set({ scoreName })} />
               </div>
               <Toggle on={d.useRanks} label="Use ranks" hint="Members pick a rank when they first sign up. Turn off for games without ranks." onChange={(useRanks) => set({ useRanks })} />
               {d.useRanks && (
@@ -757,7 +786,7 @@ function GameForm({ start, onSave, onCancel }: { start: MatchPresetRow | null; o
           </div>
           <div>
             <Label>Score counts</Label>
-            <input className={inputClass} value={d.scoreName} maxLength={30} onChange={(e) => set({ scoreName: e.target.value })} />
+            <ScoreSelect value={d.scoreName} onChange={(scoreName) => set({ scoreName })} />
           </div>
         </div>
         <Toggle on={d.useRanks} label="Use ranks" hint="Members pick a rank when they first sign up." onChange={(useRanks) => set({ useRanks })} />

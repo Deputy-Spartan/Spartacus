@@ -3,6 +3,7 @@ import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { tallyBoard, type BoardEntry } from "./engine";
+import { withLock } from "./lock";
 import { stringList } from "./render";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -42,7 +43,11 @@ const readMessages = (value: unknown) => (value && typeof value === "object" && 
 
 // Every switched-on game gets its own post. Passing a game only refreshes that
 // game and All Games, so one finished match doesn't edit every post.
-export async function syncBoard(client: Client, guildId: string, game?: string) {
+export function syncBoard(client: Client, guildId: string, game?: string) {
+  return withLock(`board:${guildId}`, () => postBoards(client, guildId, game));
+}
+
+async function postBoards(client: Client, guildId: string, game?: string) {
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId } });
   if (!config?.boardChannelId) return;
   const channel = await client.channels.fetch(config.boardChannelId).catch(() => null);

@@ -95,7 +95,27 @@ async function buildPanel(config: MatchmakingConfig) {
   };
 }
 
-export async function syncMatchmakingPanel(client: Client, guildId: string) {
+// Finds extra boards from two posts landing together, and keeps the saved one.
+async function removeExtraPanels(client: Client, channelId: string, guildId: string) {
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!isSendableChannel(channel)) return;
+  const keep = (await getConfig(guildId))?.messageId;
+  if (!keep) return;
+  const recent = await channel.messages.fetch({ limit: 30 }).catch(() => null);
+  for (const message of recent?.values() ?? []) {
+    const isBoard = message.components.some((r) => "components" in r && r.components.some((c) => "customId" in c && c.customId === "mm:find:SOLO"));
+    if (isBoard && message.author.id === client.user?.id && message.id !== keep) await message.delete().catch(() => null);
+  }
+}
+
+// The dashboard and the timer can both get here at once, so posts run in turn.
+export function syncMatchmakingPanel(client: Client, guildId: string) {
+  return withLock(`mmpanel:${guildId}`, () => postPanel(client, guildId));
+}
+
+const sweptGuilds = new Set<string>();
+
+async function postPanel(client: Client, guildId: string) {
   const config = await getConfig(guildId);
   if (!config?.enabled || !config.channelId) return;
   const channel = await client.channels.fetch(config.channelId).catch(() => null);
@@ -104,7 +124,13 @@ export async function syncMatchmakingPanel(client: Client, guildId: string) {
 
   if (config.messageId) {
     const message = await channel.messages.fetch(config.messageId).catch(() => null);
-    if (await message?.edit(payload).catch(() => null)) return;
+    if (await message?.edit(payload).catch(() => null)) {
+      if (!sweptGuilds.has(guildId)) {
+        sweptGuilds.add(guildId);
+        await removeExtraPanels(client, config.channelId, guildId);
+      }
+      return;
+    }
   }
   const sent = await channel.send(payload).catch((err) => {
     if (Date.now() - (lastPostError.get(guildId) ?? 0) > POST_ERROR_GAP_MS) {
@@ -113,7 +139,10 @@ export async function syncMatchmakingPanel(client: Client, guildId: string) {
     }
     return null;
   });
-  if (sent) await prisma.matchmakingConfig.update({ where: { guildId }, data: { messageId: sent.id } });
+  if (!sent) return;
+  await prisma.matchmakingConfig.update({ where: { guildId }, data: { messageId: sent.id } });
+  sweptGuilds.add(guildId);
+  await removeExtraPanels(client, config.channelId, guildId);
 }
 
 // ---- Match rooms ----
@@ -626,7 +655,7 @@ export async function tickMatchmaking(client: Client) {
   const configs = await prisma.matchmakingConfig.findMany({ where: { enabled: true } });
   for (const config of configs) {
     const { guildId } = config;
-    if (!config.messageId) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
+    if (!config.messageId || !sweptGuilds.has(guildId)) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
     const stale = await prisma.matchQueue.deleteMany({ where: { guildId, joinedAt: { lte: new Date(now.getTime() - config.queueMinutes * 60_000) } } });
     if (stale.count) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
     const expired = await prisma.matchChallenge.findMany({ where: { guildId, expiresAt: { lte: now } } });

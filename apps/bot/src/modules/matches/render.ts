@@ -105,7 +105,8 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
   const onMap = state.map ? ` on ${state.map}` : "";
   const until = endsAt ? `<t:${Math.floor(endsAt.getTime() / 1000)}:R>` : "soon";
   const tournament = kind === "TOURNAMENT";
-  const needed = tournament ? setup.teamSize * setup.tournamentTeams : setup.teamSize * 2;
+  const unlimited = tournament && setup.tournamentTeams === 0;
+  const needed = unlimited ? state.signups.length : tournament ? setup.teamSize * setup.tournamentTeams : setup.teamSize * 2;
   const teams = currentTeams(state);
   const word = setup.mapWord;
   let buttons: ButtonBuilder[] = [];
@@ -120,7 +121,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
     const starts = setup.startMode === "SCHEDULED" && setup.startAt && setup.startAt > new Date() ? say("noteTime", { time: `<t:${Math.floor(setup.startAt.getTime() / 1000)}:F>` }) : setup.startMode === "FULL" ? say("noteFull") : setup.startMode === "MANUAL" ? say("noteManual") : "";
     const wait = endsAt && setup.startMode !== "SCHEDULED" ? ` ${tournament ? "Starts with whoever joined" : "Resets"} ${until}.` : "";
     const event = state.eventId ? `\n📅 [Discord event](https://discord.com/events/${setup.guildId}/${state.eventId})` : "";
-    style(tournament ? "registration" : "signup", { size: `${setup.teamSize}v${setup.teamSize}`, start: `${starts}${wait}`, progress: progress(state.signups.length, needed), count: state.signups.length, needed });
+    style(tournament ? "registration" : "signup", { size: `${setup.teamSize}v${setup.teamSize}`, start: `${starts}${wait}`, progress: unlimited ? "Open to everyone" : progress(state.signups.length, needed), count: state.signups.length, needed: unlimited ? "∞" : needed });
     const notes = [event.trim(), hidden ? say("noteHidden") : ""].filter(Boolean).join("\n");
     if (notes) embed.setDescription([embed.data.description, notes].filter(Boolean).join("\n").slice(0, 4096));
     if (picking) {
@@ -131,8 +132,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
           inline: true,
         }))
       );
-      buttons = Array.from({ length: slots }, (_, slot) => button(setup, "pick", `${slotLabel(slot)} (${onTeam(state, slot).length}/${setup.teamSize})`, ButtonStyle.Primary, slot).setDisabled(onTeam(state, slot).length >= setup.teamSize));
-      extra = [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(button(setup, "leave", say("btnLeave"), ButtonStyle.Danger))];
+      buttons = [...Array.from({ length: slots }, (_, slot) => button(setup, "pick", `${slotLabel(slot)} (${onTeam(state, slot).length}/${setup.teamSize})`, ButtonStyle.Primary, slot).setDisabled(onTeam(state, slot).length >= setup.teamSize)), button(setup, "leave", say("btnLeave"), ButtonStyle.Danger)];
     } else {
       if (!hidden) embed.addFields({ name: say("labelPlayers"), value: playerList(setup, players, state.signups) });
       buttons = [button(setup, "join", say(tournament ? "btnRegister" : "btnSignUp"), ButtonStyle.Success), button(setup, "leave", say("btnLeave"), ButtonStyle.Danger)];
@@ -193,7 +193,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
 
   if (tournament && state.bracket.length) embed.addFields(...bracketFields(state, texts));
   if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: say("labelSubs"), value: say("labelSubsNote", { count: state.subsNeeded.length }) });
-  return { content: "", embeds: [embed], components: [...rows(buttons).slice(0, 3), ...extra, navRow(setup, phase, say)].slice(0, 5) };
+  return { content: "", embeds: [embed], components: [...rows(buttons).slice(0, extra.length ? 3 : 4), ...extra, navRow(setup, phase, say)].slice(0, 5) };
 }
 
 export function buildLeaderboard(setup: MatchSetup, rows: MatchPlayer[]) {

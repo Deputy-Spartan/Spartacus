@@ -2281,7 +2281,8 @@ model MatchSetup {
   startMode            String   @default("MANUAL") // MANUAL | SCHEDULED | FULL
   startAt              DateTime?
   useTimers            Boolean  @default(false)
-  tournamentTeams      Int      @default(4) // 4 | 8 | 16
+  tournamentTeams      Int      @default(4) // 2 to 64, or 0 for no limit
+  flexTeams            Boolean  @default(false) // fit team size to whoever signed up
   balance              String   @default("BALANCED") // BALANCED | CAPTAINS | RANDOM
   captainRule          String   @default("TOP") // TOP | RANDOM
   team1Name            String   @default("Team Blue")

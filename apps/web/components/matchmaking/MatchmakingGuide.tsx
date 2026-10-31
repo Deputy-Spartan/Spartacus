@@ -367,7 +367,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   heads={["Step", "What you decide"]}
                   rows={[
                     ["1. Game", "Name the setup, pick a saved game from the Game list or add a new one, and set ranks and score type"],
-                    ["2. Format", "Tournament (4, 8 or 16 slots), Team Match, or 1v1"],
+                    ["2. Format", "Tournament, 1v1 Tournament, Team Match or 1v1, plus the most teams (up to 64, or Unlimited) and whether teams adjust to fit sign-ups"],
                     ["3. Teams", "Team size, how players join, how teams split, captains, roster visibility, and team names"],
                     ["4. Maps", "The map list, and whether players vote, the bot picks, or captains ban"],
                     ["5. Schedule", "Staff start it, a set time, or when the lobby fills, plus the panel and results channels"],
@@ -395,6 +395,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["Who can see rosters", "Show Everyone, or Hidden Until Closed. Hidden shows only team counts until registration closes, then the bot posts the rosters. Staff can still see them on this page"],
                     ["How teams split", "Balanced uses rank and results. Captains Draft lets captains pick (tournaments use Balanced instead). Random shuffles everyone"],
                     ["How it starts", "Staff Start It waits for staff. Set a Time starts at your date and time with whoever joined. When Full starts as soon as the lobby fills"],
+                    ["Adjust teams to fit sign-ups", "Tournaments only. When it starts, the bot picks the team count and size that uses the most players. With 5-player teams and 8 sign-ups, that's 2 teams of 4. Anyone left over is told they're first in line as a sub"],
                     ["Use timers", "Off means a person starts each step. On adds sign-up, auto-start, score and reopen timers"],
                   ]}
                 />

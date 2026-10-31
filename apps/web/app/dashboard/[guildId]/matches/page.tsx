@@ -24,6 +24,7 @@ const BLANK: MatchSetupInput = {
   enabled: true,
   format: "SINGLE",
   tournamentTeams: 4,
+  flexTeams: false,
   balance: "BALANCED",
   captainRule: "TOP",
   team1Name: "Team Blue",
@@ -64,9 +65,10 @@ const BLANK: MatchSetupInput = {
 const PHASES: Record<string, string> = { SIGNUP: "Sign-ups open", CHECKIN: "Check-in running", DRAFT: "Captains drafting", TEAMS: "Teams set", MAP: "Picking the map", LIVE: "Match live", CONFIRM: "Waiting for confirmation", DONE: "Finished" };
 
 function formatSummary(s: MatchSetupInput): string {
-  const players = s.teamSize * (s.format === "SINGLE" ? 2 : s.tournamentTeams);
-  const format = s.format === "SINGLE" ? (s.teamSize === 1 ? "1v1" : "Team Match") : `Tournament, ${s.tournamentTeams} ${s.teamSize === 1 ? "players" : "teams"}`;
-  return `${s.teamSize}v${s.teamSize} · ${format} · ${players} players`;
+  const size = s.flexTeams && s.format === "TOURNAMENT" ? `Up to ${s.teamSize}v${s.teamSize}` : `${s.teamSize}v${s.teamSize}`;
+  if (s.format === "SINGLE") return `${size} · ${s.teamSize === 1 ? "1v1" : "Team Match"} · ${s.teamSize * 2} players`;
+  const unit = s.teamSize === 1 ? "players" : "teams";
+  return `${size} · ${s.teamSize === 1 ? "1v1 Tournament" : "Tournament"}, ${s.tournamentTeams ? `up to ${s.tournamentTeams} ${unit}` : `unlimited ${unit}`}`;
 }
 
 function mapSummary(s: MatchSetupInput): string {
@@ -84,6 +86,7 @@ function stepError(step: number, d: MatchSetupInput): string | null {
     if (d.useRanks && rankListProblem(d.ranks)) return rankListProblem(d.ranks);
   }
   if (step === 2 && (!Number.isInteger(d.teamSize) || d.teamSize < 1 || d.teamSize > 10)) return "Team size must be from 1 to 10.";
+  if (step === 2 && d.format === "TOURNAMENT" && d.joinMode === "PICK" && d.teamSize > 1 && (d.tournamentTeams === 0 || d.tournamentTeams > 16)) return "When players choose a team, use 16 teams or fewer.";
   if (step === 3 && d.useMaps) {
     if (d.maps.length < 1) return "Add at least 1 option to the list.";
     if (d.mapMethod !== "RANDOM") {
@@ -96,6 +99,7 @@ function stepError(step: number, d: MatchSetupInput): string | null {
   }
   if (step === 4) {
     if (d.startMode === "SCHEDULED" && !d.startAt) return "Pick a start date and time.";
+    if (d.format === "TOURNAMENT" && d.tournamentTeams === 0 && d.startMode === "FULL") return "With no team limit the lobby never fills. Pick Staff Start It or Set a Time.";
     if (!d.panelChannelId || !d.resultsChannelId) return "Pick a panel channel and a results channel.";
     if (d.panelChannelId === d.resultsChannelId) return "The panel and results need different channels.";
   }
@@ -361,23 +365,28 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
 
           {step === 1 && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <Choice on={tournament} title="Tournament" hint="A bracket with one champion." onClick={() => set({ format: "TOURNAMENT" })} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                <Choice on={tournament && d.teamSize > 1} title="Tournament" hint="A team bracket with one champion." onClick={() => set({ format: "TOURNAMENT", teamSize: d.teamSize > 1 ? d.teamSize : 5 })} />
+                <Choice on={tournament && d.teamSize === 1} title="1v1 Tournament" hint="A solo bracket with one champion." onClick={() => set({ format: "TOURNAMENT", teamSize: 1 })} />
                 <Choice on={!tournament && d.teamSize > 1} title="Team Match" hint="One match between two teams." onClick={() => set({ format: "SINGLE", teamSize: d.teamSize > 1 ? d.teamSize : 5 })} />
                 <Choice on={!tournament && d.teamSize === 1} title="1v1" hint="One player against another." onClick={() => set({ format: "SINGLE", teamSize: 1 })} />
               </div>
               {tournament && (
                 <div>
-                  <Label>{d.teamSize === 1 ? "Players in the bracket" : "Teams in the bracket"}</Label>
+                  <Label>{d.teamSize === 1 ? "Most players in the bracket" : "Most teams in the bracket"}</Label>
                   <select className={inputClass} value={d.tournamentTeams} onChange={(e) => set({ tournamentTeams: Number(e.target.value) })}>
-                    {[4, 8, 16].map((n) => (
+                    {[2, 4, 8, 16, 32, 64].map((n) => (
                       <option key={n} value={n}>
                         {n}
                       </option>
                     ))}
+                    <option value={0}>Unlimited</option>
                   </select>
-                  <Hint>Single elimination. If fewer sign up, staff can start with a smaller bracket.</Hint>
+                  <Hint>Single elimination, with brackets of 2, 4, 8, 16, 32 or 64. Unlimited stays open until staff start it or your set time arrives.</Hint>
                 </div>
+              )}
+              {tournament && d.teamSize > 1 && (
+                <Toggle on={d.flexTeams} label="Adjust teams to fit sign-ups" hint="When it starts, the bot picks the best team count and size. With 5-player teams and 8 sign-ups, that's 2 teams of 4. Team size becomes the most per team." onChange={(flexTeams) => set({ flexTeams })} />
               )}
             </>
           )}
@@ -387,7 +396,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
               <div>
                 <Label>Players on each team</Label>
                 <input {...num("teamSize")} min={1} max={10} />
-                <Hint>This needs {d.teamSize * (tournament ? d.tournamentTeams : 2) || 0} players in total.</Hint>
+                <Hint>{tournament && d.tournamentTeams === 0 ? "There's no limit on total players." : `The lobby fills at ${d.teamSize * (tournament ? d.tournamentTeams : 2) || 0} players.`}{tournament && d.flexTeams ? " With fewer, the bot adjusts the teams to fit." : ""}</Hint>
               </div>
               {d.teamSize > 1 && (
                 <div>

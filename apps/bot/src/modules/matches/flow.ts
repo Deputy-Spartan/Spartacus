@@ -29,6 +29,7 @@ import { addBalance, getConfig } from "../../lib/economy";
 import { awardAchievement } from "../../lib/achievements";
 import {
   bracketTeamCount,
+  fitBracket,
   buildBracket,
   currentTeams,
   draftSide,
@@ -247,7 +248,7 @@ async function clearPings(ctx: Ctx) {
 }
 
 const roleMention = (setup: MatchSetup) => (setup.pingRoleId ? `<@&${setup.pingRoleId}> ` : "");
-const lobbySize = (setup: MatchSetup, kind: string) => setup.teamSize * (kind === "TOURNAMENT" ? setup.tournamentTeams : 2);
+const lobbySize = (setup: MatchSetup, kind: string) => (kind === "TOURNAMENT" && setup.tournamentTeams === 0 ? Infinity : setup.teamSize * (kind === "TOURNAMENT" ? setup.tournamentTeams : 2));
 
 async function teamLabel(ctx: Ctx, players: string[], fallback: string): Promise<string> {
   if (ctx.setup.teamSize !== 1 || !players[0]) return fallback;
@@ -338,24 +339,26 @@ async function draftPick(ctx: Ctx, userId: string) {
 
 async function startTournament(ctx: Ctx): Promise<string | void> {
   const { setup, state } = ctx;
+  await clearPings(ctx);
   const ratings = await ratingsFor(setup, state.signups);
   const groups = usesPicks(setup)
     ? Array.from({ length: setup.tournamentTeams }, (_, i) => ({ name: slotName(setup, "TOURNAMENT", i), players: onTeam(state, i) })).filter((g) => g.players.length).sort((x, y) => y.players.length - x.players.length)
     : null;
-  let teamCount = bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams);
-  if (groups) teamCount = bracketTeamCount(groups.length, 1, setup.tournamentTeams);
+  const fit = fitBracket(state.signups.length, setup.teamSize, setup.tournamentTeams, setup.flexTeams);
+  const teamCount = groups ? bracketTeamCount(groups.length, 1, setup.tournamentTeams || 16) : fit.teams;
   if (teamCount < 2) return groups ? "A bracket needs at least 2 teams with players." : `A bracket needs at least ${setup.teamSize * 2} players.`;
   if (groups) state.teams = groups.slice(0, teamCount).map((g) => ({ ...g, captain: pickCaptain(g.players, ratings, setup.captainRule) }));
   else {
-    const ids = shuffle(state.signups).slice(0, teamCount * setup.teamSize);
-    const split = splitTeams(ids, ratings, teamCount, setup.teamSize, setup.balance === "RANDOM" ? "RANDOM" : "BALANCED");
+    const ids = shuffle(state.signups).slice(0, teamCount * fit.perTeam);
+    const sittingOut = state.signups.filter((id) => !ids.includes(id));
+    if (sittingOut.length) await ping(ctx, `${sittingOut.map((id) => `<@${id}>`).join(" ")} The teams came out even without you this time, so you're first in line as a sub.`.slice(0, 2000));
+    const split = splitTeams(ids, ratings, teamCount, fit.perTeam, setup.balance === "RANDOM" ? "RANDOM" : "BALANCED");
     state.teams = await Promise.all(
       split.map(async (players, i): Promise<MatchTeam> => ({ name: await teamLabel(ctx, players, slotName(setup, "TOURNAMENT", i)), players, captain: pickCaptain(players, ratings, setup.captainRule) }))
     );
   }
   state.bracket = buildBracket(teamCount);
   state.tie = nextTie(state.bracket);
-  await clearPings(ctx);
   await revealRosters(ctx);
   await syncBracket(ctx, true);
   if (setup.teamNaming === "CAPTAIN" && setup.teamSize > 1) {
@@ -550,7 +553,7 @@ async function replaceSession(ctx: Ctx, signups: string[] = []) {
 async function expirePhase(ctx: Ctx) {
   const { session, state, setup } = ctx;
   if (session.phase === "SIGNUP") {
-    const enough = session.kind === "TOURNAMENT" ? bracketTeamCount(state.signups.length, setup.teamSize, setup.tournamentTeams) >= 2 : state.signups.length >= 2 && setup.startMode === "SCHEDULED";
+    const enough = session.kind === "TOURNAMENT" ? fitBracket(state.signups.length, setup.teamSize, setup.tournamentTeams, setup.flexTeams).teams >= 2 : state.signups.length >= 2 && setup.startMode === "SCHEDULED";
     if (enough) {
       const problem = await closeSignups(ctx);
       if (!problem) return;

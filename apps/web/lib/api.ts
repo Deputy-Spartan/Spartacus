@@ -567,6 +567,7 @@ export interface MatchSetupInput {
   format: "SINGLE" | "TOURNAMENT";
   teamSize: number;
   tournamentTeams: number;
+  flexTeams: boolean;
   balance: "BALANCED" | "CAPTAINS" | "RANDOM";
   captainRule: "TOP" | "RANDOM";
   team1Name: string;

@@ -34,7 +34,11 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   if (!panelChannelId || !resultsChannelId) return { error: "Pick a panel channel and a results channel." };
   if (panelChannelId === resultsChannelId) return { error: "The panel and results need different channels." };
   if (!whole(b.teamSize, 1, 10)) return { error: "Team size must be from 1 to 10." };
-  if (format === "TOURNAMENT" && ![4, 8, 16].includes(b.tournamentTeams as number)) return { error: "Tournaments run with 4, 8 or 16 teams." };
+  const tournamentTeams = b.tournamentTeams as number;
+  const picking = b.joinMode === "PICK" && (b.teamSize as number) > 1;
+  if (format === "TOURNAMENT" && ![0, 2, 4, 8, 16, 32, 64].includes(tournamentTeams)) return { error: "Pick a team limit from the list." };
+  if (format === "TOURNAMENT" && picking && (tournamentTeams === 0 || tournamentTeams > 16)) return { error: "When players choose a team, use 16 teams or fewer." };
+  if (format === "TOURNAMENT" && tournamentTeams === 0 && b.startMode === "FULL") return { error: "With no team limit the lobby never fills. Pick Staff Start It or Set a Time." };
   if (useRanks && ranks.length < 2) return { error: "Add at least 2 ranks, or turn ranks off." };
   if (useRanks && rankListProblem(ranks)) return { error: rankListProblem(ranks) ?? "" };
   const startMode = pick(b.startMode, ["MANUAL", "SCHEDULED", "FULL"], "MANUAL");
@@ -65,7 +69,8 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       enabled: b.enabled === undefined ? true : Boolean(b.enabled),
       format,
       teamSize: b.teamSize as number,
-      tournamentTeams: format === "TOURNAMENT" ? (b.tournamentTeams as number) : 4,
+      tournamentTeams: format === "TOURNAMENT" ? tournamentTeams : 4,
+      flexTeams: format === "TOURNAMENT" && Boolean(b.flexTeams),
       balance: pick(b.balance, ["BALANCED", "CAPTAINS", "RANDOM"], "BALANCED"),
       captainRule: pick(b.captainRule, ["TOP", "RANDOM"], "TOP"),
       team1Name: text(b.team1Name, 60) || "Team Blue",

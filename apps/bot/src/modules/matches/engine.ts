@@ -278,3 +278,20 @@ export function tallyBoard(rows: BoardRow[]): { players: BoardEntry[]; teams: Bo
   }
   return { players: topTen(players), teams: topTen(teams) };
 }
+
+const MOST_BRACKET_TEAMS = 64;
+
+// Picks the bracket that uses the most players, then the fullest teams. With
+// fixed teams, the size stays put and spare players sit out.
+export function fitBracket(players: number, teamSize: number, maxTeams: number, flexible: boolean): { teams: number; perTeam: number } {
+  const limit = maxTeams > 0 ? Math.min(maxTeams, MOST_BRACKET_TEAMS) : MOST_BRACKET_TEAMS;
+  let best = { teams: 0, perTeam: teamSize };
+  for (let teams = 2; teams <= limit; teams *= 2) {
+    const perTeam = flexible ? Math.min(teamSize, Math.floor(players / teams)) : teamSize;
+    if (perTeam < 1 || teams * perTeam > players) continue;
+    const used = teams * perTeam;
+    const bestUsed = best.teams * best.perTeam;
+    if (used > bestUsed || (used === bestUsed && perTeam > best.perTeam)) best = { teams, perTeam };
+  }
+  return best;
+}

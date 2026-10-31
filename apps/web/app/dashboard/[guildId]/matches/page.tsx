@@ -16,6 +16,7 @@ import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, renderVoiceNam
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
+const NEW_GAME = "__new_game__";
 const BLANK_GAME = { game: "", teamSize: 5, useRanks: false, ranks: [] as string[], useMaps: false, maps: [] as string[], mapWord: "Map", scoreName: "Points" };
 
 const BLANK: MatchSetupInput = {
@@ -78,7 +79,7 @@ function mapSummary(s: MatchSetupInput): string {
 function stepError(step: number, d: MatchSetupInput): string | null {
   if (step === 0) {
     if (!d.name.trim()) return "Give this setup a name, like Friday Night 5v5.";
-    if (!d.game.trim()) return "Enter the game this setup is for.";
+    if (!d.game.trim()) return "Pick the game this setup is for.";
     if (d.useRanks && d.ranks.length < 2) return "Add at least 2 ranks, or turn ranks off.";
     if (d.useRanks && d.ranks.length > 25) return "Discord menus hold up to 25 ranks.";
   }
@@ -165,6 +166,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [presets, setPresets] = useState<MatchPresetRow[]>([]);
+  const [typingGame, setTypingGame] = useState(false);
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -184,6 +186,14 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
   function applyPreset({ game, teamSize, useRanks, ranks, useMaps, maps, mapWord, scoreName }: typeof BLANK_GAME) {
     set({ game, teamSize, useRanks, ranks, useMaps, maps, mapWord, scoreName });
     setRanksText(ranks.join(", "));
+    setTypingGame(!game);
+  }
+
+  function pickGame(value: string) {
+    if (value === NEW_GAME) return applyPreset(BLANK_GAME);
+    const preset = presets.find((p) => p.game === value);
+    if (preset) applyPreset(preset);
+    else set({ game: value });
   }
 
   const set = (patch: Partial<MatchSetupInput>) => {
@@ -282,8 +292,19 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                   <input className={inputClass} value={d.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} placeholder="Friday Night 5v5" />
                 </div>
                 <div>
-                  <Label>Game name</Label>
-                  <input className={inputClass} value={d.game} maxLength={80} onChange={(e) => set({ game: e.target.value })} placeholder="Any game" />
+                  <Label>Game</Label>
+                  <select className={inputClass} value={typingGame ? NEW_GAME : d.game} onChange={(e) => pickGame(e.target.value)}>
+                    <option value="">Pick a game…</option>
+                    {presets.map((p) => (
+                      <option key={p.id} value={p.game}>
+                        {p.game}
+                      </option>
+                    ))}
+                    {d.game && !typingGame && !presets.some((p) => p.game === d.game) && <option value={d.game}>{d.game}</option>}
+                    <option value={NEW_GAME}>+ Add a new game</option>
+                  </select>
+                  {typingGame && <input className={`${inputClass} mt-2`} aria-label="New game name" value={d.game} maxLength={80} onChange={(e) => set({ game: e.target.value })} placeholder="New game name" />}
+                  {typingGame && <Hint>Saving this setup adds the game to your Games tab.</Hint>}
                 </div>
               </div>
               <div>

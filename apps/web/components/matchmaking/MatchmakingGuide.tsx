@@ -366,7 +366,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 <Table
                   heads={["Step", "What you decide"]}
                   rows={[
-                    ["1. Game", "Pick a saved game or start blank, name the setup, and set ranks and score type"],
+                    ["1. Game", "Name the setup, pick a saved game from the Game list or add a new one, and set ranks and score type"],
                     ["2. Format", "Tournament (4, 8 or 16 slots), Team Match, or 1v1"],
                     ["3. Teams", "Team size, how players join, how teams split, captains, roster visibility, and team names"],
                     ["4. Maps", "The map list, and whether players vote, the bot picks, or captains ban"],

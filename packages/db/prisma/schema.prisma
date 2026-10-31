@@ -108,6 +108,7 @@ model Guild {
   supportTickets    SupportTicket[]
   supportSettings   SupportSettings?
   welcomeGreetings  WelcomeGreeting[]
+  matchSetups       MatchSetup[]
   createdAt         DateTime             @default(now())
 }
 
@@ -171,6 +172,7 @@ enum ModuleKey {
   LFG
   EMBED_CREATOR
   SUPPORT_INTAKE
+  MATCHES
 }
 
 model GrowthSnapshot {
@@ -2234,4 +2236,121 @@ model SupportTicket {
 
   @@index([guildId, status])
   @@index([userId, status])
+}
+
+// ---- Matches: single matches and tournaments for any game ----
+
+// All the rules for one game and format, built step by step on the
+// dashboard. Every setup has its own panel, results channel and leaderboard.
+model MatchSetup {
+  id                   String   @id @default(cuid())
+  guild                Guild    @relation(fields: [guildId], references: [id])
+  guildId              String
+  name                 String
+  game                 String
+  enabled              Boolean  @default(true)
+  format               String   @default("SINGLE") // SINGLE | TOURNAMENT
+  teamSize             Int      @default(5)
+  tournamentTeams      Int      @default(4) // 4 | 8 | 16
+  balance              String   @default("BALANCED") // BALANCED | CAPTAINS | RANDOM
+  captainRule          String   @default("TOP") // TOP | RANDOM
+  team1Name            String   @default("Team Blue")
+  team2Name            String   @default("Team Orange")
+  useRanks             Boolean  @default(false)
+  ranks                Json     @default("[]") // lowest to highest
+  scoreName            String   @default("Rounds")
+  useMaps              Boolean  @default(false)
+  mapWord              String   @default("Map")
+  maps                 Json     @default("[]")
+  mapMethod            String   @default("VOTE") // VOTE | RANDOM | BANS
+  mapChoices           Int      @default(3)
+  voteSeconds          Int      @default(60) // whole vote, or each captain's ban turn
+  skipRecent           Int      @default(0)
+  checkIn              Boolean  @default(true)
+  checkInSeconds       Int      @default(120)
+  autoMove             Boolean  @default(true)
+  reportBy             String   @default("BOTH") // BOTH | CAPTAIN | STAFF
+  lobbyVoiceId         String?
+  team1VoiceId         String?
+  team2VoiceId         String?
+  winCoins             Int      @default(100)
+  lossCoins            Int      @default(25)
+  championCoins        Int      @default(500)
+  championRoleId       String?
+  pingRoleId           String?
+  staffRoleId          String?
+  panelChannelId       String
+  resultsChannelId     String
+  panelMessageId       String?
+  leaderboardMessageId String?
+  bracketMessageId     String?
+  season               Int      @default(1)
+  nextMatchNumber      Int      @default(1)
+  createdAt            DateTime @default(now())
+
+  sessions MatchSession[]
+  players  MatchPlayer[]
+  results  MatchResult[]
+
+  @@index([guildId])
+}
+
+// One match or tournament from sign-up to finish. `state` holds the sign-ups,
+// teams, bracket and votes, so a restart or deploy picks up where it left off.
+model MatchSession {
+  id          String     @id @default(cuid())
+  setup       MatchSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
+  setupId     String
+  guildId     String
+  number      Int
+  kind        String // SINGLE | TOURNAMENT
+  phase       String // SIGNUP | CHECKIN | DRAFT | TEAMS | MAP | LIVE | CONFIRM | DONE
+  state       Json       @default("{}")
+  phaseEndsAt DateTime?
+  doneAt      DateTime?
+  closedAt    DateTime? // replaced by a newer session or canceled
+  createdAt   DateTime   @default(now())
+
+  @@index([setupId, closedAt])
+  @@index([phaseEndsAt])
+}
+
+model MatchPlayer {
+  id             String     @id @default(cuid())
+  setup          MatchSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
+  setupId        String
+  guildId        String
+  userId         String
+  rank           Int? // index into MatchSetup.ranks
+  rating         Int        @default(1000)
+  wins           Int        @default(0)
+  losses         Int        @default(0)
+  streak         Int        @default(0)
+  tournamentWins Int        @default(0)
+  coinsEarned    Int        @default(0)
+
+  @@unique([setupId, userId])
+  @@index([setupId, wins])
+}
+
+model MatchResult {
+  id          String     @id @default(cuid())
+  setup       MatchSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
+  setupId     String
+  guildId     String
+  sessionId   String
+  number      Int
+  map         String?
+  winnerName  String
+  loserName   String
+  winnerScore Int
+  loserScore  Int
+  winners     Json // user ids
+  losers      Json
+  winCoins    Int        @default(0) // what was paid, so a void reverses the exact amount
+  lossCoins   Int        @default(0)
+  voided      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+
+  @@index([setupId, createdAt])
 }

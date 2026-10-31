@@ -21,6 +21,7 @@ import pay from "./economy/pay";
 import coinflip from "./games/coinflip";
 import slots from "./games/slots";
 import trivia from "./games/trivia";
+import match from "./games/match";
 import report from "./moderation/report";
 import sticky from "./community/sticky";
 import birthday from "./community/birthday";
@@ -53,6 +54,7 @@ for (const command of [
   coinflip,
   slots,
   trivia,
+  match,
   report,
   sticky,
   birthday,

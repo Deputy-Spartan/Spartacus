@@ -39,6 +39,7 @@ import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
 import { startRulesGateReminderJob } from "./jobs/rulesGateReminder";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
+import { startMatchTickerJob } from "./jobs/matchTicker";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -166,6 +167,9 @@ export { postWeeklyRecap } from "./jobs/weeklyRecap";
 // Re-exported so apps/api's Birthdays "Send Test" button can announce a
 // test birthday for the clicking admin on demand.
 export { sendBirthdayTest } from "./jobs/birthdayAnnouncer";
+// Re-exported so apps/api's Matches page can refresh a panel, cancel a match,
+// start a season or void a result through the same queue players' clicks use.
+export { refreshMatchPanel, cancelMatch, startMatchSeason, voidMatchResult } from "./modules/matches/flow";
 
 export function startBot() {
   const client = new Client({
@@ -236,6 +240,7 @@ export function startBot() {
     startRulesGateReminderJob(c);
     startVerificationPosterJob(c);
     startPlayerReportPosterJob(c);
+    startMatchTickerJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);

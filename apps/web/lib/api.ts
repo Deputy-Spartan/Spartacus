@@ -559,6 +559,63 @@ export interface DiscordEmojiOption {
   animated: boolean;
   token: string;
 }
+export interface MatchSetupInput {
+  name: string;
+  game: string;
+  enabled: boolean;
+  format: "SINGLE" | "TOURNAMENT";
+  teamSize: number;
+  tournamentTeams: number;
+  balance: "BALANCED" | "CAPTAINS" | "RANDOM";
+  captainRule: "TOP" | "RANDOM";
+  team1Name: string;
+  team2Name: string;
+  useRanks: boolean;
+  ranks: string[];
+  scoreName: string;
+  useMaps: boolean;
+  mapWord: string;
+  maps: string[];
+  mapMethod: "VOTE" | "RANDOM" | "BANS";
+  mapChoices: number;
+  voteSeconds: number;
+  skipRecent: number;
+  checkIn: boolean;
+  checkInSeconds: number;
+  autoMove: boolean;
+  reportBy: "BOTH" | "CAPTAIN" | "STAFF";
+  lobbyVoiceId: string | null;
+  team1VoiceId: string | null;
+  team2VoiceId: string | null;
+  winCoins: number;
+  lossCoins: number;
+  championCoins: number;
+  championRoleId: string | null;
+  pingRoleId: string | null;
+  staffRoleId: string | null;
+  panelChannelId: string;
+  resultsChannelId: string;
+}
+
+export interface MatchSetupRow extends MatchSetupInput {
+  id: string;
+  season: number;
+  livePhase: string | null;
+  liveNumber: number | null;
+}
+
+export interface MatchResultRow {
+  id: string;
+  number: number;
+  map: string | null;
+  winnerName: string;
+  loserName: string;
+  winnerScore: number;
+  loserScore: number;
+  voided: boolean;
+  createdAt: string;
+}
+
 export interface ReactionRolePanelRow {
   id: string;
   channelId: string;
@@ -1608,6 +1665,16 @@ export const api = {
   setAntiRaid: (guildId: string, config: Partial<AntiRaidConfig>) =>
     request<AntiRaidConfig>(`/guilds/${guildId}/anti-raid`, { method: "PUT", body: JSON.stringify(config) }),
 
+  getMatchSetups: (guildId: string) => request<MatchSetupRow[]>(`/guilds/${guildId}/match-setups`),
+  addMatchSetup: (guildId: string, body: MatchSetupInput) =>
+    request<MatchSetupRow>(`/guilds/${guildId}/match-setups`, { method: "POST", body: JSON.stringify(body) }),
+  updateMatchSetup: (guildId: string, id: string, body: MatchSetupInput) =>
+    request<MatchSetupRow>(`/guilds/${guildId}/match-setups/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteMatchSetup: (guildId: string, id: string) => request<void>(`/guilds/${guildId}/match-setups/${id}`, { method: "DELETE" }),
+  getMatchResults: (guildId: string, id: string) => request<MatchResultRow[]>(`/guilds/${guildId}/match-setups/${id}/results`),
+  cancelMatch: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-setups/${id}/cancel`, { method: "POST" }),
+  startMatchSeason: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-setups/${id}/new-season`, { method: "POST" }),
+  voidMatchResult: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/match-results/${id}/void`, { method: "POST" }),
   getReactionRolePanels: (guildId: string) => request<ReactionRolePanelRow[]>(`/guilds/${guildId}/reaction-role-panels`),
   addReactionRolePanel: (guildId: string, body: ReactionRolePanelInput) =>
     request<ReactionRolePanelRow>(`/guilds/${guildId}/reaction-role-panels`, { method: "POST", body: JSON.stringify(body) }),

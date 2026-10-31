@@ -14,6 +14,7 @@ import { logError } from "@spartacus/db";
 import { setBotClient } from "./lib/botClient";
 
 import healthRouter from "./routes/health";
+import matchesRouter from "./routes/matches";
 import activityRouter from "./routes/activity";
 import authRouter from "./routes/auth";
 import guildsRouter from "./routes/guilds";
@@ -191,6 +192,7 @@ app.use(milestoneSettingsRouter);
 app.use(rulesGateSettingsRouter);
 app.use(lfgCommandsRouter);
 app.use(embedCreatorRouter);
+app.use(matchesRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

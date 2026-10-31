@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "../../../components/nav/Sidebar";
 import { TopHeader } from "../../../components/nav/TopHeader";
 import { CommandPalette } from "../../../components/nav/CommandPalette";
+import { PageGuideButton } from "../../../components/nav/PageGuideButton";
 import { ConfirmProvider } from "../../../components/ui/ConfirmDialog";
 import { api, clearToken, type CurrentUser } from "../../../lib/api";
 import { useIdleLogout } from "../../../lib/useIdleLogout";
@@ -96,7 +97,10 @@ export default function DashboardLayout({
               position:sticky on descendants (e.g. the Embed Creator's live
               preview column). "clip" prevents the horizontal overflow
               without that side effect. */}
-          <main className="p-3 sm:p-6 overflow-x-clip">{children}</main>
+          <main className="p-3 sm:p-6 overflow-x-clip">
+            <PageGuideButton guildId={params.guildId} />
+            {children}
+          </main>
         </div>
       </div>
     </ConfirmProvider>

@@ -648,6 +648,7 @@ export interface MatchmakingConfigRow {
   voiceNumberPad: number;
   duelVoiceName: string;
   teamVoiceName: string;
+  texts: Record<string, { title?: string; description?: string; footer?: string; color?: string; text?: string }>;
   ranked: boolean;
   games: string[];
   challengeMinutes: number;

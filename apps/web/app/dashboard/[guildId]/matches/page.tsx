@@ -11,7 +11,7 @@ import { FormError } from "../../../../components/ui/FormError";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { VOICE_TOKENS, renderVoiceName } from "@spartacus/shared";
+import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, renderVoiceName, resolveText, type MatchTextEntry, type MatchTextKey, type TextOverride } from "@spartacus/shared";
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
@@ -977,6 +977,176 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   );
 }
 
+// Shows **bold** the way Discord does, so the preview reads like the real post.
+function Formatted({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\*\*[^*]+\*\*)/).map((part, i) => (part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : <span key={i}>{part}</span>))}
+    </>
+  );
+}
+
+function MessagesTab({ guildId }: { guildId: string }) {
+  const [texts, setTexts] = useState<MatchmakingConfigRow["texts"] | null>(null);
+  const [group, setGroup] = useState(MATCH_TEXT_GROUPS[0]);
+  const [key, setKey] = useState<MatchTextKey>("boardSolo");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getMatchmaking(guildId).then((o) => setTexts(o.config.texts ?? {}));
+  }, [guildId]);
+
+  async function save() {
+    if (!texts) return;
+    setError(null);
+    try {
+      await api.saveMatchmaking(guildId, { texts });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save.");
+    }
+  }
+  const autoSave = useAutoSave(texts, save);
+  if (!texts) return <p className="text-sm text-slate-500">Loading…</p>;
+
+  const entries = Object.entries(MATCH_TEXTS) as Array<[MatchTextKey, MatchTextEntry]>;
+  const entry: MatchTextEntry = MATCH_TEXTS[key];
+  const custom = texts[key] ?? {};
+  const isEmbed = entry.defaults.text === undefined;
+  const edited = Object.keys(custom).length > 0;
+  const preview = resolveText(texts, key, entry.tokens);
+  const value = (field: keyof TextOverride) => custom[field] ?? entry.defaults[field] ?? "";
+  const change = (field: keyof TextOverride, next: string) => setTexts({ ...texts, [key]: { ...custom, [field]: next } });
+  const insert = (token: string) => {
+    const field = isEmbed ? "description" : "text";
+    change(field, `${value(field)}{${token}}`);
+  };
+  const reset = () => {
+    const { [key]: _removed, ...rest } = texts;
+    setTexts(rest);
+  };
+  const choose = (next: MatchTextKey) => {
+    setKey(next);
+    setError(null);
+  };
+  const pickGroup = (next: string) => {
+    setGroup(next);
+    const first = entries.find(([, e]) => e.group === next);
+    if (first) choose(first[0]);
+  };
+
+  return (
+    <div className="space-y-5">
+      <NeonCard>
+        <p className="font-medium mb-1">Step 1: Pick what to change</p>
+        <p className="text-xs text-slate-500 mb-3">Everything Spartacus posts for Matchmaking is here. A dot marks anything you've customized.</p>
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
+          {MATCH_TEXT_GROUPS.map((g) => (
+            <button key={g} type="button" onClick={() => pickGroup(g)} className={`shrink-0 rounded-md border px-3 py-1.5 text-xs ${g === group ? "border-neon-blue bg-base-800 text-slate-100" : "border-white/10 text-slate-500 hover:text-slate-300"}`}>
+              {g}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+          {entries
+            .filter(([, e]) => e.group === group)
+            .map(([k, e]) => (
+              <Choice key={k} on={k === key} title={`${e.label}${texts[k] ? " •" : ""}`} hint={e.hint} onClick={() => choose(k)} />
+            ))}
+        </div>
+      </NeonCard>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+        <NeonCard>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="font-medium">Step 2: {entry.label}</p>
+            {edited && (
+              <button type="button" onClick={reset} className="text-xs text-slate-500 hover:text-rose-400">
+                Reset to Default
+              </button>
+            )}
+          </div>
+          <div className="space-y-4">
+            {isEmbed ? (
+              <>
+                <div>
+                  <Label>Title</Label>
+                  <input className={inputClass} maxLength={256} value={value("title")} onChange={(e) => change("title", e.target.value)} />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <textarea className={`${inputClass} min-h-24`} maxLength={4000} value={value("description")} onChange={(e) => change("description", e.target.value)} />
+                  <Hint>Use **two stars** for bold. Leave a box empty to hide that part.</Hint>
+                </div>
+                <div>
+                  <Label>Footer</Label>
+                  <input className={inputClass} maxLength={2000} value={value("footer")} onChange={(e) => change("footer", e.target.value)} />
+                </div>
+                <div>
+                  <Label>Color</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" aria-label="Embed color" className="h-10 w-14 rounded border border-white/10 bg-base-950" value={preview.color} onChange={(e) => change("color", e.target.value)} />
+                    <span className="text-xs text-slate-500">{preview.color}</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <Label>{entry.group === "Buttons" ? "Button wording" : "Wording"}</Label>
+                <textarea className={`${inputClass} min-h-16`} maxLength={entry.group === "Buttons" ? 60 : 1500} value={value("text")} onChange={(e) => change("text", e.target.value)} />
+              </div>
+            )}
+            {Object.keys(entry.tokens).length > 0 && (
+              <div>
+                <Label>Fill-ins</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.keys(entry.tokens).map((token) => (
+                    <button key={token} type="button" onClick={() => insert(token)} className="rounded-md border border-dashed border-white/15 px-2 py-0.5 text-xs text-slate-400 hover:text-neon-blue">
+                      {`{${token}}`}
+                    </button>
+                  ))}
+                </div>
+                <Hint>Tap one to add it. Spartacus swaps it for the real value.</Hint>
+              </div>
+            )}
+            <FormError message={error} />
+            <SaveStatus status={autoSave} />
+          </div>
+        </NeonCard>
+
+        <div className="lg:sticky lg:top-4">
+          <NeonCard>
+            <p className="font-medium mb-1">Step 3: Check the preview</p>
+            <p className="text-xs text-slate-500 mb-3">This updates as you type and saves by itself. Example values are shown in place of real names.</p>
+            <div className="rounded-lg bg-[#313338] p-3">
+              {isEmbed ? (
+                <div className="rounded border-l-4 bg-[#2B2D31] p-3 text-sm text-[#DBDEE1] space-y-1.5" style={{ borderLeftColor: preview.color }}>
+                  {preview.title && (
+                    <p className="font-semibold text-white break-words">
+                      <Formatted text={preview.title} />
+                    </p>
+                  )}
+                  {preview.description && (
+                    <p className="whitespace-pre-wrap break-words">
+                      <Formatted text={preview.description} />
+                    </p>
+                  )}
+                  {preview.footer && <p className="text-xs text-[#949BA4] break-words">{preview.footer}</p>}
+                </div>
+              ) : entry.group === "Buttons" ? (
+                <span className="inline-block rounded bg-[#5865F2] px-3 py-1.5 text-sm font-medium text-white">{preview.text}</span>
+              ) : (
+                <p className="whitespace-pre-wrap break-words text-sm text-[#DBDEE1]">
+                  <Formatted text={preview.text} />
+                </p>
+              )}
+            </div>
+          </NeonCard>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
   const [games, setGames] = useState<MatchPresetRow[] | null>(null);
@@ -1012,8 +1182,6 @@ function SettingsTab({ guildId }: { guildId: string }) {
   if (form) return <GameForm key={form.game?.id ?? "new"} start={form.game} onSave={saveGame} onCancel={() => setForm(null)} />;
 
   return (
-    <div className="space-y-5">
-    <VoiceSettings guildId={guildId} />
     <NeonCard>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <p className="font-medium">Games</p>
@@ -1047,7 +1215,6 @@ function SettingsTab({ guildId }: { guildId: string }) {
         ))}
       </div>
     </NeonCard>
-    </div>
   );
 }
 
@@ -1243,7 +1410,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
   const [setups, setSetups] = useState<MatchSetupRow[] | null>(null);
   const [builder, setBuilder] = useState<{ editing: MatchSetupRow | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"setups" | "board" | "queue" | "settings">("setups");
+  const [tab, setTab] = useState<"setups" | "board" | "queue" | "games" | "voice" | "messages">("setups");
   const [roster, setRoster] = useState<Array<{ team: string; players: string[] }>>([]);
   const [results, setResults] = useState<MatchResultRow[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1299,7 +1466,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
       />
 
       <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
-        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["settings", "Settings"]] as const).map(([key, label]) => (
+        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["games", "Games"], ["voice", "Voice"], ["messages", "Messages"]] as const).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -1311,8 +1478,12 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
         ))}
       </div>
 
-      {tab === "settings" ? (
+      {tab === "games" ? (
         <SettingsTab guildId={guildId} />
+      ) : tab === "voice" ? (
+        <VoiceSettings guildId={guildId} />
+      ) : tab === "messages" ? (
+        <MessagesTab guildId={guildId} />
       ) : tab !== "setups" ? (
         <ConfigTabs key={tab} guildId={guildId} tab={tab} />
       ) : builder ? (

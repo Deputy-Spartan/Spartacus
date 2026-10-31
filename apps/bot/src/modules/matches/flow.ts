@@ -20,6 +20,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 import { Prisma, type MatchPlayer, type MatchSession, type MatchSetup } from "@prisma/client";
+import { resolveText } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -69,6 +70,7 @@ const lastPostError = new Map<string, number>();
 type Reply = string | InteractionEditReplyOptions | null;
 
 interface Ctx {
+  texts: unknown; // the Messages tab's custom wording
   client: Client;
   setup: MatchSetup;
   session: MatchSession;
@@ -102,7 +104,8 @@ async function loadCtx(client: Client, setupId: string): Promise<Ctx | null> {
     session = null;
   }
   session ??= await openSession(setup);
-  return { client, setup, session, state: readState(session) };
+  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+  return { client, setup, session, state: readState(session), texts: config?.texts ?? {} };
 }
 
 // Scheduled setups run off their start time. Otherwise sign-ups only have a
@@ -147,7 +150,7 @@ async function syncPanel(ctx: Ctx) {
   if (!isSendableChannel(channel)) return;
   if (!state.eventId && session.phase !== "DONE") await createEvent(ctx);
   const ids = [...new Set([...state.signups, ...state.teams.flatMap((t) => t.players), ...state.draftPool])];
-  const payload = buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, await fetchPlayers(setup, ids), await draftNames(client, setup, state));
+  const payload = buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, await fetchPlayers(setup, ids), await draftNames(client, setup, state), ctx.texts);
 
   if (setup.panelMessageId) {
     const message = await channel.messages.fetch(setup.panelMessageId).catch(() => null);
@@ -264,8 +267,8 @@ async function revealRosters(ctx: Ctx) {
   if (!state.reveal) return;
   state.reveal = false;
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
-  if (isSendableChannel(channel)) await channel.send({ embeds: [buildRosters(state.teams)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
-  await ping(ctx, "Registration closed. Rosters are revealed.");
+  if (isSendableChannel(channel)) await channel.send({ embeds: [buildRosters(state.teams, ctx.texts)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
+  await ping(ctx, resolveText(ctx.texts, "pingReveal").text);
 }
 
 async function closeSignups(ctx: Ctx) {
@@ -274,7 +277,7 @@ async function closeSignups(ctx: Ctx) {
   if (!ctx.setup.checkIn) return enterTeams(ctx);
   ctx.state.ready = [];
   const endsAt = ctx.setup.useTimers ? fromNow(ctx.setup.checkInSeconds * 1000) : null;
-  await ping(ctx, `${roleMention(ctx.setup)}${ctx.state.signups.map((id) => `<@${id}>`).join(" ")} Lobby is full. Check in on the panel.`.slice(0, 2000));
+  await ping(ctx, `${roleMention(ctx.setup)}${resolveText(ctx.texts, "pingCheckIn", { players: ctx.state.signups.map((id) => `<@${id}>`).join(" ") }).text}`.slice(0, 2000));
   await save(ctx, "CHECKIN", endsAt);
 }
 
@@ -366,7 +369,7 @@ async function syncBracket(ctx: Ctx, fresh = false) {
   const { client, setup, state } = ctx;
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
-  const embed = bracketEmbed(setup, state);
+  const embed = bracketEmbed(setup, state, ctx.texts);
   if (setup.bracketMessageId && !fresh) {
     const message = await channel.messages.fetch(setup.bracketMessageId).catch(() => null);
     if (await message?.edit({ embeds: [embed] }).catch(() => null)) return;
@@ -500,7 +503,7 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
     },
   });
   const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
-  if (isSendableChannel(channel)) await channel.send({ embeds: [buildResult(setup, result)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
+  if (isSendableChannel(channel)) await channel.send({ embeds: [buildResult(setup, result, ctx.texts)], allowedMentions: { parse: [] } }).catch((err) => logError("bot", err, setup.guildId));
   await syncBoard(client, setup.guildId, setup.game);
   await closeTeamRooms(ctx);
 
@@ -649,7 +652,7 @@ async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
   else {
     if (full && !state.fullPinged) {
       state.fullPinged = true;
-      await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}${setup.pingRoleId ? `<@&${setup.pingRoleId}> ` : ""}The lobby is full.${setup.startMode === "MANUAL" ? " Staff can start it from the panel." : ""}`);
+      await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}${setup.pingRoleId ? `<@&${setup.pingRoleId}> ` : ""}${resolveText(ctx.texts, "pingFull").text}${setup.startMode === "MANUAL" ? " Staff can start it from the panel." : ""}`);
     }
     await save(ctx, "SIGNUP", session.phaseEndsAt ?? signupDeadline(setup));
   }
@@ -779,7 +782,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
     }
     case "stats": {
       const player = await prisma.matchPlayer.findUnique({ where: { setupId_userId: { setupId: setup.id, userId } } });
-      return { embeds: [buildStats(setup, player)] };
+      return { embeds: [buildStats(setup, player, ctx.texts)] };
     }
     case "board": {
       const rows = await prisma.matchPlayer.findMany({ where: { setupId: setup.id, OR: [{ wins: { gt: 0 } }, { losses: { gt: 0 } }] }, orderBy: [{ wins: "desc" }, { rating: "desc" }], take: 15 });

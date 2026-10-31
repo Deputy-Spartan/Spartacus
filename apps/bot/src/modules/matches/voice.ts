@@ -1,6 +1,6 @@
 import { ChannelType, Client, Guild, OverwriteResolvable, PermissionFlagsBits } from "discord.js";
 import type { MatchmakingConfig } from "@prisma/client";
-import { DEFAULT_DUEL_VOICE_NAME, DEFAULT_TEAM_VOICE_NAME, renderVoiceName } from "@spartacus/shared";
+import { DEFAULT_DUEL_VOICE_NAME, DEFAULT_TEAM_VOICE_NAME, renderVoiceName, resolveText } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 
 export interface VoiceSide {
@@ -76,7 +76,7 @@ export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryI
       const moved = canMove ? await member!.voice.setChannel(voice.id).catch(() => null) : null;
       if (!moved) missing.push(id);
     }
-    if (missing.length) pings.push(`${missing.map((id) => `<@${id}>`).join(" ")} Your match started. Join <#${voice.id}>.`);
+    if (missing.length) pings.push(resolveText(config?.texts, "pingVoice", { players: missing.map((id) => `<@${id}>`).join(" "), channel: `<#${voice.id}>` }).text);
   }
   return { voiceIds, pings };
 }

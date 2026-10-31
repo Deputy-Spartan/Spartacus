@@ -1,4 +1,5 @@
 import { Client, EmbedBuilder } from "discord.js";
+import { styleEmbed } from "./render";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -14,7 +15,7 @@ function line(entry: BoardEntry, index: number, name: string): string {
   return `${MEDALS[index] ?? `**${index + 1}.**`} ${name}: ${entry.wins}W ${entry.losses}L · ${percent}%`;
 }
 
-export async function buildBoard(client: Client, guildId: string, game: string, since: Date | null) {
+export async function buildBoard(client: Client, guildId: string, game: string, since: Date | null, texts: unknown = {}) {
   const results = await prisma.matchResult.findMany({
     where: { guildId, voided: false, ...(game === "ALL" ? {} : { game }), ...(since ? { createdAt: { gte: since } } : {}) },
     orderBy: { createdAt: "desc" },
@@ -26,16 +27,8 @@ export async function buildBoard(client: Client, guildId: string, game: string, 
   const members = await Promise.all(players.map((p) => guild?.members.fetch(p.key).catch(() => null)));
   const label = game === "ALL" ? "All Games" : game;
   return [
-    new EmbedBuilder()
-      .setColor(0xf0b232)
-      .setTitle(`🏅 Top 10 Players: ${label}`.slice(0, 256))
-      .setDescription(players.map((p, i) => line(p, i, members[i]?.displayName ?? "Former member")).join("\n") || "No matches played yet.")
-      .setFooter({ text: "Updates after every match" }),
-    new EmbedBuilder()
-      .setColor(0x7b99bc)
-      .setTitle(`👥 Top 10 Teams: ${label}`.slice(0, 256))
-      .setDescription(teams.map((t, i) => line(t, i, t.key)).join("\n") || "No team matches played yet.")
-      .setFooter({ text: "Saved and named teams · Updates after every match" }),
+    styleEmbed(new EmbedBuilder(), texts, "boardPlayers", { game: label }).setDescription(players.map((p, i) => line(p, i, members[i]?.displayName ?? "Former member")).join("\n") || "No matches played yet."),
+    styleEmbed(new EmbedBuilder(), texts, "boardTeams", { game: label }).setDescription(teams.map((t, i) => line(t, i, t.key)).join("\n") || "No team matches played yet."),
   ];
 }
 
@@ -64,7 +57,7 @@ async function postBoards(client: Client, guildId: string, game?: string) {
 
   for (const key of wanted) {
     if (game && key !== "ALL" && key !== game && messages[key]) continue;
-    const embeds = await buildBoard(client, guildId, key, config.boardSince);
+    const embeds = await buildBoard(client, guildId, key, config.boardSince, config.texts);
     const message = messages[key] ? await channel.messages.fetch(messages[key]).catch(() => null) : null;
     if (await message?.edit({ embeds }).catch(() => null)) continue;
     const sent = await channel.send({ embeds, allowedMentions: { parse: [] } }).catch((err) => {

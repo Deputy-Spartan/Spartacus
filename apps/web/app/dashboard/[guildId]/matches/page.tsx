@@ -11,7 +11,7 @@ import { FormError } from "../../../../components/ui/FormError";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { api, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
+import { api, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
 const BLANK_GAME = { game: "", teamSize: 5, useRanks: false, ranks: [] as string[], useMaps: false, maps: [] as string[], mapWord: "Map", scoreName: "Points" };
@@ -684,6 +684,195 @@ function ResultsList({ results, onVoid }: { results: MatchResultRow[]; onVoid: (
   );
 }
 
+function GameForm({ start, onSave, onCancel }: { start: MatchPresetRow | null; onSave: (game: MatchPresetInput) => Promise<void>; onCancel: () => void }) {
+  const [d, setD] = useState<MatchPresetInput>(start ?? { ...BLANK_GAME, teamSize: 2 });
+  const [ranksText, setRanksText] = useState((start?.ranks ?? []).join(", "));
+  const [mapDraft, setMapDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const set = (patch: Partial<MatchPresetInput>) => {
+    setD((prev) => ({ ...prev, ...patch }));
+    setError(null);
+  };
+  const word = d.mapWord.trim() || "Map";
+
+  function addMaps() {
+    const names = mapDraft.split(",").map((m) => m.trim()).filter(Boolean);
+    set({ maps: [...new Set([...d.maps, ...names])] });
+    setMapDraft("");
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave({ ...d, maps: [...new Set([...d.maps, ...mapDraft.split(",").map((m) => m.trim()).filter(Boolean)])] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save this game.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <NeonCard>
+      <p className="font-medium mb-3">{start ? `Edit ${start.game}` : "Add a Game"}</p>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <Label>Game name</Label>
+            <input className={inputClass} value={d.game} maxLength={80} disabled={!!start} onChange={(e) => set({ game: e.target.value })} placeholder="Any game" />
+            {start && <Hint>Names stay fixed so past results stay together.</Hint>}
+          </div>
+          <div>
+            <Label>Players per team</Label>
+            <input type="number" min={1} max={10} className={inputClass} value={d.teamSize} onChange={(e) => set({ teamSize: Number(e.target.value) })} />
+          </div>
+          <div>
+            <Label>Score counts</Label>
+            <input className={inputClass} value={d.scoreName} maxLength={30} onChange={(e) => set({ scoreName: e.target.value })} />
+          </div>
+        </div>
+        <Toggle on={d.useRanks} label="Use ranks" hint="Members pick a rank when they first sign up." onChange={(useRanks) => set({ useRanks })} />
+        {d.useRanks && (
+          <div>
+            <Label>Ranks, lowest to highest</Label>
+            <textarea
+              className={`${inputClass} min-h-20`}
+              value={ranksText}
+              onChange={(e) => {
+                setRanksText(e.target.value);
+                set({ ranks: e.target.value.split(",").map((r) => r.trim()).filter(Boolean) });
+              }}
+            />
+            <Hint>Separate them with commas. Up to 25.</Hint>
+          </div>
+        )}
+        <Toggle on={d.useMaps} label="Use maps" hint="Turn off for games with no maps or stages." onChange={(useMaps) => set({ useMaps })} />
+        {d.useMaps && (
+          <>
+            <div>
+              <Label>What do you call them?</Label>
+              <input className={inputClass} value={d.mapWord} maxLength={30} onChange={(e) => set({ mapWord: e.target.value })} />
+            </div>
+            <div>
+              <Label>
+                {word} list ({d.maps.length})
+              </Label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  className={`${inputClass} min-w-0 flex-1`}
+                  value={mapDraft}
+                  placeholder="Type a name, or several with commas"
+                  onChange={(e) => setMapDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addMaps();
+                    }
+                  }}
+                />
+                <button type="button" onClick={addMaps} className="neon-button-sm shrink-0">
+                  Add
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {d.maps.map((m) => (
+                  <span key={m} className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-base-800 pl-3 pr-1 py-0.5 text-xs">
+                    {m}
+                    <button type="button" aria-label={`Remove ${m}`} onClick={() => set({ maps: d.maps.filter((x) => x !== m) })} className="w-5 h-5 rounded-full text-slate-500 hover:text-rose-400">
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        <FormError message={error} />
+        <div className="flex justify-between gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            Cancel
+          </button>
+          <button type="button" onClick={save} disabled={saving} className="neon-button disabled:opacity-50">
+            {saving ? "Saving…" : start ? "Save Changes" : "Add Game"}
+          </button>
+        </div>
+      </div>
+    </NeonCard>
+  );
+}
+
+function SettingsTab({ guildId }: { guildId: string }) {
+  const confirm = useConfirm();
+  const [games, setGames] = useState<MatchPresetRow[] | null>(null);
+  const [form, setForm] = useState<{ game: MatchPresetRow | null } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api.getMatchPresets(guildId).then(setGames);
+  }
+  useEffect(refresh, [guildId]);
+
+  async function saveGame(game: MatchPresetInput) {
+    if (form?.game) await api.updateMatchPreset(guildId, form.game.id, game);
+    else await api.addMatchPreset(guildId, game);
+    setNotice(form?.game ? `${game.game} updated.` : `${game.game} added to the setup builder, Leaderboard and Matchmaking.`);
+    setForm(null);
+    refresh();
+  }
+
+  async function remove(game: MatchPresetRow) {
+    if (!(await confirm(`Remove ${game.game}? It comes off the setup builder and Matchmaking, and its leaderboard post is deleted. Past results and saved setups stay.`, { confirmLabel: "Remove" }))) return;
+    setError(null);
+    try {
+      await api.deleteMatchPreset(guildId, game.id);
+      setNotice(`${game.game} removed.`);
+      refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove this game.");
+    }
+  }
+
+  if (form) return <GameForm key={form.game?.id ?? "new"} start={form.game} onSave={saveGame} onCancel={() => setForm(null)} />;
+
+  return (
+    <NeonCard>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+        <p className="font-medium">Games</p>
+        <button type="button" onClick={() => setForm({ game: null })} className="neon-button-sm">
+          + Add Game
+        </button>
+      </div>
+      <p className="text-xs text-slate-500 mb-2">Add a game once and it's ready in the setup builder, on the Leaderboard and on the Matchmaking board.</p>
+      {notice && <p className="text-xs text-emerald-400 mb-2">{notice}</p>}
+      <FormError message={error} />
+      {games === null && <p className="text-sm text-slate-500 py-4">Loading…</p>}
+      {games?.length === 0 && <p className="text-sm text-slate-500 py-4 text-center">No games yet. Add your first one.</p>}
+      <div className="divide-y divide-white/5">
+        {games?.map((g) => (
+          <div key={g.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3">
+            <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
+              <p className="text-sm break-words">{g.game}</p>
+              <p className="text-xs text-slate-500">
+                {g.teamSize} per team · {g.useMaps ? `${g.maps.length} ${g.mapWord.toLowerCase()}s` : "No maps"} · {g.useRanks ? `${g.ranks.length} ranks` : "No ranks"} · Scored in {g.scoreName}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setForm({ game: g })} className="text-xs text-slate-400 hover:text-neon-blue py-1">
+                Edit
+              </button>
+              <button type="button" onClick={() => remove(g)} className="text-xs text-slate-500 hover:text-rose-400 py-1">
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </NeonCard>
+  );
+}
+
 function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" }) {
   const confirm = useConfirm();
   const [data, setData] = useState<MatchmakingOverview | null>(null);
@@ -879,7 +1068,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
   const [setups, setSetups] = useState<MatchSetupRow[] | null>(null);
   const [builder, setBuilder] = useState<{ editing: MatchSetupRow | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"setups" | "board" | "queue">("setups");
+  const [tab, setTab] = useState<"setups" | "board" | "queue" | "settings">("setups");
   const [roster, setRoster] = useState<Array<{ team: string; players: string[] }>>([]);
   const [results, setResults] = useState<MatchResultRow[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -935,7 +1124,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
       />
 
       <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
-        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"]] as const).map(([key, label]) => (
+        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["settings", "Settings"]] as const).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -947,7 +1136,9 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
         ))}
       </div>
 
-      {tab !== "setups" ? (
+      {tab === "settings" ? (
+        <SettingsTab guildId={guildId} />
+      ) : tab !== "setups" ? (
         <ConfigTabs key={tab} guildId={guildId} tab={tab} />
       ) : builder ? (
         <SetupBuilder

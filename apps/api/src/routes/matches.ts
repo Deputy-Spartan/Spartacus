@@ -126,6 +126,36 @@ async function seedPresets(guildId: string) {
   await prisma.matchPreset.createMany({ data: [...STARTER_PRESETS, ...fromSetups].map((p) => ({ ...p, guildId })), skipDuplicates: true });
 }
 
+// Adding a game puts it on the Leaderboard and Matchmaking board in one step,
+// and removing it takes it back off. Past results stay either way.
+async function setGameListed(guildId: string, game: string, listed: boolean) {
+  const config = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
+  const change = (value: unknown) => {
+    const current = (Array.isArray(value) ? value : []).filter((g) => g !== game);
+    return listed ? [...current, game] : current;
+  };
+  await prisma.matchmakingConfig.update({ where: { guildId }, data: { boardGames: change(config.boardGames), games: change(config.games) } });
+  const client = getBotClient();
+  if (client) {
+    const { syncBoard } = await import("@spartacus/bot");
+    await syncBoard(client, guildId).catch(() => null);
+  }
+}
+
+function readGame(b: Record<string, unknown>) {
+  const game = text(b.game, 80);
+  const ranks = list(b.ranks, 25);
+  const maps = list(b.maps, 100);
+  const useRanks = Boolean(b.useRanks);
+  const useMaps = Boolean(b.useMaps);
+  if (!game) return { error: "Enter the game's name." };
+  if (game.toUpperCase() === "ALL") return { error: "That name is reserved. Pick another one." };
+  if (!whole(b.teamSize, 1, 10)) return { error: "Team size must be from 1 to 10." };
+  if (useRanks && ranks.length < 2) return { error: "Add at least 2 ranks, or turn ranks off." };
+  if (useMaps && maps.length < 1) return { error: "Add at least 1 map, or turn maps off." };
+  return { data: { game, teamSize: b.teamSize as number, useRanks, ranks, useMaps, maps, mapWord: text(b.mapWord, 30) || "Map", scoreName: text(b.scoreName, 30) || "Points" } };
+}
+
 // A new setup puts its game on the list, even one removed earlier. Editing an
 // old setup only refreshes a preset that's still listed, so it can't bring
 // back one that was removed on purpose.
@@ -134,8 +164,10 @@ async function syncPreset(guildId: string, data: SetupData, isNew: boolean) {
   const existing = await prisma.matchPreset.findFirst({ where: { guildId, game: { equals: data.game as string, mode: "insensitive" } } });
   if (!existing) {
     await prisma.matchPreset.create({ data: { guildId, game: data.game as string, ...presetFields(data) } });
+    await setGameListed(guildId, data.game as string, true);
   } else if (isNew || !existing.deleted) {
     await prisma.matchPreset.update({ where: { id: existing.id }, data: { ...presetFields(data), deleted: false } });
+    if (existing.deleted) await setGameListed(guildId, existing.game, true);
   }
 }
 
@@ -144,10 +176,32 @@ router.get("/guilds/:guildId/match-presets", requireAuth, requireGuildPermission
   res.json(await prisma.matchPreset.findMany({ where: { guildId: req.params.guildId, deleted: false }, orderBy: { createdAt: "asc" } }));
 });
 
+router.post("/guilds/:guildId/match-presets", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const { data, error } = readGame(req.body);
+  if (!data) return res.status(400).json({ error });
+  await seedPresets(guildId);
+  const existing = await prisma.matchPreset.findFirst({ where: { guildId, game: { equals: data.game, mode: "insensitive" } } });
+  if (existing && !existing.deleted) return res.status(400).json({ error: "That game is already on your list." });
+  const row = existing ? await prisma.matchPreset.update({ where: { id: existing.id }, data: { ...data, deleted: false } }) : await prisma.matchPreset.create({ data: { ...data, guildId } });
+  await setGameListed(guildId, row.game, true);
+  res.status(201).json(row);
+});
+
+// The name stays fixed because results and teams are filed under it.
+router.patch("/guilds/:guildId/match-presets/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const preset = await prisma.matchPreset.findUnique({ where: { id: req.params.id } });
+  if (!preset || preset.guildId !== req.params.guildId) return res.status(404).json({ error: "Game not found" });
+  const { data, error } = readGame({ ...req.body, game: preset.game });
+  if (!data) return res.status(400).json({ error });
+  res.json(await prisma.matchPreset.update({ where: { id: preset.id }, data }));
+});
+
 router.delete("/guilds/:guildId/match-presets/:id", requireAuth, requireGuildPermission, async (req, res) => {
   const preset = await prisma.matchPreset.findUnique({ where: { id: req.params.id } });
   if (!preset || preset.guildId !== req.params.guildId) return res.status(404).json({ error: "Preset not found" });
   await prisma.matchPreset.update({ where: { id: preset.id }, data: { deleted: true } });
+  await setGameListed(req.params.guildId, preset.game, false);
   res.status(204).send();
 });
 

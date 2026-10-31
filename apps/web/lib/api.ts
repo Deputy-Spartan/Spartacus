@@ -608,6 +608,8 @@ export interface MatchSetupInput {
   resultsChannelId: string;
 }
 
+export type MatchPresetInput = Omit<MatchPresetRow, "id">;
+
 export interface MatchPresetRow {
   id: string;
   game: string;
@@ -1726,6 +1728,8 @@ export const api = {
     request<AntiRaidConfig>(`/guilds/${guildId}/anti-raid`, { method: "PUT", body: JSON.stringify(config) }),
 
   getMatchPresets: (guildId: string) => request<MatchPresetRow[]>(`/guilds/${guildId}/match-presets`),
+  addMatchPreset: (guildId: string, body: MatchPresetInput) => request<MatchPresetRow>(`/guilds/${guildId}/match-presets`, { method: "POST", body: JSON.stringify(body) }),
+  updateMatchPreset: (guildId: string, id: string, body: MatchPresetInput) => request<MatchPresetRow>(`/guilds/${guildId}/match-presets/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteMatchPreset: (guildId: string, id: string) => request<void>(`/guilds/${guildId}/match-presets/${id}`, { method: "DELETE" }),
   getMatchSetups: (guildId: string) => request<MatchSetupRow[]>(`/guilds/${guildId}/match-setups`),
   addMatchSetup: (guildId: string, body: MatchSetupInput) =>

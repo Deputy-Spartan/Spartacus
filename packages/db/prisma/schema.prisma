@@ -2406,8 +2406,20 @@ model MatchmakingConfig {
   enabled          Boolean   @default(false)
   channelId        String?
   messageId        String?
+  activityChannelId String? // challenges and match threads, or the board's channel if unset
+  lobbyVoiceId     String?
   voiceCategoryId  String?
   createVoice      Boolean   @default(true)
+  requireLobby     Boolean   @default(false)
+  voiceSource      String    @default("LOBBY") // LOBBY | ANY
+  voiceReturn      Boolean   @default(true)
+  voicePrivate     Boolean   @default(false)
+  voiceLimit       String    @default("TEAM") // TEAM | EXTRA | NONE
+  voiceExtra       Int       @default(0)
+  voicePlacement   String    @default("BELOW_LOBBY") // BELOW_LOBBY | TOP | BOTTOM
+  voiceNumberPad   Int       @default(1)
+  duelVoiceName    String    @default("{a} vs {b}")
+  teamVoiceName    String    @default("{team}")
   ranked           Boolean   @default(true)
   games            Json      @default("[]")
   challengeMinutes Int       @default(5)

@@ -11,7 +11,8 @@ import { FormError } from "../../../../components/ui/FormError";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { api, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
+import { VOICE_TOKENS, renderVoiceName } from "@spartacus/shared";
+import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
 const BLANK_GAME = { game: "", teamSize: 5, useRanks: false, ranks: [] as string[], useMaps: false, maps: [] as string[], mapWord: "Map", scoreName: "Points" };
@@ -802,6 +803,180 @@ function GameForm({ start, onSave, onCancel }: { start: MatchPresetRow | null; o
   );
 }
 
+function NameBuilder({ label, value, onChange, tokens }: { label: string; value: string; onChange: (next: string) => void; tokens: readonly string[] }) {
+  const parts = value.split(/(\{[a-z]+\})/).filter(Boolean);
+  const move = (index: number, by: number) => {
+    const next = [...parts];
+    const [part] = next.splice(index, 1);
+    next.splice(index + by, 0, part);
+    onChange(next.join(""));
+  };
+  return (
+    <div>
+      <Label>{label}</Label>
+      <input className={inputClass} value={value} maxLength={100} onChange={(e) => onChange(e.target.value)} />
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {parts.map((part, i) => (
+          <span key={`${part}${i}`} className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-base-800 px-1 py-0.5 text-xs">
+            <button type="button" aria-label={`Move ${part} left`} disabled={i === 0} onClick={() => move(i, -1)} className="w-5 h-5 text-slate-500 hover:text-slate-200 disabled:opacity-30">
+              ◀
+            </button>
+            <span className="whitespace-pre px-1">{VOICE_TOKENS.find((t) => t.token === part)?.label ?? part}</span>
+            <button type="button" aria-label={`Move ${part} right`} disabled={i === parts.length - 1} onClick={() => move(i, 1)} className="w-5 h-5 text-slate-500 hover:text-slate-200 disabled:opacity-30">
+              ▶
+            </button>
+            <button type="button" aria-label={`Remove ${part}`} onClick={() => onChange(parts.filter((_, n) => n !== i).join(""))} className="w-5 h-5 text-slate-500 hover:text-rose-400">
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {VOICE_TOKENS.filter((t) => tokens.includes(t.token)).map((t) => (
+          <button key={t.token} type="button" onClick={() => onChange(`${value}${value && !value.endsWith(" ") ? " " : ""}${t.token}`)} className="rounded-md border border-dashed border-white/15 px-2 py-0.5 text-xs text-slate-400 hover:text-neon-blue">
+            + {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VoiceSettings({ guildId }: { guildId: string }) {
+  const [config, setConfig] = useState<MatchmakingConfigRow | null>(null);
+  const [channels, setChannels] = useState<DiscordChannels | null>(null);
+  const [sample, setSample] = useState<"duel" | "team">("duel");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.getMatchmaking(guildId).then((o) => setConfig(o.config));
+    api.getDiscordChannels(guildId).then(setChannels);
+  }, [guildId]);
+
+  async function save() {
+    if (!config) return;
+    setError(null);
+    try {
+      await api.saveMatchmaking(guildId, config);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save.");
+    }
+  }
+  const autoSave = useAutoSave(config, save);
+  if (!config) return <p className="text-sm text-slate-500">Loading…</p>;
+  const set = (patch: Partial<MatchmakingConfigRow>) => setConfig((prev) => (prev ? { ...prev, ...patch } : prev));
+
+  const voice = channels?.voiceChannels ?? [];
+  const lobby = voice.find((c) => c.id === config.lobbyVoiceId) ?? null;
+  const lobbyName = lobby?.name ?? "Lobby";
+  const pickedCategory = channels?.categories.find((c) => c.id === config.voiceCategoryId)?.name ?? null;
+  const category = pickedCategory ?? lobby?.categoryName ?? "Voice Channels";
+  const sharesCategory = !lobby || (lobby.categoryName ?? "Voice Channels") === category;
+  const others = voice.filter((c) => c.categoryName === category && c.id !== config.lobbyVoiceId).slice(0, 4).map((c) => c.name);
+  const values = { a: sample === "duel" ? "Kuro" : "Night Crew", b: sample === "duel" ? "FrostByte" : "Red Line", game: "Your Game", map: "Bank", number: 12, pad: config.voiceNumberPad };
+  const players = sample === "duel" ? 2 : 5;
+  const limit = config.voiceLimit === "NONE" ? null : Math.min(99, players + (config.voiceLimit === "EXTRA" ? config.voiceExtra : 0));
+  const rooms = sample === "duel" ? [renderVoiceName(config.duelVoiceName, values)] : [renderVoiceName(config.teamVoiceName, { ...values, team: values.a }), renderVoiceName(config.teamVoiceName, { ...values, team: values.b })];
+  const row = (name: string, live: boolean) => (
+    <div key={name + live} className={`flex items-center gap-1.5 rounded px-2 py-1 text-sm ${live ? "bg-white/5 text-slate-100" : "text-slate-500"}`}>
+      <span aria-hidden>{live && config.voicePrivate ? "🔒" : "🔊"}</span>
+      <span className="min-w-0 flex-1 truncate">{name}</span>
+      {live && <span className="text-[11px] rounded bg-base-950 px-1.5 text-slate-400">{limit === null ? "No limit" : `0/${limit}`}</span>}
+    </div>
+  );
+  const lobbyRow = row(lobbyName, false);
+  const roomRows = rooms.map((r) => row(r, true));
+  const otherRows = others.map((n) => row(n, false));
+  const list = !sharesCategory ? [...(config.voicePlacement === "BOTTOM" ? [...otherRows, ...roomRows] : [...roomRows, ...otherRows])] : config.voicePlacement === "TOP" ? [...roomRows, lobbyRow, ...otherRows] : config.voicePlacement === "BOTTOM" ? [lobbyRow, ...otherRows, ...roomRows] : [lobbyRow, ...roomRows, ...otherRows];
+
+  return (
+    <NeonCard>
+      <p className="font-medium mb-1">Voice Channels</p>
+      <p className="text-xs text-slate-500 mb-3">Players wait in one Lobby. When a match starts, the bot creates temporary channels and moves everyone in. These settings also apply to tournaments and team matches.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-5 items-start">
+        <div className="min-w-0 space-y-4">
+          <Toggle on={config.createVoice} label="Create voice channels for Matchmaking" hint="A 1v1 shares one channel, and each team gets its own." onChange={(createVoice) => set({ createVoice })} />
+          <div>
+            <Label>Lobby voice channel</Label>
+            <ChannelSelect guildId={guildId} kind="voice" value={config.lobbyVoiceId} onChange={(id) => set({ lobbyVoiceId: id || null })} />
+          </div>
+          <div>
+            <Label>Who gets moved</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Choice on={config.voiceSource === "LOBBY"} title="Lobby Only" hint="Only players in the Lobby are moved. Others get a link." onClick={() => set({ voiceSource: "LOBBY" })} />
+              <Choice on={config.voiceSource === "ANY"} title="Any Voice Channel" hint="Players are pulled in from any voice channel." onClick={() => set({ voiceSource: "ANY" })} />
+            </div>
+          </div>
+          <Toggle on={config.requireLobby} label="Must be in the Lobby to queue" hint="Find a Match only works from inside the Lobby." onChange={(requireLobby) => set({ requireLobby })} />
+          <Toggle on={config.voiceReturn} label="Return players to the Lobby" hint="Moves everyone back before the channels are deleted." onChange={(voiceReturn) => set({ voiceReturn })} />
+          <Toggle on={config.voicePrivate} label="Private channels" hint="Only the match's players can join. Needs Manage Roles for Spartacus." onChange={(voicePrivate) => set({ voicePrivate })} />
+          <NameBuilder label="1v1 channel name" value={config.duelVoiceName} onChange={(duelVoiceName) => set({ duelVoiceName })} tokens={["{a}", "{b}", "{game}", "{map}", "{number}"]} />
+          <NameBuilder label="Team channel name" value={config.teamVoiceName} onChange={(teamVoiceName) => set({ teamVoiceName })} tokens={["{team}", "{game}", "{map}", "{number}"]} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Number style</Label>
+              <select className={inputClass} value={config.voiceNumberPad} onChange={(e) => set({ voiceNumberPad: Number(e.target.value) })}>
+                <option value={1}>Plain (5)</option>
+                <option value={2}>2 digits (05)</option>
+                <option value={3}>3 digits (005)</option>
+                <option value={4}>4 digits (0005)</option>
+              </select>
+            </div>
+            <div>
+              <Label>User limit</Label>
+              <select className={inputClass} value={config.voiceLimit} onChange={(e) => set({ voiceLimit: e.target.value as MatchmakingConfigRow["voiceLimit"] })}>
+                <option value="TEAM">Match players only</option>
+                <option value="EXTRA">Players plus extra spots</option>
+                <option value="NONE">No limit</option>
+              </select>
+            </div>
+          </div>
+          {config.voiceLimit === "EXTRA" && (
+            <div>
+              <Label>Extra spots</Label>
+              <input type="number" min={0} max={20} className={inputClass} value={config.voiceExtra} onChange={(e) => set({ voiceExtra: Number(e.target.value) })} />
+              <Hint>Room for coaches or spectators.</Hint>
+            </div>
+          )}
+          <div>
+            <Label>Where channels appear</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Choice on={config.voicePlacement === "BELOW_LOBBY"} title="Below the Lobby" hint="Right under it." onClick={() => set({ voicePlacement: "BELOW_LOBBY" })} />
+              <Choice on={config.voicePlacement === "TOP"} title="Top" hint="First in the category." onClick={() => set({ voicePlacement: "TOP" })} />
+              <Choice on={config.voicePlacement === "BOTTOM"} title="Bottom" hint="Last in the category." onClick={() => set({ voicePlacement: "BOTTOM" })} />
+            </div>
+          </div>
+          <div>
+            <Label>Category</Label>
+            <ChannelSelect guildId={guildId} kind="category" value={config.voiceCategoryId} onChange={(voiceCategoryId) => set({ voiceCategoryId: voiceCategoryId || null })} placeholder="Same as the Lobby" />
+          </div>
+          <FormError message={error} />
+          <SaveStatus status={autoSave} />
+        </div>
+        <aside className="lg:sticky lg:top-4 rounded-lg border border-white/10 bg-base-950 p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-500 mb-2">Preview</p>
+          <div className="flex gap-1 mb-3">
+            {(["duel", "team"] as const).map((k) => (
+              <button key={k} type="button" onClick={() => setSample(k)} className={`rounded-md border px-2.5 py-1 text-xs ${sample === k ? "border-neon-blue text-slate-100" : "border-white/10 text-slate-500"}`}>
+                {k === "duel" ? "1v1" : "Team Match"}
+              </button>
+            ))}
+          </div>
+          {!sharesCategory && (
+            <div className="mb-2">
+              <p className="px-2 text-[11px] font-semibold uppercase text-slate-500">{lobby?.categoryName ?? "Voice Channels"}</p>
+              {lobbyRow}
+            </div>
+          )}
+          <p className="px-2 text-[11px] font-semibold uppercase text-slate-500">{category}</p>
+          <div className="mt-1 space-y-0.5">{list}</div>
+          <p className="text-[11px] text-slate-600 mt-3">Highlighted channels are temporary. The players and teams here are examples.</p>
+        </aside>
+      </div>
+    </NeonCard>
+  );
+}
+
 function SettingsTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
   const [games, setGames] = useState<MatchPresetRow[] | null>(null);
@@ -837,6 +1012,8 @@ function SettingsTab({ guildId }: { guildId: string }) {
   if (form) return <GameForm key={form.game?.id ?? "new"} start={form.game} onSave={saveGame} onCancel={() => setForm(null)} />;
 
   return (
+    <div className="space-y-5">
+    <VoiceSettings guildId={guildId} />
     <NeonCard>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <p className="font-medium">Games</p>
@@ -870,6 +1047,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
         ))}
       </div>
     </NeonCard>
+    </div>
   );
 }
 
@@ -976,6 +1154,10 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
         </div>
         <Label>Category and text channel</Label>
         <ChannelSelect guildId={guildId} value={config.channelId} onChange={(channelId) => set({ channelId: channelId || null })} />
+        <Label>Challenges and match threads channel</Label>
+        <ChannelSelect guildId={guildId} value={config.activityChannelId} onChange={(activityChannelId) => set({ activityChannelId: activityChannelId || null })} />
+        <Hint>Challenges and private match threads post here, so the board stays clean. If you leave this empty they use the board's channel.</Hint>
+        <div className="h-3" />
         <Label>Games on the board</Label>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2 mb-1">
           {presets.map((p) => (
@@ -984,13 +1166,6 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
         </div>
         <Hint>Maps and team size come from each game's preset.</Hint>
         <div className="space-y-4 mt-4">
-          <Toggle on={config.createVoice} label="Create voice channels" hint="One shared channel for a 1v1, one per team for team matches. Deleted when the match ends." onChange={(createVoice) => set({ createVoice })} />
-          {config.createVoice && (
-            <div>
-              <Label>Voice channel category</Label>
-              <ChannelSelect guildId={guildId} kind="category" value={config.voiceCategoryId} onChange={(voiceCategoryId) => set({ voiceCategoryId: voiceCategoryId || null })} placeholder="Same as the text channel" />
-            </div>
-          )}
           <Toggle on={config.ranked} label="Count on the leaderboard" hint="Turn off to keep these matches casual." onChange={(ranked) => set({ ranked })} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {num("challengeMinutes", "Challenge expires (minutes)", "Dropped if nobody answers.")}

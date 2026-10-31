@@ -53,6 +53,7 @@ import {
   type Side,
 } from "./engine";
 import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
+import { closeVoiceRooms, openVoiceRooms } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
 import { syncMatchmakingPanel, tickMatchmaking } from "./matchmaking";
@@ -428,67 +429,26 @@ async function goLive(ctx: Ctx, map: string | null, note: string | null) {
   await save(ctx, "LIVE", deadline);
 }
 
-// Creates a voice channel per team beside the main one, capped at the team
-// size, and moves everyone in. A bot can only move someone already connected
-// to voice, so anyone else gets pinged a link to their team's channel.
+// Team matches get a channel per team, and a 1v1 shares one, using the voice
+// settings from the Settings tab.
 async function openTeamRooms(ctx: Ctx): Promise<string[]> {
-  const { client, setup, state } = ctx;
+  const { client, setup, session, state } = ctx;
   const teams = currentTeams(state);
   if (!setup.autoMove || !setup.lobbyVoiceId || !teams) return [];
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
   const main = await guild?.channels.fetch(setup.lobbyVoiceId).catch(() => null);
   if (!guild || !main?.isVoiceBased()) return ["The main voice channel for this match is gone. Pick a new one on the dashboard."];
-
-  const pings: string[] = [];
-  for (const team of teams) {
-    const room = await guild.channels
-      .create({
-        name: team.name.slice(0, 100),
-        type: ChannelType.GuildVoice,
-        parent: main.parentId ?? undefined,
-        userLimit: Math.min(99, setup.teamSize),
-        permissionOverwrites: main.permissionOverwrites.cache,
-      })
-      .catch((err) => {
-        logError("bot", err, setup.guildId);
-        return null;
-      });
-    if (!room) {
-      pings.push(`I couldn't create a voice channel for ${team.name}. Check that I have Manage Channels.`);
-      continue;
-    }
-    state.voiceIds.push(room.id);
-    const missing: string[] = [];
-    for (const id of team.players) {
-      const member = await guild.members.fetch({ user: id, force: true }).catch(() => null);
-      const moved = member?.voice.channelId
-        ? await member.voice.setChannel(room.id).catch((err) => {
-            logError("bot", err, setup.guildId);
-            return null;
-          })
-        : null;
-      if (!moved) missing.push(id);
-    }
-    if (missing.length) pings.push(`${missing.map((id) => `<@${id}>`).join(" ")} Your match started. Join <#${room.id}>.`);
-  }
+  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+  const { voiceIds, pings } = await openVoiceRooms({ guild, config, lobbyId: setup.lobbyVoiceId, fallbackCategoryId: main.parentId, game: setup.game, map: state.map, number: session.number, a: teams[0], b: teams[1], shared: setup.teamSize === 1 });
+  state.voiceIds.push(...voiceIds);
   return pings;
 }
 
-// Moves everyone back to the main channel, then deletes the team channels.
 async function closeTeamRooms(ctx: Ctx) {
   const { client, setup, state } = ctx;
   if (state.voiceIds.length === 0) return;
-  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
-  for (const id of state.voiceIds) {
-    const room = await guild?.channels.fetch(id).catch(() => null);
-    if (!room?.isVoiceBased()) continue;
-    if (setup.lobbyVoiceId) {
-      for (const member of room.members.values()) {
-        await member.voice.setChannel(setup.lobbyVoiceId).catch((err) => logError("bot", err, setup.guildId));
-      }
-    }
-    await room.delete().catch((err) => logError("bot", err, setup.guildId));
-  }
+  const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
+  await closeVoiceRooms(client, config, state.voiceIds, setup.lobbyVoiceId, setup.guildId);
   state.voiceIds = [];
 }
 
@@ -643,7 +603,7 @@ async function swapPlayer(ctx: Ctx, out: string, sub: string): Promise<string> {
   const { client, setup, session, state } = ctx;
   const team = replacePlayer(state, out, sub);
   if (!team) return "That player isn't on a team.";
-  const room = state.voiceIds[currentTeams(state)?.indexOf(team) ?? -1];
+  const room = state.voiceIds[Math.min(currentTeams(state)?.indexOf(team) ?? -1, state.voiceIds.length - 1)];
   if (room) {
     const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
     const member = await guild?.members.fetch({ user: sub, force: true }).catch(() => null);

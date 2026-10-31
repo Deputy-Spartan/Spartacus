@@ -25,6 +25,7 @@ import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { cleanTeamName, pickOne } from "./engine";
+import { closeVoiceRooms, openVoiceRooms } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
 import { stringList } from "./render";
@@ -202,7 +203,8 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
   });
 
   const guild = await client.guilds.fetch(guildId).catch(() => null);
-  const parent = config.channelId ? await client.channels.fetch(config.channelId).catch(() => null) : null;
+  const parentId = config.activityChannelId ?? config.channelId;
+  const parent = parentId ? await client.channels.fetch(parentId).catch(() => null) : null;
   if (!guild || parent?.type !== ChannelType.GuildText) return room;
 
   const title = `${a.name} vs ${b.name}`.slice(0, 100);
@@ -213,29 +215,9 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
       return null;
     }));
 
-  const voiceIds: string[] = [];
-  const notes: string[] = [];
-  if (config.createVoice) {
-    const rooms: Array<{ name: string; cap: number; players: string[] }> = kind === "SOLO" ? [{ name: title, cap: 2, players: everyone }] : [a, b].map((t) => ({ name: t.name, cap: t.players.length, players: t.players }));
-    for (const r of rooms) {
-      const voice = await guild.channels.create({ name: r.name.slice(0, 100), type: ChannelType.GuildVoice, parent: config.voiceCategoryId ?? parent.parentId ?? undefined, userLimit: Math.min(99, r.cap) }).catch((err) => {
-        logError("bot", err, guildId);
-        return null;
-      });
-      if (!voice) {
-        notes.push("I couldn't create a voice channel. Check that I have Manage Channels.");
-        continue;
-      }
-      voiceIds.push(voice.id);
-      const missing: string[] = [];
-      for (const id of r.players) {
-        const member = await guild.members.fetch({ user: id, force: true }).catch(() => null);
-        const moved = member?.voice.channelId ? await member.voice.setChannel(voice.id).catch(() => null) : null;
-        if (!moved) missing.push(id);
-      }
-      if (missing.length) notes.push(`${mentionAll(missing)} Join <#${voice.id}>.`);
-    }
-  }
+  const { voiceIds, pings: notes } = config.createVoice
+    ? await openVoiceRooms({ guild, config, lobbyId: config.lobbyVoiceId, fallbackCategoryId: parent.parentId, game, map: room.map, number: room.number, a, b, shared: kind === "SOLO" })
+    : { voiceIds: [], pings: [] };
 
   room = await prisma.matchRoom.update({ where: { id: room.id }, data: { threadId: thread?.id ?? null, voiceIds } });
   if (thread) {
@@ -252,10 +234,8 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
 }
 
 async function closeRoom(client: Client, room: MatchRoom, closing: string) {
-  for (const id of stringList(room.voiceIds)) {
-    const voice = await client.channels.fetch(id).catch(() => null);
-    await voice?.delete().catch((err) => logError("bot", err, room.guildId));
-  }
+  const config = await getConfig(room.guildId);
+  await closeVoiceRooms(client, config, stringList(room.voiceIds), config?.lobbyVoiceId ?? null, room.guildId);
   await refreshRoom(client, room);
   const thread = await roomThread(client, room);
   await thread?.send({ content: closing, allowedMentions: { parse: [] } }).catch(() => null);
@@ -324,6 +304,10 @@ const sideOf = (team: MatchTeam): Side => ({ name: team.name, players: stringLis
 
 async function find(client: Client, config: MatchmakingConfig, kind: Kind, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
   const { guildId } = config;
+  if (config.requireLobby && config.lobbyVoiceId) {
+    const member = await guild?.members.fetch({ user: userId, force: true }).catch(() => null);
+    if (member?.voice.channelId !== config.lobbyVoiceId) return `Join <#${config.lobbyVoiceId}> first, then tap Find a Match.`;
+  }
   if (kind === "SOLO") {
     const busy = await openRoomFor(guildId, [userId]);
     if (busy) return inRoomMessage(busy);
@@ -370,7 +354,8 @@ async function challengePicker(config: MatchmakingConfig, kind: Kind, game: stri
 
 async function sendChallenge(client: Client, config: MatchmakingConfig, data: Pick<MatchChallenge, "game" | "kind" | "fromId" | "toId" | "fromTeam" | "toTeam">): Promise<string> {
   const { guildId, challengeMinutes } = config;
-  const channel = config.channelId ? await client.channels.fetch(config.channelId).catch(() => null) : null;
+  const channelId = config.activityChannelId ?? config.channelId;
+  const channel = channelId ? await client.channels.fetch(channelId).catch(() => null) : null;
   if (!isSendableChannel(channel)) return "The Matchmaking channel isn't available.";
   const challenge = await prisma.matchChallenge.create({ data: { ...data, guildId, expiresAt: new Date(Date.now() + challengeMinutes * 60_000) } });
   const who = data.fromTeam ? `**${data.fromTeam}** challenged **${data.toTeam}**` : `<@${data.fromId}> challenged you`;
@@ -387,8 +372,9 @@ async function sendChallenge(client: Client, config: MatchmakingConfig, data: Pi
 
 async function dropChallenge(client: Client, challenge: MatchChallenge, config: MatchmakingConfig | null) {
   await prisma.matchChallenge.delete({ where: { id: challenge.id } }).catch(() => null);
-  if (!challenge.messageId || !config?.channelId) return;
-  const channel = await client.channels.fetch(config.channelId).catch(() => null);
+  const channelId = config?.activityChannelId ?? config?.channelId;
+  if (!challenge.messageId || !channelId) return;
+  const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
   const message = await channel.messages.fetch(challenge.messageId).catch(() => null);
   await message?.delete().catch(() => null);

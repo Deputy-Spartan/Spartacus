@@ -22,9 +22,14 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^match(rank|draft|score|name)?:/.test(interaction.customId)) {
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^match(rank|draft|score|name|setup)?:/.test(interaction.customId)) {
     if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "MATCHES"))) {
       await interaction.reply({ content: "⚠️ Matches is disabled for this server.", ephemeral: true });
+      return;
+    }
+    if (interaction.isButton() && interaction.customId.startsWith("matchsetup:")) {
+      const { handleServerSetup } = await import("../modules/matches/serverSetup");
+      await handleServerSetup(interaction);
       return;
     }
     const { handleMatchButton, handleMatchDraft, handleMatchName, handleMatchRank, handleMatchScore } = await import("../modules/matches/flow");

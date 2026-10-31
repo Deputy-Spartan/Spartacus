@@ -59,6 +59,7 @@ import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult
 import { closeVoiceRooms, nameVoiceForMap, openTextRoom, openVoiceRooms, swapRoomAccess } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
+import { startServerSetup } from "./serverSetup";
 import { syncMatchmakingPanel, tickMatchmaking } from "./matchmaking";
 
 const CONFIRM_MS = 5 * 60_000;
@@ -1189,6 +1190,7 @@ async function setupForCommand(guildId: string, channelId: string): Promise<Matc
 
 export async function handleMatchCommand(interaction: ChatInputCommandInteraction) {
   const sub = interaction.options.getSubcommand();
+  if (sub === "setup") return startServerSetup(interaction);
   await interaction.deferReply({ ephemeral: true });
   const setup = interaction.guildId ? await setupForCommand(interaction.guildId, interaction.channelId) : null;
   if (!setup) {

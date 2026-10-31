@@ -601,6 +601,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["/match leaderboard", "Shows the leaderboard privately"],
                     ["/match sub", "Staff: replaces a player"],
                     ["/match setrank", "Staff: corrects a player's rank"],
+                    ["/match setup", "Admins: creates the Matchmaking roles and locks a category to them, after you confirm"],
                   ]}
                 />
                 <Text>Use these in a match channel. If only one setup exists, they work anywhere. When players choose a team, they join from the panel's team buttons.</Text>

@@ -1,13 +1,44 @@
 // Everything Matchmaking says in Discord, with the default wording. The bot and
 // the Messages tab both read this list, so the preview always matches Discord.
+export interface TextField {
+  name: string;
+  value: string;
+  inline: boolean;
+}
+
 export interface TextOverride {
   title?: string;
   description?: string;
   footer?: string;
   color?: string;
   text?: string;
+  url?: string;
+  authorName?: string;
+  authorIcon?: string;
+  thumbnail?: string;
+  image?: string;
+  footerIcon?: string;
+  timestamp?: boolean;
+  fields?: TextField[];
 }
 export type TextOverrides = Record<string, TextOverride>;
+export type GameTextOverrides = Record<string, TextOverrides>;
+
+export interface ResolvedText {
+  title: string;
+  description: string;
+  footer: string;
+  color: string;
+  text: string;
+  url: string;
+  authorName: string;
+  authorIcon: string;
+  thumbnail: string;
+  image: string;
+  footerIcon: string;
+  timestamp: boolean;
+  fields: TextField[];
+}
 
 export interface MatchTextEntry {
   group: string;
@@ -15,6 +46,7 @@ export interface MatchTextEntry {
   hint: string;
   defaults: TextOverride;
   tokens: Record<string, string>; // token to example value
+  global?: boolean; // shared by every game, so it can't differ per game
 }
 
 const GOLD = "#F0B232";
@@ -28,11 +60,12 @@ const matchTokens = { ...gameTokens, onMap: " on Bank", mapWord: "Map" };
 
 const embed = (group: string, label: string, hint: string, defaults: TextOverride, tokens: Record<string, string> = {}): MatchTextEntry => ({ group, label, hint, defaults, tokens });
 const line = (group: string, label: string, hint: string, text: string, tokens: Record<string, string> = {}): MatchTextEntry => ({ group, label, hint, defaults: { text }, tokens });
-const buttonLabel = (label: string, hint: string): MatchTextEntry => ({ group: "Buttons", label, hint, defaults: { text: label }, tokens: {} });
+const buttonLabel = (label: string, hint: string, global = false): MatchTextEntry => ({ group: "Buttons", label, hint, defaults: { text: label }, tokens: {}, global });
+const note = (label: string, hint: string, text: string, tokens: Record<string, string> = {}, global = false): MatchTextEntry => ({ group: "Labels and Notes", label, hint, defaults: { text }, tokens, global });
 
 export const MATCH_TEXTS = {
-  boardSolo: embed("Matchmaking", "1v1 board", "The 1v1 half of the always-open board.", { title: "⚔️ 1v1 Matchmaking", description: "Find an opponent or challenge someone. Spartacus sets up the match right away.", color: STEEL }),
-  boardTeam: embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Create a team once, then queue or challenge any time.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }),
+  boardSolo: { ...embed("Matchmaking", "1v1 board", "The 1v1 half of the always-open board.", { title: "⚔️ 1v1 Matchmaking", description: "Find an opponent or challenge someone. Spartacus sets up the match right away.", color: STEEL }), global: true },
+  boardTeam: { ...embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Create a team once, then queue or challenge any time.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }), global: true },
   room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
   challenge: line("Matchmaking", "Challenge ping", "Sent to the player or team being challenged.", "{target} {from} challenged you to {game}. This expires {expires}.", { target: "@Kuro", from: "@FrostByte", game: "Rainbow Six Siege", expires: "in 5 minutes" }),
   roomWon: line("Matchmaking", "Match finished", "Posted in the thread when a match ends.", "🏆 **{winner}** won {score}. This match is closed.", { winner: "Kuro", score: "4-2" }),
@@ -85,39 +118,80 @@ export const MATCH_TEXTS = {
   btnLeaderboard: buttonLabel("Leaderboard", "On the panel."),
   btnResults: buttonLabel("All Results", "On the panel."),
   btnStaff: buttonLabel("Staff", "On the panel."),
-  btnFindSolo: buttonLabel("1v1: Find a Match", "On the Matchmaking board."),
-  btnChallengeSolo: buttonLabel("1v1: Challenge a Player", "On the Matchmaking board."),
-  btnLeaveSolo: buttonLabel("Leave 1v1 Queue", "On the Matchmaking board."),
-  btnFindTeam: buttonLabel("Teams: Find a Match", "On the Matchmaking board."),
-  btnChallengeTeam: buttonLabel("Teams: Challenge a Team", "On the Matchmaking board."),
-  btnLeaveTeam: buttonLabel("Leave Team Queue", "On the Matchmaking board."),
-  btnCreateTeam: buttonLabel("Create a Team", "On the Matchmaking board."),
-  btnMyTeams: buttonLabel("My Teams", "On the Matchmaking board."),
+  btnFindSolo: buttonLabel("1v1: Find a Match", "On the Matchmaking board.", true),
+  btnChallengeSolo: buttonLabel("1v1: Challenge a Player", "On the Matchmaking board.", true),
+  btnLeaveSolo: buttonLabel("Leave 1v1 Queue", "On the Matchmaking board.", true),
+  btnFindTeam: buttonLabel("Teams: Find a Match", "On the Matchmaking board.", true),
+  btnChallengeTeam: buttonLabel("Teams: Challenge a Team", "On the Matchmaking board.", true),
+  btnLeaveTeam: buttonLabel("Leave Team Queue", "On the Matchmaking board.", true),
+  btnCreateTeam: buttonLabel("Create a Team", "On the Matchmaking board.", true),
+  btnMyTeams: buttonLabel("My Teams", "On the Matchmaking board.", true),
   btnAccept: buttonLabel("Accept", "On challenges."),
   btnDecline: buttonLabel("Decline", "On challenges."),
+
+  labelPlayers: note("Players heading", "Above the sign-up list.", "Players"),
+  labelPicking: note("Draft heading", "Above players still to pick.", "Still to pick"),
+  labelConfirm: note("Confirmation heading", "Above a reported score.", "Waiting for confirmation"),
+  labelSubs: note("Subs heading", "When a sub is needed.", "Subs needed"),
+  labelSubsNote: note("Subs note", "Under the subs heading.", "{count} open. Tap Subs to jump in.", { count: "1" }),
+  labelWaiting: note("1v1 queue heading", "On the Matchmaking board.", "Waiting ({count})", { count: "2" }, true),
+  labelTeamsWaiting: note("Team queue heading", "On the Matchmaking board.", "Teams waiting ({count})", { count: "1" }, true),
+  noteCheckinOpen: note("Check-in with no timer", "Fills in {deadline}.", "Ready up to continue. Staff can skip this."),
+  noteCheckinTimed: note("Check-in with a timer", "Fills in {deadline}.", "Ready up {time} or your slot opens for the next player.", { time: "in 2 minutes" }),
+  noteVoteOpen: note("Vote with no timer", "Fills in {deadline}.", "Voting stays open until everyone votes or staff end it."),
+  noteVoteTimed: note("Vote with a timer", "Fills in {deadline}.", "Voting closes {time}. Ties are picked at random.", { time: "in 1 minute" }),
+  noteTeamsWait: note("Teams with no timer", "Fills in {auto}.", " Waiting for a captain or staff to start."),
+  noteTeamsAuto: note("Teams with a timer", "Fills in {auto}.", " Starts by itself {time}.", { time: "in 2 minutes" }),
+  noteDone: note("Finished, no rewards", "Fills in {rewards}.", "Leaderboard updated."),
+  noteDoneRewards: note("Finished, with rewards", "Fills in {rewards}.", "+{win} coins to the winners, +{loss} to the other team. Leaderboard updated.", { win: "100", loss: "25" }),
+  roundFinal: note("Final", "Bracket round name.", "Final"),
+  roundSemi: note("Semifinals", "Bracket round name.", "Semifinals"),
+  roundQuarter: note("Quarterfinals", "Bracket round name.", "Quarterfinals"),
+  roundOf: note("Early rounds", "Bracket round name.", "Round of {teams}", { teams: "16" }),
 } satisfies Record<string, MatchTextEntry>;
 
 export type MatchTextKey = keyof typeof MATCH_TEXTS;
 
-export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Match Steps", "Results", "Pings", "Buttons"];
+export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Match Steps", "Results", "Pings", "Buttons", "Labels and Notes"];
 
 export function fillText(template: string, values: Record<string, string | number | null | undefined>): string {
   return template.replace(/\{([a-zA-Z]+)\}/g, (whole, key: string) => (key in values ? String(values[key] ?? "") : whole));
 }
 
+// A game's edits sit on top of All Games, one box at a time.
+export function textsForGame(all: unknown, byGame: unknown, game: string | null | undefined): TextOverrides {
+  const base = (all && typeof all === "object" ? all : {}) as TextOverrides;
+  const games = (byGame && typeof byGame === "object" ? byGame : {}) as GameTextOverrides;
+  const own = game ? games[game] ?? {} : {};
+  const merged: TextOverrides = { ...base };
+  for (const [key, value] of Object.entries(own)) merged[key] = { ...base[key], ...value };
+  return merged;
+}
+
 // A blank custom box hides that part, except on buttons and lines, which can't be empty.
-export function resolveText(overrides: unknown, key: MatchTextKey, values: Record<string, string | number | null | undefined> = {}): Required<TextOverride> {
+export function resolveText(overrides: unknown, key: MatchTextKey, values: Record<string, string | number | null | undefined> = {}): ResolvedText {
   const entry: MatchTextEntry = MATCH_TEXTS[key];
   const custom = (overrides && typeof overrides === "object" ? (overrides as TextOverrides)[key] : undefined) ?? {};
-  const pick = (field: "title" | "description" | "footer") => fillText(custom[field] ?? entry.defaults[field] ?? "", values).trim();
+  const fill = (text: string) => fillText(text, values).trim();
+  const pick = (field: "title" | "description" | "footer") => fill(custom[field] ?? entry.defaults[field] ?? "");
   return {
     title: pick("title"),
     description: pick("description"),
     footer: pick("footer"),
     color: custom.color || entry.defaults.color || STEEL,
     text: fillText(custom.text?.trim() || entry.defaults.text || "", values),
+    url: custom.url ?? "",
+    authorName: fill(custom.authorName ?? ""),
+    authorIcon: custom.authorIcon ?? "",
+    thumbnail: custom.thumbnail ?? "",
+    image: custom.image ?? "",
+    footerIcon: custom.footerIcon ?? "",
+    timestamp: custom.timestamp ?? false,
+    fields: (custom.fields ?? []).map((f) => ({ name: fill(f.name), value: fill(f.value), inline: f.inline })).filter((f) => f.name && f.value),
   };
 }
+
+const webLink = (value: unknown) => (typeof value === "string" && /^https?:\/\/\S+$/.test(value.trim()) ? value.trim().slice(0, 500) : "");
 
 export function cleanOverrides(raw: unknown): TextOverrides {
   const out: TextOverrides = {};
@@ -130,7 +204,21 @@ export function cleanOverrides(raw: unknown): TextOverrides {
     if (typeof value.footer === "string") item.footer = value.footer.slice(0, 2000);
     if (typeof value.text === "string") item.text = value.text.slice(0, key.startsWith("btn") ? 60 : 1500);
     if (typeof value.color === "string" && /^#[0-9a-fA-F]{6}$/.test(value.color)) item.color = value.color;
+    if (typeof value.authorName === "string") item.authorName = value.authorName.slice(0, 256);
+    for (const link of ["url", "authorIcon", "thumbnail", "image", "footerIcon"] as const) if (value[link] !== undefined) item[link] = webLink(value[link]);
+    if (typeof value.timestamp === "boolean") item.timestamp = value.timestamp;
+    if (Array.isArray(value.fields)) item.fields = value.fields.slice(0, 10).map((f) => ({ name: String(f?.name ?? "").slice(0, 256), value: String(f?.value ?? "").slice(0, 1024), inline: Boolean(f?.inline) }));
     if (Object.keys(item).length) out[key] = item;
+  }
+  return out;
+}
+
+export function cleanGameOverrides(raw: unknown): GameTextOverrides {
+  const out: GameTextOverrides = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [game, value] of Object.entries(raw as Record<string, unknown>)) {
+    const cleaned = cleanOverrides(value);
+    if (Object.keys(cleaned).length) out[game.slice(0, 80)] = cleaned;
   }
   return out;
 }

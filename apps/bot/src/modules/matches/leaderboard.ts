@@ -1,4 +1,5 @@
 import { Client, EmbedBuilder } from "discord.js";
+import { textsForGame } from "@spartacus/shared";
 import { styleEmbed } from "./render";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
@@ -57,7 +58,7 @@ async function postBoards(client: Client, guildId: string, game?: string) {
 
   for (const key of wanted) {
     if (game && key !== "ALL" && key !== game && messages[key]) continue;
-    const embeds = await buildBoard(client, guildId, key, config.boardSince, config.texts);
+    const embeds = await buildBoard(client, guildId, key, config.boardSince, textsForGame(config.texts, config.gameTexts, key === "ALL" ? null : key));
     const message = messages[key] ? await channel.messages.fetch(messages[key]).catch(() => null) : null;
     if (await message?.edit({ embeds }).catch(() => null)) continue;
     const sent = await channel.send({ embeds, allowedMentions: { parse: [] } }).catch((err) => {

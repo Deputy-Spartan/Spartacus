@@ -12,7 +12,7 @@ import { MatchmakingGuide } from "../../../../components/matchmaking/Matchmaking
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, renderVoiceName, resolveText, type MatchTextEntry, type MatchTextKey, type TextOverride } from "@spartacus/shared";
+import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
@@ -818,11 +818,21 @@ function NameBuilder({ label, value, onChange, tokens }: { label: string; value:
       <input className={inputClass} value={value} maxLength={100} onChange={(e) => onChange(e.target.value)} />
       <div className="flex flex-wrap gap-1.5 mt-2">
         {parts.map((part, i) => (
-          <span key={`${part}${i}`} className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-base-800 px-1 py-0.5 text-xs">
+          <span key={i} className="inline-flex items-center gap-0.5 rounded-md border border-white/10 bg-base-800 px-1 py-0.5 text-xs">
             <button type="button" aria-label={`Move ${part} left`} disabled={i === 0} onClick={() => move(i, -1)} className="w-5 h-5 text-slate-500 hover:text-slate-200 disabled:opacity-30">
               ◀
             </button>
-            <span className="whitespace-pre px-1">{VOICE_TOKENS.find((t) => t.token === part)?.label ?? part}</span>
+            {VOICE_TOKENS.some((t) => t.token === part) ? (
+              <span className="px-1">{VOICE_TOKENS.find((t) => t.token === part)?.label}</span>
+            ) : (
+              <input
+                aria-label="Text piece"
+                className="bg-base-950 rounded px-1 text-xs min-w-0"
+                style={{ width: `${Math.max(3, part.length + 1)}ch` }}
+                value={part}
+                onChange={(e) => onChange(parts.map((p, n) => (n === i ? e.target.value : p)).join(""))}
+              />
+            )}
             <button type="button" aria-label={`Move ${part} right`} disabled={i === parts.length - 1} onClick={() => move(i, 1)} className="w-5 h-5 text-slate-500 hover:text-slate-200 disabled:opacity-30">
               ▶
             </button>
@@ -833,6 +843,9 @@ function NameBuilder({ label, value, onChange, tokens }: { label: string; value:
         ))}
       </div>
       <div className="flex flex-wrap gap-1.5 mt-2">
+        <button type="button" onClick={() => onChange(`${value}${value && !value.endsWith(" ") ? " " : ""}Text`)} className="rounded-md border border-dashed border-white/15 px-2 py-0.5 text-xs text-slate-400 hover:text-neon-blue">
+          + Text
+        </button>
         {VOICE_TOKENS.filter((t) => tokens.includes(t.token)).map((t) => (
           <button key={t.token} type="button" onClick={() => onChange(`${value}${value && !value.endsWith(" ") ? " " : ""}${t.token}`)} className="rounded-md border border-dashed border-white/15 px-2 py-0.5 text-xs text-slate-400 hover:text-neon-blue">
             + {t.label}
@@ -870,7 +883,7 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   const voice = channels?.voiceChannels ?? [];
   const lobby = voice.find((c) => c.id === config.lobbyVoiceId) ?? null;
   const lobbyName = lobby?.name ?? "Lobby";
-  const pickedCategory = channels?.categories.find((c) => c.id === config.voiceCategoryId)?.name ?? null;
+  const pickedCategory = channels?.categories.find((c) => c.id === (sample === "duel" ? config.duelCategoryId : config.teamCategoryId))?.name ?? null;
   const category = pickedCategory ?? lobby?.categoryName ?? "Voice Channels";
   const sharesCategory = !lobby || (lobby.categoryName ?? "Voice Channels") === category;
   const others = voice.filter((c) => c.categoryName === category && c.id !== config.lobbyVoiceId).slice(0, 4).map((c) => c.name);
@@ -948,8 +961,11 @@ function VoiceSettings({ guildId }: { guildId: string }) {
             </div>
           </div>
           <div>
-            <Label>Category</Label>
-            <ChannelSelect guildId={guildId} kind="category" value={config.voiceCategoryId} onChange={(voiceCategoryId) => set({ voiceCategoryId: voiceCategoryId || null })} placeholder="Same as the Lobby" />
+            <Label>1v1 category</Label>
+            <ChannelSelect guildId={guildId} kind="category" value={config.duelCategoryId} onChange={(duelCategoryId) => set({ duelCategoryId: duelCategoryId || null })} placeholder="Same as the Lobby" />
+            <Label>Team category</Label>
+            <ChannelSelect guildId={guildId} kind="category" value={config.teamCategoryId} onChange={(teamCategoryId) => set({ teamCategoryId: teamCategoryId || null })} placeholder="Same as the Lobby" />
+            <Hint>Keep 1v1 and team channels in their own categories. "Below the Lobby" only applies when they share the Lobby's category.</Hint>
           </div>
           <FormError message={error} />
           <SaveStatus status={autoSave} />
@@ -988,35 +1004,44 @@ function Formatted({ text }: { text: string }) {
 }
 
 function MessagesTab({ guildId }: { guildId: string }) {
-  const [texts, setTexts] = useState<MatchmakingConfigRow["texts"] | null>(null);
+  const [saved, setSaved] = useState<Pick<MatchmakingConfigRow, "texts" | "gameTexts"> | null>(null);
+  const [games, setGames] = useState<string[]>([]);
+  const [scope, setScope] = useState("ALL");
   const [group, setGroup] = useState(MATCH_TEXT_GROUPS[0]);
   const [key, setKey] = useState<MatchTextKey>("boardSolo");
+  const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getMatchmaking(guildId).then((o) => setTexts(o.config.texts ?? {}));
+    api.getMatchmaking(guildId).then((o) => setSaved({ texts: o.config.texts ?? {}, gameTexts: o.config.gameTexts ?? {} }));
+    api.getMatchPresets(guildId).then((p) => setGames(p.map((g) => g.game)));
   }, [guildId]);
 
   async function save() {
-    if (!texts) return;
+    if (!saved) return;
     setError(null);
     try {
-      await api.saveMatchmaking(guildId, { texts });
+      await api.saveMatchmaking(guildId, saved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save.");
     }
   }
-  const autoSave = useAutoSave(texts, save);
-  if (!texts) return <p className="text-sm text-slate-500">Loading…</p>;
+  const autoSave = useAutoSave(saved, save);
+  if (!saved) return <p className="text-sm text-slate-500">Loading…</p>;
 
-  const entries = Object.entries(MATCH_TEXTS) as Array<[MatchTextKey, MatchTextEntry]>;
+  const allGames = scope === "ALL";
+  const texts = allGames ? saved.texts : saved.gameTexts[scope] ?? {};
+  const setTexts = (next: MatchmakingConfigRow["texts"]) => setSaved(allGames ? { ...saved, texts: next } : { ...saved, gameTexts: { ...saved.gameTexts, [scope]: next } });
+  const merged = textsForGame(saved.texts, saved.gameTexts, allGames ? null : scope);
+  const entries = (Object.entries(MATCH_TEXTS) as Array<[MatchTextKey, MatchTextEntry]>).filter(([, e]) => allGames || !e.global);
   const entry: MatchTextEntry = MATCH_TEXTS[key];
   const custom = texts[key] ?? {};
+  const shown = merged[key] ?? {};
   const isEmbed = entry.defaults.text === undefined;
   const edited = Object.keys(custom).length > 0;
-  const preview = resolveText(texts, key, entry.tokens);
-  const value = (field: keyof TextOverride) => custom[field] ?? entry.defaults[field] ?? "";
-  const change = (field: keyof TextOverride, next: string) => setTexts({ ...texts, [key]: { ...custom, [field]: next } });
+  const preview = resolveText(merged, key, entry.tokens);
+  const value = (field: "title" | "description" | "footer" | "color" | "text" | "url" | "authorName" | "authorIcon" | "thumbnail" | "image" | "footerIcon") => shown[field] ?? entry.defaults[field] ?? "";
+  const change = (field: keyof TextOverride, next: string | boolean | TextField[]) => setTexts({ ...texts, [key]: { ...custom, [field]: next } });
   const insert = (token: string) => {
     const field = isEmbed ? "description" : "text";
     change(field, `${value(field)}{${token}}`);
@@ -1024,6 +1049,22 @@ function MessagesTab({ guildId }: { guildId: string }) {
   const reset = () => {
     const { [key]: _removed, ...rest } = texts;
     setTexts(rest);
+  };
+  const fields = shown.fields ?? [];
+  const setField = (index: number, patch: Partial<TextField>) => change("fields", fields.map((f, i) => (i === index ? { ...f, ...patch } : f)));
+  const moveField = (index: number, by: number) => {
+    const next = [...fields];
+    const [item] = next.splice(index, 1);
+    next.splice(index + by, 0, item);
+    change("fields", next);
+  };
+  const size = preview.title.length + preview.description.length + preview.footer.length + preview.authorName.length + preview.fields.reduce((n, f) => n + f.name.length + f.value.length, 0);
+  const pickScope = (next: string) => {
+    setScope(next);
+    if (next !== "ALL" && MATCH_TEXTS[key].global) {
+      setGroup("Sign-Ups");
+      setKey("signup");
+    }
   };
   const choose = (next: MatchTextKey) => {
     setKey(next);
@@ -1039,7 +1080,18 @@ function MessagesTab({ guildId }: { guildId: string }) {
     <div className="space-y-5">
       <NeonCard>
         <p className="font-medium mb-1">Step 1: Pick what to change</p>
-        <p className="text-xs text-slate-500 mb-3">Everything Spartacus posts for Matchmaking is here. A dot marks anything you've customized.</p>
+        <p className="text-xs text-slate-500 mb-3">Everything Spartacus posts for Matchmaking is here. A dot marks anything customized for the choice below.</p>
+        <Label>Game</Label>
+        <select className={`${inputClass} mb-1`} value={scope} onChange={(e) => pickScope(e.target.value)}>
+          <option value="ALL">All Games (the default for everything)</option>
+          {games.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        <Hint>{allGames ? "Changes here apply to every game that doesn't have its own version." : `Changes here only apply to ${scope}. Anything you leave alone uses All Games. The shared Matchmaking board is edited under All Games.`}</Hint>
+        <div className="h-3" />
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3">
           {MATCH_TEXT_GROUPS.map((g) => (
             <button key={g} type="button" onClick={() => pickGroup(g)} className={`shrink-0 rounded-md border px-3 py-1.5 text-xs ${g === group ? "border-neon-blue bg-base-800 text-slate-100" : "border-white/10 text-slate-500 hover:text-slate-300"}`}>
@@ -1089,6 +1141,74 @@ function MessagesTab({ guildId }: { guildId: string }) {
                     <span className="text-xs text-slate-500">{preview.color}</span>
                   </div>
                 </div>
+                <button type="button" onClick={() => setMore(!more)} aria-expanded={more} className="text-xs text-neon-blue hover:underline">
+                  {more ? "Hide" : "Show"} links, images, author and fields
+                </button>
+                {more && (
+                  <div className="space-y-3 rounded-lg border border-white/10 p-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label>Title link</Label>
+                        <input className={inputClass} placeholder="https://" value={value("url")} onChange={(e) => change("url", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Author name</Label>
+                        <input className={inputClass} maxLength={256} value={value("authorName")} onChange={(e) => change("authorName", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Author icon link</Label>
+                        <input className={inputClass} placeholder="https://" value={value("authorIcon")} onChange={(e) => change("authorIcon", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Footer icon link</Label>
+                        <input className={inputClass} placeholder="https://" value={value("footerIcon")} onChange={(e) => change("footerIcon", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Thumbnail link</Label>
+                        <input className={inputClass} placeholder="https://" value={value("thumbnail")} onChange={(e) => change("thumbnail", e.target.value)} />
+                      </div>
+                      <div>
+                        <Label>Large image link</Label>
+                        <input className={inputClass} placeholder="https://" value={value("image")} onChange={(e) => change("image", e.target.value)} />
+                      </div>
+                    </div>
+                    <Hint>Links must start with http:// or https://. Discord may not show an image link it can't load.</Hint>
+                    <Toggle on={shown.timestamp ?? false} label="Show the time" hint="Adds the current time beside the footer." onChange={(on) => change("timestamp", on)} />
+                    <div>
+                      <Label>Your own fields ({fields.length}/10)</Label>
+                      <div className="space-y-2">
+                        {fields.map((f, i) => (
+                          <div key={i} className="rounded-lg border border-white/10 p-2 space-y-2">
+                            <input className={inputClass} aria-label={`Field ${i + 1} heading`} placeholder="Heading" maxLength={256} value={f.name} onChange={(e) => setField(i, { name: e.target.value })} />
+                            <textarea className={`${inputClass} min-h-14`} aria-label={`Field ${i + 1} text`} placeholder="Text" maxLength={1024} value={f.value} onChange={(e) => setField(i, { value: e.target.value })} />
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                              <label className="flex items-center gap-1.5">
+                                <input type="checkbox" checked={f.inline} onChange={(e) => setField(i, { inline: e.target.checked })} />
+                                Side by side
+                              </label>
+                              <button type="button" disabled={i === 0} onClick={() => moveField(i, -1)} className="hover:text-slate-200 disabled:opacity-30">
+                                Move up
+                              </button>
+                              <button type="button" disabled={i === fields.length - 1} onClick={() => moveField(i, 1)} className="hover:text-slate-200 disabled:opacity-30">
+                                Move down
+                              </button>
+                              <button type="button" onClick={() => change("fields", fields.filter((_, n) => n !== i))} className="hover:text-rose-400">
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {fields.length < 10 && (
+                        <button type="button" onClick={() => change("fields", [...fields, { name: "", value: "", inline: false }])} className="neon-button-sm mt-2">
+                          + Add Field
+                        </button>
+                      )}
+                      <Hint>Your fields appear before the ones Spartacus adds, like player lists.</Hint>
+                    </div>
+                  </div>
+                )}
+                <p className={`text-xs ${size > 5000 ? "text-rose-400" : "text-slate-600"}`}>{size}/5000 characters. Discord limits a whole embed, and player lists need room too.</p>
               </>
             ) : (
               <div>
@@ -1120,9 +1240,16 @@ function MessagesTab({ guildId }: { guildId: string }) {
             <p className="text-xs text-slate-500 mb-3">This updates as you type and saves by itself. Example values are shown in place of real names.</p>
             <div className="rounded-lg bg-[#313338] p-3">
               {isEmbed ? (
-                <div className="rounded border-l-4 bg-[#2B2D31] p-3 text-sm text-[#DBDEE1] space-y-1.5" style={{ borderLeftColor: preview.color }}>
+                <div className="relative rounded border-l-4 bg-[#2B2D31] p-3 text-sm text-[#DBDEE1] space-y-1.5" style={{ borderLeftColor: preview.color }}>
+                  {preview.thumbnail && <img src={preview.thumbnail} alt="" className="float-right ml-3 h-16 w-16 rounded object-cover" />}
+                  {preview.authorName && (
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-white break-words">
+                      {preview.authorIcon && <img src={preview.authorIcon} alt="" className="h-5 w-5 rounded-full" />}
+                      {preview.authorName}
+                    </p>
+                  )}
                   {preview.title && (
-                    <p className="font-semibold text-white break-words">
+                    <p className={`font-semibold break-words ${preview.url ? "text-[#00A8FC]" : "text-white"}`}>
                       <Formatted text={preview.title} />
                     </p>
                   )}
@@ -1131,7 +1258,25 @@ function MessagesTab({ guildId }: { guildId: string }) {
                       <Formatted text={preview.description} />
                     </p>
                   )}
-                  {preview.footer && <p className="text-xs text-[#949BA4] break-words">{preview.footer}</p>}
+                  {preview.fields.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {preview.fields.map((f, i) => (
+                        <div key={i} className={`min-w-0 ${f.inline ? "" : "col-span-3"}`}>
+                          <p className="text-xs font-semibold text-white break-words">{f.name}</p>
+                          <p className="text-xs whitespace-pre-wrap break-words">
+                            <Formatted text={f.value} />
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {preview.image && <img src={preview.image} alt="" className="clear-both w-full rounded" />}
+                  {(preview.footer || preview.timestamp) && (
+                    <p className="clear-both flex items-center gap-1.5 text-xs text-[#949BA4] break-words">
+                      {preview.footerIcon && <img src={preview.footerIcon} alt="" className="h-4 w-4 rounded-full" />}
+                      {[preview.footer, preview.timestamp ? "Today at 8:00 PM" : ""].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
                 </div>
               ) : entry.group === "Buttons" ? (
                 <span className="inline-block rounded bg-[#5865F2] px-3 py-1.5 text-sm font-medium text-white">{preview.text}</span>

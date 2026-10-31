@@ -1,3 +1,4 @@
+import type { TextOverrides } from "@spartacus/shared";
 import type { EmbedExtra } from "./embedExtra";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -636,7 +637,8 @@ export interface MatchmakingConfigRow {
   channelId: string | null;
   activityChannelId: string | null;
   lobbyVoiceId: string | null;
-  voiceCategoryId: string | null;
+  duelCategoryId: string | null;
+  teamCategoryId: string | null;
   createVoice: boolean;
   requireLobby: boolean;
   voiceSource: "LOBBY" | "ANY";
@@ -648,7 +650,8 @@ export interface MatchmakingConfigRow {
   voiceNumberPad: number;
   duelVoiceName: string;
   teamVoiceName: string;
-  texts: Record<string, { title?: string; description?: string; footer?: string; color?: string; text?: string }>;
+  texts: TextOverrides;
+  gameTexts: Record<string, TextOverrides>;
   ranked: boolean;
   games: string[];
   challengeMinutes: number;

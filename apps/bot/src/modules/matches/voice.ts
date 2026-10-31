@@ -1,6 +1,6 @@
 import { ChannelType, Client, Guild, OverwriteResolvable, PermissionFlagsBits } from "discord.js";
 import type { MatchmakingConfig } from "@prisma/client";
-import { DEFAULT_DUEL_VOICE_NAME, DEFAULT_TEAM_VOICE_NAME, renderVoiceName, resolveText } from "@spartacus/shared";
+import { DEFAULT_DUEL_VOICE_NAME, DEFAULT_TEAM_VOICE_NAME, renderVoiceName, resolveText, type TextOverrides } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 
 export interface VoiceSide {
@@ -19,6 +19,7 @@ interface OpenOptions {
   a: VoiceSide;
   b: VoiceSide;
   shared: boolean; // a 1v1 shares one channel, teams get one each
+  texts: TextOverrides;
 }
 
 const cap = (config: MatchmakingConfig | null, players: number) => {
@@ -28,10 +29,10 @@ const cap = (config: MatchmakingConfig | null, players: number) => {
 
 // Creates the match's voice channels and moves players in. A bot can only move
 // someone already connected, so anyone else is returned to be sent a link.
-export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryId, game, map, number, a, b, shared }: OpenOptions) {
+export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryId, game, map, number, a, b, shared, texts }: OpenOptions) {
   const lobby = lobbyId ? await guild.channels.fetch(lobbyId).catch(() => null) : null;
   const main = lobby?.isVoiceBased() ? lobby : null;
-  const parent = config?.voiceCategoryId ?? main?.parentId ?? fallbackCategoryId ?? undefined;
+  const parent = (shared ? config?.duelCategoryId : config?.teamCategoryId) ?? main?.parentId ?? fallbackCategoryId ?? undefined;
   const values = { a: a.name, b: b.name, game, map, number, pad: config?.voiceNumberPad ?? 1 };
   const rooms = shared
     ? [{ name: renderVoiceName(config?.duelVoiceName ?? DEFAULT_DUEL_VOICE_NAME, values), players: [...a.players, ...b.players] }]
@@ -76,7 +77,7 @@ export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryI
       const moved = canMove ? await member!.voice.setChannel(voice.id).catch(() => null) : null;
       if (!moved) missing.push(id);
     }
-    if (missing.length) pings.push(resolveText(config?.texts, "pingVoice", { players: missing.map((id) => `<@${id}>`).join(" "), channel: `<#${voice.id}>` }).text);
+    if (missing.length) pings.push(resolveText(texts, "pingVoice", { players: missing.map((id) => `<@${id}>`).join(" "), channel: `<#${voice.id}>` }).text);
   }
   return { voiceIds, pings };
 }

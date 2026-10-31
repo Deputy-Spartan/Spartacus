@@ -2408,7 +2408,8 @@ model MatchmakingConfig {
   messageId        String?
   activityChannelId String? // challenges and match threads, or the board's channel if unset
   lobbyVoiceId     String?
-  voiceCategoryId  String?
+  duelCategoryId   String? // where 1v1 voice channels go, or the Lobby's category if unset
+  teamCategoryId   String? // same for team voice channels
   createVoice      Boolean   @default(true)
   requireLobby     Boolean   @default(false)
   voiceSource      String    @default("LOBBY") // LOBBY | ANY
@@ -2421,6 +2422,7 @@ model MatchmakingConfig {
   duelVoiceName    String    @default("{a} vs {b}")
   teamVoiceName    String    @default("{team}")
   texts            Json      @default("{}") // custom wording and embed styles, by MATCH_TEXTS key
+  gameTexts        Json      @default("{}") // the same, per game, on top of texts
   ranked           Boolean   @default(true)
   games            Json      @default("[]")
   challengeMinutes Int       @default(5)

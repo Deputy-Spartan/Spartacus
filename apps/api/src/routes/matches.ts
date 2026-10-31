@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { cleanOverrides } from "@spartacus/shared";
+import { cleanGameOverrides, cleanOverrides } from "@spartacus/shared";
 import { Prisma, prisma } from "@spartacus/db";
 import { deleteChannelMessage } from "../lib/discordRest";
 import { getBotClient } from "../lib/botClient";
@@ -302,7 +302,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGames", "channelId", "activityChannelId", "lobbyVoiceId", "voiceCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voicePlacement", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["boardChannelId", "boardGames", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voicePlacement", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
@@ -326,7 +326,7 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   if (b.requireLobby && !b.lobbyVoiceId) return res.status(400).json({ error: "Pick a Lobby before requiring it." });
 
   const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
-  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 40) : b[k] === "" ? null : b[k]]));
+  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 40) : b[k] === "" ? null : b[k]]));
   const movedBoard = b.boardChannelId !== undefined && (b.boardChannelId || null) !== existing.boardChannelId;
   const movedPanel = b.channelId !== undefined && (b.channelId || null) !== existing.channelId;
   const switchedOff = b.enabled === false && existing.enabled;
@@ -341,7 +341,7 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
     const { syncBoard, syncMatchmakingPanel } = await import("@spartacus/bot");
     await syncBoard(client, guildId).catch(() => null);
     await syncMatchmakingPanel(client, guildId).catch(() => null);
-    if (b.texts !== undefined && JSON.stringify(config.texts) !== JSON.stringify(existing.texts)) {
+    if ((b.texts !== undefined || b.gameTexts !== undefined) && JSON.stringify([config.texts, config.gameTexts]) !== JSON.stringify([existing.texts, existing.gameTexts])) {
       const { refreshMatchPanel } = await import("@spartacus/bot");
       const setups = await prisma.matchSetup.findMany({ where: { guildId, enabled: true }, select: { id: true } });
       for (const s of setups) await refreshMatchPanel(client, s.id).catch(() => null);

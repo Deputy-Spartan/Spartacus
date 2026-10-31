@@ -21,7 +21,7 @@ import {
   type UserSelectMenuInteraction,
 } from "discord.js";
 import type { MatchChallenge, MatchPreset, MatchRoom, MatchTeam, MatchmakingConfig } from "@prisma/client";
-import { resolveText, type MatchTextKey } from "@spartacus/shared";
+import { resolveText, textsForGame, type MatchTextKey } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -48,6 +48,7 @@ const mentionAll = (ids: string[]) => ids.map((id) => `<@${id}>`).join(" ");
 
 const lock = (guildId: string) => <T>(run: () => Promise<T>) => withLock(`mm:${guildId}`, run);
 const getConfig = (guildId: string) => prisma.matchmakingConfig.findUnique({ where: { guildId } });
+const textsFor = (config: MatchmakingConfig | null, game: string) => textsForGame(config?.texts, config?.gameTexts, game);
 const presetFor = (guildId: string, game: string): Promise<MatchPreset | null> => prisma.matchPreset.findFirst({ where: { guildId, game, deleted: false } });
 const teamSizeFor = (preset: MatchPreset | null) => Math.max(2, preset?.teamSize ?? 5);
 
@@ -77,8 +78,8 @@ async function buildPanel(config: MatchmakingConfig) {
   const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
   return {
     embeds: [
-      styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: `Waiting (${solo.length})`, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
-      styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: `Teams waiting (${squads.length})`, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
+      styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: resolveText(config.texts, "labelWaiting", { count: solo.length }).text, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
+      styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: resolveText(config.texts, "labelTeamsWaiting", { count: squads.length }).text, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
     ],
     components: [
       row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Secondary)),
@@ -166,7 +167,7 @@ async function roomThread(client: Client, room: MatchRoom) {
 async function refreshRoom(client: Client, room: MatchRoom) {
   const thread = await roomThread(client, room);
   const message = room.messageId ? await thread?.messages.fetch(room.messageId).catch(() => null) : null;
-  const texts = (await getConfig(room.guildId))?.texts;
+  const texts = textsFor(await getConfig(room.guildId), room.game);
   await message?.edit({ embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts) }).catch(() => null);
 }
 
@@ -208,15 +209,16 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
       return null;
     }));
 
+  const texts = textsFor(config, game);
   const { voiceIds, pings: notes } = config.createVoice
-    ? await openVoiceRooms({ guild, config, lobbyId: config.lobbyVoiceId, fallbackCategoryId: parent.parentId, game, map: room.map, number: room.number, a, b, shared: kind === "SOLO" })
+    ? await openVoiceRooms({ guild, config, lobbyId: config.lobbyVoiceId, fallbackCategoryId: parent.parentId, game, map: room.map, number: room.number, a, b, shared: kind === "SOLO", texts })
     : { voiceIds: [], pings: [] };
 
   room = await prisma.matchRoom.update({ where: { id: room.id }, data: { threadId: thread?.id ?? null, voiceIds } });
   if (thread) {
     for (const id of everyone) await thread.members.add(id).catch(() => null);
     const card = await thread
-      .send({ content: [mentionAll(everyone), ...notes].join("\n").slice(0, 2000), embeds: [roomEmbed(room, config.texts)], components: roomButtons(room, config.texts), allowedMentions: { parse: ["users"] } })
+      .send({ content: [mentionAll(everyone), ...notes].join("\n").slice(0, 2000), embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts), allowedMentions: { parse: ["users"] } })
       .catch((err) => {
         logError("bot", err, guildId);
         return null;
@@ -257,7 +259,7 @@ async function finishRoom(client: Client, room: MatchRoom, side: string, high: n
       loserTeam: ranked && room.kind === "TEAM" ? loser : null,
     },
   });
-  await closeRoom(client, { ...done, voiceIds: room.voiceIds }, resolveText(config?.texts, "roomWon", { winner, score: `${high}-${low}` }).text);
+  await closeRoom(client, { ...done, voiceIds: room.voiceIds }, resolveText(textsFor(config, room.game), "roomWon", { winner, score: `${high}-${low}` }).text);
   await syncBoard(client, room.guildId, room.game);
   await syncMatchmakingPanel(client, room.guildId);
 }
@@ -267,7 +269,7 @@ export async function cancelRoom(client: Client, roomId: string): Promise<boolea
   if (!room || !OPEN_ROOMS.includes(room.status)) return false;
   await lock(room.guildId)(async () => {
     const closed = await prisma.matchRoom.update({ where: { id: room.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
-    await closeRoom(client, { ...closed, voiceIds: room.voiceIds }, resolveText((await getConfig(room.guildId))?.texts, "roomCanceled").text);
+    await closeRoom(client, { ...closed, voiceIds: room.voiceIds }, resolveText(textsFor(await getConfig(room.guildId), room.game), "roomCanceled").text);
     await syncMatchmakingPanel(client, room.guildId);
   });
   return true;
@@ -353,8 +355,8 @@ async function sendChallenge(client: Client, config: MatchmakingConfig, data: Pi
   const challenge = await prisma.matchChallenge.create({ data: { ...data, guildId, expiresAt: new Date(Date.now() + challengeMinutes * 60_000) } });
   const message = await channel
     .send({
-      content: resolveText(config.texts, "challenge", { target: `<@${data.toId}>`, from: data.fromTeam ? `**${data.fromTeam}**` : `<@${data.fromId}>`, game: data.game, expires: `<t:${Math.floor(challenge.expiresAt.getTime() / 1000)}:R>` }).text,
-      components: [row(button(`mmans:${challenge.id}:accept`, resolveText(config.texts, "btnAccept").text, ButtonStyle.Success), button(`mmans:${challenge.id}:decline`, resolveText(config.texts, "btnDecline").text, ButtonStyle.Danger))],
+      content: resolveText(textsFor(config, data.game), "challenge", { target: `<@${data.toId}>`, from: data.fromTeam ? `**${data.fromTeam}**` : `<@${data.fromId}>`, game: data.game, expires: `<t:${Math.floor(challenge.expiresAt.getTime() / 1000)}:R>` }).text,
+      components: [row(button(`mmans:${challenge.id}:accept`, resolveText(textsFor(config, data.game), "btnAccept").text, ButtonStyle.Success), button(`mmans:${challenge.id}:decline`, resolveText(textsFor(config, data.game), "btnDecline").text, ButtonStyle.Danger))],
       allowedMentions: { users: [data.toId] },
     })
     .catch(() => null);
@@ -569,7 +571,7 @@ export async function handleMatchmaking(interaction: Interaction) {
           if (action === "cancel") {
             if (!staff && ![fresh.aCaptain, fresh.bCaptain].includes(user.id)) return "Only the players or staff can cancel.";
             const closed = await prisma.matchRoom.update({ where: { id: fresh.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
-            await closeRoom(client, { ...closed, voiceIds: fresh.voiceIds }, resolveText(config.texts, "roomCanceled").text);
+            await closeRoom(client, { ...closed, voiceIds: fresh.voiceIds }, resolveText(textsFor(config, fresh.game), "roomCanceled").text);
             await syncMatchmakingPanel(client, guildId);
             return "Match canceled.";
           }

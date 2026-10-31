@@ -14,7 +14,13 @@ export function styleEmbed(embed: EmbedBuilder, texts: unknown, key: MatchTextKe
   embed.setColor(parseInt(t.color.slice(1), 16));
   embed.setTitle(t.title ? t.title.slice(0, 256) : null);
   embed.setDescription(t.description ? t.description.slice(0, 4096) : null);
-  embed.setFooter(t.footer ? { text: t.footer.slice(0, 2048) } : null);
+  embed.setFooter(t.footer ? { text: t.footer.slice(0, 2048), iconURL: t.footerIcon || undefined } : null);
+  embed.setURL(t.url || null);
+  embed.setAuthor(t.authorName ? { name: t.authorName.slice(0, 256), iconURL: t.authorIcon || undefined } : null);
+  embed.setThumbnail(t.thumbnail || null);
+  embed.setImage(t.image || null);
+  if (t.timestamp) embed.setTimestamp();
+  if (t.fields.length) embed.addFields(t.fields.slice(0, 10));
   return embed;
 }
 
@@ -76,7 +82,7 @@ function teamFields(setup: MatchSetup, players: PlayerMap, teams: MatchTeam[]) {
   }));
 }
 
-const roundName = (ties: number) => (ties === 1 ? "Final" : ties === 2 ? "Semifinals" : ties === 4 ? "Quarterfinals" : `Round of ${ties * 2}`);
+const roundName = (ties: number, texts: unknown) => (ties === 1 ? resolveText(texts, "roundFinal").text : ties === 2 ? resolveText(texts, "roundSemi").text : ties === 4 ? resolveText(texts, "roundQuarter").text : resolveText(texts, "roundOf", { teams: ties * 2 }).text);
 
 function tieLine(state: MatchState, tie: BracketTie, live: boolean): string {
   const name = (i: number | null) => (i === null ? "TBD" : state.teams[i].name);
@@ -85,9 +91,9 @@ function tieLine(state: MatchState, tie: BracketTie, live: boolean): string {
   return `**${name(win)}** ${high}-${low} ~~${name(lose)}~~`;
 }
 
-export function bracketFields(state: MatchState) {
+export function bracketFields(state: MatchState, texts: unknown = {}) {
   return state.bracket.map((ties, r) => ({
-    name: roundName(ties.length),
+    name: roundName(ties.length, texts),
     value: fitLines(ties.map((tie, i) => tieLine(state, tie, state.tie?.[0] === r && state.tie?.[1] === i))),
   }));
 }
@@ -128,17 +134,17 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       buttons = Array.from({ length: slots }, (_, slot) => button(setup, "pick", `${slotLabel(slot)} (${onTeam(state, slot).length}/${setup.teamSize})`, ButtonStyle.Primary, slot).setDisabled(onTeam(state, slot).length >= setup.teamSize));
       extra = [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(button(setup, "leave", say("btnLeave"), ButtonStyle.Danger))];
     } else {
-      if (!hidden) embed.addFields({ name: "Players", value: playerList(setup, players, state.signups) });
+      if (!hidden) embed.addFields({ name: say("labelPlayers"), value: playerList(setup, players, state.signups) });
       buttons = [button(setup, "join", say(tournament ? "btnRegister" : "btnSignUp"), ButtonStyle.Success), button(setup, "leave", say("btnLeave"), ButtonStyle.Danger)];
     }
   } else if (phase === "CHECKIN") {
-    style("checkin", { deadline: endsAt ? `Ready up ${until} or your slot opens for the next player.` : "Ready up to continue. Staff can skip this.", progress: progress(state.ready.length, state.signups.length), count: state.ready.length, needed: state.signups.length });
+    style("checkin", { deadline: endsAt ? say("noteCheckinTimed", { time: until }) : say("noteCheckinOpen"), progress: progress(state.ready.length, state.signups.length), count: state.ready.length, needed: state.signups.length });
     buttons = [button(setup, "ready", say("btnReady"), ButtonStyle.Success)];
   } else if (phase === "DRAFT") {
     const side = draftSide(state.draftPick) === "a" ? 0 : 1;
     style("draft", { captain: `<@${state.teams[side].captain}>` });
     if (endsAt) embed.setDescription(`${embed.data.description ?? ""} Auto-picks ${until}.`.trim());
-    embed.addFields(...teamFields(setup, players, state.teams), { name: "Still to pick", value: playerList(setup, players, state.draftPool) });
+    embed.addFields(...teamFields(setup, players, state.teams), { name: say("labelPicking"), value: playerList(setup, players, state.draftPool) });
     const menu = new StringSelectMenuBuilder()
       .setCustomId(`matchdraft:${setup.id}`)
       .setPlaceholder("Captain: pick a player")
@@ -146,7 +152,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
     extra = [new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu)];
   } else if (phase === "TEAMS") {
     const naming = setup.teamNaming === "CAPTAIN" && setup.teamSize > 1;
-    const wait = endsAt ? ` Starts by itself ${until}.` : " Waiting for a captain or staff to start.";
+    const wait = endsAt ? say("noteTeamsAuto", { time: until }) : say("noteTeamsWait");
     style(naming ? "nameTeams" : "teams", { auto: wait });
     if (!tournament) embed.addFields(...teamFields(setup, players, state.teams));
     buttons = [button(setup, "start", say("btnStart"), ButtonStyle.Success), ...(naming ? [button(setup, "name", say("btnNameTeam"), ButtonStyle.Primary)] : [])];
@@ -159,7 +165,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       buttons = state.mapOptions.flatMap((m, i) => (state.banned.includes(m) ? [] : [button(setup, "ban", m, ButtonStyle.Danger, i)]));
     } else {
       const count = (m: string) => Object.values(state.votes).filter((v) => v === m).length;
-      style("vote", { deadline: endsAt ? `Voting closes ${until}. Ties are picked at random.` : "Voting stays open until everyone votes or staff end it." });
+      style("vote", { deadline: endsAt ? say("noteVoteTimed", { time: until }) : say("noteVoteOpen") });
       embed.addFields(...labels);
       buttons = state.mapOptions.map((m, i) => button(setup, "vote", `${m} (${count(m)})`, ButtonStyle.Primary, i));
     }
@@ -171,7 +177,7 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       buttons = [button(setup, "report", `${teams[0].name} Won`, ButtonStyle.Primary, "a"), button(setup, "report", `${teams[1].name} Won`, ButtonStyle.Secondary, "b")];
     } else if (state.report) {
       const r = state.report;
-      embed.addFields({ name: "Waiting for confirmation", value: `<@${r.by}> reported **${(r.winner === "a" ? teams[0] : teams[1]).name}** won ${r.winnerScore}-${r.loserScore} ${setup.scoreName}. Accepted ${until}.` });
+      embed.addFields({ name: say("labelConfirm"), value: `<@${r.by}> reported **${(r.winner === "a" ? teams[0] : teams[1]).name}** won ${r.winnerScore}-${r.loserScore} ${setup.scoreName}. Accepted ${until}.` });
       buttons = [button(setup, "confirm", say("btnConfirm"), ButtonStyle.Success), button(setup, "dispute", say("btnDispute"), ButtonStyle.Danger)];
     }
   } else if (phase === "DONE") {
@@ -180,13 +186,13 @@ export function buildPanel(setup: MatchSetup, kind: string, number: number, phas
       buttons = [button(setup, "new", say("btnNewTournament"), ButtonStyle.Success)];
     } else {
       const winner = state.winner === "b" ? state.teams[1] : state.teams[0];
-      style("done", { winner: winner?.name, score: state.score ?? "", onMap, rewards: setup.rewardsEnabled ? `+${setup.winCoins} coins to the winners, +${setup.lossCoins} to the other team. Leaderboard updated.` : "Leaderboard updated." });
+      style("done", { winner: winner?.name, score: state.score ?? "", onMap, rewards: setup.rewardsEnabled ? say("noteDoneRewards", { win: setup.winCoins, loss: setup.lossCoins }) : say("noteDone") });
       buttons = [button(setup, "runback", say("btnRunBack"), ButtonStyle.Success), button(setup, "new", say("btnNewSignups"), ButtonStyle.Primary)];
     }
   }
 
-  if (tournament && state.bracket.length) embed.addFields(...bracketFields(state));
-  if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: "Subs needed", value: `${state.subsNeeded.length} open. Tap Subs to jump in.` });
+  if (tournament && state.bracket.length) embed.addFields(...bracketFields(state, texts));
+  if (state.subsNeeded.length && ["TEAMS", "MAP", "LIVE"].includes(phase)) embed.addFields({ name: say("labelSubs"), value: say("labelSubsNote", { count: state.subsNeeded.length }) });
   return { content: "", embeds: [embed], components: [...rows(buttons).slice(0, 3), ...extra, navRow(setup, phase, say)].slice(0, 5) };
 }
 
@@ -233,10 +239,10 @@ export function buildResult(setup: MatchSetup, result: MatchResult, texts: unkno
 }
 
 export function buildRosters(teams: MatchTeam[], texts: unknown = {}) {
-  return styleEmbed(new EmbedBuilder(), texts, "rosters")
-    .addFields(...teams.slice(0, 24).map((team) => ({ name: team.name.slice(0, 256), value: fitLines(team.players.map((id) => `${id === team.captain ? "👑 " : ""}<@${id}>`)) || "Open", inline: true })));
+  const embed = styleEmbed(new EmbedBuilder(), texts, "rosters");
+  return embed.addFields(...teams.slice(0, 25 - (embed.data.fields?.length ?? 0)).map((team) => ({ name: team.name.slice(0, 256), value: fitLines(team.players.map((id) => `${id === team.captain ? "👑 " : ""}<@${id}>`)) || "Open", inline: true })));
 }
 
 export function buildBracket(setup: MatchSetup, state: MatchState, texts: unknown = {}) {
-  return styleEmbed(new EmbedBuilder(), texts, "bracket", { setup: setup.name, game: setup.game }).addFields(...bracketFields(state));
+  return styleEmbed(new EmbedBuilder(), texts, "bracket", { setup: setup.name, game: setup.game }).addFields(...bracketFields(state, texts));
 }

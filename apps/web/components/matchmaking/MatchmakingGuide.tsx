@@ -335,8 +335,8 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 items={[
                   <>Turn on <strong>Create voice channels for Matchmaking</strong> and pick your <strong>Lobby</strong>.</>,
                   <>Choose <strong>Who gets moved</strong>. Lobby Only moves people in the Lobby and sends everyone else a link. Any Voice Channel pulls players in from anywhere.</>,
-                  <>Build the channel names. Type a name, or tap pieces like Team, Game or Number, and use ◀ ▶ to rearrange them.</>,
-                  <>Set the number style, user limit, placement and category.</>,
+                  <>Build the channel names. Type a name, or tap pieces like Team, Game or Number. Tap <strong>+ Text</strong> to add your own words, and use ◀ ▶ to rearrange them.</>,
+                  <>Set the number style, user limit and placement, then pick a <strong>1v1 category</strong> and <strong>Team category</strong> to keep them organized.</>,
                   <>Check the preview beside the settings. Switch between 1v1 and Team Match to see both.</>,
                 ]}
               />
@@ -517,8 +517,8 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
               <Text>Change what Spartacus says. Anything you don't touch keeps its default, so you only need to edit what you want different.</Text>
               <Steps
                 items={[
-                  <><strong>Pick what to change.</strong> Choose a group, then an item. A dot marks anything you've customized.</>,
-                  <><strong>Edit it.</strong> Embeds have a title, description, footer and color. Pings and buttons have wording.</>,
+                  <><strong>Pick what to change.</strong> Choose <strong>All Games</strong> or one saved game, then a group and an item. A dot marks anything you've customized.</>,
+                  <><strong>Edit it.</strong> Embeds have a title, description, footer and color. Tap <strong>Show links, images, author and fields</strong> for everything else. Pings and buttons have wording.</>,
                   <><strong>Check the preview.</strong> It updates as you type and saves by itself, and live panels refresh.</>,
                 ]}
               />
@@ -532,8 +532,11 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["Results", "Match results, revealed rosters, bracket, and My Stats"],
                   ["Pings", "Check-in, rosters revealed, and join voice"],
                   ["Buttons", "The label on every main button"],
+                  ["Labels and Notes", "Headings, round names, deadline sentences and reward notes"],
                 ]}
               />
+              <Heading>All Games or one game</Heading>
+              <Text>All Games is the default for everything. Picking a game lets you change only what's different for it, and the rest keeps using All Games. The shared Matchmaking board and its buttons are edited under All Games, because every game uses them.</Text>
               <Heading>Fill-ins</Heading>
               <Text>Words in curly brackets are swapped for real values. Tap one to add it. Each item shows the ones it supports, and {"{game}"} becomes the game's name, for example.</Text>
               <Bullets
@@ -544,7 +547,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   <><strong>Reset to Default</strong> undoes your changes to that item.</>,
                 ]}
               />
-              <Tip>Short private replies, error messages, round names and some automatic sentences, like deadlines, can't be changed yet.</Tip>
+              <Tip>Short private replies and error messages can't be changed yet. Keep embeds under about 5,000 characters, because Discord limits a whole embed and player lists need room too.</Tip>
               <GoTo tab="messages" label="Messages" onOpen={onOpen} />
             </div>
           </NeonCard>

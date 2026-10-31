@@ -20,7 +20,7 @@ import {
   type StringSelectMenuInteraction,
 } from "discord.js";
 import { Prisma, type MatchPlayer, type MatchSession, type MatchSetup } from "@prisma/client";
-import { resolveText } from "@spartacus/shared";
+import { resolveText, textsForGame, type TextOverrides } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -105,7 +105,7 @@ async function loadCtx(client: Client, setupId: string): Promise<Ctx | null> {
   }
   session ??= await openSession(setup);
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
-  return { client, setup, session, state: readState(session), texts: config?.texts ?? {} };
+  return { client, setup, session, state: readState(session), texts: textsForGame(config?.texts, config?.gameTexts, setup.game) };
 }
 
 // Scheduled setups run off their start time. Otherwise sign-ups only have a
@@ -442,7 +442,7 @@ async function openTeamRooms(ctx: Ctx): Promise<string[]> {
   const main = await guild?.channels.fetch(setup.lobbyVoiceId).catch(() => null);
   if (!guild || !main?.isVoiceBased()) return ["The main voice channel for this match is gone. Pick a new one on the dashboard."];
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
-  const { voiceIds, pings } = await openVoiceRooms({ guild, config, lobbyId: setup.lobbyVoiceId, fallbackCategoryId: main.parentId, game: setup.game, map: state.map, number: session.number, a: teams[0], b: teams[1], shared: setup.teamSize === 1 });
+  const { voiceIds, pings } = await openVoiceRooms({ guild, config, lobbyId: setup.lobbyVoiceId, fallbackCategoryId: main.parentId, game: setup.game, map: state.map, number: session.number, a: teams[0], b: teams[1], shared: setup.teamSize === 1, texts: ctx.texts as TextOverrides });
   state.voiceIds.push(...voiceIds);
   return pings;
 }

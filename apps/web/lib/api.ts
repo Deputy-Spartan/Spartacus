@@ -646,7 +646,6 @@ export interface MatchmakingConfigRow {
   voicePrivate: boolean;
   voiceLimit: "TEAM" | "EXTRA" | "NONE";
   voiceExtra: number;
-  voicePlacement: "BELOW_LOBBY" | "TOP" | "BOTTOM";
   voiceNumberPad: number;
   duelVoiceName: string;
   teamVoiceName: string;

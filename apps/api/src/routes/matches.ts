@@ -302,7 +302,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGames", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voicePlacement", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["boardChannelId", "boardGames", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;

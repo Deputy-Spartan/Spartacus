@@ -2417,7 +2417,6 @@ model MatchmakingConfig {
   voicePrivate     Boolean   @default(false)
   voiceLimit       String    @default("TEAM") // TEAM | EXTRA | NONE
   voiceExtra       Int       @default(0)
-  voicePlacement   String    @default("BELOW_LOBBY") // BELOW_LOBBY | TOP | BOTTOM
   voiceNumberPad   Int       @default(1)
   duelVoiceName    String    @default("{a} vs {b}")
   teamVoiceName    String    @default("{team}")

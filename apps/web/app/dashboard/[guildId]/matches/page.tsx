@@ -901,7 +901,7 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   const lobbyRow = row(lobbyName, false);
   const roomRows = rooms.map((r) => row(r, true));
   const otherRows = others.map((n) => row(n, false));
-  const list = !sharesCategory ? [...(config.voicePlacement === "BOTTOM" ? [...otherRows, ...roomRows] : [...roomRows, ...otherRows])] : config.voicePlacement === "TOP" ? [...roomRows, lobbyRow, ...otherRows] : config.voicePlacement === "BOTTOM" ? [lobbyRow, ...otherRows, ...roomRows] : [lobbyRow, ...roomRows, ...otherRows];
+  const list = sharesCategory ? [lobbyRow, ...roomRows, ...otherRows] : [...otherRows, ...roomRows];
 
   return (
     <NeonCard>
@@ -953,19 +953,11 @@ function VoiceSettings({ guildId }: { guildId: string }) {
             </div>
           )}
           <div>
-            <Label>Where channels appear</Label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <Choice on={config.voicePlacement === "BELOW_LOBBY"} title="Below the Lobby" hint="Right under it." onClick={() => set({ voicePlacement: "BELOW_LOBBY" })} />
-              <Choice on={config.voicePlacement === "TOP"} title="Top" hint="First in the category." onClick={() => set({ voicePlacement: "TOP" })} />
-              <Choice on={config.voicePlacement === "BOTTOM"} title="Bottom" hint="Last in the category." onClick={() => set({ voicePlacement: "BOTTOM" })} />
-            </div>
-          </div>
-          <div>
             <Label>1v1 category</Label>
             <ChannelSelect guildId={guildId} kind="category" value={config.duelCategoryId} onChange={(duelCategoryId) => set({ duelCategoryId: duelCategoryId || null })} placeholder="Same as the Lobby" />
             <Label>Team category</Label>
             <ChannelSelect guildId={guildId} kind="category" value={config.teamCategoryId} onChange={(teamCategoryId) => set({ teamCategoryId: teamCategoryId || null })} placeholder="Same as the Lobby" />
-            <Hint>Keep 1v1 and team channels in their own categories. "Below the Lobby" only applies when they share the Lobby's category.</Hint>
+            <Hint>Keep 1v1 and team channels in their own categories. New channels go at the bottom of a dedicated category. Left empty, they appear right under the Lobby.</Hint>
           </div>
           <FormError message={error} />
           <SaveStatus status={autoSave} />

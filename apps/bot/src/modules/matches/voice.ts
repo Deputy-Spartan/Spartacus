@@ -40,7 +40,6 @@ export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryI
 
   const voiceIds: string[] = [];
   const pings: string[] = [];
-  const placement = config?.voicePlacement ?? "BELOW_LOBBY";
   const onlyLobby = (config?.voiceSource ?? "LOBBY") === "LOBBY" && !!main;
   for (const [index, room] of rooms.entries()) {
     const botId = guild.client.user.id;
@@ -67,8 +66,8 @@ export async function openVoiceRooms({ guild, config, lobbyId, fallbackCategoryI
     }
     voiceIds.push(voice.id);
 
-    if (placement === "TOP") await voice.setPosition(index).catch(() => null);
-    else if (placement === "BELOW_LOBBY" && main && main.parentId === voice.parentId) await voice.setPosition(main.position + 1 + index).catch(() => null);
+    // Sharing the Lobby's category keeps a match right under it.
+    if (main && main.parentId === voice.parentId) await voice.setPosition(main.position + 1 + index).catch(() => null);
 
     const missing: string[] = [];
     for (const id of room.players) {

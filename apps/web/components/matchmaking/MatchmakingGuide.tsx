@@ -336,7 +336,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   <>Turn on <strong>Create voice channels for Matchmaking</strong> and pick your <strong>Lobby</strong>.</>,
                   <>Choose <strong>Who gets moved</strong>. Lobby Only moves people in the Lobby and sends everyone else a link. Any Voice Channel pulls players in from anywhere.</>,
                   <>Build the channel names. Type a name, or tap pieces like Team, Game or Number. Tap <strong>+ Text</strong> to add your own words, and use ◀ ▶ to rearrange them.</>,
-                  <>Set the number style, user limit and placement, then pick a <strong>1v1 category</strong> and <strong>Team category</strong> to keep them organized.</>,
+                  <>Set the number style and user limit, then pick a <strong>1v1 category</strong> and <strong>Team category</strong> to keep them organized.</>,
                   <>Check the preview beside the settings. Switch between 1v1 and Team Match to see both.</>,
                 ]}
               />
@@ -347,11 +347,11 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["Return players to the Lobby", "Moves everyone back before channels are deleted"],
                   ["Private channels", "Only that match's players can join"],
                   ["User limit", "Match players only, players plus extra spots, or no limit"],
-                  ["Where channels appear", "Below the Lobby, or at the top or bottom of the category"],
+                  ["1v1 and Team categories", "Where each type of channel goes. Left empty, channels appear under the Lobby"],
                 ]}
               />
               <Tip>A bot can only move someone already connected to voice. Anyone who isn't gets pinged a link instead.</Tip>
-              <Text>The Lobby here is for the Matchmaking board. Each tournament or match setup picks its own main voice channel, and you can use the same Lobby. Names, limits, placement and privacy apply to both.</Text>
+              <Text>The Lobby here is for the Matchmaking board. Each tournament or match setup picks its own main voice channel, and you can use the same Lobby. Names, limits, categories and privacy apply to both.</Text>
               <GoTo tab="voice" label="Voice" onOpen={onOpen} />
             </div>
           </NeonCard>

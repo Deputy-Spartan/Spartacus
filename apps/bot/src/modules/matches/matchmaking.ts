@@ -30,6 +30,7 @@ import { closeVoiceRooms, openVoiceRooms } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
 import { stringList, styleEmbed } from "./render";
+import { isModuleEnabled } from "../../lib/moduleGate";
 
 const CONFIRM_MS = 5 * 60_000;
 const OPEN_ROOMS = ["LIVE", "CONFIRM"];
@@ -39,6 +40,7 @@ const LFT = "LFT";
 const LFT_HOURS = 24;
 const TEAMS_SHOWN = 15;
 const TEAM_LIST_CHARS = 3000;
+const INVITE_HOURS = 24;
 const lastPostError = new Map<string, number>();
 
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
@@ -486,6 +488,7 @@ async function teamManager(team: MatchTeam): Promise<InteractionEditReplyOptions
     button(`mm:rename:${team.id}`, "Rename", ButtonStyle.Secondary),
     button(`mm:roster:${team.id}`, "Change Players", ButtonStyle.Primary),
     ...(open > 0 && waiting > 0 ? [button(`mm:recruit:${team.id}`, `Add from Looking for a Team (${waiting})`, ButtonStyle.Success)] : []),
+    ...(open > 0 ? [button(`mm:invite:${team.id}`, "Invite Players", ButtonStyle.Success)] : []),
     button(`mm:disband:${team.id}`, "Disband", ButtonStyle.Danger),
   ];
   return {
@@ -493,6 +496,87 @@ async function teamManager(team: MatchTeam): Promise<InteractionEditReplyOptions
     components: [row(...buttons)],
     allowedMentions: { parse: [] },
   };
+}
+
+function invitePicker(team: MatchTeam, open: number): InteractionEditReplyOptions {
+  const menu = new UserSelectMenuBuilder().setCustomId(`mminvitepick:${team.id}`).setPlaceholder("Pick players to invite").setMinValues(1).setMaxValues(Math.max(1, open));
+  return {
+    content: `Who do you want to invite to ${team.name}? ${open} spot${open === 1 ? "" : "s"} open. Each player gets a message to accept or decline.`,
+    components: [new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(menu)],
+  };
+}
+
+// Sends each invite as a DM with its own Accept and Decline. Only the invitee
+// receives the message, so whoever presses its buttons is the person invited.
+async function sendInvites(client: Client, guild: Interaction["guild"], team: MatchTeam, captainName: string, userIds: string[]): Promise<string> {
+  const players = stringList(team.players);
+  const expires = Math.floor(Date.now() / 1000) + INVITE_HOURS * 3600;
+  const sent: string[] = [], closed: string[] = [], skipped: string[] = [];
+  for (const id of userIds) {
+    if (players.includes(id)) { skipped.push(id); continue; }
+    const target = await client.users.fetch(id).catch(() => null);
+    const ok = await target
+      ?.send({
+        content: `🛡️ **${captainName}** invited you to join **${team.name}** for ${team.game} in **${guild?.name ?? "the server"}**. This invite lasts ${INVITE_HOURS} hours.`,
+        components: [row(button(`mminvite:${team.id}:${expires}:accept`, "Accept", ButtonStyle.Success), button(`mminvite:${team.id}:${expires}:decline`, "Decline", ButtonStyle.Danger))],
+      })
+      .then(() => true, () => false);
+    (ok ? sent : closed).push(id);
+  }
+  return [
+    sent.length ? `📨 Invited ${mentionAll(sent)}. You'll get a message when they answer.` : "",
+    closed.length ? `Couldn't message ${mentionAll(closed)}. Their DMs are closed, so add them with Change Players instead.` : "",
+    skipped.length ? `Already on the team: ${mentionAll(skipped)}.` : "",
+  ].filter(Boolean).join("\n") || "Nobody was invited.";
+}
+
+// Accept or Decline on an invite DM. These arrive outside the server, so they
+// skip the server-only checks the board's buttons go through.
+export async function handleTeamInvite(interaction: ButtonInteraction) {
+  const [, teamId, expires, answer] = interaction.customId.split(":");
+  const { client, user } = interaction;
+  const done = (content: string) => interaction.update({ content, components: [] }).catch(() => interaction.reply({ content, ephemeral: true }).catch(() => null));
+  try {
+    if (Number(expires) * 1000 < Date.now()) return void (await done("This invite has expired. Ask the captain to send a new one."));
+    const team = await prisma.matchTeam.findUnique({ where: { id: teamId } });
+    if (!team) return void (await done("That team no longer exists."));
+    if (!(await isModuleEnabled(team.guildId, "MATCHES"))) return void (await done("Matchmaking is turned off in that server right now."));
+    const tell = async (text: string) => {
+      const captain = await client.users.fetch(team.captainId).catch(() => null);
+      await captain?.send(text).catch(() => null);
+    };
+
+    if (answer === "decline") {
+      await done(`You declined the invite to **${team.name}**.`);
+      await tell(`<@${user.id}> declined your invite to **${team.name}**.`);
+      return;
+    }
+
+    const guild = await client.guilds.fetch(team.guildId).catch(() => null);
+    const member = await guild?.members.fetch(user.id).catch(() => null);
+    if (!member) return void (await done("You need to be in that server to join the team."));
+    const result = await lock(team.guildId)(async () => {
+      const fresh = await prisma.matchTeam.findUnique({ where: { id: team.id } });
+      if (!fresh) return "That team no longer exists.";
+      const players = stringList(fresh.players);
+      if (players.includes(user.id)) return `You're already on **${fresh.name}**.`;
+      if (players.length >= teamSizeFor(await presetFor(fresh.guildId, fresh.game))) return `**${fresh.name}** is full now.`;
+      const blocked = await teamBusy(fresh);
+      if (blocked) return `${blocked} Tap Accept again once it's over.`;
+      await saveRoster(fresh, [...players, user.id]);
+      return null;
+    });
+    if (result) {
+      if (result.endsWith("once it's over.")) return void (await interaction.reply({ content: result, ephemeral: true }).catch(() => null));
+      return void (await done(result));
+    }
+    await done(`✅ You joined **${team.name}** for ${team.game}. Tap My Teams on the Matchmaking board to see it.`);
+    await tell(`<@${user.id}> accepted your invite and joined **${team.name}**.`);
+    await syncMatchmakingPanel(client, team.guildId);
+  } catch (err) {
+    logError("bot", err);
+    await interaction.reply({ content: failed, ephemeral: true }).catch(() => null);
+  }
 }
 
 async function ownTeam(guildId: string, teamId: string, userId: string): Promise<MatchTeam | string> {
@@ -554,13 +638,20 @@ async function renameModal(interaction: ButtonInteraction, team: MatchTeam) {
 }
 
 // Teams can start short and fill up later, so any number up to the size is fine.
-function matesPicker(team: MatchTeam, size: number): InteractionEditReplyOptions {
-  const current = stringList(team.players).filter((id) => id !== team.captainId);
+// Discord only sends a multi-pick menu once it's closed, which is easy to
+// miss, so picks show here first and nothing changes until Save Players.
+const pendingMates = new Map<string, string[]>();
+const pendingKey = (teamId: string, userId: string) => `${teamId}:${userId}`;
+
+function matesPicker(team: MatchTeam, size: number, picked?: string[]): InteractionEditReplyOptions {
+  const current = picked ?? stringList(team.players).filter((id) => id !== team.captainId);
   const menu = new UserSelectMenuBuilder().setCustomId(`mmmates:${team.id}`).setPlaceholder("Pick your teammates").setMinValues(0).setMaxValues(size - 1);
   if (current.length) menu.setDefaultUsers(current.slice(0, size - 1));
+  const intro = `Pick up to ${size - 1} teammate${size === 2 ? "" : "s"} for ${team.name}, then tap **Save Players**. You can leave spots open and fill them later.`;
   return {
-    content: `Pick up to ${size - 1} teammate${size === 2 ? "" : "s"} for ${team.name}. You can leave spots open and fill them later from Looking for a Team.`,
-    components: [new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(menu)],
+    content: picked ? `${intro}\n\nSelected: ${picked.length ? mentionAll(picked) : "nobody (just you)"}. Tap **Save Players** to keep this.` : intro,
+    components: [new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(menu), row(button(`mmmatesave:${team.id}`, "Save Players", ButtonStyle.Success))],
+    allowedMentions: { parse: [] },
   };
 }
 
@@ -624,6 +715,12 @@ export async function handleMatchmaking(interaction: Interaction) {
           return `${team.name} was disbanded. Its leaderboard record stays.`;
         });
         await reply(interaction, value);
+      } else if (action === "invite") {
+        const team = await ownTeam(guildId, arg, user.id);
+        if (typeof team === "string") return void (await reply(interaction, team));
+        const open = teamSizeFor(await presetFor(guildId, team.game)) - stringList(team.players).length;
+        await reply(interaction, open > 0 ? invitePicker(team, open) : `${team.name} is already full.`);
+        return;
       } else if (action === "roster" || action === "recruit") {
         const team = await ownTeam(guildId, arg, user.id);
         const blocked = typeof team === "string" ? team : await teamBusy(team);
@@ -681,6 +778,16 @@ export async function handleMatchmaking(interaction: Interaction) {
       });
       await reply(interaction, value);
       await syncMatchmakingPanel(client, guildId);
+      return;
+    }
+
+    if (prefix === "mminvitepick" && interaction.isUserSelectMenu()) {
+      await interaction.deferUpdate();
+      const team = await ownTeam(guildId, parts[1], user.id);
+      if (typeof team === "string") return void (await reply(interaction, team));
+      const picked = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id);
+      if (picked.length === 0) return void (await reply(interaction, "Pick someone other than yourself."));
+      await reply(interaction, { content: await sendInvites(client, interaction.guild, team, member?.displayName ?? user.username, picked), components: [], allowedMentions: { parse: [] } });
       return;
     }
 
@@ -766,13 +873,29 @@ export async function handleMatchmaking(interaction: Interaction) {
 
     if (prefix === "mmmates" && interaction.isUserSelectMenu()) {
       await interaction.deferUpdate();
+      const team = await ownTeam(guildId, parts[1], user.id);
+      if (typeof team === "string") return void (await reply(interaction, team));
+      const size = teamSizeFor(await presetFor(guildId, team.game));
+      const picked = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id).slice(0, size - 1);
+      pendingMates.set(pendingKey(team.id, user.id), picked);
+      await reply(interaction, matesPicker(team, size, picked));
+      return;
+    }
+
+    if (prefix === "mmmatesave" && interaction.isButton()) {
+      await interaction.deferUpdate();
       const value = await run(async () => {
         const team = await ownTeam(guildId, parts[1], user.id);
         if (typeof team === "string") return team;
         const blocked = await teamBusy(team);
         if (blocked) return blocked;
         const size = teamSizeFor(await presetFor(guildId, team.game));
-        const mates = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id).slice(0, size - 1);
+        const mates = pendingMates.get(pendingKey(team.id, user.id));
+        if (!mates) {
+          const unchanged = matesPicker(team, size);
+          return { ...unchanged, content: `${unchanged.content}\n\nPick players in the menu first, close it, then tap **Save Players**.` };
+        }
+        pendingMates.delete(pendingKey(team.id, user.id));
         await saveRoster(team, [user.id, ...mates]);
         const open = size - 1 - mates.length;
         return {

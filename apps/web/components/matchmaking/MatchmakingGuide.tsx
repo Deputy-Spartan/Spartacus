@@ -585,7 +585,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["Create a team", `${resolveText(texts, "btnCreateTeam").text}, name it, then pick teammates. You can leave spots open. Captains create one team per game`],
                     ["Find a team", `${resolveText(texts, "btnLookingForTeam").text} lists you for a game so captains can add you. Tap it again to come off. The list clears after 24 hours`],
                     ["Queue your team", `${resolveText(texts, "btnFindTeam").text}. Only the captain can do this`],
-                    ["Manage your team", `${resolveText(texts, "btnMyTeams").text} shows your teams. Captains can rename, change players, add people who are looking, or disband. Players can leave a team there`],
+                    ["Manage your team", `${resolveText(texts, "btnMyTeams").text} shows your teams. Captains can rename, change players, invite players (they get a message to accept or decline), add people who are looking, or disband. Players can leave a team there`],
                   ]}
                 />
                 <Text>Once matched, you get a private thread with the map, players and voice link. Either side reports the winner, and the other side confirms. An unanswered report is accepted after 5 minutes. After two disputes, only staff can report it.</Text>

@@ -40,6 +40,13 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // Team invites are answered in a DM, so they come before the server-only check below.
+  if (interaction.isButton() && interaction.customId.startsWith("mminvite:")) {
+    const { handleTeamInvite } = await import("../modules/matches/matchmaking");
+    await handleTeamInvite(interaction);
+    return;
+  }
+
   if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && /^mm[a-z]*:/.test(interaction.customId)) {
     if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "MATCHES"))) {
       await interaction.reply({ content: "⚠️ Matchmaking is disabled for this server.", ephemeral: true });

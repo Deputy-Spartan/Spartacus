@@ -394,35 +394,99 @@ async function find(client: Client, config: MatchmakingConfig, kind: Kind, game:
 function gameAction(client: Client, config: MatchmakingConfig, action: string, kind: Kind, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
   if (action === "find") return find(client, config, kind, game, userId, guild);
   if (action === "lft") return lookingForTeam(config.guildId, game, userId);
-  if (action === "pickup") return pickup(client, config, game, userId, guild);
+  if (action === "pickup") return pickup(config, game, userId, guild);
   return challengePicker(config, kind, game, userId);
 }
 
-// Everyone on the Looking for a Team list for a game, plus whoever tapped,
-// split into two even sides and started now, even if the teams aren't full.
-async function pickup(client: Client, config: MatchmakingConfig, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
-  const { guildId } = config;
-  const busy = await openRoomFor(guildId, [userId]);
-  if (busy) return inRoomMessage(busy);
-  const size = teamSizeFor(await presetFor(guildId, game));
-  const waiting = await prisma.matchQueue.findMany({ where: { guildId, game, kind: LFT }, orderBy: { joinedAt: "asc" } });
-  const rooms = await prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } });
-  const playing = new Set(rooms.flatMap((r) => [...stringList(r.aPlayers), ...stringList(r.bPlayers)]));
-  const pool = [userId, ...waiting.map((q) => q.userId).filter((id) => id !== userId && !playing.has(id))].slice(0, size * 2);
-  if (pool.length < 2) return `Nobody else is waiting for ${game} yet. Ask people to tap Looking for a Team, then tap Start Pickup Match again.`;
+// ---- Pickup matches ----
+// Start Pickup Match walks through who's playing and how teams are made, then
+// starts right away, even if the teams aren't full or are uneven.
+type PickupSetup = { game: string; players: string[]; mode: "random" | "pick"; teamOne: string[] | null; names?: Record<string, string> };
+const pendingPickups = new Map<string, PickupSetup>();
+const pickupKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
 
-  const mixed = shuffle(pool);
-  const half = Math.ceil(mixed.length / 2);
-  const names = await Promise.all(mixed.map((id) => guild?.members.fetch(id).catch(() => null)));
-  const side = (ids: string[]): Side => ({ name: `Team ${names[mixed.indexOf(ids[0])]?.displayName ?? "Player"}`.slice(0, 80), players: ids, captain: ids[0] });
-  const a = side(mixed.slice(0, half));
-  const b = side(mixed.slice(half));
+async function playersInMatches(guildId: string): Promise<Set<string>> {
+  const rooms = await prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } });
+  return new Set(rooms.flatMap((r) => [...stringList(r.aPlayers), ...stringList(r.bPlayers)]));
+}
+
+// Whoever is in the tapper's voice channel (or the lobby when they aren't in
+// one), then the Looking for a Team list.
+async function pickupDefaults(config: MatchmakingConfig, game: string, userId: string, guild: Interaction["guild"], size: number): Promise<string[]> {
+  const member = await guild?.members.fetch({ user: userId, force: true }).catch(() => null);
+  const voiceId = member?.voice.channelId ?? config.lobbyVoiceId;
+  const voice = voiceId ? await guild?.channels.fetch(voiceId).catch(() => null) : null;
+  const inVoice = voice?.isVoiceBased() ? [...voice.members.entries()].filter(([, m]) => !m.user?.bot).map(([id]) => id) : [];
+  const waiting = await prisma.matchQueue.findMany({ where: { guildId: config.guildId, game, kind: LFT }, orderBy: { joinedAt: "asc" } });
+  const playing = await playersInMatches(config.guildId);
+  return [...new Set([userId, ...inVoice, ...waiting.map((q) => q.userId)])].filter((id) => !playing.has(id)).slice(0, size * 2);
+}
+
+function pickupScreen(index: number, setup: PickupSetup, size: number, note = ""): InteractionEditReplyOptions {
+  const { players, mode, teamOne } = setup;
+  const max = Math.min(25, size * 2);
+  const who = new UserSelectMenuBuilder().setCustomId(`mmpickwho:${index}`).setPlaceholder("Who's playing?").setMinValues(0).setMaxValues(max);
+  if (players.length) who.setDefaultUsers(players.slice(0, max));
+  const how = new StringSelectMenuBuilder().setCustomId(`mmpickhow:${index}`).addOptions(
+    { label: "Random teams", description: "Shuffle everyone into two even sides", value: "random", default: mode === "random" },
+    { label: "I'll pick the teams", description: "Choose who's on Team 1, everyone else is Team 2", value: "pick", default: mode === "pick" },
+  );
+  const rows: Row[] = [row(who), row(how)];
+  const lines = [`⚡ **Pickup match · ${setup.game}** (up to ${size}v${size})`, `Players (${players.length}): ${players.length ? mentionAll(players) : "nobody yet"}`];
+  if (mode === "pick" && players.length >= 2) {
+    const chosen = (teamOne ?? []).filter((id) => players.includes(id));
+    rows.push(row(new StringSelectMenuBuilder().setCustomId(`mmpickside:${index}`).setPlaceholder("Who's on Team 1?").setMinValues(1).setMaxValues(players.length - 1)
+      .addOptions(players.map((id) => ({ label: setup.names?.[id] ?? id, value: id, default: chosen.includes(id) })))));
+    if (chosen.length) lines.push(`Team 1: ${mentionAll(chosen)}`, `Team 2: ${mentionAll(players.filter((id) => !chosen.includes(id)))}`);
+  }
+  rows.push(row(button(`mmpickgo:${index}`, "Start Match", ButtonStyle.Success)));
+  lines.push("", "Change the players or how teams are made, then tap **Start Match**. Close a menu to save what you picked.");
+  if (note) lines.push("", note);
+  return { content: lines.join("\n").slice(0, 2000), components: rows, allowedMentions: { parse: [] } };
+}
+
+async function pickup(config: MatchmakingConfig, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
+  const busy = await openRoomFor(config.guildId, [userId]);
+  if (busy) return inRoomMessage(busy);
+  const size = teamSizeFor(await presetFor(config.guildId, game));
+  const setup: PickupSetup = { game, players: await pickupDefaults(config, game, userId, guild, size), mode: "random", teamOne: null };
+  await nameAll(setup, guild);
+  pendingPickups.set(pickupKey(config.guildId, userId), setup);
+  return pickupScreen(stringList(config.games).indexOf(game), setup, size);
+}
+
+async function nameAll(setup: PickupSetup, guild: Interaction["guild"]) {
+  const names = await Promise.all(setup.players.map((id) => guild?.members.fetch(id).catch(() => null)));
+  setup.names = Object.fromEntries(setup.players.map((id, i) => [id, (names[i]?.displayName ?? "Player").slice(0, 100)]));
+}
+
+async function startPickup(client: Client, config: MatchmakingConfig, setup: PickupSetup, guild: Interaction["guild"]): Promise<string> {
+  const { guildId } = config;
+  const size = teamSizeFor(await presetFor(guildId, setup.game));
+  const playing = await playersInMatches(guildId);
+  const busy = setup.players.filter((id) => playing.has(id));
+  if (busy.length) return `${mentionAll(busy)} ${busy.length === 1 ? "is" : "are"} already in a match. Take them out of the players first.`;
+  if (setup.players.length < 2) return "Pick at least 2 players.";
+  if (setup.players.length > size * 2) return `That's too many for ${setup.game}. Pick up to ${size * 2} players.`;
+
+  let one: string[], two: string[];
+  if (setup.mode === "pick") {
+    one = (setup.teamOne ?? []).filter((id) => setup.players.includes(id));
+    two = setup.players.filter((id) => !one.includes(id));
+    if (!one.length || !two.length) return "Pick who's on Team 1 first. Everyone else goes on Team 2.";
+  } else {
+    const mixed = shuffle(setup.players);
+    one = mixed.slice(0, Math.ceil(mixed.length / 2));
+    two = mixed.slice(one.length);
+  }
+  await nameAll(setup, guild);
+  const side = (ids: string[]): Side => ({ name: `Team ${setup.names?.[ids[0]] ?? "Player"}`.slice(0, 80), players: ids, captain: ids[0] });
+  const a = side(one);
+  const b = side(two);
   if (a.name === b.name) b.name = `${b.name} 2`;
-  await prisma.matchQueue.deleteMany({ where: { guildId, game, kind: LFT, userId: { in: pool } } });
-  const room = await openRoom(client, config, "PICKUP", game, a, b);
-  const left = waiting.length - pool.filter((id) => waiting.some((q) => q.userId === id)).length;
-  const where = room.threadId ? `<#${room.threadId}>` : "your match";
-  return `⚡ Pickup match started, ${a.players.length}v${b.players.length}: ${where}${left > 0 ? `. ${left} still waiting for the next one.` : "."}`;
+  await prisma.matchQueue.deleteMany({ where: { guildId, game: setup.game, kind: LFT, userId: { in: setup.players } } });
+  const room = await openRoom(client, config, "PICKUP", setup.game, a, b);
+  return `⚡ Pickup match started, ${one.length}v${two.length}: ${room.threadId ? `<#${room.threadId}>` : "your match"}`;
 }
 
 async function challengePicker(config: MatchmakingConfig, kind: Kind, game: string, userId: string): Promise<Reply> {
@@ -818,6 +882,36 @@ export async function handleMatchmaking(interaction: Interaction) {
       const picked = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id);
       if (picked.length === 0) return void (await reply(interaction, "Pick someone other than yourself."));
       await reply(interaction, { content: await sendInvites(client, interaction.guild, team, member?.displayName ?? user.username, picked), components: [], allowedMentions: { parse: [] } });
+      return;
+    }
+
+    if (prefix.startsWith("mmpick") && prefix !== "mmpickgo") {
+      await interaction.deferUpdate();
+      const setup = pendingPickups.get(pickupKey(guildId, user.id));
+      if (!setup) return void (await reply(interaction, "This setup timed out. Tap Start Pickup Match again."));
+      const size = teamSizeFor(await presetFor(guildId, setup.game));
+      if (prefix === "mmpickwho" && interaction.isUserSelectMenu()) {
+        setup.players = [...interaction.users.filter((u) => !u.bot).keys()].slice(0, size * 2);
+        await nameAll(setup, interaction.guild);
+      } else if (prefix === "mmpickhow" && interaction.isStringSelectMenu()) {
+        setup.mode = interaction.values[0] === "pick" ? "pick" : "random";
+      } else if (prefix === "mmpickside" && interaction.isStringSelectMenu()) {
+        setup.teamOne = interaction.values;
+      }
+      await reply(interaction, pickupScreen(Number(parts[1]), setup, size));
+      return;
+    }
+
+    if (prefix === "mmpickgo" && interaction.isButton()) {
+      await interaction.deferUpdate();
+      const key = pickupKey(guildId, user.id);
+      const setup = pendingPickups.get(key);
+      if (!setup) return void (await reply(interaction, "This setup timed out. Tap Start Pickup Match again."));
+      const result = await run(() => startPickup(client, config, setup, interaction.guild));
+      if (!result.startsWith("⚡")) return void (await reply(interaction, pickupScreen(Number(parts[1]), setup, teamSizeFor(await presetFor(guildId, setup.game)), result)));
+      pendingPickups.delete(key);
+      await reply(interaction, { content: result, components: [] });
+      await syncMatchmakingPanel(client, guildId);
       return;
     }
 

@@ -150,7 +150,7 @@ export const MATCH_TEXTS = {
   btnCreateTeam: buttonLabel("Create a Team", "On the Matchmaking board.", true),
   btnMyTeams: buttonLabel("My Teams", "On the Matchmaking board.", true),
   btnLookingForTeam: buttonLabel("Looking for a Team", "On the Matchmaking board. Tap again to come off the list.", true),
-  btnPickup: buttonLabel("Start Pickup Match", "On the Matchmaking board. Splits everyone looking for a team into two sides and starts now.", true),
+  btnPickup: buttonLabel("Start Pickup Match", "On the Matchmaking board. Picks players from voice and the Looking for a Team list, makes two teams and starts now.", true),
   btnAccept: buttonLabel("Accept", "On challenges."),
   btnDecline: buttonLabel("Decline", "On challenges."),
 

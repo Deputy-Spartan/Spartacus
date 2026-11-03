@@ -25,7 +25,7 @@ import { resolveText, textsForGame, type MatchTextKey } from "@spartacus/shared"
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
-import { cleanTeamName, pickOne } from "./engine";
+import { cleanTeamName, pickOne, shuffle } from "./engine";
 import { closeVoiceRooms, openVoiceRooms } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
@@ -44,7 +44,9 @@ const INVITE_HOURS = 24;
 const lastPostError = new Map<string, number>();
 
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
-type Kind = "SOLO" | "TEAM";
+// PICKUP rooms are made on the spot from the Looking for a Team list, so they
+// count for each player but never for a team.
+type Kind = "SOLO" | "TEAM" | "PICKUP";
 type Side = { name: string; players: string[]; captain: string };
 type Reply = string | InteractionEditReplyOptions;
 type Choosing = ButtonInteraction | StringSelectMenuInteraction;
@@ -93,7 +95,7 @@ async function buildPanel(config: MatchmakingConfig) {
     components: [
       row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Danger)),
       row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Danger)),
-      row(button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary)),
+      row(button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary), button("mm:pickup", say("btnPickup"), ButtonStyle.Success)),
     ],
     allowedMentions: { parse: [] as never[] },
   };
@@ -392,7 +394,35 @@ async function find(client: Client, config: MatchmakingConfig, kind: Kind, game:
 function gameAction(client: Client, config: MatchmakingConfig, action: string, kind: Kind, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
   if (action === "find") return find(client, config, kind, game, userId, guild);
   if (action === "lft") return lookingForTeam(config.guildId, game, userId);
+  if (action === "pickup") return pickup(client, config, game, userId, guild);
   return challengePicker(config, kind, game, userId);
+}
+
+// Everyone on the Looking for a Team list for a game, plus whoever tapped,
+// split into two even sides and started now, even if the teams aren't full.
+async function pickup(client: Client, config: MatchmakingConfig, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
+  const { guildId } = config;
+  const busy = await openRoomFor(guildId, [userId]);
+  if (busy) return inRoomMessage(busy);
+  const size = teamSizeFor(await presetFor(guildId, game));
+  const waiting = await prisma.matchQueue.findMany({ where: { guildId, game, kind: LFT }, orderBy: { joinedAt: "asc" } });
+  const rooms = await prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } });
+  const playing = new Set(rooms.flatMap((r) => [...stringList(r.aPlayers), ...stringList(r.bPlayers)]));
+  const pool = [userId, ...waiting.map((q) => q.userId).filter((id) => id !== userId && !playing.has(id))].slice(0, size * 2);
+  if (pool.length < 2) return `Nobody else is waiting for ${game} yet. Ask people to tap Looking for a Team, then tap Start Pickup Match again.`;
+
+  const mixed = shuffle(pool);
+  const half = Math.ceil(mixed.length / 2);
+  const names = await Promise.all(mixed.map((id) => guild?.members.fetch(id).catch(() => null)));
+  const side = (ids: string[]): Side => ({ name: `Team ${names[mixed.indexOf(ids[0])]?.displayName ?? "Player"}`.slice(0, 80), players: ids, captain: ids[0] });
+  const a = side(mixed.slice(0, half));
+  const b = side(mixed.slice(half));
+  if (a.name === b.name) b.name = `${b.name} 2`;
+  await prisma.matchQueue.deleteMany({ where: { guildId, game, kind: LFT, userId: { in: pool } } });
+  const room = await openRoom(client, config, "PICKUP", game, a, b);
+  const left = waiting.length - pool.filter((id) => waiting.some((q) => q.userId === id)).length;
+  const where = room.threadId ? `<#${room.threadId}>` : "your match";
+  return `⚡ Pickup match started, ${a.players.length}v${b.players.length}: ${where}${left > 0 ? `. ${left} still waiting for the next one.` : "."}`;
 }
 
 async function challengePicker(config: MatchmakingConfig, kind: Kind, game: string, userId: string): Promise<Reply> {
@@ -608,7 +638,7 @@ async function lookingForTeam(guildId: string, game: string, userId: string): Pr
     return `You're off the Looking for a Team list for ${game}.`;
   }
   await prisma.matchQueue.create({ data: { guildId, game, kind: LFT, userId } });
-  return `You're on the Looking for a Team list for ${game}. Captains can add you from My Teams. Tap the button again to come off it.`;
+  return `You're on the Looking for a Team list for ${game}. Captains can add you from My Teams, or anyone waiting can tap Start Pickup Match to play now. Tap the button again to come off it.`;
 }
 
 async function recruitPicker(guild: Interaction["guild"], team: MatchTeam): Promise<Reply> {
@@ -694,7 +724,7 @@ export async function handleMatchmaking(interaction: Interaction) {
         return void (await renameModal(interaction, team));
       }
       await interaction.deferReply({ ephemeral: true });
-      if (action === "find" || action === "challenge" || action === "newteam" || action === "lft") {
+      if (action === "find" || action === "challenge" || action === "newteam" || action === "lft" || action === "pickup") {
         const game = await chooseGame(interaction, config, action, arg ?? "");
         if (!game) return;
         await reply(interaction, await run(() => gameAction(client, config, action, arg as Kind, game, user.id, interaction.guild)));

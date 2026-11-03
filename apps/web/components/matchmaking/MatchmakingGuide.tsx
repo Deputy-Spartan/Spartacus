@@ -491,7 +491,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
                 <Buttons texts={texts} items={[["btnFindSolo", "green"], ["btnChallengeSolo", "blue"], ["btnLeaveSolo", "red"]]} />
                 <Buttons texts={texts} items={[["btnFindTeam", "green"], ["btnChallengeTeam", "blue"], ["btnLeaveTeam", "red"]]} />
-                <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"]]} />
+                <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"], ["btnPickup", "green"]]} />
               </Frame>
               <Table
                 heads={["Setting", "Default", "What it does"]}
@@ -584,6 +584,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["Answer a challenge", `${resolveText(texts, "btnAccept").text} or ${resolveText(texts, "btnDecline").text} on the ping`],
                     ["Create a team", `${resolveText(texts, "btnCreateTeam").text}, name it, then pick teammates. You can leave spots open. Captains create one team per game`],
                     ["Find a team", `${resolveText(texts, "btnLookingForTeam").text} lists you for a game so captains can add you. Tap it again to come off. The list clears after 24 hours`],
+                    ["Play now without full teams", `${resolveText(texts, "btnPickup").text} takes you and everyone looking for a team in that game, splits you into two even sides and starts right away, even 2v2 or 3v2. Results count for each player, not for a team`],
                     ["Queue your team", `${resolveText(texts, "btnFindTeam").text}. Only the captain can do this`],
                     ["Manage your team", `${resolveText(texts, "btnMyTeams").text} shows your teams. Captains can rename, change players, invite players (they get a message to accept or decline), add people who are looking, or disband. Players can leave a team there`],
                   ]}

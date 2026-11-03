@@ -401,7 +401,8 @@ function gameAction(client: Client, config: MatchmakingConfig, action: string, k
 // ---- Pickup matches ----
 // Start Pickup Match walks through who's playing and how teams are made, then
 // starts right away, even if the teams aren't full or are uneven.
-type PickupSetup = { game: string; players: string[]; mode: "random" | "pick"; teamOne: string[] | null; names?: Record<string, string> };
+// pool is everyone offered so far; players is who's ticked.
+type PickupSetup = { game: string; pool: string[]; players: string[]; mode: "random" | "pick"; teamOne: string[] | null; names?: Record<string, string> };
 const pendingPickups = new Map<string, PickupSetup>();
 const pickupKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
 
@@ -425,13 +426,16 @@ async function pickupDefaults(config: MatchmakingConfig, game: string, userId: s
 function pickupScreen(index: number, setup: PickupSetup, size: number, note = ""): InteractionEditReplyOptions {
   const { players, mode, teamOne } = setup;
   const max = Math.min(25, size * 2);
-  const who = new UserSelectMenuBuilder().setCustomId(`mmpickwho:${index}`).setPlaceholder("Who's playing?").setMinValues(0).setMaxValues(max);
-  if (players.length) who.setDefaultUsers(players.slice(0, max));
+  // A people menu with picks filled in draws name chips over the message in
+  // Discord, so the list is a plain checklist and adding someone is separate.
+  const who = new StringSelectMenuBuilder().setCustomId(`mmpickwho:${index}`).setPlaceholder("Who's playing?").setMinValues(0).setMaxValues(setup.pool.length)
+    .addOptions(setup.pool.map((id) => ({ label: setup.names?.[id] ?? "Player", value: id, default: players.includes(id) })));
+  const add = new UserSelectMenuBuilder().setCustomId(`mmpickadd:${index}`).setPlaceholder("Add someone else").setMinValues(1).setMaxValues(Math.min(10, max));
   const how = new StringSelectMenuBuilder().setCustomId(`mmpickhow:${index}`).addOptions(
     { label: "Random teams", description: "Shuffle everyone into two even sides", value: "random", default: mode === "random" },
     { label: "I'll pick the teams", description: "Choose who's on Team 1, everyone else is Team 2", value: "pick", default: mode === "pick" },
   );
-  const rows: Row[] = [row(who), row(how)];
+  const rows: Row[] = [row(who), row(add), row(how)];
   const lines = [`⚡ **Pickup match · ${setup.game}** (up to ${size}v${size})`, `Players (${players.length}): ${players.length ? mentionAll(players) : "nobody yet"}`];
   if (mode === "pick" && players.length >= 2) {
     const chosen = (teamOne ?? []).filter((id) => players.includes(id));
@@ -440,7 +444,7 @@ function pickupScreen(index: number, setup: PickupSetup, size: number, note = ""
     if (chosen.length) lines.push(`Team 1: ${mentionAll(chosen)}`, `Team 2: ${mentionAll(players.filter((id) => !chosen.includes(id)))}`);
   }
   rows.push(row(button(`mmpickgo:${index}`, "Start Match", ButtonStyle.Success)));
-  lines.push("", "Change the players or how teams are made, then tap **Start Match**. Close a menu to save what you picked.");
+  lines.push("", "Untick anyone who isn't playing, add anyone missing, choose how teams are made, then tap **Start Match**. Close a menu to save what you picked.");
   if (note) lines.push("", note);
   return { content: lines.join("\n").slice(0, 2000), components: rows, allowedMentions: { parse: [] } };
 }
@@ -449,15 +453,17 @@ async function pickup(config: MatchmakingConfig, game: string, userId: string, g
   const busy = await openRoomFor(config.guildId, [userId]);
   if (busy) return inRoomMessage(busy);
   const size = teamSizeFor(await presetFor(config.guildId, game));
-  const setup: PickupSetup = { game, players: await pickupDefaults(config, game, userId, guild, size), mode: "random", teamOne: null };
+  const players = await pickupDefaults(config, game, userId, guild, size);
+  const setup: PickupSetup = { game, pool: players, players, mode: "random", teamOne: null };
   await nameAll(setup, guild);
   pendingPickups.set(pickupKey(config.guildId, userId), setup);
   return pickupScreen(stringList(config.games).indexOf(game), setup, size);
 }
 
 async function nameAll(setup: PickupSetup, guild: Interaction["guild"]) {
-  const names = await Promise.all(setup.players.map((id) => guild?.members.fetch(id).catch(() => null)));
-  setup.names = Object.fromEntries(setup.players.map((id, i) => [id, (names[i]?.displayName ?? "Player").slice(0, 100)]));
+  const ids = [...new Set([...setup.pool, ...setup.players])];
+  const names = await Promise.all(ids.map((id) => guild?.members.fetch(id).catch(() => null)));
+  setup.names = Object.fromEntries(ids.map((id, i) => [id, (names[i]?.displayName ?? "Player").slice(0, 100)]));
 }
 
 async function startPickup(client: Client, config: MatchmakingConfig, setup: PickupSetup, guild: Interaction["guild"]): Promise<string> {
@@ -890,8 +896,12 @@ export async function handleMatchmaking(interaction: Interaction) {
       const setup = pendingPickups.get(pickupKey(guildId, user.id));
       if (!setup) return void (await reply(interaction, "This setup timed out. Tap Start Pickup Match again."));
       const size = teamSizeFor(await presetFor(guildId, setup.game));
-      if (prefix === "mmpickwho" && interaction.isUserSelectMenu()) {
-        setup.players = [...interaction.users.filter((u) => !u.bot).keys()].slice(0, size * 2);
+      if (prefix === "mmpickwho" && interaction.isStringSelectMenu()) {
+        setup.players = setup.pool.filter((id) => interaction.values.includes(id)).slice(0, size * 2);
+      } else if (prefix === "mmpickadd" && interaction.isUserSelectMenu()) {
+        const added = [...interaction.users.filter((u) => !u.bot).keys()];
+        setup.pool = [...new Set([...setup.pool, ...added])].slice(-25);
+        setup.players = setup.pool.filter((id) => setup.players.includes(id) || added.includes(id)).slice(0, size * 2);
         await nameAll(setup, interaction.guild);
       } else if (prefix === "mmpickhow" && interaction.isStringSelectMenu()) {
         setup.mode = interaction.values[0] === "pick" ? "pick" : "random";

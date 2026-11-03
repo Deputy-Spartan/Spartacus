@@ -181,7 +181,6 @@ export const MATCH_TEXTS = {
   labelTeamsWaiting: note("Team queue heading", "On the Matchmaking board.", "Teams waiting ({count})", { count: "1" }, true),
   labelLookingForTeam: note("Looking for a team heading", "In the Teams list.", "Looking for a team ({count})", { count: "2" }, true),
   labelNoTeamsYet: note("No teams yet", "In the Teams list before anyone makes one.", "No teams yet. Tap Create a Team to start one.", {}, true),
-  labelMultiTeam: note("On more than one team heading", "In the Teams list.", "On more than one team", {}, true),
   noteCheckinOpen: note("Check-in with no timer", "Fills in {deadline}.", "Ready up to continue. Staff can skip this."),
   noteCheckinTimed: note("Check-in with a timer", "Fills in {deadline}.", "Ready up {time} or your slot opens for the next player.", { time: "in 2 minutes" }),
   noteVoteOpen: note("Vote with no timer", "Fills in {deadline}.", "Voting stays open until everyone votes or staff end it."),

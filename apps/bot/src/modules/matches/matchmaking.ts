@@ -119,8 +119,10 @@ function teamField(t: MatchTeam, queue: MatchQueue[], rooms: MatchRoom[], preset
 
 const sortTeams = (teams: MatchTeam[]) => [...teams].sort((x, y) => x.game.localeCompare(y.game) || x.name.localeCompare(y.name));
 
-// Every team, privately, split over as many embeds as it takes.
-async function activeTeams(config: MatchmakingConfig): Promise<InteractionEditReplyOptions> {
+// Every team, privately, a page at a time with Previous and Next.
+const TEAMS_PER_PAGE = 10;
+const PAGE_CHARS = 5000;
+async function activeTeams(config: MatchmakingConfig, page = 0): Promise<InteractionEditReplyOptions> {
   const { guildId } = config;
   const [teams, queue, rooms, presets] = await Promise.all([
     prisma.matchTeam.findMany({ where: { guildId } }),
@@ -128,62 +130,40 @@ async function activeTeams(config: MatchmakingConfig): Promise<InteractionEditRe
     prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } }),
     prisma.matchPreset.findMany({ where: { guildId, deleted: false } }),
   ]);
-  const head = () => styleEmbed(new EmbedBuilder(), config.texts, "activeTeams", { count: teams.length });
-  const waiting = queue.filter((q) => q.kind === LFT);
-  if (teams.length === 0) {
-    const empty = head().setDescription(resolveText(config.texts, "labelNoTeamsYet").text);
-    if (waiting.length) empty.addFields({ name: resolveText(config.texts, "labelLookingForTeam", { count: waiting.length }).text, value: waiting.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) });
-    return { embeds: [empty], components: [], allowedMentions: { parse: [] } };
-  }
-  // Discord allows 25 rows per embed, 10 embeds and 6,000 characters per message.
-  const embeds: EmbedBuilder[] = [head()];
-  let rows = 0, chars = 0, shown = 0;
+  const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
+  const lft = queue.filter((q) => q.kind === LFT);
+  const lftField = lft.length ? { name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) } : null;
+
+  // Pages fill up to 10 teams, or less when big teams would pass Discord's 6,000 characters.
+  const pages: Array<Array<{ name: string; value: string }>> = [[]];
+  let chars = 0;
   for (const t of sortTeams(teams)) {
     const field = teamField(t, queue, rooms, presets);
     const length = field.name.length + field.value.length;
-    if (chars + length > 5500) break;
-    if (rows === 25) {
-      if (embeds.length === 10) break;
-      embeds.push(new EmbedBuilder().setColor(embeds[0].data.color ?? null));
-      rows = 0;
+    if (pages.at(-1)!.length === TEAMS_PER_PAGE || (pages.at(-1)!.length && chars + length > PAGE_CHARS)) {
+      pages.push([]);
+      chars = 0;
     }
-    embeds.at(-1)!.addFields(field);
-    rows++;
+    pages.at(-1)!.push(field);
     chars += length;
-    shown++;
   }
-  if (shown < teams.length) embeds.at(-1)!.setFooter({ text: `And ${teams.length - shown} more teams that don't fit here.` });
-
-  const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
-  const teamsOf = new Map<string, string[]>();
-  for (const t of sortTeams(teams)) for (const id of stringList(t.players)) teamsOf.set(id, [...(teamsOf.get(id) ?? []), t.name]);
-  const shared = [...teamsOf].filter(([, names]) => names.length > 1);
-  const lft = queue.filter((q) => q.kind === LFT);
-  const extras = [
-    ...(shared.length ? [{ name: say("labelMultiTeam"), value: shared.slice(0, 15).map(([id, names]) => `<@${id}>: ${names.join(", ")}`).join("\n").slice(0, 1024) }] : []),
-    ...(lft.length ? [{ name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) }] : []),
-  ];
-  for (const field of extras) {
-    if (chars + field.name.length + field.value.length > 5900) break;
-    if (rows === 25) {
-      if (embeds.length === 10) break;
-      embeds.push(new EmbedBuilder().setColor(embeds[0].data.color ?? null));
-      rows = 0;
-    }
-    embeds.at(-1)!.addFields(field);
-    rows++;
-    chars += field.name.length + field.value.length;
-  }
-  return { embeds, components: [], allowedMentions: { parse: [] } };
+  const last = pages.length - 1;
+  const at = Math.min(Math.max(0, page), last);
+  const embed = styleEmbed(new EmbedBuilder(), config.texts, "activeTeams", { count: teams.length });
+  if (teams.length === 0) embed.setDescription(say("labelNoTeamsYet"));
+  embed.addFields(pages[at]);
+  if (at === last && lftField) embed.addFields(lftField);
+  if (pages.length > 1) embed.setFooter({ text: `Page ${at + 1} of ${pages.length}` });
+  const nav = pages.length > 1
+    ? [row(button(`mm:teams:${at - 1}`, "◀ Previous", ButtonStyle.Secondary).setDisabled(at === 0), button(`mm:teams:${at + 1}`, "Next ▶", ButtonStyle.Secondary).setDisabled(at === last))]
+    : [];
+  return { embeds: [embed], components: nav, allowedMentions: { parse: [] } };
 }
 
 function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: MatchQueue[], rooms: MatchRoom[], presets: MatchPreset[]) {
   const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
   const embed = styleEmbed(new EmbedBuilder(), config.texts, "boardTeamList");
   const sorted = sortTeams(teams);
-
-  const teamsOf = new Map<string, string[]>();
-  for (const t of sorted) for (const id of stringList(t.players)) teamsOf.set(id, [...(teamsOf.get(id) ?? []), t.name]);
 
   // Discord refuses a message whose embeds pass 6,000 characters, so big
   // teams stop the list early instead of breaking the whole board.
@@ -198,9 +178,6 @@ function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: Mat
   const shown = fields.length;
   if (sorted.length === 0) fields.push({ name: "\u200b", value: say("labelNoTeamsYet") });
   if (sorted.length > shown) fields.push({ name: "\u200b", value: `And ${sorted.length - shown} more. Tap Active Teams to see them all.` });
-
-  const shared = [...teamsOf].filter(([, names]) => names.length > 1);
-  if (shared.length) fields.push({ name: say("labelMultiTeam"), value: shared.slice(0, 15).map(([id, names]) => `<@${id}>: ${names.join(", ")}`).join("\n").slice(0, 1024) });
 
   const lft = queue.filter((q) => q.kind === LFT);
   if (lft.length) fields.push({ name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) });
@@ -928,6 +905,11 @@ export async function handleMatchmaking(interaction: Interaction) {
         const team = await ownTeam(guildId, arg, user.id);
         if (typeof team === "string") return void (await interaction.reply({ content: team, ephemeral: true }));
         return void (await renameModal(interaction, team));
+      }
+      // Previous and Next turn the page of the same private message.
+      if (action === "teams" && arg !== undefined) {
+        await interaction.deferUpdate();
+        return void (await reply(interaction, await activeTeams(config, Number(arg) || 0)));
       }
       await interaction.deferReply({ ephemeral: true });
       if (action === "teams") return void (await reply(interaction, await activeTeams(config)));

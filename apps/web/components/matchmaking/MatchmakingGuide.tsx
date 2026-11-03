@@ -491,7 +491,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
                 <Buttons texts={texts} items={[["btnFindSolo", "green"], ["btnChallengeSolo", "blue"], ["btnLeaveSolo", "red"]]} />
                 <Buttons texts={texts} items={[["btnFindTeam", "green"], ["btnChallengeTeam", "blue"], ["btnLeaveTeam", "red"]]} />
-                <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"], ["btnPickup", "green"]]} />
+                <Buttons texts={texts} items={[["btnPickup", "green"], ["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"]]} />
               </Frame>
               <Table
                 heads={["Setting", "Default", "What it does"]}

@@ -36,7 +36,8 @@ export async function buildBoard(client: Client, guildId: string, game: string, 
   const label = game === "ALL" ? "All Games" : game;
   const say = (key: MatchTextKey) => resolveText(texts, key).text;
   const color = (key: MatchTextKey, embed: EmbedBuilder) => (texts[key]?.color ? embed : embed.setColor(parseInt(gameColor(game).slice(1), 16)));
-  const playerList = players.map((p, i) => line(p, i, members[i]?.displayName ?? "Former member")).join("\n") || say("labelNoPlayers");
+  // Mentions show as clickable names in an embed and never ping anyone.
+  const playerList = players.map((p, i) => line(p, i, members[i] ? `<@${p.key}>` : "Former member")).join("\n") || say("labelNoPlayers");
   const teamList = teams.map((t, i) => line(t, i, t.key)).join("\n") || say("labelNoTeams");
 
   if (style === "SEPARATE") {

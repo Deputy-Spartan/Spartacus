@@ -86,7 +86,7 @@ export const MATCH_TEXTS = {
   boardTools: { ...embed("Matchmaking", "Teams and help board", "The last part of the always-open board.", { title: "🧰 Teams & Help", description: "Make a team, manage yours, see every team, or get listed so captains can add you. New here? Tap How it works.", color: STEEL }), global: true },
   activeTeams: {
     ...embed("Matchmaking", "Active Teams", "Shown privately when someone taps Active Teams. Spartacus adds every team and its players.", { title: "🛡️ Active Teams ({count})", description: "Every team and who's on it. 👑 is the captain.", color: STEEL }, { count: "2" }),
-    previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }],
+    previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }],
     global: true,
   },
   room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}\n\nWhen you're done, a captain (👑) taps who won and types the score. The other side taps Confirm.", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
@@ -209,11 +209,12 @@ export const BOARD_PARTS = [
   { id: "TOOLS", label: "Teams & Help", embed: "boardTools", buttons: [{ key: "btnCreateTeam", customId: "mm:newteam", color: "gray" }, { key: "btnMyTeams", customId: "mm:myteam", color: "gray" }, { key: "btnLookingForTeam", customId: "mm:lft", color: "gray" }, { key: "btnActiveTeams", customId: "mm:teams", color: "gray" }, { key: "btnHelp", customId: "mm:help", color: "gray" }] },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; embed: MatchTextKey; buttons: ReadonlyArray<{ key: MatchTextKey; customId: string; color: BoardButtonColor }> }>;
 export type BoardPartId = (typeof BOARD_PARTS)[number]["id"];
-export const DEFAULT_BOARD_PARTS: BoardPartId[] = BOARD_PARTS.map((p) => p.id);
+// The Teams list starts off, since Active Teams shows every team privately.
+export const DEFAULT_BOARD_PARTS: BoardPartId[] = ["SOLO", "TEAM", "PICKUP", "TOOLS"];
 
 // The saved order with anything unknown or repeated dropped.
 export function boardPartOrder(value: unknown): BoardPartId[] {
-  const known = new Set<string>(DEFAULT_BOARD_PARTS);
+  const known = new Set<string>(BOARD_PARTS.map((p) => p.id));
   const list = Array.isArray(value) ? [...new Set(value.filter((v): v is BoardPartId => typeof v === "string" && known.has(v)))] : [];
   return list.length ? list : [...DEFAULT_BOARD_PARTS];
 }

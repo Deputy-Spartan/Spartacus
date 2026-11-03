@@ -129,7 +129,12 @@ async function activeTeams(config: MatchmakingConfig): Promise<InteractionEditRe
     prisma.matchPreset.findMany({ where: { guildId, deleted: false } }),
   ]);
   const head = () => styleEmbed(new EmbedBuilder(), config.texts, "activeTeams", { count: teams.length });
-  if (teams.length === 0) return { embeds: [head().setDescription(resolveText(config.texts, "labelNoTeamsYet").text)], components: [], allowedMentions: { parse: [] } };
+  const waiting = queue.filter((q) => q.kind === LFT);
+  if (teams.length === 0) {
+    const empty = head().setDescription(resolveText(config.texts, "labelNoTeamsYet").text);
+    if (waiting.length) empty.addFields({ name: resolveText(config.texts, "labelLookingForTeam", { count: waiting.length }).text, value: waiting.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) });
+    return { embeds: [empty], components: [], allowedMentions: { parse: [] } };
+  }
   // Discord allows 25 rows per embed, 10 embeds and 6,000 characters per message.
   const embeds: EmbedBuilder[] = [head()];
   let rows = 0, chars = 0, shown = 0;
@@ -148,6 +153,27 @@ async function activeTeams(config: MatchmakingConfig): Promise<InteractionEditRe
     shown++;
   }
   if (shown < teams.length) embeds.at(-1)!.setFooter({ text: `And ${teams.length - shown} more teams that don't fit here.` });
+
+  const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
+  const teamsOf = new Map<string, string[]>();
+  for (const t of sortTeams(teams)) for (const id of stringList(t.players)) teamsOf.set(id, [...(teamsOf.get(id) ?? []), t.name]);
+  const shared = [...teamsOf].filter(([, names]) => names.length > 1);
+  const lft = queue.filter((q) => q.kind === LFT);
+  const extras = [
+    ...(shared.length ? [{ name: say("labelMultiTeam"), value: shared.slice(0, 15).map(([id, names]) => `<@${id}>: ${names.join(", ")}`).join("\n").slice(0, 1024) }] : []),
+    ...(lft.length ? [{ name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) }] : []),
+  ];
+  for (const field of extras) {
+    if (chars + field.name.length + field.value.length > 5900) break;
+    if (rows === 25) {
+      if (embeds.length === 10) break;
+      embeds.push(new EmbedBuilder().setColor(embeds[0].data.color ?? null));
+      rows = 0;
+    }
+    embeds.at(-1)!.addFields(field);
+    rows++;
+    chars += field.name.length + field.value.length;
+  }
   return { embeds, components: [], allowedMentions: { parse: [] } };
 }
 

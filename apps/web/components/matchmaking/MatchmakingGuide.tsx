@@ -492,7 +492,6 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 <Buttons texts={texts} items={[["btnFindTeam", "green"], ["btnChallengeTeam", "blue"], ["btnLeaveTeam", "red"]]} />
                 <Embed texts={texts} item="boardPickup" />
                 <Buttons texts={texts} items={[["btnPickup", "green"]]} />
-                <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
                 <Embed texts={texts} item="boardTools" />
                 <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"], ["btnActiveTeams", "gray"], ["btnHelp", "gray"]]} />
               </Frame>

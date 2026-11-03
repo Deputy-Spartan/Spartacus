@@ -119,7 +119,7 @@ function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: Mat
     const players = stringList(t.players);
     const size = teamSizeFor(presets.find((p) => p.game === t.game) ?? null);
     const status = playing(t) ? " · ⚔️ playing" : queued.has(t.id) ? " · 🔍 in queue" : "";
-    const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `<@${id}>`));
+    const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `👤 <@${id}>`));
     const field = { name: `${t.name} · ${t.game} (${players.length}/${size})${status}`.slice(0, 256), value: names.join("\n").slice(0, 1024) };
     budget -= field.name.length + field.value.length;
     if (budget < 0) break;

@@ -79,7 +79,7 @@ export const MATCH_TEXTS = {
   boardTeam: { ...embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Create a team once, then queue or challenge any time.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }), global: true },
   boardTeamList: {
     ...embed("Matchmaking", "Teams list", "The third part of the always-open board: every team and who's on it.", { title: "🛡️ Teams", description: "Every team and who's on it. Captains manage theirs from My Teams.", color: STEEL }),
-    previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n@FrostByte" }],
+    previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }],
     global: true,
   },
   room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),

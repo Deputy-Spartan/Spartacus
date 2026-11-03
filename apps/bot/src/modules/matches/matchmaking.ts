@@ -879,8 +879,26 @@ async function reportAllowed(room: MatchRoom, userId: string, staff: boolean): P
   return [room.aCaptain, room.bCaptain].includes(userId) ? null : "Only the team captains can report.";
 }
 
+// Discord leaves channel mentions blank inside the embeds of "only you can
+// see this" replies, so there they become links named after the channel.
+function linkChannels(text: string, guild: Interaction["guild"]) {
+  return text.replace(/<#(\d+)>/g, (whole, id: string) => {
+    const channel = guild?.channels.cache?.get(id);
+    if (!guild || !channel) return whole;
+    return `[${channel.isVoiceBased() ? "🔊" : "#"}${channel.name}](https://discord.com/channels/${guild.id}/${id})`;
+  });
+}
+
+function withChannelLinks(embed: EmbedBuilder, guild: Interaction["guild"]) {
+  if (embed.data.description) embed.setDescription(linkChannels(embed.data.description, guild));
+  if (embed.data.fields?.length) embed.setFields(embed.data.fields.map((f) => ({ ...f, value: linkChannels(f.value, guild).slice(0, 1024) })));
+  return embed;
+}
+
 async function reply(interaction: ButtonInteraction | StringSelectMenuInteraction | UserSelectMenuInteraction | ModalSubmitInteraction, value: Reply) {
-  await interaction.editReply(typeof value === "string" ? { content: value, components: [] } : value);
+  const payload = typeof value === "string" ? { content: value, components: [] } : value;
+  const embeds = payload.embeds?.map((e) => (e instanceof EmbedBuilder ? withChannelLinks(e, interaction.guild) : e));
+  await interaction.editReply(embeds ? { ...payload, embeds } : payload);
 }
 
 const failed = "Something went wrong with that. Staff can see the details on the Errors page.";

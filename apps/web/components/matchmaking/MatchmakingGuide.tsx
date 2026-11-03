@@ -488,9 +488,10 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
               <Frame label="Preview: the board">
                 <Embed texts={texts} item="boardSolo" fields={[{ name: "Waiting (1)", value: "Kuro · Rainbow Six Siege" }]} />
                 <Embed texts={texts} item="boardTeam" fields={[{ name: "Teams waiting (0)", value: "Nobody yet" }]} />
+                <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n@FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
                 <Buttons texts={texts} items={[["btnFindSolo", "green"], ["btnChallengeSolo", "blue"], ["btnLeaveSolo", "gray"]]} />
                 <Buttons texts={texts} items={[["btnFindTeam", "green"], ["btnChallengeTeam", "blue"], ["btnLeaveTeam", "gray"]]} />
-                <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"]]} />
+                <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"]]} />
               </Frame>
               <Table
                 heads={["Setting", "Default", "What it does"]}
@@ -581,9 +582,10 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["Find a 1v1", `${resolveText(texts, "btnFindSolo").text}, then pick a game. You're matched at once if someone's waiting, or tagged when they join`],
                     ["Challenge someone", `${resolveText(texts, "btnChallengeSolo").text}, then pick a game and a player`],
                     ["Answer a challenge", `${resolveText(texts, "btnAccept").text} or ${resolveText(texts, "btnDecline").text} on the ping`],
-                    ["Create a team", `${resolveText(texts, "btnCreateTeam").text}, name it, then pick teammates. Captains create one team per game`],
+                    ["Create a team", `${resolveText(texts, "btnCreateTeam").text}, name it, then pick teammates. You can leave spots open. Captains create one team per game`],
+                    ["Find a team", `${resolveText(texts, "btnLookingForTeam").text} lists you for a game so captains can add you. Tap it again to come off. The list clears after 24 hours`],
                     ["Queue your team", `${resolveText(texts, "btnFindTeam").text}. Only the captain can do this`],
-                    ["Manage your team", `${resolveText(texts, "btnMyTeams").text} shows your teams. Captains can disband from there`],
+                    ["Manage your team", `${resolveText(texts, "btnMyTeams").text} shows your teams. Captains can rename, change players, add people who are looking, or disband. Players can leave a team there`],
                   ]}
                 />
                 <Text>Once matched, you get a private thread with the map, players and voice link. Either side reports the winner, and the other side confirms. An unanswered report is accepted after 5 minutes. After two disputes, only staff can report it.</Text>

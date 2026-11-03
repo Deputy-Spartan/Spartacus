@@ -20,7 +20,7 @@ import {
   type StringSelectMenuInteraction,
   type UserSelectMenuInteraction,
 } from "discord.js";
-import type { MatchChallenge, MatchPreset, MatchRoom, MatchTeam, MatchmakingConfig } from "@prisma/client";
+import type { MatchChallenge, MatchPreset, MatchQueue, MatchRoom, MatchTeam, MatchmakingConfig } from "@prisma/client";
 import { resolveText, textsForGame, type MatchTextKey } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
@@ -34,6 +34,11 @@ import { stringList, styleEmbed } from "./render";
 const CONFIRM_MS = 5 * 60_000;
 const OPEN_ROOMS = ["LIVE", "CONFIRM"];
 const POST_ERROR_GAP_MS = 10 * 60_000;
+// Solo players waiting to be recruited onto a team share the queue table.
+const LFT = "LFT";
+const LFT_HOURS = 24;
+const TEAMS_SHOWN = 15;
+const TEAM_LIST_CHARS = 3000;
 const lastPostError = new Map<string, number>();
 
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
@@ -68,9 +73,10 @@ const inRoomMessage = (room: MatchRoom) => (room.threadId ? `Finish your current
 
 async function buildPanel(config: MatchmakingConfig) {
   const queue = await prisma.matchQueue.findMany({ where: { guildId: config.guildId }, orderBy: { joinedAt: "asc" } });
-  const teamIds = queue.flatMap((q) => (q.teamId ? [q.teamId] : []));
-  const teams = await prisma.matchTeam.findMany({ where: { id: { in: teamIds } } });
-  const live = await prisma.matchRoom.count({ where: { guildId: config.guildId, status: { in: OPEN_ROOMS } } });
+  const teams = await prisma.matchTeam.findMany({ where: { guildId: config.guildId }, orderBy: { createdAt: "asc" } });
+  const rooms = await prisma.matchRoom.findMany({ where: { guildId: config.guildId, status: { in: OPEN_ROOMS } } });
+  const presets = await prisma.matchPreset.findMany({ where: { guildId: config.guildId, deleted: false } });
+  const live = rooms.length;
   const solo = queue.filter((q) => q.kind === "SOLO");
   const squads = queue.filter((q) => q.kind === "TEAM");
   const lines = (list: string[]) => list.slice(0, 15).join("\n").slice(0, 1024) || "Nobody yet";
@@ -80,14 +86,53 @@ async function buildPanel(config: MatchmakingConfig) {
     embeds: [
       styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: resolveText(config.texts, "labelWaiting", { count: solo.length }).text, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
       styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: resolveText(config.texts, "labelTeamsWaiting", { count: squads.length }).text, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
+      teamListEmbed(config, teams, queue, rooms, presets),
     ],
     components: [
       row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Secondary)),
       row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Secondary)),
-      row(button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary)),
+      row(button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary)),
     ],
     allowedMentions: { parse: [] as never[] },
   };
+}
+
+// Every team with its players, so people can see who's where. Someone on two
+// teams shows under both, and is listed again at the bottom.
+function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: MatchQueue[], rooms: MatchRoom[], presets: MatchPreset[]) {
+  const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
+  const embed = styleEmbed(new EmbedBuilder(), config.texts, "boardTeamList");
+  const sorted = [...teams].sort((x, y) => x.game.localeCompare(y.game) || x.name.localeCompare(y.name));
+  const queued = new Set(queue.filter((q) => q.kind === "TEAM").map((q) => q.teamId));
+  const playing = (t: MatchTeam) => rooms.some((r) => r.kind === "TEAM" && r.game === t.game && (r.aName === t.name || r.bName === t.name));
+
+  const teamsOf = new Map<string, string[]>();
+  for (const t of sorted) for (const id of stringList(t.players)) teamsOf.set(id, [...(teamsOf.get(id) ?? []), t.name]);
+
+  // Discord refuses a message whose embeds pass 6,000 characters, so big
+  // teams stop the list early instead of breaking the whole board.
+  const fields: Array<{ name: string; value: string }> = [];
+  let budget = TEAM_LIST_CHARS;
+  for (const t of sorted.slice(0, TEAMS_SHOWN)) {
+    const players = stringList(t.players);
+    const size = teamSizeFor(presets.find((p) => p.game === t.game) ?? null);
+    const status = playing(t) ? " · ⚔️ playing" : queued.has(t.id) ? " · 🔍 in queue" : "";
+    const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `<@${id}>`));
+    const field = { name: `${t.name} · ${t.game} (${players.length}/${size})${status}`.slice(0, 256), value: names.join("\n").slice(0, 1024) };
+    budget -= field.name.length + field.value.length;
+    if (budget < 0) break;
+    fields.push(field);
+  }
+  const shown = fields.length;
+  if (sorted.length === 0) fields.push({ name: "\u200b", value: say("labelNoTeamsYet") });
+  if (sorted.length > shown) fields.push({ name: "\u200b", value: `And ${sorted.length - shown} more. Tap My Teams to see yours.` });
+
+  const shared = [...teamsOf].filter(([, names]) => names.length > 1);
+  if (shared.length) fields.push({ name: say("labelMultiTeam"), value: shared.slice(0, 15).map(([id, names]) => `<@${id}>: ${names.join(", ")}`).join("\n").slice(0, 1024) });
+
+  const lft = queue.filter((q) => q.kind === LFT);
+  if (lft.length) fields.push({ name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) });
+  return embed.addFields(fields);
 }
 
 // Finds extra boards from two posts landing together, and keeps the saved one.
@@ -177,7 +222,7 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
   const preset = await presetFor(guildId, game);
   const maps = preset?.useMaps ? stringList(preset.maps) : [];
   const everyone = [...a.players, ...b.players];
-  await prisma.matchQueue.deleteMany({ where: { guildId, userId: { in: [...everyone, a.captain, b.captain] } } });
+  await prisma.matchQueue.deleteMany({ where: { guildId, kind: { not: LFT }, userId: { in: [...everyone, a.captain, b.captain] } } });
 
   let room = await prisma.matchRoom.create({
     data: {
@@ -342,6 +387,12 @@ async function find(client: Client, config: MatchmakingConfig, kind: Kind, game:
   return `${team.name} is in the ${game} queue.`;
 }
 
+function gameAction(client: Client, config: MatchmakingConfig, action: string, kind: Kind, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
+  if (action === "find") return find(client, config, kind, game, userId, guild);
+  if (action === "lft") return lookingForTeam(config.guildId, game, userId);
+  return challengePicker(config, kind, game, userId);
+}
+
 async function challengePicker(config: MatchmakingConfig, kind: Kind, game: string, userId: string): Promise<Reply> {
   const index = stringList(config.games).indexOf(game);
   if (kind === "SOLO") {
@@ -415,11 +466,81 @@ async function answerChallenge(interaction: ButtonInteraction, id: string, accep
 
 async function myTeams(guildId: string, userId: string): Promise<Reply> {
   const teams = (await prisma.matchTeam.findMany({ where: { guildId } })).filter((t) => stringList(t.players).includes(userId));
-  if (teams.length === 0) return "You aren't on a team yet.";
-  const lines = teams.map((t) => `**${t.name}** (${t.game}): ${mentionAll(stringList(t.players))}`).join("\n").slice(0, 1900);
-  const owned = teams.filter((t) => t.captainId === userId).slice(0, 5);
-  const buttons = owned.map((t) => button(`mm:disband:${t.id}`, `Disband ${t.name}`, ButtonStyle.Danger));
-  return { content: lines, components: buttons.length ? [row(...buttons)] : [], allowedMentions: { parse: [] } };
+  if (teams.length === 0) return "You aren't on a team yet. Tap Create a Team, or Looking for a Team so captains can add you.";
+  const lines = teams.map((t) => `**${t.name}** (${t.game})${t.captainId === userId ? " 👑" : ""}: ${mentionAll(stringList(t.players))}`).join("\n").slice(0, 1900);
+  const owned = teams.filter((t) => t.captainId === userId).slice(0, 25);
+  const joined = teams.filter((t) => t.captainId !== userId).slice(0, 25);
+  const menus: Row[] = [];
+  if (owned.length) menus.push(row(new StringSelectMenuBuilder().setCustomId("mmmanage").setPlaceholder("Manage a team you captain").addOptions(owned.map((t) => ({ label: t.name.slice(0, 100), description: t.game.slice(0, 100), value: t.id })))));
+  if (joined.length) menus.push(row(new StringSelectMenuBuilder().setCustomId("mmleaveteam").setPlaceholder("Leave a team").addOptions(joined.map((t) => ({ label: t.name.slice(0, 100), description: t.game.slice(0, 100), value: t.id })))));
+  return { content: lines, components: menus, allowedMentions: { parse: [] } };
+}
+
+// What a captain sees after picking one of their teams.
+async function teamManager(team: MatchTeam): Promise<InteractionEditReplyOptions> {
+  const size = teamSizeFor(await presetFor(team.guildId, team.game));
+  const players = stringList(team.players);
+  const open = Math.max(0, size - players.length);
+  const waiting = await prisma.matchQueue.count({ where: { guildId: team.guildId, game: team.game, kind: LFT } });
+  const buttons = [
+    button(`mm:rename:${team.id}`, "Rename", ButtonStyle.Secondary),
+    button(`mm:roster:${team.id}`, "Change Players", ButtonStyle.Primary),
+    ...(open > 0 && waiting > 0 ? [button(`mm:recruit:${team.id}`, `Add from Looking for a Team (${waiting})`, ButtonStyle.Success)] : []),
+    button(`mm:disband:${team.id}`, "Disband", ButtonStyle.Danger),
+  ];
+  return {
+    content: [`**${team.name}** · ${team.game} (${players.length}/${size})`, mentionAll(players), open > 0 ? `${open} spot${open === 1 ? "" : "s"} open. The team can queue once it's full.` : "Full and ready to queue."].join("\n"),
+    components: [row(...buttons)],
+    allowedMentions: { parse: [] },
+  };
+}
+
+async function ownTeam(guildId: string, teamId: string, userId: string): Promise<MatchTeam | string> {
+  const team = await prisma.matchTeam.findUnique({ where: { id: teamId } });
+  if (!team || team.guildId !== guildId) return "That team no longer exists.";
+  if (team.captainId !== userId) return "Only the team's captain can do that.";
+  return team;
+}
+
+// Changing players mid-match would change who the room thinks is playing.
+async function teamBusy(team: MatchTeam): Promise<string | null> {
+  const room = await openRoomFor(team.guildId, stringList(team.players));
+  return room ? `${team.name} has a match going. Finish it first.` : null;
+}
+
+async function saveRoster(team: MatchTeam, players: string[]) {
+  await prisma.matchTeam.update({ where: { id: team.id }, data: { players } });
+  // The queued roster is out of date, and new players are no longer looking.
+  await prisma.matchQueue.deleteMany({ where: { teamId: team.id } });
+  await prisma.matchQueue.deleteMany({ where: { guildId: team.guildId, game: team.game, kind: LFT, userId: { in: players } } });
+}
+
+async function lookingForTeam(guildId: string, game: string, userId: string): Promise<string> {
+  const onTeam = (await prisma.matchTeam.findMany({ where: { guildId, game } })).find((t) => stringList(t.players).includes(userId));
+  if (onTeam) return `You're already on **${onTeam.name}** for ${game}. Tap My Teams to see it.`;
+  const where = { guildId_game_kind_userId: { guildId, game, kind: LFT, userId } };
+  if (await prisma.matchQueue.findUnique({ where })) {
+    await prisma.matchQueue.delete({ where });
+    return `You're off the Looking for a Team list for ${game}.`;
+  }
+  await prisma.matchQueue.create({ data: { guildId, game, kind: LFT, userId } });
+  return `You're on the Looking for a Team list for ${game}. Captains can add you from My Teams. Tap the button again to come off it.`;
+}
+
+async function recruitPicker(guild: Interaction["guild"], team: MatchTeam): Promise<Reply> {
+  const size = teamSizeFor(await presetFor(team.guildId, team.game));
+  const open = size - stringList(team.players).length;
+  if (open <= 0) return `${team.name} is already full.`;
+  const waiting = await prisma.matchQueue.findMany({ where: { guildId: team.guildId, game: team.game, kind: LFT }, orderBy: { joinedAt: "asc" }, take: 25 });
+  if (waiting.length === 0) return `Nobody is looking for a ${team.game} team right now.`;
+  const names = await Promise.all(waiting.map((q) => guild?.members.fetch(q.userId).catch(() => null)));
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId(`mmrecruit:${team.id}`)
+    .setPlaceholder("Pick players to add")
+    .setMinValues(1)
+    .setMaxValues(Math.min(open, waiting.length))
+    .addOptions(waiting.map((q, i) => ({ label: (names[i]?.displayName ?? "Player").slice(0, 100), value: q.userId })));
+  return { content: `Who do you want on ${team.name}? ${open} spot${open === 1 ? "" : "s"} open.`, components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
 }
 
 async function teamNameModal(interaction: ButtonInteraction | StringSelectMenuInteraction, index: number) {
@@ -427,9 +548,20 @@ async function teamNameModal(interaction: ButtonInteraction | StringSelectMenuIn
   await interaction.showModal(new ModalBuilder().setCustomId(`mmteamname:${index}`).setTitle("Create a Team").addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(field)));
 }
 
+async function renameModal(interaction: ButtonInteraction, team: MatchTeam) {
+  const field = new TextInputBuilder().setCustomId("name").setLabel("New team name").setStyle(TextInputStyle.Short).setMinLength(2).setMaxLength(32).setValue(team.name).setRequired(true);
+  await interaction.showModal(new ModalBuilder().setCustomId(`mmrename:${team.id}`).setTitle(`Rename ${team.name}`.slice(0, 45)).addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(field)));
+}
+
+// Teams can start short and fill up later, so any number up to the size is fine.
 function matesPicker(team: MatchTeam, size: number): InteractionEditReplyOptions {
-  const menu = new UserSelectMenuBuilder().setCustomId(`mmmates:${team.id}`).setPlaceholder("Pick your teammates").setMinValues(size - 1).setMaxValues(size - 1);
-  return { content: `Pick ${size - 1} teammate${size === 2 ? "" : "s"} for ${team.name}.`, components: [new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(menu)] };
+  const current = stringList(team.players).filter((id) => id !== team.captainId);
+  const menu = new UserSelectMenuBuilder().setCustomId(`mmmates:${team.id}`).setPlaceholder("Pick your teammates").setMinValues(0).setMaxValues(size - 1);
+  if (current.length) menu.setDefaultUsers(current.slice(0, size - 1));
+  return {
+    content: `Pick up to ${size - 1} teammate${size === 2 ? "" : "s"} for ${team.name}. You can leave spots open and fill them later from Looking for a Team.`,
+    components: [new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(menu)],
+  };
 }
 
 async function reportAllowed(room: MatchRoom, userId: string, staff: boolean): Promise<string | null> {
@@ -465,26 +597,39 @@ export async function handleMatchmaking(interaction: Interaction) {
     if (prefix === "mm" && interaction.isButton()) {
       const [, action, arg] = parts;
       if (action === "newteam" && games.length === 1) return void (await teamNameModal(interaction, 0));
+      if (action === "rename") {
+        const team = await ownTeam(guildId, arg, user.id);
+        if (typeof team === "string") return void (await interaction.reply({ content: team, ephemeral: true }));
+        return void (await renameModal(interaction, team));
+      }
       await interaction.deferReply({ ephemeral: true });
-      if (action === "find" || action === "challenge" || action === "newteam") {
+      if (action === "find" || action === "challenge" || action === "newteam" || action === "lft") {
         const game = await chooseGame(interaction, config, action, arg ?? "");
         if (!game) return;
-        const value = await run(async () => (action === "find" ? find(client, config, arg as Kind, game, user.id, interaction.guild) : challengePicker(config, arg as Kind, game, user.id)));
-        await reply(interaction, value);
+        await reply(interaction, await run(() => gameAction(client, config, action, arg as Kind, game, user.id, interaction.guild)));
       } else if (action === "leave") {
         await run(() => prisma.matchQueue.deleteMany({ where: { guildId, userId: user.id, kind: arg } }));
         await reply(interaction, "You left the queue.");
       } else if (action === "myteam") {
         await reply(interaction, await myTeams(guildId, user.id));
       } else if (action === "disband") {
+        const team = await ownTeam(guildId, arg, user.id);
+        await reply(interaction, typeof team === "string" ? team : { content: `Disband **${team.name}**? Everyone comes off the team. Its leaderboard record stays.`, components: [row(button(`mm:disbandyes:${team.id}`, `Disband ${team.name}`, ButtonStyle.Danger))] });
+      } else if (action === "disbandyes") {
         const value = await run(async () => {
-          const team = await prisma.matchTeam.findUnique({ where: { id: arg } });
-          if (!team || team.guildId !== guildId || team.captainId !== user.id) return "Only the captain can do that.";
+          const team = await ownTeam(guildId, arg, user.id);
+          if (typeof team === "string") return team;
           await prisma.matchQueue.deleteMany({ where: { teamId: team.id } });
           await prisma.matchTeam.delete({ where: { id: team.id } });
           return `${team.name} was disbanded. Its leaderboard record stays.`;
         });
         await reply(interaction, value);
+      } else if (action === "roster" || action === "recruit") {
+        const team = await ownTeam(guildId, arg, user.id);
+        const blocked = typeof team === "string" ? team : await teamBusy(team);
+        if (blocked || typeof team === "string") return void (await reply(interaction, blocked ?? "That team no longer exists."));
+        await reply(interaction, action === "roster" ? matesPicker(team, teamSizeFor(await presetFor(guildId, team.game))) : await recruitPicker(interaction.guild, team));
+        return;
       }
       await syncMatchmakingPanel(client, guildId);
       return;
@@ -500,7 +645,7 @@ export async function handleMatchmaking(interaction: Interaction) {
       const game = games[Number(picked)];
       if (action === "newteam") return void (await teamNameModal(interaction, Number(interaction.values[0])));
       await interaction.deferUpdate();
-      await reply(interaction, await run(async () => (action === "find" ? find(client, config, kind as Kind, game, user.id, interaction.guild) : challengePicker(config, kind as Kind, game, user.id))));
+      await reply(interaction, await run(() => gameAction(client, config, action, kind as Kind, game, user.id, interaction.guild)));
       await syncMatchmakingPanel(client, guildId);
       return;
     }
@@ -513,6 +658,73 @@ export async function handleMatchmaking(interaction: Interaction) {
       const busy = await openRoomFor(guildId, [target.id]);
       if (busy) return void (await reply(interaction, "That player is already in a match."));
       await reply(interaction, await run(() => sendChallenge(client, config, { game, kind: "SOLO", fromId: user.id, toId: target.id, fromTeam: null, toTeam: null })));
+      return;
+    }
+
+    if (prefix === "mmmanage" && interaction.isStringSelectMenu()) {
+      await interaction.deferUpdate();
+      const team = await ownTeam(guildId, interaction.values[0], user.id);
+      await reply(interaction, typeof team === "string" ? team : await teamManager(team));
+      return;
+    }
+
+    if (prefix === "mmleaveteam" && interaction.isStringSelectMenu()) {
+      await interaction.deferUpdate();
+      const value = await run(async () => {
+        const team = await prisma.matchTeam.findUnique({ where: { id: interaction.values[0] } });
+        if (!team || team.guildId !== guildId || !stringList(team.players).includes(user.id)) return "You aren't on that team.";
+        if (team.captainId === user.id) return "Captains can't leave their own team. Disband it from My Teams instead.";
+        const blocked = await teamBusy(team);
+        if (blocked) return blocked;
+        await saveRoster(team, stringList(team.players).filter((id) => id !== user.id));
+        return `You left ${team.name}.`;
+      });
+      await reply(interaction, value);
+      await syncMatchmakingPanel(client, guildId);
+      return;
+    }
+
+    if (prefix === "mmrecruit" && interaction.isStringSelectMenu()) {
+      await interaction.deferUpdate();
+      const value = await run(async () => {
+        const team = await ownTeam(guildId, parts[1], user.id);
+        if (typeof team === "string") return team;
+        const blocked = await teamBusy(team);
+        if (blocked) return blocked;
+        const size = teamSizeFor(await presetFor(guildId, team.game));
+        const still = await prisma.matchQueue.findMany({ where: { guildId, game: team.game, kind: LFT, userId: { in: interaction.values } } });
+        const adding = still.map((q) => q.userId).slice(0, size - stringList(team.players).length);
+        if (adding.length === 0) return "Those players are no longer looking for a team.";
+        await saveRoster(team, [...stringList(team.players), ...adding]);
+        for (const id of adding) {
+          const added = await client.users.fetch(id).catch(() => null);
+          await added?.send(`You were added to **${team.name}** for ${team.game} in **${interaction.guild?.name ?? "the server"}**. Tap My Teams on the Matchmaking board to see it.`).catch(() => null);
+        }
+        return teamManager((await prisma.matchTeam.findUnique({ where: { id: team.id } })) ?? team);
+      });
+      await reply(interaction, value);
+      await syncMatchmakingPanel(client, guildId);
+      return;
+    }
+
+    if (prefix === "mmrename" && interaction.isModalSubmit()) {
+      await interaction.deferReply({ ephemeral: true });
+      const name = cleanTeamName(interaction.fields.getTextInputValue("name"));
+      if (name.length < 2) return void (await reply(interaction, "Use at least 2 letters or numbers."));
+      await reply(
+        interaction,
+        await run(async () => {
+          const team = await ownTeam(guildId, parts[1], user.id);
+          if (typeof team === "string") return team;
+          const blocked = await teamBusy(team);
+          if (blocked) return blocked;
+          const taken = await prisma.matchTeam.findFirst({ where: { guildId, game: team.game, name: { equals: name, mode: "insensitive" }, id: { not: team.id } } });
+          if (taken) return "Another team already has that name.";
+          await prisma.matchTeam.update({ where: { id: team.id }, data: { name } });
+          return `Renamed to **${name}**. Past results stay under the old name on the leaderboard.`;
+        })
+      );
+      await syncMatchmakingPanel(client, guildId);
       return;
     }
 
@@ -544,21 +756,33 @@ export async function handleMatchmaking(interaction: Interaction) {
           const taken = await prisma.matchTeam.findFirst({ where: { guildId, game, name: { equals: name, mode: "insensitive" } } });
           if (taken) return "Another team already has that name.";
           const team = await prisma.matchTeam.create({ data: { guildId, game, name, captainId: user.id, players: [user.id] } });
+          await prisma.matchQueue.deleteMany({ where: { guildId, game, kind: LFT, userId: user.id } });
           return matesPicker(team, teamSizeFor(await presetFor(guildId, game)));
         })
       );
+      await syncMatchmakingPanel(client, guildId);
       return;
     }
 
     if (prefix === "mmmates" && interaction.isUserSelectMenu()) {
       await interaction.deferUpdate();
-      const team = await prisma.matchTeam.findUnique({ where: { id: parts[1] } });
-      if (!team || team.captainId !== user.id) return void (await reply(interaction, "Only the captain can do that."));
-      const mates = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id);
-      const size = teamSizeFor(await presetFor(guildId, team.game));
-      if (mates.length !== size - 1) return void (await reply(interaction, matesPicker(team, size)));
-      await prisma.matchTeam.update({ where: { id: team.id }, data: { players: [user.id, ...mates] } });
-      await reply(interaction, `**${team.name}** is ready for ${team.game}: ${mentionAll([user.id, ...mates])}`);
+      const value = await run(async () => {
+        const team = await ownTeam(guildId, parts[1], user.id);
+        if (typeof team === "string") return team;
+        const blocked = await teamBusy(team);
+        if (blocked) return blocked;
+        const size = teamSizeFor(await presetFor(guildId, team.game));
+        const mates = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id).slice(0, size - 1);
+        await saveRoster(team, [user.id, ...mates]);
+        const open = size - 1 - mates.length;
+        return {
+          content: open > 0 ? `**${team.name}** saved with ${mates.length + 1} of ${size}. Fill the last ${open} from My Teams.` : `**${team.name}** is ready for ${team.game}: ${mentionAll([user.id, ...mates])}`,
+          components: [],
+          allowedMentions: { parse: [] },
+        };
+      });
+      await reply(interaction, value);
+      await syncMatchmakingPanel(client, guildId);
       return;
     }
 
@@ -661,8 +885,9 @@ export async function tickMatchmaking(client: Client) {
   for (const config of configs) {
     const { guildId } = config;
     if (!config.messageId || !sweptGuilds.has(guildId)) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
-    const stale = await prisma.matchQueue.deleteMany({ where: { guildId, joinedAt: { lte: new Date(now.getTime() - config.queueMinutes * 60_000) } } });
-    if (stale.count) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
+    const stale = await prisma.matchQueue.deleteMany({ where: { guildId, kind: { not: LFT }, joinedAt: { lte: new Date(now.getTime() - config.queueMinutes * 60_000) } } });
+    const staleLft = await prisma.matchQueue.deleteMany({ where: { guildId, kind: LFT, joinedAt: { lte: new Date(now.getTime() - LFT_HOURS * 3_600_000) } } });
+    if (stale.count || staleLft.count) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
     const expired = await prisma.matchChallenge.findMany({ where: { guildId, expiresAt: { lte: now } } });
     for (const challenge of expired) await lock(guildId)(() => dropChallenge(client, challenge, config)).catch((err) => logError("bot", err, guildId));
   }

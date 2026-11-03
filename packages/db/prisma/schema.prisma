@@ -1291,6 +1291,15 @@ model ChannelLock {
 // guild row exists (that's sometimes exactly the bug being logged), or
 // entirely outside any guild context (auth failures, startup errors).
 
+// One row per Discord event a bot copy has handled, so two copies running
+// during a deploy don't both act on it (a join welcomed twice).
+model EventClaim {
+  key       String   @id
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model ErrorLog {
   id        String   @id @default(cuid())
   guildId   String?

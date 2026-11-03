@@ -471,8 +471,8 @@ async function myTeams(guildId: string, userId: string): Promise<Reply> {
   const owned = teams.filter((t) => t.captainId === userId).slice(0, 25);
   const joined = teams.filter((t) => t.captainId !== userId).slice(0, 25);
   const menus: Row[] = [];
-  if (owned.length) menus.push(row(new StringSelectMenuBuilder().setCustomId("mmmanage").setPlaceholder("Manage a team you captain").addOptions(owned.map((t) => ({ label: t.name.slice(0, 100), description: t.game.slice(0, 100), value: t.id })))));
-  if (joined.length) menus.push(row(new StringSelectMenuBuilder().setCustomId("mmleaveteam").setPlaceholder("Leave a team").addOptions(joined.map((t) => ({ label: t.name.slice(0, 100), description: t.game.slice(0, 100), value: t.id })))));
+  if (owned.length) menus.push(row(new StringSelectMenuBuilder().setCustomId("mmmanage:pick").setPlaceholder("Manage a team you captain").addOptions(owned.map((t) => ({ label: t.name.slice(0, 100), description: t.game.slice(0, 100), value: t.id })))));
+  if (joined.length) menus.push(row(new StringSelectMenuBuilder().setCustomId("mmleaveteam:pick").setPlaceholder("Leave a team").addOptions(joined.map((t) => ({ label: t.name.slice(0, 100), description: t.game.slice(0, 100), value: t.id })))));
   return { content: lines, components: menus, allowedMentions: { parse: [] } };
 }
 

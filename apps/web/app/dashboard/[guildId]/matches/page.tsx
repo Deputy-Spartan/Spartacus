@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
@@ -8,6 +8,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
+import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { MatchmakingGuide } from "../../../../components/matchmaking/MatchmakingGuide";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
@@ -1074,10 +1075,21 @@ function VoiceSettings({ guildId }: { guildId: string }) {
 const HEADING_SIZE: Record<number, string> = { 1: "text-2xl", 2: "text-xl", 3: "text-base" };
 
 // Shows bold, links and # headings the way Discord does, so the preview reads like the real post.
-function Formatted({ text, headings = false }: { text: string; headings?: boolean }) {
+type MentionNames = { channels: Record<string, string>; roles: Record<string, string> };
+
+function Formatted({ text, headings = false, names }: { text: string; headings?: boolean; names?: MentionNames }) {
   const inline = (line: string) =>
-    line.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/).map((part, i) => {
+    line.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\)|<#\d+>|<@&\d+>)/).map((part, i) => {
       if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
+      const mention = part.match(/^<(#|@&)(\d+)>$/);
+      if (mention) {
+        const name = mention[1] === "#" ? names?.channels[mention[2]] : names?.roles[mention[2]];
+        return (
+          <span key={i} className="rounded bg-[#5865F2]/30 px-0.5 text-[#C9CDFB]">
+            {mention[1] === "#" ? `#${name ?? "unknown-channel"}` : `@${name ?? "unknown-role"}`}
+          </span>
+        );
+      }
       const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
       if (link) return <span key={i} className="text-[#00A8FC]">{link[1]}</span>;
       return <span key={i}>{part}</span>;
@@ -1102,6 +1114,14 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
   const [key, setKey] = useState<MatchTextKey>(startKey ?? "boardSolo");
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [names, setNames] = useState<MentionNames>({ channels: {}, roles: {} });
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const wordingRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    api.getDiscordChannels(guildId).then((c) => setNames((n) => ({ ...n, channels: Object.fromEntries([...c.textChannels, ...c.voiceChannels].map((x) => [x.id, x.name])) }))).catch(() => null);
+    api.getDiscordRoles(guildId).then((r) => setNames((n) => ({ ...n, roles: Object.fromEntries(r.map((x) => [x.id, x.name])) }))).catch(() => null);
+  }, [guildId]);
 
   useEffect(() => {
     api.getMatchmaking(guildId).then((o) => setSaved({ texts: o.config.texts ?? {}, gameTexts: o.config.gameTexts ?? {} }));
@@ -1221,8 +1241,9 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                 </div>
                 <div>
                   <Label>Description</Label>
-                  <textarea className={`${inputClass} min-h-24`} maxLength={4000} value={value("description")} onChange={(e) => change("description", e.target.value)} />
-                  <Hint>Use **two stars** for bold. Start a description line with # and a space for big text. Leave a box empty to hide that part.</Hint>
+                  <MarkdownToolbar guildId={guildId} textareaRef={descriptionRef} value={value("description")} onChange={(next) => change("description", next)} />
+                  <textarea ref={descriptionRef} className={`${inputClass} min-h-24`} maxLength={4000} value={value("description")} onChange={(e) => change("description", e.target.value)} />
+                  <Hint>Use the bar above to add a channel, role or emoji where your cursor is, or to make text bold or big. Channels show as clickable links in Discord. Leave a box empty to hide that part.</Hint>
                 </div>
                 <div>
                   <Label>Footer</Label>
@@ -1309,7 +1330,9 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
             ) : (
               <div>
                 <Label>{entry.group === "Buttons" ? "Button wording" : "Wording"}</Label>
-                <textarea className={`${inputClass} min-h-16`} maxLength={entry.group === "Buttons" ? 60 : 1500} value={value("text")} onChange={(e) => change("text", e.target.value)} />
+                {entry.group !== "Buttons" && <MarkdownToolbar guildId={guildId} textareaRef={wordingRef} value={value("text")} onChange={(next) => change("text", next)} />}
+                <textarea ref={wordingRef} className={`${inputClass} min-h-16`} maxLength={entry.group === "Buttons" ? 60 : 1500} value={value("text")} onChange={(e) => change("text", e.target.value)} />
+                {entry.group === "Buttons" && <Hint>Buttons show plain text only, so channels and roles can't go on a button.</Hint>}
               </div>
             )}
             {Object.keys(entry.tokens).length > 0 && (
@@ -1351,7 +1374,7 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                   )}
                   {preview.description && (
                     <p className="whitespace-pre-wrap break-words">
-                      <Formatted text={preview.description} headings />
+                      <Formatted text={preview.description} headings names={names} />
                     </p>
                   )}
                   {[...preview.fields, ...(entry.previewFields ?? []).map((f) => ({ ...f, inline: true }))].length > 0 && (
@@ -1360,7 +1383,7 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                         <div key={i} className={`min-w-0 ${f.inline ? "" : "col-span-3"}`}>
                           <p className="text-xs font-semibold text-white break-words">{f.name}</p>
                           <p className="text-xs whitespace-pre-wrap break-words">
-                            <Formatted text={f.value} />
+                            <Formatted text={f.value} names={names} />
                           </p>
                         </div>
                       ))}
@@ -1378,7 +1401,7 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                 <span className="inline-block rounded bg-[#5865F2] px-3 py-1.5 text-sm font-medium text-white">{preview.text}</span>
               ) : (
                 <p className="whitespace-pre-wrap break-words text-sm text-[#DBDEE1]">
-                  <Formatted text={preview.text} />
+                  <Formatted text={preview.text} names={names} />
                 </p>
               )}
             </div>

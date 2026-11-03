@@ -231,11 +231,10 @@ export function buildRoomNotice(setup: MatchSetup, phase: string, number: number
 }
 
 export function buildLeaderboard(setup: MatchSetup, rows: MatchPlayer[]) {
-  const medals = ["🥇", "🥈", "🥉"];
   const lines = rows.map((p, i) => {
     const games = p.wins + p.losses;
     const percent = games ? Math.round((p.wins / games) * 100) : 0;
-    return `${medals[i] ?? `**${i + 1}.**`} <@${p.userId}>: ${p.wins}W ${p.losses}L · ${percent}%${p.tournamentWins ? ` · 🏆 ${p.tournamentWins}` : ""}${p.streak > 1 ? ` · 🔥 ${p.streak}` : ""}`;
+    return `**${i + 1}.** <@${p.userId}>: ${p.wins}W ${p.losses}L · ${percent}%${p.tournamentWins ? ` · 🏆 ${p.tournamentWins}` : ""}${p.streak > 1 ? ` · 🔥 ${p.streak}` : ""}`;
   });
   return new EmbedBuilder()
     .setColor(COLOR.gold)

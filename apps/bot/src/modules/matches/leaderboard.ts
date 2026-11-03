@@ -8,12 +8,11 @@ import { tallyBoard, type BoardEntry } from "./engine";
 import { withLock } from "./lock";
 import { stringList } from "./render";
 
-const MEDALS = ["🥇", "🥈", "🥉"];
 
 function line(entry: BoardEntry, index: number, name: string): string {
   const games = entry.wins + entry.losses;
   const percent = games ? Math.round((entry.wins / games) * 100) : 0;
-  return `${MEDALS[index] ?? `**${index + 1}.**`} ${name}: ${entry.wins}W ${entry.losses}L · ${percent}%`;
+  return `**${index + 1}.** ${name}: ${entry.wins}W ${entry.losses}L · ${percent}%`;
 }
 
 // Your own description stays, with the ranked list always below it.

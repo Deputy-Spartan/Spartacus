@@ -55,8 +55,8 @@ const STEEL = "#7B99BC";
 const GREEN = "#3BA55D";
 
 const gameTokens = { game: "Rainbow Six Siege", setup: "Friday Night 5v5", number: "12" };
-const samplePlayers = "🥇 Kuro: 12W 3L · 80%\n🥈 FrostByte: 10W 4L · 71%\n🥉 Deimos: 9W 5L · 64%";
-const sampleTeams = "🥇 Night Crew: 7W 1L · 88%\n🥈 Red Line: 5W 3L · 63%";
+const samplePlayers = "**1.** @Kuro: 12W 3L · 80%\n**2.** @FrostByte: 10W 4L · 71%\n**3.** @Deimos: 9W 5L · 64%";
+const sampleTeams = "**1.** Night Crew: 7W 1L · 88%\n**2.** Red Line: 5W 3L · 63%";
 const countTokens = { progress: "🟩🟩🟩⬛⬛", count: "6", needed: "10" };
 const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it.", startTime: "Friday, November 6 at 10:00 PM (in 6 days)", format: "Tournament · Single Elimination", teams: "Up to 4 teams · Up to 5 per team", maps: "Player vote on 3 maps", signedUp: "**6** signed up", eventLink: "[View event](https://discord.com)" };
 const signupPlayers = [{ name: "Players", value: "Nobody yet. Be the first!" }];

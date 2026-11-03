@@ -426,25 +426,29 @@ async function pickupDefaults(config: MatchmakingConfig, game: string, userId: s
 function pickupScreen(index: number, setup: PickupSetup, size: number, note = ""): InteractionEditReplyOptions {
   const { players, mode, teamOne } = setup;
   const max = Math.min(25, size * 2);
-  // A people menu with picks filled in draws name chips over the message in
-  // Discord, so the list is a plain checklist and adding someone is separate.
-  const who = new StringSelectMenuBuilder().setCustomId(`mmpickwho:${index}`).setPlaceholder("Who's playing?").setMinValues(0).setMaxValues(setup.pool.length)
-    .addOptions(setup.pool.map((id) => ({ label: setup.names?.[id] ?? "Player", value: id, default: players.includes(id) })));
+  // A menu that opens with picks filled in draws name chips over the message
+  // in Discord, so who's playing goes in the menu's placeholder instead.
+  const nameList = (ids: string[]) => ids.map((id) => setup.names?.[id] ?? "Player").join(", ");
+  const fit = (text: string) => (text.length > 150 ? `${text.slice(0, 149)}…` : text);
+  const out = players.length
+    ? [row(new StringSelectMenuBuilder().setCustomId(`mmpickwho:${index}`).setPlaceholder(fit(`Playing (${players.length}): ${nameList(players)}`)).setMinValues(1).setMaxValues(players.length)
+        .addOptions(players.map((id) => ({ label: setup.names?.[id] ?? "Player", description: "Tap to take out", value: id }))))]
+    : [];
   const add = new UserSelectMenuBuilder().setCustomId(`mmpickadd:${index}`).setPlaceholder("Add someone else").setMinValues(1).setMaxValues(Math.min(10, max));
   const how = new StringSelectMenuBuilder().setCustomId(`mmpickhow:${index}`).addOptions(
     { label: "Random teams", description: "Shuffle everyone into two even sides", value: "random", default: mode === "random" },
     { label: "I'll pick the teams", description: "Choose who's on Team 1, everyone else is Team 2", value: "pick", default: mode === "pick" },
   );
-  const rows: Row[] = [row(who), row(add), row(how)];
+  const rows: Row[] = [...out, row(add), row(how)];
   const lines = [`⚡ **Pickup match · ${setup.game}** (up to ${size}v${size})`, `Players (${players.length}): ${players.length ? mentionAll(players) : "nobody yet"}`];
   if (mode === "pick" && players.length >= 2) {
     const chosen = (teamOne ?? []).filter((id) => players.includes(id));
-    rows.push(row(new StringSelectMenuBuilder().setCustomId(`mmpickside:${index}`).setPlaceholder("Who's on Team 1?").setMinValues(1).setMaxValues(players.length - 1)
-      .addOptions(players.map((id) => ({ label: setup.names?.[id] ?? id, value: id, default: chosen.includes(id) })))));
+    rows.push(row(new StringSelectMenuBuilder().setCustomId(`mmpickside:${index}`).setPlaceholder(fit(chosen.length ? `Team 1: ${nameList(chosen)}` : "Who's on Team 1?")).setMinValues(1).setMaxValues(players.length - 1)
+      .addOptions(players.map((id) => ({ label: setup.names?.[id] ?? id, value: id })))));
     if (chosen.length) lines.push(`Team 1: ${mentionAll(chosen)}`, `Team 2: ${mentionAll(players.filter((id) => !chosen.includes(id)))}`);
   }
   rows.push(row(button(`mmpickgo:${index}`, "Start Match", ButtonStyle.Success)));
-  lines.push("", "Untick anyone who isn't playing, add anyone missing, choose how teams are made, then tap **Start Match**. Close a menu to save what you picked.");
+  lines.push("", "Take out anyone who isn't playing, add anyone missing, choose how teams are made, then tap **Start Match**.");
   if (note) lines.push("", note);
   return { content: lines.join("\n").slice(0, 2000), components: rows, allowedMentions: { parse: [] } };
 }
@@ -897,7 +901,7 @@ export async function handleMatchmaking(interaction: Interaction) {
       if (!setup) return void (await reply(interaction, "This setup timed out. Tap Start Pickup Match again."));
       const size = teamSizeFor(await presetFor(guildId, setup.game));
       if (prefix === "mmpickwho" && interaction.isStringSelectMenu()) {
-        setup.players = setup.pool.filter((id) => interaction.values.includes(id)).slice(0, size * 2);
+        setup.players = setup.players.filter((id) => !interaction.values.includes(id));
       } else if (prefix === "mmpickadd" && interaction.isUserSelectMenu()) {
         const added = [...interaction.users.filter((u) => !u.bot).keys()];
         setup.pool = [...new Set([...setup.pool, ...added])].slice(-25);

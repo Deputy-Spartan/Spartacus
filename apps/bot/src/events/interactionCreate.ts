@@ -22,6 +22,18 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if ((interaction.isButton() || interaction.isModalSubmit()) && /^tvcm?:/.test(interaction.customId)) {
+    const { handleTempChannelControl } = await import("../modules/community/tempChannelControls");
+    await handleTempChannelControl(interaction);
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("srvsetup:")) {
+    const { handleServerSetupInteraction } = await import("../modules/setup/serverSetupCommand");
+    await handleServerSetupInteraction(interaction);
+    return;
+  }
+
   if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^match(rank|draft|score|name|setup)?:/.test(interaction.customId)) {
     if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "MATCHES"))) {
       await interaction.reply({ content: "⚠️ Matches is disabled for this server.", ephemeral: true });

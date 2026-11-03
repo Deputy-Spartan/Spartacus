@@ -3,3 +3,5 @@ export * from "./navItems";
 export * from "./voiceNames";
 export * from "./matchTexts";
 export * from "./rankGroups";
+
+export * from "./serverBlueprint";

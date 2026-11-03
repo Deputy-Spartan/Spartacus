@@ -20,6 +20,7 @@ router.get("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
     config ?? {
       guildId: req.params.guildId,
       channelId: null,
+      leaveChannelId: null,
       welcomeText: "Welcome to {server}, {user}!",
       goodbyeText: "{user} has left {server}.",
       embedColor: "#00E5FF",
@@ -31,8 +32,9 @@ router.get("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
 });
 
 router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, welcomeText, goodbyeText, embedColor, embedEnabled, embedTitle, buttons, embedExtra, savedEmbedId } = req.body as {
+  const { channelId, leaveChannelId, welcomeText, goodbyeText, embedColor, embedEnabled, embedTitle, buttons, embedExtra, savedEmbedId } = req.body as {
     channelId?: string;
+    leaveChannelId?: string | null;
     welcomeText?: string;
     goodbyeText?: string;
     embedColor?: string;
@@ -45,6 +47,7 @@ router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
 
   const data = {
     channelId,
+    leaveChannelId: leaveChannelId || null,
     welcomeText,
     goodbyeText,
     embedColor,

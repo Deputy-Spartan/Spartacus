@@ -20,9 +20,11 @@ export async function execute(member: GuildMember | PartialGuildMember) {
   if (!enabled) return;
 
   const config = await prisma.welcomeConfig.findUnique({ where: { guildId: member.guild.id } });
-  if (!config?.channelId) return;
+  // Goodbyes can go to their own channel, like a staff log, instead of the welcome one.
+  const channelId = config?.leaveChannelId ?? config?.channelId;
+  if (!config || !channelId) return;
 
-  const channel = await member.guild.channels.fetch(config.channelId).catch(() => null);
+  const channel = await member.guild.channels.fetch(channelId).catch(() => null);
   if (!channel?.isTextBased()) return;
 
   const payload = await buildGoodbyePayload(member.guild, config, member);

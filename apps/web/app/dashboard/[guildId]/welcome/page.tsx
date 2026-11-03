@@ -121,6 +121,15 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
             tokens={WELCOME_SEGMENT_TOKENS}
           />
 
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Goodbye Channel (optional)</label>
+          <ChannelSelect
+            guildId={params.guildId}
+            value={config.leaveChannelId ?? null}
+            onChange={(leaveChannelId) => setConfig({ ...config, leaveChannelId: leaveChannelId || null })}
+            placeholder="Same as the welcome channel"
+          />
+          <p className="text-xs text-slate-600 mt-1">Pick a staff channel to keep goodbyes out of the public welcome channel.</p>
+
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Goodbye Message</label>
           <MessageSegmentBuilder
             value={config.goodbyeText}

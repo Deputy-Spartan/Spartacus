@@ -91,7 +91,8 @@ export async function sendWelcomeTest(client: Client, guildId: string, callerId:
   const guild = await client.guilds.fetch(guildId).catch(() => null);
   if (!guild) return { ok: false, error: "Couldn't load this server." };
 
-  const channel = await guild.channels.fetch(config.channelId).catch(() => null);
+  const channelId = kind === "goodbye" ? config.leaveChannelId ?? config.channelId : config.channelId;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel)) return { ok: false, error: "The configured channel isn't postable." };
 
   const member = await guild.members.fetch(callerId).catch(() => null);

@@ -87,6 +87,7 @@ export interface DashboardActivityEntry {
 export interface WelcomeConfig {
   guildId: string;
   channelId: string | null;
+  leaveChannelId?: string | null;
   welcomeText: string;
   goodbyeText: string;
   embedColor: string;

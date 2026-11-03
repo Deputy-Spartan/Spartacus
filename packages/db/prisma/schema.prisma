@@ -243,6 +243,7 @@ model WelcomeConfig {
   guild        Guild   @relation(fields: [guildId], references: [id])
   guildId      String  @unique
   channelId    String?
+  leaveChannelId String? // goodbyes post here when set, otherwise in channelId
   welcomeText  String?
   goodbyeText  String?
   embedColor   String? @default("#00E5FF")

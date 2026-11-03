@@ -1,6 +1,7 @@
 import { ChannelType, Events, VoiceState } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
+import { tempChannelControls } from "./tempChannelControls";
 
 export const name = Events.VoiceStateUpdate;
 
@@ -48,6 +49,7 @@ async function handleJoin(state: VoiceState) {
   if (!created) return;
 
   await state.member.voice.setChannel(created.id).catch(() => null);
+  await created.send(tempChannelControls(created.id)).catch(() => null);
 
   let textChannelId: string | undefined;
   if (lobby.pairTextChannel) {

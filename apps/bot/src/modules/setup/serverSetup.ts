@@ -375,7 +375,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
   const staffRoles = ["staff", "support"].map(role).filter(Boolean) as string[];
 
   const tasks: Array<[string, () => Promise<unknown>]> = [
-    ["Welcome", () => fillSettings("welcomeConfig", g, { channelId: ch("welcome"), leaveChannelId: ch("server-log"), welcomeText: `Welcome to **{server}**, {user}! Read and accept <#${ch("rules")}>, then pick your games in <#${ch("roles")}>.`, goodbyeText: "{user} left {server}." })],
+    ["Welcome", () => fillSettings("welcomeConfig", g, { channelId: ch("welcome"), leaveChannelId: ch("server-log"), welcomeText: `Welcome to **{server}**! Read and accept <#${ch("rules")}>, then pick your games in <#${ch("roles")}>.`, goodbyeText: "{user} left {server}." })],
     ["Rules", async () => {
       const settings = await fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: BLUEPRINT_RULES });
       return settings;

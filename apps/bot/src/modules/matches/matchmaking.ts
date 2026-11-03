@@ -96,7 +96,7 @@ async function buildPanel(config: MatchmakingConfig) {
     components: [
       row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Danger)),
       row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Danger)),
-      row(button("mm:pickup", say("btnPickup"), ButtonStyle.Success), button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary)),
+      row(button("mm:pickup", say("btnPickup"), ButtonStyle.Success), button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary), button("mm:help", say("btnHelp"), ButtonStyle.Secondary)),
     ],
     allowedMentions: { parse: [] as never[] },
   };
@@ -192,9 +192,15 @@ async function postPanel(client: Client, guildId: string) {
 
 // ---- Match rooms ----
 
+// The captain is listed first with a crown, since they're the one who reports.
+function sideList(room: MatchRoom, players: string[], captain: string) {
+  if (room.kind === "SOLO") return mentionAll(players);
+  return [captain, ...players.filter((id) => id !== captain)].map((id) => (id === captain ? `👑 <@${id}>` : `👤 <@${id}>`)).join("\n");
+}
+
 function roomEmbed(room: MatchRoom, texts: unknown) {
   const embed = styleEmbed(new EmbedBuilder(), texts, "room", { a: room.aName, b: room.bName, game: room.game, onMap: room.map ? ` on ${room.map}` : "" })
-    .addFields({ name: room.aName.slice(0, 256), value: mentionAll(stringList(room.aPlayers)).slice(0, 1024), inline: true }, { name: room.bName.slice(0, 256), value: mentionAll(stringList(room.bPlayers)).slice(0, 1024), inline: true });
+    .addFields({ name: room.aName.slice(0, 256), value: sideList(room, stringList(room.aPlayers), room.aCaptain).slice(0, 1024), inline: true }, { name: room.bName.slice(0, 256), value: sideList(room, stringList(room.bPlayers), room.bCaptain).slice(0, 1024), inline: true });
   if (room.status === "DONE") embed.setColor(0xf0b232);
   if (room.status === "CANCELED") embed.setColor(0xed4245).setTitle(`Canceled: ${room.aName} vs ${room.bName}`.slice(0, 256));
   if (room.status === "CONFIRM") embed.addFields({ name: "Waiting for confirmation", value: `<@${room.reportedBy}> reported **${room.reportSide === "a" ? room.aName : room.bName}** won ${room.reportHigh}-${room.reportLow}. It's accepted automatically in 5 minutes.` });
@@ -795,6 +801,7 @@ export async function handleMatchmaking(interaction: Interaction) {
       return;
     }
     const games = stringList(config.games);
+    const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
 
     if (prefix === "mm" && interaction.isButton()) {
       const [, action, arg] = parts;
@@ -805,6 +812,10 @@ export async function handleMatchmaking(interaction: Interaction) {
         return void (await renameModal(interaction, team));
       }
       await interaction.deferReply({ ephemeral: true });
+      if (action === "help") {
+        const tokens = { pickup: say("btnPickup"), findSolo: say("btnFindSolo"), challengeSolo: say("btnChallengeSolo"), createTeam: say("btnCreateTeam"), myTeams: say("btnMyTeams"), findTeam: say("btnFindTeam"), challengeTeam: say("btnChallengeTeam"), lft: say("btnLookingForTeam") };
+        return void (await reply(interaction, { embeds: [styleEmbed(new EmbedBuilder(), config.texts, "helpGuide", tokens)], components: [] }));
+      }
       if (action === "find" || action === "challenge" || action === "newteam" || action === "lft" || action === "pickup") {
         const game = await chooseGame(interaction, config, action, arg ?? "");
         if (!game) return;

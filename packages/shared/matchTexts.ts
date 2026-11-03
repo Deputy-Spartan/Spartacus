@@ -75,14 +75,18 @@ const buttonLabel = (label: string, hint: string, global = false): MatchTextEntr
 const note = (label: string, hint: string, text: string, tokens: Record<string, string> = {}, global = false): MatchTextEntry => ({ group: "Labels and Notes", label, hint, defaults: { text }, tokens, global });
 
 export const MATCH_TEXTS = {
-  boardSolo: { ...embed("Matchmaking", "1v1 board", "The 1v1 half of the always-open board.", { title: "⚔️ 1v1 Matchmaking", description: "Find an opponent or challenge someone. Spartacus sets up the match right away.", color: STEEL }), global: true },
-  boardTeam: { ...embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Create a team once, then queue or challenge any time.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }), global: true },
+  boardSolo: { ...embed("Matchmaking", "1v1 board", "The 1v1 half of the always-open board.", { title: "⚔️ 1v1 Matchmaking", description: "Find a Match pairs you with the next player who taps it. Challenge a Player picks someone directly.", color: STEEL }), global: true },
+  boardTeam: { ...embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Make a team once, then the captain queues it or challenges another team. No team? Tap Looking for a Team.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }), global: true },
   boardTeamList: {
     ...embed("Matchmaking", "Teams list", "The third part of the always-open board: every team and who's on it.", { title: "🛡️ Teams", description: "Every team and who's on it. Captains manage theirs from My Teams.", color: STEEL }),
     previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }],
     global: true,
   },
-  room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
+  room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}\n\nWhen you're done, a captain (👑) taps who won and types the score. The other side taps Confirm.", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
+  helpGuide: {
+    ...embed("Matchmaking", "How it works", "Shown privately when someone taps How it works on the board. Button names fill in by themselves.", { title: "❓ How Matchmaking works", description: "**⚡ Play right now**\nJoin a voice channel, tap **{pickup}**, check who's playing, then tap **Start Match**. Teams can be uneven.\n\n**⚔️ 1v1**\n**{findSolo}** pairs you with the next player who taps it. **{challengeSolo}** sends one person a challenge.\n\n**👥 Teams**\n**{createTeam}** makes your team and **{myTeams}** adds players. The captain then taps **{findTeam}** or **{challengeTeam}**. No team yet? Tap **{lft}** so captains can add you.\n\n**🏁 After the match**\nEveryone gets a private match thread. When you're done, a captain taps who won and types the score, then the other side taps **Confirm**. The leaderboard updates and the thread is deleted.\n\n**🚪 Changed your mind?**\nThe red buttons take you out of a queue.", color: STEEL }, { pickup: "Start Pickup Match", findSolo: "1v1: Find a Match", challengeSolo: "1v1: Challenge a Player", createTeam: "Create a Team", myTeams: "My Teams", findTeam: "Teams: Find a Match", challengeTeam: "Teams: Challenge a Team", lft: "Looking for a Team" }),
+    global: true,
+  },
   challenge: line("Matchmaking", "Challenge ping", "Sent to the player or team being challenged.", "{target} {from} challenged you to {game}. This expires {expires}.", { target: "@Kuro", from: "@FrostByte", game: "Rainbow Six Siege", expires: "in 5 minutes" }),
   roomWon: line("Matchmaking", "Match finished", "Posted in the thread when a match ends.", "🏆 **{winner}** won {score}. This match is closed.", { winner: "Kuro", score: "4-2" }),
   roomCanceled: line("Matchmaking", "Match canceled", "Posted in the thread when a match is canceled.", "This match was canceled and nothing was recorded."),
@@ -150,6 +154,7 @@ export const MATCH_TEXTS = {
   btnCreateTeam: buttonLabel("Create a Team", "On the Matchmaking board.", true),
   btnMyTeams: buttonLabel("My Teams", "On the Matchmaking board.", true),
   btnLookingForTeam: buttonLabel("Looking for a Team", "On the Matchmaking board. Tap again to come off the list.", true),
+  btnHelp: buttonLabel("How it works", "On the Matchmaking board. Shows a short guide privately.", true),
   btnPickup: buttonLabel("Start Pickup Match", "On the Matchmaking board. Picks players from voice and the Looking for a Team list, makes two teams and starts now.", true),
   btnAccept: buttonLabel("Accept", "On challenges."),
   btnDecline: buttonLabel("Decline", "On challenges."),

@@ -491,7 +491,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
                 <Buttons texts={texts} items={[["btnFindSolo", "green"], ["btnChallengeSolo", "blue"], ["btnLeaveSolo", "red"]]} />
                 <Buttons texts={texts} items={[["btnFindTeam", "green"], ["btnChallengeTeam", "blue"], ["btnLeaveTeam", "red"]]} />
-                <Buttons texts={texts} items={[["btnPickup", "green"], ["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"]]} />
+                <Buttons texts={texts} items={[["btnPickup", "green"], ["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"], ["btnHelp", "gray"]]} />
               </Frame>
               <Table
                 heads={["Setting", "Default", "What it does"]}
@@ -504,7 +504,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
               />
               <Tip>These timers stay on because there's no staff to clear things. You can change each one.</Tip>
               <Frame label="Preview: a match room">
-                <Embed texts={texts} item="room" fields={[{ name: "Kuro", value: "@Kuro" }, { name: "FrostByte", value: "@FrostByte" }]} />
+                <Embed texts={texts} item="room" fields={[{ name: "Night Crew", value: "👑 @Kuro\n👤 @Deimos" }, { name: "Red Line", value: "👑 @FrostByte\n👤 @Vex" }]} />
               </Frame>
               <Text>Live Matches, Teams and Match History on this tab let staff cancel a match, disband a team, or void a result. Nothing needs them day to day.</Text>
               <GoTo tab="queue" label="Matchmaking" onOpen={onOpen} />
@@ -584,6 +584,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["Answer a challenge", `${resolveText(texts, "btnAccept").text} or ${resolveText(texts, "btnDecline").text} on the ping`],
                     ["Create a team", `${resolveText(texts, "btnCreateTeam").text}, name it, then pick teammates. You can leave spots open. Captains create one team per game`],
                     ["Find a team", `${resolveText(texts, "btnLookingForTeam").text} lists you for a game so captains can add you. Tap it again to come off. The list clears after 24 hours`],
+                    ["New here?", `${resolveText(texts, "btnHelp").text} on the board shows a short guide to everything below`],
                     ["Play now without full teams", `${resolveText(texts, "btnPickup").text} then pick the game. Everyone in your voice channel (or the lobby) and on the Looking for a Team list is filled in, so take out anyone not playing, add anyone missing, choose random teams or move players between Team 1 and Team 2 yourself, then tap Start Match. Uneven teams like 3v2 are fine. Results count for each player, not for a team`],
                     ["Queue your team", `${resolveText(texts, "btnFindTeam").text}. Only the captain can do this`],
                     ["Manage your team", `${resolveText(texts, "btnMyTeams").text} shows your teams. Captains can rename, change players, invite players (they get a message to accept or decline), add people who are looking, or disband. Players can leave a team there`],

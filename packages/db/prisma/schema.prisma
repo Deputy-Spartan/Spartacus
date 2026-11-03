@@ -244,6 +244,7 @@ model WelcomeConfig {
   guildId      String  @unique
   channelId    String?
   leaveChannelId String? // goodbyes post here when set, otherwise in channelId
+  pingAboveEmbed Boolean @default(true) // embed mentions never notify, so the new member is also pinged above the embed
   welcomeText  String?
   goodbyeText  String?
   embedColor   String? @default("#00E5FF")

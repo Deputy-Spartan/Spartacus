@@ -88,6 +88,7 @@ export interface WelcomeConfig {
   guildId: string;
   channelId: string | null;
   leaveChannelId?: string | null;
+  pingAboveEmbed?: boolean;
   welcomeText: string;
   goodbyeText: string;
   embedColor: string;

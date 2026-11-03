@@ -150,6 +150,17 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
           {config.embedEnabled && (
             <>
+              <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium">Also Ping Them Above the Embed</p>
+                  <p className="text-xs text-slate-500">
+                    A mention inside an embed shows their name but doesn't notify them. On adds a ping above the embed so they get a notification. Off
+                    shows the name only inside the embed.
+                  </p>
+                </div>
+                <ToggleSwitch enabled={config.pingAboveEmbed !== false} onChange={(v) => setConfig({ ...config, pingAboveEmbed: v })} label="Ping above the embed" />
+              </div>
+
               <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Title (optional)</label>
               <input
                 className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"

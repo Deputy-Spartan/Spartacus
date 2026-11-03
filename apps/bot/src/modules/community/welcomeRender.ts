@@ -34,7 +34,8 @@ export async function buildWelcomePayload(guild: Guild, config: WelcomeConfig, m
   // Discord never delivers a ping notification for a mention that only
   // appears inside an embed, so add the bare mention back to `content` if
   // embed mode left it empty — see guildMemberAdd.ts for the full reasoning.
-  if (!payload.content?.includes(tokens["{user}"])) {
+  // Servers can turn this off to show the name only inside the embed.
+  if (config.pingAboveEmbed !== false && !payload.content?.includes(tokens["{user}"])) {
     payload.content = [tokens["{user}"], payload.content].filter(Boolean).join(" ");
   }
 

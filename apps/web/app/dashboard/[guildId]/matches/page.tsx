@@ -12,7 +12,7 @@ import { MatchmakingGuide } from "../../../../components/matchmaking/Matchmaking
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useAutoSave } from "../../../../lib/useAutoSave";
-import { MATCH_TEXTS, MATCH_TEXT_GROUPS, VOICE_TOKENS, gameColor, rankListProblem, renderTextRoomName, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
+import { BOARD_PARTS, MATCH_TEXTS, MATCH_TEXT_GROUPS, boardPartOrder, VOICE_TOKENS, gameColor, rankListProblem, renderTextRoomName, renderVoiceName, resolveText, textsForGame, type MatchTextEntry, type MatchTextKey, type TextField, type TextOverride } from "@spartacus/shared";
 import { api, type DiscordChannels, type MatchPresetInput, type MatchPresetRow, type MatchResultRow, type MatchSetupInput, type MatchSetupRow, type MatchmakingConfigRow, type MatchmakingOverview } from "../../../../lib/api";
 
 const STEPS = ["Game", "Format", "Teams", "Maps", "Schedule", "Match Flow", "Rewards", "Review"];
@@ -1094,12 +1094,12 @@ function Formatted({ text, headings = false }: { text: string; headings?: boolea
   );
 }
 
-function MessagesTab({ guildId }: { guildId: string }) {
+function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchTextKey }) {
   const [saved, setSaved] = useState<Pick<MatchmakingConfigRow, "texts" | "gameTexts"> | null>(null);
   const [games, setGames] = useState<string[]>([]);
   const [scope, setScope] = useState("ALL");
-  const [group, setGroup] = useState(MATCH_TEXT_GROUPS[0]);
-  const [key, setKey] = useState<MatchTextKey>("boardSolo");
+  const [group, setGroup] = useState(startKey ? MATCH_TEXTS[startKey].group : MATCH_TEXT_GROUPS[0]);
+  const [key, setKey] = useState<MatchTextKey>(startKey ?? "boardSolo");
   const [more, setMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1389,6 +1389,78 @@ function MessagesTab({ guildId }: { guildId: string }) {
   );
 }
 
+const BUTTON_COLORS = { green: "bg-[#248046]", blue: "bg-[#5865F2]", red: "bg-[#DA373C]", gray: "bg-[#4E5058]" } as const;
+
+// The board as Discord shows it: one message per part with its buttons.
+// Parts can be switched off and reordered, and Edit opens the wording.
+function BoardLayout({ config, onChange, onEditText }: { config: MatchmakingConfigRow; onChange: (panelParts: string[]) => void; onEditText: (key: MatchTextKey) => void }) {
+  const on = boardPartOrder(config.panelParts);
+  const off = BOARD_PARTS.map((p) => p.id).filter((id) => !on.includes(id));
+  const move = (index: number, by: number) => {
+    const next = [...on];
+    const [item] = next.splice(index, 1);
+    next.splice(index + by, 0, item);
+    onChange(next);
+  };
+  return (
+    <NeonCard>
+      <p className="font-medium mb-1">Board Layout</p>
+      <p className="text-xs text-slate-500 mb-3">The board posts as separate messages, top to bottom like below, each with its buttons under it. Switch parts on or off, move them, or tap Edit to change what a part or button says. Changes show in Discord within a few seconds.</p>
+      <div className="space-y-2">
+        {[...on, ...off].map((id) => {
+          const part = BOARD_PARTS.find((p) => p.id === id)!;
+          const shown = on.includes(id);
+          const index = on.indexOf(id);
+          const look = resolveText(config.texts, part.embed);
+          return (
+            <div key={id} className={`rounded-lg border border-white/10 p-3 ${shown ? "" : "opacity-50"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <p className="text-sm font-medium">
+                  {shown ? `${index + 1}. ` : ""}
+                  {part.label}
+                  {!shown && <span className="text-xs text-slate-500"> · hidden</span>}
+                </p>
+                <div className="flex items-center gap-3 text-xs">
+                  {shown && (
+                    <>
+                      <button type="button" disabled={index === 0} onClick={() => move(index, -1)} className="text-slate-400 hover:text-slate-100 disabled:opacity-30 py-1" aria-label={`Move ${part.label} up`}>
+                        ▲ Up
+                      </button>
+                      <button type="button" disabled={index === on.length - 1} onClick={() => move(index, 1)} className="text-slate-400 hover:text-slate-100 disabled:opacity-30 py-1" aria-label={`Move ${part.label} down`}>
+                        ▼ Down
+                      </button>
+                    </>
+                  )}
+                  <ToggleSwitch enabled={shown} onChange={(next) => (next ? onChange([...on, id]) : on.length > 1 && onChange(on.filter((x) => x !== id)))} label={`Show ${part.label}`} />
+                </div>
+              </div>
+              <div className="rounded-lg bg-[#313338] p-3">
+                <button type="button" onClick={() => onEditText(part.embed)} className="group block w-full text-left rounded border-l-4 bg-[#2B2D31] p-3 text-sm text-[#DBDEE1] hover:ring-1 hover:ring-neon-blue" style={{ borderLeftColor: look.color }}>
+                  {look.title && <p className="font-semibold text-white break-words">{look.title}</p>}
+                  {look.description && <p className="whitespace-pre-wrap break-words text-xs mt-1 line-clamp-3">{look.description}</p>}
+                  {look.footer && <p className="text-[11px] text-[#949BA4] mt-1 break-words">{look.footer}</p>}
+                  <span className="mt-2 inline-block text-[11px] text-neon-blue opacity-70 group-hover:opacity-100">✎ Edit this embed</span>
+                </button>
+                {part.buttons.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {part.buttons.map((b) => (
+                      <button key={b.key} type="button" onClick={() => onEditText(b.key)} title="Edit this button's wording" className={`rounded px-3 py-1.5 text-xs font-medium text-white hover:ring-1 hover:ring-white/60 ${BUTTON_COLORS[b.color]}`}>
+                        {resolveText(config.texts, b.key).text}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {part.buttons.length === 0 && <p className="text-[11px] text-[#949BA4] mt-2">No buttons. Spartacus fills in the teams and players.</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <Hint>Tap an embed or a button above to change its wording, colors and images in Messages. At least one part has to stay on.</Hint>
+    </NeonCard>
+  );
+}
+
 function SettingsTab({ guildId }: { guildId: string }) {
   const confirm = useConfirm();
   const [games, setGames] = useState<MatchPresetRow[] | null>(null);
@@ -1460,7 +1532,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
   );
 }
 
-function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" }) {
+function ConfigTabs({ guildId, tab, onEditText }: { guildId: string; tab: "board" | "queue"; onEditText: (key: MatchTextKey) => void }) {
   const confirm = useConfirm();
   const [data, setData] = useState<MatchmakingOverview | null>(null);
   const [config, setConfig] = useState<MatchmakingConfigRow | null>(null);
@@ -1597,6 +1669,8 @@ function ConfigTabs({ guildId, tab }: { guildId: string; tab: "board" | "queue" 
         <SaveStatus status={autoSave} />
       </NeonCard>
 
+      <BoardLayout config={config} onChange={(panelParts) => set({ panelParts })} onEditText={onEditText} />
+
       <NeonCard>
         <p className="font-medium mb-1">Live Matches</p>
         <p className="text-xs text-slate-500 mb-2">Staff can step in here. Nothing needs them.</p>
@@ -1660,6 +1734,12 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
   const [builder, setBuilder] = useState<{ editing: MatchSetupRow | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<"setups" | "board" | "queue" | "games" | "voice" | "messages" | "guide">("setups");
+  const [messageKey, setMessageKey] = useState<MatchTextKey | undefined>(undefined);
+  const editText = (key: MatchTextKey) => {
+    setMessageKey(key);
+    setTab("messages");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const [roster, setRoster] = useState<Array<{ team: string; players: string[] }>>([]);
   const [results, setResults] = useState<MatchResultRow[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1740,9 +1820,9 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
       ) : tab === "voice" ? (
         <VoiceSettings guildId={guildId} />
       ) : tab === "messages" ? (
-        <MessagesTab guildId={guildId} />
+        <MessagesTab key={messageKey ?? "start"} guildId={guildId} startKey={messageKey} />
       ) : tab !== "setups" ? (
-        <ConfigTabs key={tab} guildId={guildId} tab={tab} />
+        <ConfigTabs key={tab} guildId={guildId} tab={tab} onEditText={editText} />
       ) : builder ? (
         <SetupBuilder
           guildId={guildId}

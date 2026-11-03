@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { MAX_RANKS, cleanGameOverrides, cleanOverrides, rankListProblem } from "@spartacus/shared";
+import { MAX_RANKS, cleanGameOverrides, cleanOverrides, rankListProblem, boardPartOrder } from "@spartacus/shared";
 import { Prisma, prisma } from "@spartacus/db";
 import { deleteChannelMessage } from "../lib/discordRest";
 import { getBotClient } from "../lib/botClient";
@@ -307,7 +307,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "textRooms", "textRoomName", "textRoomView", "roomCloseSeconds", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["panelParts", "boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "textRooms", "textRoomName", "textRoomView", "roomCloseSeconds", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
@@ -331,19 +331,23 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   for (const key of ["duelVoiceName", "teamVoiceName", "textRoomName"]) if (b[key] !== undefined && !text(b[key], 100)) return res.status(400).json({ error: "Channel names can't be empty." });
   if (b.roomCloseSeconds !== undefined && !whole(b.roomCloseSeconds, 0, 600)) return res.status(400).json({ error: "Close time must be from 0 to 600 seconds." });
   if (b.textRoomView !== undefined && !["PLAYERS", "ALL"].includes(b.textRoomView as string)) return res.status(400).json({ error: "Pick who can see match channels." });
+  if (b.panelParts !== undefined && (!Array.isArray(b.panelParts) || b.panelParts.length === 0 || boardPartOrder(b.panelParts).length !== new Set(b.panelParts).size)) return res.status(400).json({ error: "Keep at least one part of the board on." });
   if (b.requireLobby && !b.lobbyVoiceId) return res.status(400).json({ error: "Pick a Lobby before requiring it." });
 
   const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
-  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 500) : b[k] === "" ? null : b[k]]));
+  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 500) : k === "panelParts" ? boardPartOrder(b[k]) : b[k] === "" ? null : b[k]]));
   const movedBoard = b.boardChannelId !== undefined && (b.boardChannelId || null) !== existing.boardChannelId;
   const movedPanel = b.channelId !== undefined && (b.channelId || null) !== existing.channelId;
   const switchedOff = b.enabled === false && existing.enabled;
   if (movedBoard && existing.boardChannelId) {
     for (const id of Object.values((existing.boardMessages ?? {}) as Record<string, string>)) await deleteChannelMessage(existing.boardChannelId, id).catch(() => null);
   }
-  if ((movedPanel || switchedOff) && existing.channelId && existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
+  if ((movedPanel || switchedOff) && existing.channelId) {
+    const parts = [...new Set([...(Array.isArray(existing.panelMessages) ? (existing.panelMessages as string[]) : []), ...(existing.messageId ? [existing.messageId] : [])])];
+    for (const id of parts) await deleteChannelMessage(existing.channelId, id).catch(() => null);
+  }
 
-  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessages: {} } : {}), ...(movedPanel || switchedOff ? { messageId: null } : {}) } });
+  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessages: {} } : {}), ...(movedPanel || switchedOff ? { messageId: null, panelMessages: [] } : {}) } });
   const client = getBotClient();
   if (client) {
     const { syncBoard, syncMatchmakingPanel } = await import("@spartacus/bot");

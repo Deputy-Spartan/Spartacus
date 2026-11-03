@@ -82,6 +82,8 @@ export const MATCH_TEXTS = {
     previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }],
     global: true,
   },
+  boardPickup: { ...embed("Matchmaking", "Pickup board", "The pickup part of the always-open board.", { title: "⚡ Pickup Match", description: "Play right now with whoever's around, even if teams aren't full. Join voice, tap the button, check who's playing, then start.", color: GREEN }), global: true },
+  boardTools: { ...embed("Matchmaking", "Teams and help board", "The last part of the always-open board.", { title: "🧰 Teams & Help", description: "Make a team, manage yours, or get listed so captains can add you. New here? Tap How it works.", color: STEEL }), global: true },
   room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}\n\nWhen you're done, a captain (👑) taps who won and types the score. The other side taps Confirm.", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
   helpGuide: {
     ...embed("Matchmaking", "How it works", "Shown privately when someone taps How it works on the board. Button names fill in by themselves.", { title: "❓ How Matchmaking works", description: "**⚡ Play right now**\nJoin a voice channel, tap **{pickup}**, check who's playing, then tap **Start Match**. Teams can be uneven.\n\n**⚔️ 1v1**\n**{findSolo}** pairs you with the next player who taps it. **{challengeSolo}** sends one person a challenge.\n\n**👥 Teams**\n**{createTeam}** makes your team and **{myTeams}** adds players. The captain then taps **{findTeam}** or **{challengeTeam}**. No team yet? Tap **{lft}** so captains can add you.\n\n**🏁 After the match**\nEveryone gets a private match thread. When you're done, a captain taps who won and types the score, then the other side taps **Confirm**. The leaderboard updates and the thread is deleted.\n\n**🚪 Changed your mind?**\nThe red buttons take you out of a queue.", color: STEEL }, { pickup: "Start Pickup Match", findSolo: "1v1: Find a Match", challengeSolo: "1v1: Challenge a Player", createTeam: "Create a Team", myTeams: "My Teams", findTeam: "Teams: Find a Match", challengeTeam: "Teams: Challenge a Team", lft: "Looking for a Team" }),
@@ -189,6 +191,26 @@ export const MATCH_TEXTS = {
 } satisfies Record<string, MatchTextEntry>;
 
 export type MatchTextKey = keyof typeof MATCH_TEXTS;
+
+// The Matchmaking board posts one message per part, each with its buttons.
+// Servers choose which parts show and in what order.
+export type BoardButtonColor = "green" | "blue" | "red" | "gray";
+export const BOARD_PARTS = [
+  { id: "SOLO", label: "1v1 Matchmaking", embed: "boardSolo", buttons: [{ key: "btnFindSolo", customId: "mm:find:SOLO", color: "green" }, { key: "btnChallengeSolo", customId: "mm:challenge:SOLO", color: "blue" }, { key: "btnLeaveSolo", customId: "mm:leave:SOLO", color: "red" }] },
+  { id: "TEAM", label: "Team Matchmaking", embed: "boardTeam", buttons: [{ key: "btnFindTeam", customId: "mm:find:TEAM", color: "green" }, { key: "btnChallengeTeam", customId: "mm:challenge:TEAM", color: "blue" }, { key: "btnLeaveTeam", customId: "mm:leave:TEAM", color: "red" }] },
+  { id: "PICKUP", label: "Pickup Match", embed: "boardPickup", buttons: [{ key: "btnPickup", customId: "mm:pickup", color: "green" }] },
+  { id: "TEAMS", label: "Teams list", embed: "boardTeamList", buttons: [] },
+  { id: "TOOLS", label: "Teams & Help", embed: "boardTools", buttons: [{ key: "btnCreateTeam", customId: "mm:newteam", color: "gray" }, { key: "btnMyTeams", customId: "mm:myteam", color: "gray" }, { key: "btnLookingForTeam", customId: "mm:lft", color: "gray" }, { key: "btnHelp", customId: "mm:help", color: "gray" }] },
+] as const satisfies ReadonlyArray<{ id: string; label: string; embed: MatchTextKey; buttons: ReadonlyArray<{ key: MatchTextKey; customId: string; color: BoardButtonColor }> }>;
+export type BoardPartId = (typeof BOARD_PARTS)[number]["id"];
+export const DEFAULT_BOARD_PARTS: BoardPartId[] = BOARD_PARTS.map((p) => p.id);
+
+// The saved order with anything unknown or repeated dropped.
+export function boardPartOrder(value: unknown): BoardPartId[] {
+  const known = new Set<string>(DEFAULT_BOARD_PARTS);
+  const list = Array.isArray(value) ? [...new Set(value.filter((v): v is BoardPartId => typeof v === "string" && known.has(v)))] : [];
+  return list.length ? list : [...DEFAULT_BOARD_PARTS];
+}
 
 export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Match Steps", "Match Rooms", "Results", "Pings", "Buttons", "Labels and Notes"];
 

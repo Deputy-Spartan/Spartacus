@@ -487,11 +487,14 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
               />
               <Frame label="Preview: the board">
                 <Embed texts={texts} item="boardSolo" fields={[{ name: "Waiting (1)", value: "Kuro · Rainbow Six Siege" }]} />
-                <Embed texts={texts} item="boardTeam" fields={[{ name: "Teams waiting (0)", value: "Nobody yet" }]} />
-                <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
                 <Buttons texts={texts} items={[["btnFindSolo", "green"], ["btnChallengeSolo", "blue"], ["btnLeaveSolo", "red"]]} />
+                <Embed texts={texts} item="boardTeam" fields={[{ name: "Teams waiting (0)", value: "Nobody yet" }]} />
                 <Buttons texts={texts} items={[["btnFindTeam", "green"], ["btnChallengeTeam", "blue"], ["btnLeaveTeam", "red"]]} />
-                <Buttons texts={texts} items={[["btnPickup", "green"], ["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"], ["btnHelp", "gray"]]} />
+                <Embed texts={texts} item="boardPickup" />
+                <Buttons texts={texts} items={[["btnPickup", "green"]]} />
+                <Embed texts={texts} item="boardTeamList" fields={[{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }]} />
+                <Embed texts={texts} item="boardTools" />
+                <Buttons texts={texts} items={[["btnCreateTeam", "gray"], ["btnMyTeams", "gray"], ["btnLookingForTeam", "gray"], ["btnHelp", "gray"]]} />
               </Frame>
               <Table
                 heads={["Setting", "Default", "What it does"]}

@@ -2409,6 +2409,8 @@ model MatchmakingConfig {
   enabled          Boolean   @default(false)
   channelId        String?
   messageId        String?
+  panelMessages    Json      @default("[]") // each part of the board in order; messageId is the first
+  panelParts       Json      @default("[\"SOLO\",\"TEAM\",\"PICKUP\",\"TEAMS\",\"TOOLS\"]") // which parts show, in order
   activityChannelId String? // challenges and match threads, or the board's channel if unset
   lobbyVoiceId     String?
   duelCategoryId   String? // where 1v1 voice channels go, or the Lobby's category if unset

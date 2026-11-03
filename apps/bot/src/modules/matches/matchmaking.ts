@@ -21,7 +21,7 @@ import {
   type UserSelectMenuInteraction,
 } from "discord.js";
 import type { MatchChallenge, MatchPreset, MatchQueue, MatchRoom, MatchTeam, MatchmakingConfig } from "@prisma/client";
-import { resolveText, textsForGame, type MatchTextKey } from "@spartacus/shared";
+import { BOARD_PARTS, boardPartOrder, resolveText, textsForGame, type BoardButtonColor, type BoardPartId, type MatchTextKey } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -87,20 +87,23 @@ async function buildPanel(config: MatchmakingConfig) {
   const lines = (list: string[]) => list.slice(0, 15).join("\n").slice(0, 1024) || "Nobody yet";
 
   const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
-  return {
-    embeds: [
-      styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: resolveText(config.texts, "labelWaiting", { count: solo.length }).text, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
-      styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: resolveText(config.texts, "labelTeamsWaiting", { count: squads.length }).text, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
-      teamListEmbed(config, teams, queue, rooms, presets),
-    ],
-    components: [
-      row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Danger)),
-      row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Danger)),
-      row(button("mm:pickup", say("btnPickup"), ButtonStyle.Success), button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary), button("mm:help", say("btnHelp"), ButtonStyle.Secondary)),
-    ],
-    allowedMentions: { parse: [] as never[] },
+  const embeds: Record<BoardPartId, () => EmbedBuilder> = {
+    SOLO: () => styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: resolveText(config.texts, "labelWaiting", { count: solo.length }).text, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
+    TEAM: () => styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: resolveText(config.texts, "labelTeamsWaiting", { count: squads.length }).text, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
+    PICKUP: () => styleEmbed(new EmbedBuilder(), config.texts, "boardPickup"),
+    TEAMS: () => teamListEmbed(config, teams, queue, rooms, presets),
+    TOOLS: () => styleEmbed(new EmbedBuilder(), config.texts, "boardTools"),
   };
+  // Each part is its own message so its buttons sit right under it. The
+  // server picks which parts show and their order on the dashboard.
+  return boardPartOrder(config.panelParts).map((id) => {
+    const { buttons } = BOARD_PARTS.find((p) => p.id === id)!;
+    const rows = buttons.length ? [row(...buttons.map((b) => button(b.customId, say(b.key), BUTTON_STYLES[b.color])))] : [];
+    return { embeds: [embeds[id]()], components: rows, allowedMentions: { parse: [] as never[] } };
+  });
 }
+
+const BUTTON_STYLES: Record<BoardButtonColor, ButtonStyle> = { green: ButtonStyle.Success, blue: ButtonStyle.Primary, red: ButtonStyle.Danger, gray: ButtonStyle.Secondary };
 
 // Every team with its players, so people can see who's where. Someone on two
 // teams shows under both, and is listed again at the bottom.
@@ -140,16 +143,21 @@ function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: Mat
   return embed.addFields(fields);
 }
 
-// Finds extra boards from two posts landing together, and keeps the saved one.
+// Finds leftover board messages, like the old one-message board or two posts
+// landing together, and keeps the saved ones.
 async function removeExtraPanels(client: Client, channelId: string, guildId: string) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
-  const keep = (await getConfig(guildId))?.messageId;
-  if (!keep) return;
+  const config = await getConfig(guildId);
+  const keep = new Set(stringList(config?.panelMessages));
+  if (!keep.size) return;
+  const teamsTitle = resolveText(config?.texts, "boardTeamList").title;
   const recent = await channel.messages.fetch({ limit: 30 }).catch(() => null);
   for (const message of recent?.values() ?? []) {
-    const isBoard = message.components.some((r) => "components" in r && r.components.some((c) => "customId" in c && c.customId === "mm:find:SOLO"));
-    if (isBoard && message.author.id === client.user?.id && message.id !== keep) await message.delete().catch(() => null);
+    if (message.author.id !== client.user?.id || keep.has(message.id)) continue;
+    const hasBoardButtons = message.components.some((r) => "components" in r && r.components.some((c) => "customId" in c && !!c.customId?.startsWith("mm:")));
+    const isTeamsList = message.components.length === 0 && !!teamsTitle && message.embeds[0]?.title === teamsTitle;
+    if (hasBoardButtons || isTeamsList) await message.delete().catch(() => null);
   }
 }
 
@@ -160,16 +168,31 @@ export function syncMatchmakingPanel(client: Client, guildId: string) {
 
 const sweptGuilds = new Set<string>();
 
+// What each board message last showed, so only parts that changed are edited.
+const shownParts = new Map<string, string>();
+
 async function postPanel(client: Client, guildId: string) {
   const config = await getConfig(guildId);
   if (!config?.enabled || !config.channelId) return;
   const channel = await client.channels.fetch(config.channelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
-  const payload = await buildPanel(config);
+  const parts = await buildPanel(config);
+  const ids = stringList(config.panelMessages);
 
-  if (config.messageId) {
-    const message = await channel.messages.fetch(config.messageId).catch(() => null);
-    if (await message?.edit(payload).catch(() => null)) {
+  if (ids.length === parts.length) {
+    let intact = true;
+    for (const [i, part] of parts.entries()) {
+      const shown = JSON.stringify(part);
+      // The bot's own messages are cached, so checking one is still there is free.
+      const message = await channel.messages.fetch(ids[i]).catch(() => null);
+      if (message && shownParts.get(ids[i]) === shown) continue;
+      if (!(await message?.edit(part).catch(() => null))) {
+        intact = false;
+        break;
+      }
+      shownParts.set(ids[i], shown);
+    }
+    if (intact) {
       if (!sweptGuilds.has(guildId)) {
         sweptGuilds.add(guildId);
         await removeExtraPanels(client, config.channelId, guildId);
@@ -177,15 +200,28 @@ async function postPanel(client: Client, guildId: string) {
       return;
     }
   }
-  const sent = await channel.send(payload).catch((err) => {
-    if (Date.now() - (lastPostError.get(guildId) ?? 0) > POST_ERROR_GAP_MS) {
-      lastPostError.set(guildId, Date.now());
-      logError("bot", err, guildId);
-    }
-    return null;
-  });
-  if (!sent) return;
-  await prisma.matchmakingConfig.update({ where: { guildId }, data: { messageId: sent.id } });
+
+  // A part is missing, so the whole board posts again to keep it in order.
+  for (const id of [...ids, ...(config.messageId && !ids.includes(config.messageId) ? [config.messageId] : [])]) {
+    shownParts.delete(id);
+    const old = await channel.messages.fetch(id).catch(() => null);
+    await old?.delete().catch(() => null);
+  }
+  const sent: string[] = [];
+  for (const part of parts) {
+    const message = await channel.send(part).catch((err) => {
+      if (Date.now() - (lastPostError.get(guildId) ?? 0) > POST_ERROR_GAP_MS) {
+        lastPostError.set(guildId, Date.now());
+        logError("bot", err, guildId);
+      }
+      return null;
+    });
+    if (!message) break;
+    sent.push(message.id);
+    shownParts.set(message.id, JSON.stringify(part));
+  }
+  await prisma.matchmakingConfig.update({ where: { guildId }, data: { messageId: sent[0] ?? null, panelMessages: sent } });
+  if (sent.length < parts.length) return;
   sweptGuilds.add(guildId);
   await removeExtraPanels(client, config.channelId, guildId);
 }

@@ -107,12 +107,54 @@ const BUTTON_STYLES: Record<BoardButtonColor, ButtonStyle> = { green: ButtonStyl
 
 // Every team with its players, so people can see who's where. Someone on two
 // teams shows under both, and is listed again at the bottom.
+function teamField(t: MatchTeam, queue: MatchQueue[], rooms: MatchRoom[], presets: MatchPreset[]) {
+  const players = stringList(t.players);
+  const size = teamSizeFor(presets.find((p) => p.game === t.game) ?? null);
+  const playing = rooms.some((r) => r.kind === "TEAM" && r.game === t.game && (r.aName === t.name || r.bName === t.name));
+  const queued = queue.some((q) => q.kind === "TEAM" && q.teamId === t.id);
+  const status = playing ? " · ⚔️ playing" : queued ? " · 🔍 in queue" : "";
+  const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `👤 <@${id}>`));
+  return { name: `${t.name} · ${t.game} (${players.length}/${size})${status}`.slice(0, 256), value: names.join("\n").slice(0, 1024) };
+}
+
+const sortTeams = (teams: MatchTeam[]) => [...teams].sort((x, y) => x.game.localeCompare(y.game) || x.name.localeCompare(y.name));
+
+// Every team, privately, split over as many embeds as it takes.
+async function activeTeams(config: MatchmakingConfig): Promise<InteractionEditReplyOptions> {
+  const { guildId } = config;
+  const [teams, queue, rooms, presets] = await Promise.all([
+    prisma.matchTeam.findMany({ where: { guildId } }),
+    prisma.matchQueue.findMany({ where: { guildId } }),
+    prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } }),
+    prisma.matchPreset.findMany({ where: { guildId, deleted: false } }),
+  ]);
+  const head = () => styleEmbed(new EmbedBuilder(), config.texts, "activeTeams", { count: teams.length });
+  if (teams.length === 0) return { embeds: [head().setDescription(resolveText(config.texts, "labelNoTeamsYet").text)], components: [], allowedMentions: { parse: [] } };
+  // Discord allows 25 rows per embed, 10 embeds and 6,000 characters per message.
+  const embeds: EmbedBuilder[] = [head()];
+  let rows = 0, chars = 0, shown = 0;
+  for (const t of sortTeams(teams)) {
+    const field = teamField(t, queue, rooms, presets);
+    const length = field.name.length + field.value.length;
+    if (chars + length > 5500) break;
+    if (rows === 25) {
+      if (embeds.length === 10) break;
+      embeds.push(new EmbedBuilder().setColor(embeds[0].data.color ?? null));
+      rows = 0;
+    }
+    embeds.at(-1)!.addFields(field);
+    rows++;
+    chars += length;
+    shown++;
+  }
+  if (shown < teams.length) embeds.at(-1)!.setFooter({ text: `And ${teams.length - shown} more teams that don't fit here.` });
+  return { embeds, components: [], allowedMentions: { parse: [] } };
+}
+
 function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: MatchQueue[], rooms: MatchRoom[], presets: MatchPreset[]) {
   const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
   const embed = styleEmbed(new EmbedBuilder(), config.texts, "boardTeamList");
-  const sorted = [...teams].sort((x, y) => x.game.localeCompare(y.game) || x.name.localeCompare(y.name));
-  const queued = new Set(queue.filter((q) => q.kind === "TEAM").map((q) => q.teamId));
-  const playing = (t: MatchTeam) => rooms.some((r) => r.kind === "TEAM" && r.game === t.game && (r.aName === t.name || r.bName === t.name));
+  const sorted = sortTeams(teams);
 
   const teamsOf = new Map<string, string[]>();
   for (const t of sorted) for (const id of stringList(t.players)) teamsOf.set(id, [...(teamsOf.get(id) ?? []), t.name]);
@@ -122,18 +164,14 @@ function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: Mat
   const fields: Array<{ name: string; value: string }> = [];
   let budget = TEAM_LIST_CHARS;
   for (const t of sorted.slice(0, TEAMS_SHOWN)) {
-    const players = stringList(t.players);
-    const size = teamSizeFor(presets.find((p) => p.game === t.game) ?? null);
-    const status = playing(t) ? " · ⚔️ playing" : queued.has(t.id) ? " · 🔍 in queue" : "";
-    const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `👤 <@${id}>`));
-    const field = { name: `${t.name} · ${t.game} (${players.length}/${size})${status}`.slice(0, 256), value: names.join("\n").slice(0, 1024) };
+    const field = teamField(t, queue, rooms, presets);
     budget -= field.name.length + field.value.length;
     if (budget < 0) break;
     fields.push(field);
   }
   const shown = fields.length;
   if (sorted.length === 0) fields.push({ name: "\u200b", value: say("labelNoTeamsYet") });
-  if (sorted.length > shown) fields.push({ name: "\u200b", value: `And ${sorted.length - shown} more. Tap My Teams to see yours.` });
+  if (sorted.length > shown) fields.push({ name: "\u200b", value: `And ${sorted.length - shown} more. Tap Active Teams to see them all.` });
 
   const shared = [...teamsOf].filter(([, names]) => names.length > 1);
   if (shared.length) fields.push({ name: say("labelMultiTeam"), value: shared.slice(0, 15).map(([id, names]) => `<@${id}>: ${names.join(", ")}`).join("\n").slice(0, 1024) });
@@ -848,6 +886,7 @@ export async function handleMatchmaking(interaction: Interaction) {
         return void (await renameModal(interaction, team));
       }
       await interaction.deferReply({ ephemeral: true });
+      if (action === "teams") return void (await reply(interaction, await activeTeams(config)));
       if (action === "help") {
         const tokens = { pickup: say("btnPickup"), findSolo: say("btnFindSolo"), challengeSolo: say("btnChallengeSolo"), createTeam: say("btnCreateTeam"), myTeams: say("btnMyTeams"), findTeam: say("btnFindTeam"), challengeTeam: say("btnChallengeTeam"), lft: say("btnLookingForTeam") };
         return void (await reply(interaction, { embeds: [styleEmbed(new EmbedBuilder(), config.texts, "helpGuide", tokens)], components: [] }));

@@ -83,7 +83,12 @@ export const MATCH_TEXTS = {
     global: true,
   },
   boardPickup: { ...embed("Matchmaking", "Pickup board", "The pickup part of the always-open board.", { title: "⚡ Pickup Match", description: "Play right now with whoever's around, even if teams aren't full. Join voice, tap the button, check who's playing, then start.", color: GREEN }), global: true },
-  boardTools: { ...embed("Matchmaking", "Teams and help board", "The last part of the always-open board.", { title: "🧰 Teams & Help", description: "Make a team, manage yours, or get listed so captains can add you. New here? Tap How it works.", color: STEEL }), global: true },
+  boardTools: { ...embed("Matchmaking", "Teams and help board", "The last part of the always-open board.", { title: "🧰 Teams & Help", description: "Make a team, manage yours, see every team, or get listed so captains can add you. New here? Tap How it works.", color: STEEL }), global: true },
+  activeTeams: {
+    ...embed("Matchmaking", "Active Teams", "Shown privately when someone taps Active Teams. Spartacus adds every team and its players.", { title: "🛡️ Active Teams ({count})", description: "Every team and who's on it. 👑 is the captain.", color: STEEL }, { count: "2" }),
+    previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }],
+    global: true,
+  },
   room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}\n\nWhen you're done, a captain (👑) taps who won and types the score. The other side taps Confirm.", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
   helpGuide: {
     ...embed("Matchmaking", "How it works", "Shown privately when someone taps How it works on the board. Button names fill in by themselves.", { title: "❓ How Matchmaking works", description: "**⚡ Play right now**\nJoin a voice channel, tap **{pickup}**, check who's playing, then tap **Start Match**. Teams can be uneven.\n\n**⚔️ 1v1**\n**{findSolo}** pairs you with the next player who taps it. **{challengeSolo}** sends one person a challenge.\n\n**👥 Teams**\n**{createTeam}** makes your team and **{myTeams}** adds players. The captain then taps **{findTeam}** or **{challengeTeam}**. No team yet? Tap **{lft}** so captains can add you.\n\n**🏁 After the match**\nEveryone gets a private match thread. When you're done, a captain taps who won and types the score, then the other side taps **Confirm**. The leaderboard updates and the thread is deleted.\n\n**🚪 Changed your mind?**\nThe red buttons take you out of a queue.", color: STEEL }, { pickup: "Start Pickup Match", findSolo: "1v1: Find a Match", challengeSolo: "1v1: Challenge a Player", createTeam: "Create a Team", myTeams: "My Teams", findTeam: "Teams: Find a Match", challengeTeam: "Teams: Challenge a Team", lft: "Looking for a Team" }),
@@ -156,6 +161,7 @@ export const MATCH_TEXTS = {
   btnCreateTeam: buttonLabel("Create a Team", "On the Matchmaking board.", true),
   btnMyTeams: buttonLabel("My Teams", "On the Matchmaking board.", true),
   btnLookingForTeam: buttonLabel("Looking for a Team", "On the Matchmaking board. Tap again to come off the list.", true),
+  btnActiveTeams: buttonLabel("Active Teams", "On the Matchmaking board. Privately shows every team and its players.", true),
   btnHelp: buttonLabel("How it works", "On the Matchmaking board. Shows a short guide privately.", true),
   btnPickup: buttonLabel("Start Pickup Match", "On the Matchmaking board. Picks players from voice and the Looking for a Team list, makes two teams and starts now.", true),
   btnAccept: buttonLabel("Accept", "On challenges."),
@@ -200,7 +206,7 @@ export const BOARD_PARTS = [
   { id: "TEAM", label: "Team Matchmaking", embed: "boardTeam", buttons: [{ key: "btnFindTeam", customId: "mm:find:TEAM", color: "green" }, { key: "btnChallengeTeam", customId: "mm:challenge:TEAM", color: "blue" }, { key: "btnLeaveTeam", customId: "mm:leave:TEAM", color: "red" }] },
   { id: "PICKUP", label: "Pickup Match", embed: "boardPickup", buttons: [{ key: "btnPickup", customId: "mm:pickup", color: "green" }] },
   { id: "TEAMS", label: "Teams list", embed: "boardTeamList", buttons: [] },
-  { id: "TOOLS", label: "Teams & Help", embed: "boardTools", buttons: [{ key: "btnCreateTeam", customId: "mm:newteam", color: "gray" }, { key: "btnMyTeams", customId: "mm:myteam", color: "gray" }, { key: "btnLookingForTeam", customId: "mm:lft", color: "gray" }, { key: "btnHelp", customId: "mm:help", color: "gray" }] },
+  { id: "TOOLS", label: "Teams & Help", embed: "boardTools", buttons: [{ key: "btnCreateTeam", customId: "mm:newteam", color: "gray" }, { key: "btnMyTeams", customId: "mm:myteam", color: "gray" }, { key: "btnLookingForTeam", customId: "mm:lft", color: "gray" }, { key: "btnActiveTeams", customId: "mm:teams", color: "gray" }, { key: "btnHelp", customId: "mm:help", color: "gray" }] },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; embed: MatchTextKey; buttons: ReadonlyArray<{ key: MatchTextKey; customId: string; color: BoardButtonColor }> }>;
 export type BoardPartId = (typeof BOARD_PARTS)[number]["id"];
 export const DEFAULT_BOARD_PARTS: BoardPartId[] = BOARD_PARTS.map((p) => p.id);

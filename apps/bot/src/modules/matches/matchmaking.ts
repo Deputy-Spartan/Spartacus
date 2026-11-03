@@ -91,8 +91,8 @@ async function buildPanel(config: MatchmakingConfig) {
       teamListEmbed(config, teams, queue, rooms, presets),
     ],
     components: [
-      row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Secondary)),
-      row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Secondary)),
+      row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Danger)),
+      row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Danger)),
       row(button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary)),
     ],
     allowedMentions: { parse: [] as never[] },

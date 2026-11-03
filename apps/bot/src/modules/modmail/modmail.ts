@@ -2,6 +2,7 @@ import { ChannelType, Client, EmbedBuilder, Events, Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
+import { activeDmConversation } from "../../lib/dmConversations";
 
 export const name = Events.MessageCreate;
 
@@ -11,6 +12,9 @@ export const name = Events.MessageCreate;
 // rather than a dedicated settings table.
 export async function execute(message: Message) {
   if (message.author.bot || message.guild) return; // only DMs
+  // Leave the DM to an application or Support DM conversation already going.
+  const busy = await activeDmConversation(message.author.id);
+  if (busy === "application" || busy === "support") return;
 
   for (const guild of message.client.guilds.cache.values()) {
     const isMember = await guild.members.fetch(message.author.id).catch(() => null);

@@ -41,6 +41,7 @@ const LFT_HOURS = 24;
 const TEAMS_SHOWN = 15;
 const TEAM_LIST_CHARS = 3000;
 const INVITE_HOURS = 24;
+export const matchTiming = { threadDeleteMs: 30_000 };
 const lastPostError = new Map<string, number>();
 
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
@@ -282,9 +283,15 @@ async function closeRoom(client: Client, room: MatchRoom, closing: string) {
   await closeVoiceRooms(client, config, stringList(room.voiceIds), config?.lobbyVoiceId ?? null, room.guildId);
   await refreshRoom(client, room);
   const thread = await roomThread(client, room);
-  await thread?.send({ content: closing, allowedMentions: { parse: [] } }).catch(() => null);
-  await thread?.setLocked(true).catch(() => null);
-  await thread?.setArchived(true).catch(() => null);
+  if (!thread) return;
+  const seconds = Math.round(matchTiming.threadDeleteMs / 1000);
+  await thread.send({ content: `${closing}\n-# This thread is deleted in ${seconds} seconds. Results are on the leaderboard.`, allowedMentions: { parse: [] } }).catch(() => null);
+  await thread.setLocked(true).catch(() => null);
+  // Deleted after a short wait so players see the result first. If the bot
+  // can't delete it, it's archived instead.
+  setTimeout(() => {
+    thread.delete().catch(async () => void (await thread.setArchived(true).catch(() => null)));
+  }, matchTiming.threadDeleteMs).unref?.();
 }
 
 async function finishRoom(client: Client, room: MatchRoom, side: string, high: number, low: number) {

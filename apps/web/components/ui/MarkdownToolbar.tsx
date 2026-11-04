@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type RefObject } from "react";
 import { api, type DiscordChannelOption, type DiscordRoleOption } from "../../lib/api";
-import { ServerEmojiGrid } from "./EmojiPicker";
+import { ServerEmojiGrid, StandardEmojiGrid } from "./EmojiPicker";
 import { usePrompt } from "./ConfirmDialog";
 
 interface MarkdownToolbarProps {
@@ -44,6 +44,7 @@ const LINE_BUTTONS = [
 export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased }: MarkdownToolbarProps) {
   const [channels, setChannels] = useState<DiscordChannelOption[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiTab, setEmojiTab] = useState<"standard" | "server">("standard");
   const [roles, setRoles] = useState<DiscordRoleOption[]>([]);
   const prompt = usePrompt();
 
@@ -179,20 +180,43 @@ export function MarkdownToolbar({ guildId, textareaRef, value, onChange, aliased
           ))}
         </select>
 
-        <button type="button" title="Insert a server emoji" onClick={() => setEmojiOpen(!emojiOpen)} className={`${btn} text-sm`}>
+        <button type="button" title="Insert an emoji" onClick={() => setEmojiOpen(!emojiOpen)} className={`${btn} text-sm`}>
           😀
         </button>
       </div>
 
       {emojiOpen && (
-        <div className="rounded-lg border border-white/10 bg-base-900 p-3 max-h-48 overflow-y-auto">
+        <div className="rounded-lg border border-white/10 bg-base-900 p-3">
+          <div className="flex gap-1 mb-2">
+            {(
+              [
+                ["standard", "Any emoji"],
+                ["server", "Server emojis"],
+              ] as const
+            ).map(([k, l]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setEmojiTab(k)}
+                className={`flex-1 text-xs px-2 py-1 rounded ${emojiTab === k ? "bg-neon-blue/15 text-neon-blue" : "text-slate-500 hover:text-slate-300"}`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
           <p className="text-[11px] text-slate-500 mb-1.5">Tap as many as you like — each is added at your cursor.</p>
-          <ServerEmojiGrid
-            guildId={guildId}
-            onPick={(e) => {
-              insertAtCursor(aliased ? `:${e.name}:` : e.token, false);
-            }}
-          />
+          {emojiTab === "standard" ? (
+            <StandardEmojiGrid onPick={(e) => insertAtCursor(e, false)} />
+          ) : (
+            <div className="max-h-48 overflow-y-auto">
+              <ServerEmojiGrid
+                guildId={guildId}
+                onPick={(e) => {
+                  insertAtCursor(aliased ? `:${e.name}:` : e.token, false);
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

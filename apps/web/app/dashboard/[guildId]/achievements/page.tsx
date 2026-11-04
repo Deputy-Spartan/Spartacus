@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ChannelOverrideField } from "../../../../components/ui/ChannelOverrideField";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { Required } from "../../../../components/ui/Required";
@@ -125,12 +126,8 @@ function CustomAchievements({ guildId }: { guildId: string }) {
       </div>
 
       <div className="rounded-lg border border-white/10 p-3">
-        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 mb-2">
-          <input
-            className="w-16 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm text-center"
-            value={draft.emoji}
-            onChange={(e) => setDraft({ ...draft, emoji: e.target.value })}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2 mb-2">
+          <EmojiPicker guildId={guildId} popover value={draft.emoji ?? ""} onChange={(emoji) => setDraft({ ...draft, emoji })} placeholder="Emoji" />
           <input
             className="bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
             placeholder="Achievement name, e.g. Diamond Rank"

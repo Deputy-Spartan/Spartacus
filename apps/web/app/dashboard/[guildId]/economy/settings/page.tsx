@@ -3,6 +3,7 @@
 import { DiscordEmbed, DiscordMessage } from "../../../../../components/ui/DiscordPreview";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
+import { EmojiPicker } from "../../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
 import { api, type EconomyConfig, type ModuleState } from "../../../../../lib/api";
 
@@ -61,11 +62,7 @@ export default function EconomySettingsPage({ params }: { params: { guildId: str
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Currency symbol</label>
             <p className="text-xs text-slate-600 mb-2">A unicode emoji or a Discord custom emoji.</p>
-            <input
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              value={config.currencyIcon}
-              onChange={(e) => persist({ ...config, currencyIcon: e.target.value })}
-            />
+            <EmojiPicker guildId={params.guildId} popover value={config.currencyIcon} onChange={(emoji) => persist({ ...config, currencyIcon: emoji || "🪙" })} placeholder="🪙" />
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Embed accent colour</label>

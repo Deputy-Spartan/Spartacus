@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { DiscordEmoji } from "../../../../components/ui/DiscordInline";
+import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
@@ -698,17 +700,14 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
           </div>
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Skip messages reacted with</label>
-          <div className="flex gap-2 mb-2">
-            <input
-              className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              placeholder="Emoji, e.g. ⭐"
+          <div className="mb-2">
+            <EmojiPicker
+              guildId={guildId}
               value={emojiDraft}
-              onChange={(e) => setEmojiDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && emojiDraft.trim()) {
-                  setForm({ ...form, protectedEmojis: [...form.protectedEmojis, emojiDraft.trim()] });
-                  setEmojiDraft("");
-                }
+              placeholder="＋ Add an emoji, e.g. ⭐"
+              onChange={(emoji) => {
+                if (emoji && !form.protectedEmojis.includes(emoji)) setForm({ ...form, protectedEmojis: [...form.protectedEmojis, emoji] });
+                setEmojiDraft("");
               }}
             />
           </div>
@@ -716,7 +715,7 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
             <div className="flex flex-wrap gap-1.5 mb-4">
               {form.protectedEmojis.map((e) => (
                 <span key={e} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-base-800 border border-white/10">
-                  {e}
+                  <DiscordEmoji value={e} size={16} />
                   <button onClick={() => setForm({ ...form, protectedEmojis: form.protectedEmojis.filter((x) => x !== e) })} className="text-slate-500 hover:text-rose-400">
                     ×
                   </button>

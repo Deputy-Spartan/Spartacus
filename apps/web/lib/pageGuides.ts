@@ -385,9 +385,18 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     tips: ["Use Stop Now under Active Polls to end one early."],
   },
   "/stream-alerts": {
-    title: "Stream Alerts",
-    purpose: "Pings a channel when a creator goes live.",
-    steps: ["Tap + Create New.", "Pick Twitch or YouTube.", "Enter the creator's Channel Name.", "Enter the Announce Channel ID. Turn on Developer Mode in Discord, then right-click the channel to copy it.", "Tap Add Subscription."],
+    title: "Going Live",
+    purpose: "Posts an alert when your streamers go live on Twitch, YouTube, Kick or TikTok, and for anywhere else with /golive.",
+    before: ["Make an alerts channel, and optionally a ping role and a “🔴 Live Now” role."],
+    steps: [
+      "Where Alerts Go: pick the channel and the ping role.",
+      "Streamers: pick a platform, paste their channel name or link, and link their Discord account if you want the live role and /golive. Use Check now to see if Spartacus can find them, and Send test for a sample post.",
+      "The Alert: change the text, title, button and color, with placeholders like {name}, {title}, {game} and {viewers}. The preview shows each platform.",
+      "While Live and After: the live role, keeping the post updated, and what happens when they stop.",
+      "Manual Go Live: /golive start and /golive end, for Facebook, Trovo, Rumble, X and the rest, or as a TikTok backup.",
+    ],
+    members: ["Streamers can run /golive start to announce their stream, and /golive end when they're done."],
+    tips: ["Twitch and Kick need their free app keys set on the bot. The page warns you if one is missing.", "TikTok has no official way to check, so it's in beta. /golive always works."],
   },
   "/commands": {
     title: "Custom Commands",

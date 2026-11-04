@@ -309,13 +309,46 @@ model StreamSubscription {
   id                String    @id @default(cuid())
   guild             Guild     @relation(fields: [guildId], references: [id])
   guildId           String
-  platform          String // "twitch" | "youtube"
-  channelName       String
+  platform          String // twitch | youtube | kick | tiktok | other (manual, via /golive)
+  channelName       String // the handle, or the stream link for "other"
   announceChannelId String
   isLive            Boolean   @default(false)
   lastNotifiedAt    DateTime?
 
+  // Going Live (see packages/shared/goLive.ts)
+  displayName    String?
+  platformName   String? // for "other", e.g. Facebook
+  discordUserId  String? // the streamer's own account: gets the live role, can use /golive
+  pingRoleId     String? // overrides the server's ping role
+  liveMessageId  String?
+  liveStartedAt  DateTime?
+  lastTitle      String?
+  lastGame       String?
+  lastThumbnail  String?
+  lastAvatar     String?
+  peakViewers    Int       @default(0)
+  offlineStrikes Int       @default(0) // offline checks in a row, so a blip doesn't end the stream
+  lastError      String?
+
   @@index([guildId])
+}
+
+model StreamAlertSettings {
+  id               String  @id @default(cuid())
+  guildId          String  @unique
+  defaultChannelId String?
+  pingRoleId       String?
+  liveRoleId       String? // given to a linked streamer while they're live
+  selfServeRoleId  String? // members with this role can use /golive for themselves
+  contentTemplate  String?
+  embedTitle       String?
+  embedDescription String?
+  embedColor       String? // empty = each platform's own color
+  buttonLabel      String?
+  showThumbnail    Boolean @default(true)
+  updateWhileLive  Boolean @default(true) // keep viewers, title and game fresh on the post
+  endAction        String  @default("EDIT") // EDIT (stream ended summary) | DELETE | KEEP
+  cooldownMinutes  Int     @default(30) // no second post if they come back within this
 }
 
 model MemberXp {

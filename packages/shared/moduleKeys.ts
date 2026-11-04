@@ -67,7 +67,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   MODERATION: "Moderation & Automod",
   WELCOME: "Welcome & Goodbye",
   LEVELING: "Leveling & XP",
-  STREAM_ALERTS: "Stream Alerts",
+  STREAM_ALERTS: "Going Live",
   CUSTOM_COMMANDS: "Custom Commands",
   EVENTS: "Event Coordination",
   ANTI_RAID: "Anti-Raid",

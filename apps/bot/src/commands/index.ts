@@ -31,6 +31,7 @@ import prestige from "./leveling/prestige";
 import remindme from "./utility/remindme";
 import serverSetup from "./utility/serverSetup";
 import role from "./utility/role";
+import golive from "./community/golive";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -66,6 +67,7 @@ for (const command of [
   remindme,
   serverSetup,
   role,
+  golive,
 ]) {
   commands.set(command.data.name, command);
 }

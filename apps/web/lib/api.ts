@@ -150,10 +150,45 @@ export interface CustomCommand {
 
 export interface StreamSubscription {
   id: string;
-  platform: "twitch" | "youtube";
+  platform: "twitch" | "youtube" | "kick" | "tiktok" | "other";
   channelName: string;
   announceChannelId: string;
   isLive: boolean;
+  displayName?: string | null;
+  platformName?: string | null;
+  discordUserId?: string | null;
+  pingRoleId?: string | null;
+  liveStartedAt?: string | null;
+  lastTitle?: string | null;
+  lastGame?: string | null;
+  lastAvatar?: string | null;
+  peakViewers?: number;
+  lastError?: string | null;
+  lastNotifiedAt?: string | null;
+}
+export interface StreamAlertSettingsRow {
+  guildId?: string;
+  defaultChannelId?: string | null;
+  pingRoleId?: string | null;
+  liveRoleId?: string | null;
+  selfServeRoleId?: string | null;
+  contentTemplate?: string | null;
+  embedTitle?: string | null;
+  embedDescription?: string | null;
+  embedColor?: string | null;
+  buttonLabel?: string | null;
+  showThumbnail?: boolean;
+  updateWhileLive?: boolean;
+  endAction?: "EDIT" | "DELETE" | "KEEP";
+  cooldownMinutes?: number;
+}
+export interface LiveCheckResult {
+  live?: boolean;
+  title?: string | null;
+  game?: string | null;
+  viewers?: number | null;
+  name?: string | null;
+  error?: string;
 }
 
 export type RsvpRole = "TANK" | "DPS" | "HEALER" | "ATTENDING" | "ABSENT";
@@ -1881,9 +1916,17 @@ export const api = {
 
   getStreamSubscriptions: (guildId: string) =>
     request<StreamSubscription[]>(`/guilds/${guildId}/stream-subscriptions`),
+  getStreamAlertSettings: (guildId: string) =>
+    request<{ settings: StreamAlertSettingsRow; keys: { TWITCH: boolean; KICK: boolean } }>(`/guilds/${guildId}/stream-alert-settings`),
+  setStreamAlertSettings: (guildId: string, settings: StreamAlertSettingsRow) =>
+    request<StreamAlertSettingsRow>(`/guilds/${guildId}/stream-alert-settings`, { method: "PUT", body: JSON.stringify(settings) }),
+  updateStreamSubscription: (guildId: string, id: string, body: Partial<StreamSubscription>) =>
+    request<StreamSubscription>(`/guilds/${guildId}/stream-subscriptions/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  checkStreamSubscription: (guildId: string, id: string) => request<LiveCheckResult>(`/guilds/${guildId}/stream-subscriptions/${id}/check`, { method: "POST" }),
+  testStreamSubscription: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-subscriptions/${id}/test`, { method: "POST" }),
   addStreamSubscription: (
     guildId: string,
-    body: { platform: "twitch" | "youtube"; channelName: string; announceChannelId: string }
+    body: Partial<StreamSubscription> & { platform: StreamSubscription["platform"]; channelName: string; announceChannelId?: string }
   ) =>
     request<StreamSubscription>(`/guilds/${guildId}/stream-subscriptions`, {
       method: "POST",

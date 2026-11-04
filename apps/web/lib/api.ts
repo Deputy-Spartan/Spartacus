@@ -177,6 +177,8 @@ export interface StreamAlertSettingsRow {
   embedDescription?: string | null;
   embedColor?: string | null;
   buttonLabel?: string | null;
+  buttonEmoji?: string | null;
+  embedExtra?: import("./embedExtra").EmbedExtra | null;
   showThumbnail?: boolean;
   updateWhileLive?: boolean;
   endAction?: "EDIT" | "DELETE" | "KEEP";

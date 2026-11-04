@@ -22,6 +22,13 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // /golive setup: the step-by-step Going Live wizard.
+  if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("glw:")) {
+    const { handleGoLiveSetup } = await import("../modules/community/goLiveSetup");
+    await handleGoLiveSetup(interaction);
+    return;
+  }
+
   if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith("tvcp:")) {
     const { handleTempPanel } = await import("../modules/community/tempChannelPanel");
     await handleTempPanel(interaction);

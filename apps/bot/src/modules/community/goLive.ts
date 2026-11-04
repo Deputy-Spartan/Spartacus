@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, type BaseMessageOptions, type Guild } from "discord.js";
 import type { StreamAlertSettings, StreamSubscription } from "@prisma/client";
-import { buildGoLiveMessage, platformInfo, type LiveInfo, type LivePlatform } from "@spartacus/shared";
+import { buildGoLiveMessage, fillGoLiveExtra, platformInfo, type LiveInfo, type LivePlatform } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
@@ -43,7 +43,18 @@ export function discordPayload(settings: Partial<StreamAlertSettings>, info: Liv
   if (m.fields.length) embed.addFields(m.fields);
   if (m.image) embed.setImage(m.image);
   if (m.thumbnail) embed.setThumbnail(m.thumbnail);
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(m.button.label || "Watch").setURL(m.button.url));
+  // Extras from the dashboard replace the matching default part.
+  if (!ended) {
+    const x = fillGoLiveExtra(settings.embedExtra, info);
+    if (x.authorName) embed.setAuthor({ name: x.authorName.slice(0, 256), iconURL: x.authorIconUrl || m.author.icon || undefined, url: m.button.url });
+    if (x.thumbnailUrl) embed.setThumbnail(x.thumbnailUrl);
+    if (x.imageUrl) embed.setImage(x.imageUrl);
+    if (x.footerText || x.footerIconUrl) embed.setFooter({ text: x.footerText || m.footer, iconURL: x.footerIconUrl || undefined });
+    if (x.fields?.length) embed.addFields(x.fields.slice(0, 25 - m.fields.length));
+  }
+  const button = new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(m.button.label || "Watch").setURL(m.button.url);
+  if (m.button.emoji) button.setEmoji(m.button.emoji);
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
   return {
     content: m.content || undefined,
     embeds: [embed],

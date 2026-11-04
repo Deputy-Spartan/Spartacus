@@ -47,7 +47,9 @@ export interface GoLiveSettingsLike {
   embedDescription?: string | null;
   embedColor?: string | null; // empty = the platform's own color
   buttonLabel?: string | null;
+  buttonEmoji?: string | null;
   showThumbnail?: boolean;
+  embedExtra?: unknown;
 }
 
 export const GO_LIVE_DEFAULTS = {
@@ -113,7 +115,7 @@ export interface GoLiveMessage {
   image: string | null;
   thumbnail: string | null;
   author: { name: string; icon: string | null };
-  button: { label: string; url: string };
+  button: { label: string; url: string; emoji: string | null };
   footer: string;
   ended: boolean;
 }
@@ -132,7 +134,7 @@ export function buildGoLiveMessage(s: GoLiveSettingsLike, i: LiveInfo, ended?: {
       image: null,
       thumbnail: i.avatar ?? null,
       author: { name: i.name, icon: i.avatar ?? null },
-      button: { label: `Visit on ${platName}`, url: i.url },
+      button: { label: `Visit on ${platName}`, url: i.url, emoji: null },
       footer: `${platName} · Stream ended`,
       ended: true,
     };
@@ -150,8 +152,42 @@ export function buildGoLiveMessage(s: GoLiveSettingsLike, i: LiveInfo, ended?: {
     image: s.showThumbnail === false ? null : i.thumbnail ?? null,
     thumbnail: i.avatar ?? null,
     author: { name: `${i.name} is live on ${platName}`, icon: i.avatar ?? null },
-    button: { label: fillGoLive(s.buttonLabel?.trim() || GO_LIVE_DEFAULTS.button, i).slice(0, 80), url: i.url },
+    button: { label: fillGoLive(s.buttonLabel?.trim() || GO_LIVE_DEFAULTS.button, i).slice(0, 80), url: i.url, emoji: s.buttonEmoji?.trim() || null },
     footer: platName,
     ended: false,
   };
+}
+
+// The extra embed parts from the dashboard (author, images, footer, fields),
+// with placeholders filled in. Empty parts are left out so the defaults stay.
+export interface GoLiveExtra {
+  authorName?: string;
+  authorIconUrl?: string;
+  thumbnailUrl?: string;
+  imageUrl?: string;
+  footerText?: string;
+  footerIconUrl?: string;
+  timestamp?: boolean;
+  fields?: Array<{ name: string; value: string; inline: boolean }>;
+}
+
+export function fillGoLiveExtra(raw: unknown, i: LiveInfo): GoLiveExtra {
+  if (!raw || typeof raw !== "object") return {};
+  const e = raw as Record<string, unknown>;
+  const str = (k: string) => (typeof e[k] === "string" && (e[k] as string).trim() ? fillGoLive(e[k] as string, i) : undefined);
+  const out: GoLiveExtra = {
+    authorName: str("authorName"),
+    authorIconUrl: str("authorIconUrl"),
+    thumbnailUrl: str("thumbnailUrl"),
+    imageUrl: str("imageUrl"),
+    footerText: str("footerText"),
+    footerIconUrl: str("footerIconUrl"),
+  };
+  if (Array.isArray(e.fields)) {
+    out.fields = (e.fields as Array<Record<string, unknown>>)
+      .filter((f) => f && (f.name || f.value))
+      .slice(0, 20)
+      .map((f) => ({ name: fillGoLive(String(f.name || "\u200b"), i).slice(0, 256), value: fillGoLive(String(f.value || "\u200b"), i).slice(0, 1024), inline: !!f.inline }));
+  }
+  return out;
 }

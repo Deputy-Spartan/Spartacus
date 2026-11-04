@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { LIVE_PLATFORMS, cleanHandle, type LivePlatform } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { manualEndLive, manualGoLive } from "../../modules/community/goLive";
+import { startGoLiveSetup } from "../../modules/community/goLiveSetup";
 import type { CommandModule } from "../types";
 
 // /golive: announce your stream by hand, for any platform (TikTok when the
@@ -28,13 +29,22 @@ const command: CommandModule = {
         .addStringOption((o) => o.setName("title").setDescription("What you're streaming (optional)"))
         .addStringOption((o) => o.setName("site").setDescription("For Other: the site's name, e.g. Facebook")),
     )
-    .addSubcommand((s) => s.setName("end").setDescription("Mark your stream as over")) as SlashCommandBuilder,
+    .addSubcommand((s) => s.setName("end").setDescription("Mark your stream as over"))
+    .addSubcommand((s) => s.setName("setup").setDescription("Set up going-live alerts step by step (staff)")) as SlashCommandBuilder,
 
   async execute(interaction) {
     const guild = interaction.guild;
     if (!guild) return;
     const member = await guild.members.fetch(interaction.user.id).catch(() => null);
     if (!member) return;
+    if (interaction.options.getSubcommand() === "setup") {
+      if (!member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        await interaction.reply({ content: "You need Manage Server to set up Going Live.", ephemeral: true });
+        return;
+      }
+      await startGoLiveSetup(interaction);
+      return;
+    }
     const settings = await prisma.streamAlertSettings.findUnique({ where: { guildId: guild.id } });
     // Staff, streamers linked on the dashboard, or members with the streamer role.
     const linked = await prisma.streamSubscription.count({ where: { guildId: guild.id, discordUserId: member.id } });

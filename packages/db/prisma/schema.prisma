@@ -345,6 +345,8 @@ model StreamAlertSettings {
   embedDescription String?
   embedColor       String? // empty = each platform's own color
   buttonLabel      String?
+  buttonEmoji      String?
+  embedExtra       Json? // author, thumbnail, image, footer, fields (same shape as other modules)
   showThumbnail    Boolean @default(true)
   updateWhileLive  Boolean @default(true) // keep viewers, title and game fresh on the post
   endAction        String  @default("EDIT") // EDIT (stream ended summary) | DELETE | KEEP

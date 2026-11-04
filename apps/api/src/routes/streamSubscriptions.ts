@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
+import { Prisma, prisma } from "@spartacus/db";
 import { LIVE_PLATFORMS, cleanHandle, type LivePlatform } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
@@ -35,7 +35,8 @@ router.put("/guilds/:guildId/stream-alert-settings", requireAuth, requireGuildPe
   const b = req.body ?? {};
   const data: Record<string, unknown> = {};
   for (const k of ["defaultChannelId", "pingRoleId", "liveRoleId", "selfServeRoleId"]) if (k in b) data[k] = id(b[k]);
-  for (const k of ["contentTemplate", "embedTitle", "embedDescription", "buttonLabel"]) if (k in b) data[k] = text(b[k]);
+  for (const k of ["contentTemplate", "embedTitle", "embedDescription", "buttonLabel", "buttonEmoji"]) if (k in b) data[k] = text(b[k], k === "buttonEmoji" ? 100 : 2000);
+  if ("embedExtra" in b) data.embedExtra = b.embedExtra && typeof b.embedExtra === "object" ? (b.embedExtra as object) : Prisma.JsonNull;
   if ("embedColor" in b) data.embedColor = typeof b.embedColor === "string" && /^#[0-9a-f]{6}$/i.test(b.embedColor) ? b.embedColor : null;
   for (const k of ["showThumbnail", "updateWhileLive"]) if (typeof b[k] === "boolean") data[k] = b[k];
   if (["EDIT", "DELETE", "KEEP"].includes(b.endAction)) data.endAction = b.endAction;

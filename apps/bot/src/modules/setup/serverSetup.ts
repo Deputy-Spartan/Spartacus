@@ -5,6 +5,7 @@ import {
   GuildVerificationLevel,
   OverwriteType,
   PermissionFlagsBits,
+  SnowflakeUtil,
   type CategoryChannel,
   type Guild,
   type GuildBasedChannel,
@@ -545,29 +546,59 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
 
 // Discord's own join questions. Default channels must be ones anyone can see.
 async function setupOnboarding(guild: Guild, opts: SetupOptions, ids: Ids, notes: string[]): Promise<string> {
-  const prompts = blueprintOnboarding(opts.games).map((q, i) => ({
-    id: String(BigInt(Date.now()) * 1000n + BigInt(i * 100)),
+  // Discord wants real snowflakes for new question and answer IDs.
+  const newId = () => SnowflakeUtil.generate().toString();
+  // Discord only lets onboarding hand out roles below Spartacus's own role.
+  const top = guild.members.me?.roles.highest;
+  const blocked = new Set<string>();
+  const usable = (roleId: string | undefined) => {
+    const r = roleId ? guild.roles.cache.get(roleId) : undefined;
+    if (!r) return false;
+    if (top && top.comparePositionTo(r) <= 0) {
+      blocked.add(r.name);
+      return false;
+    }
+    return true;
+  };
+  const prompts = blueprintOnboarding(opts.games).map((q) => ({
+    id: newId(),
     type: 0,
     title: q.title,
     single_select: q.singleSelect,
     required: false,
     in_onboarding: true,
     options: q.options
-      .map((o, j) => ({ id: String(BigInt(Date.now()) * 1000n + BigInt(i * 100 + j + 1)), title: o.label, emoji_name: o.emoji, role_ids: [ids.roles.get(o.role)].filter(Boolean), channel_ids: [] }))
+      .map((o) => ({ id: newId(), title: o.label, emoji_name: o.emoji, role_ids: [ids.roles.get(o.role)].filter(usable), channel_ids: [] }))
       .filter((o) => o.role_ids.length),
-  }));
+  })).filter((p) => p.options.length);
+  const moveNote = `Spartacus's role has to be above these roles for onboarding to give them out: ${[...blocked].slice(0, 15).join(", ")}. Drag Spartacus to the top in Server Settings → Roles, then run /server-setup again with Onboarding.`;
+  if (!prompts.length) {
+    notes.push(blocked.size ? moveNote : "Onboarding was skipped because none of its roles exist yet. Build Roles first, then run /server-setup again with Onboarding.");
+    return blocked.size ? "🧭 Onboarding skipped (Spartacus's role is too low)" : "🧭 Onboarding skipped (no roles yet)";
+  }
+  if (blocked.size) notes.push(moveNote);
   const defaults = ["welcome", "rules", "roles"].map((k) => ids.channels.get(k)).filter(Boolean);
   const body = { prompts, default_channel_ids: defaults, enabled: true, mode: 0 };
   const path = `/guilds/${guild.id}/onboarding` as `/${string}`;
-  const ok = await guild.client.rest.put(path, { body }).then(() => true, () => false);
-  if (ok) return "🧭 Onboarding questions set and switched on";
+  let reason = "";
+  const put = (data: object) =>
+    guild.client.rest.put(path, { body: data }).then(
+      () => true,
+      (err: unknown) => {
+        reason = err instanceof Error ? err.message : String(err);
+        logError("bot", err, guild.id);
+        return false;
+      },
+    );
+  if (await put(body)) return "🧭 Onboarding questions set and switched on";
+  const firstReason = reason;
   // Discord only switches onboarding on with enough open channels; the
   // questions are still saved so they show once it can be turned on.
-  const saved = await guild.client.rest.put(path, { body: { ...body, enabled: false } }).then(() => true, () => false);
+  const saved = await put({ ...body, enabled: false });
   notes.push(
     saved
       ? "Onboarding questions are saved but Discord wouldn't switch them on, since it wants more channels that new members can see before accepting the rules. #🎭・roles does the same job, and you can switch onboarding on in Server Settings → Onboarding."
-      : "Discord refused the onboarding questions. Make sure Community is on, then run /server-setup again. #🎭・roles works either way.",
+      : `Discord refused the onboarding questions: "${(reason || firstReason).slice(0, 300)}". Make sure Community is on and Spartacus has Manage Server and Manage Roles, then run /server-setup again. #🎭・roles works either way.`,
   );
   return saved ? "🧭 Onboarding questions saved (not switched on yet)" : "🧭 Onboarding skipped";
 }

@@ -37,7 +37,7 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
       type: ChannelType.GuildVoice,
       parent: parentId ?? undefined,
       userLimit: game?.userLimit || lobby.userLimit || undefined,
-      bitrate: lobby.bitrate || undefined,
+      bitrate: lobby.bitrate ? Math.min(lobby.bitrate, guild.maximumBitrate) : undefined,
     })
     .catch(() => null);
   if (!created) {

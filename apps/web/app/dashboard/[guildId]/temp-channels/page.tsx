@@ -222,6 +222,22 @@ function Step({
 }
 
 const label = "text-xs uppercase tracking-wide text-slate-500 block mb-2";
+
+// Every voice bitrate Discord allows. Above 96 kbps needs Server Boosts, and
+// the bot lowers it to the server's max if the boosts run out.
+const BITRATES: Array<{ kbps: number; note: string }> = [
+  { kbps: 8, note: "" },
+  { kbps: 16, note: "" },
+  { kbps: 24, note: "" },
+  { kbps: 32, note: "" },
+  { kbps: 48, note: "" },
+  { kbps: 64, note: "Discord's default" },
+  { kbps: 80, note: "" },
+  { kbps: 96, note: "Best without boosts" },
+  { kbps: 128, note: "Boost Level 1" },
+  { kbps: 256, note: "Boost Level 2" },
+  { kbps: 384, note: "Boost Level 3" },
+];
 const field = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
 const hex = (n: number | undefined) => "#" + (n ?? 0x5865f2).toString(16).padStart(6, "0");
 
@@ -395,8 +411,15 @@ function LobbyFields({
             <input type="number" className={field} value={value.userLimit ?? 0} onChange={(e) => onChange({ userLimit: Number(e.target.value) })} />
           </div>
           <div>
-            <label className={label}>Bitrate (bps)</label>
-            <input type="number" className={field} value={value.bitrate ?? 64000} onChange={(e) => onChange({ bitrate: Number(e.target.value) })} />
+            <label className={label}>Bitrate</label>
+            <select className={field} value={value.bitrate ?? 64000} onChange={(e) => onChange({ bitrate: Number(e.target.value) })}>
+              {!BITRATES.some((b) => b.kbps * 1000 === (value.bitrate ?? 64000)) && <option value={value.bitrate ?? 64000}>{Math.round((value.bitrate ?? 64000) / 1000)} kbps</option>}
+              {BITRATES.map((b) => (
+                <option key={b.kbps} value={b.kbps * 1000}>
+                  {b.kbps} kbps{b.note ? ` · ${b.note}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className={label}>Delete After Empty (sec)</label>

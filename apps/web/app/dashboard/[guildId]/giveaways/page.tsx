@@ -9,7 +9,8 @@ import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbed
 import { Required } from "../../../../components/ui/Required";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { FormError } from "../../../../components/ui/FormError";
-import { useBotAvatar } from "../../../../lib/useBotAvatar";
+import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage, extraEmbedProps } from "../../../../components/ui/DiscordPreview";
+import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 import { api, type GiveawayInput, type GiveawayRow, type StickyButton } from "../../../../lib/api";
 
 const EMPTY: GiveawayInput = {
@@ -29,7 +30,6 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
   const [rows, setRows] = useState<GiveawayRow[]>([]);
   const [form, setForm] = useState<GiveawayInput>(EMPTY);
   const [error, setError] = useState<string | null>(null);
-  const avatarUrl = useBotAvatar();
 
   function refresh() {
     api.getGiveaways(params.guildId).then(setRows);
@@ -143,37 +143,26 @@ export default function GiveawaysPage({ params }: { params: { guildId: string } 
         <div className="space-y-4">
           <NeonCard>
             <p className="font-medium mb-3">Preview</p>
-            <div className="rounded-lg bg-[#313338] p-4 font-sans">
-              <div className="flex gap-3">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-                ) : (
-                  <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
-                    <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
-                  </div>
-                  {form.savedEmbedId ? (
-                    <p className="text-xs text-slate-500 italic mb-2">Using your saved embed for this giveaway's announcement.</p>
-                  ) : (
-                    <div className="rounded bg-[#2b2d31] border-l-4 p-3 max-w-md" style={{ borderColor: form.embedColor || "#B14BFF" }}>
-                      <p className="text-[#f2f3f5] font-semibold text-sm mb-1">🎁 {form.prize || "Prize name"}</p>
-                      <p className="text-[#dbdee1] text-sm whitespace-pre-wrap mb-2">
-                        {form.description ? `${form.description}\n\n` : ""}
-                        Click <span className="font-semibold">Enter</span> below to join. Ends {form.endsAt ? new Date(form.endsAt).toLocaleString() : "…"}.
-                      </p>
-                      {form.imageUrl && <img src={form.imageUrl} alt="" className="rounded max-h-40 object-cover mb-2" />}
-                      <p className="text-[#949ba4] text-xs">{form.winnerCount} winner(s)</p>
-                    </div>
-                  )}
-                  <div className="mt-2">
-                    <span className="inline-block bg-[#248046] text-white text-xs font-medium px-3 py-1.5 rounded">Enter</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {form.savedEmbedId ? (
+              <SavedEmbedPreview guildId={params.guildId} savedEmbedId={form.savedEmbedId} />
+            ) : (
+              <DiscordMessage>
+                <DiscordEmbed
+                  color={form.embedColor || "#B14BFF"}
+                  title={`🎁 ${form.prize || "Prize name"}`}
+                  description={`${form.description ? `${form.description}\n\n` : ""}Click **Enter** below to join. Ends ${form.endsAt && !Number.isNaN(new Date(form.endsAt).getTime()) ? `<t:${Math.floor(new Date(form.endsAt).getTime() / 1000)}:R>` : "…"}.`}
+                  {...extraEmbedProps(form.embedExtra)}
+                  imageUrl={form.imageUrl || form.embedExtra?.imageUrl}
+                  footer={form.embedExtra?.footerText || `${form.winnerCount} winner(s)`}
+                />
+                <DiscordButtonRow>
+                  <DiscordButton label="Enter" style="success" />
+                  {(form.buttons ?? []).map((btn, i) => (
+                    <DiscordButton key={i} label={btn.label || "Button"} style="link" />
+                  ))}
+                </DiscordButtonRow>
+              </DiscordMessage>
+            )}
           </NeonCard>
 
           <NeonCard>

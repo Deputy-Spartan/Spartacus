@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
@@ -69,16 +70,20 @@ function CommandFields({
 
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
       <div className="mb-4">
-        {value.savedEmbedId && <p className="text-xs text-slate-600 mb-2">Preview reflects the saved embed once sent.</p>}
-        <StickyPreview
-          content={value.response}
-          embedEnabled={false}
-          embedTitle=""
-          embedDescription={value.response}
-          embedColor="#5865F2"
-          buttons={[]}
-          embedExtra={{}}
-        />
+        {/* Same message as apps/bot/src/events/messageCreate.ts sends for the command. */}
+        {value.savedEmbedId ? (
+          <SavedEmbedPreview guildId={guildId} savedEmbedId={value.savedEmbedId} />
+        ) : (
+          <StickyPreview
+            content={value.embedEnabled ? "" : value.response}
+            embedEnabled={!!value.embedEnabled}
+            embedTitle={value.embedTitle ?? ""}
+            embedDescription={value.response}
+            embedColor={value.embedColor ?? "#5865F2"}
+            buttons={value.buttons ?? []}
+            embedExtra={value.embedExtra ?? {}}
+          />
+        )}
       </div>
     </>
   );

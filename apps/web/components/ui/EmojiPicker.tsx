@@ -93,7 +93,9 @@ export function EmojiPicker({ guildId, value, onChange, popover, placeholder = "
               <span className="truncate text-slate-300">:{customMatch[2]}:</span>
             </>
           ) : value ? (
-            <span className="text-lg leading-none">{value}</span>
+            <span className={value.length > 8 ? "truncate text-xs text-rose-300" : "text-lg leading-none"} title={value}>
+              {value}
+            </span>
           ) : (
             <span className="text-slate-500 truncate">{placeholder}</span>
           )}

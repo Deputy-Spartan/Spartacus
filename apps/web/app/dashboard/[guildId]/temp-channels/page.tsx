@@ -8,10 +8,12 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../../../lib/api";
-import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, TEMP_GUIDE_DEFAULT, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, SERVER_EMOJI_LOOSE, TEMP_GUIDE_DEFAULT, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EditableText } from "../../../../components/ui/EditableText";
+import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage, DiscordSelect } from "../../../../components/ui/DiscordPreview";
+import { useDiscordNames } from "../../../../components/ui/DiscordMarkdown";
 
 type Tab = "active" | "create";
 
@@ -77,6 +79,15 @@ function NameFormatField({ value, onChange }: { value: string; onChange: (next: 
 // The "What are you playing?" menu posted in each new channel. Picking a
 // game renames the channel to that game's name and sets its limit.
 function GameChoicesField({ guildId, value, onChange }: { guildId: string; value: TempGameChoice[]; onChange: (next: TempGameChoice[]) => void }) {
+  // Server emoji ids, to flag a code that isn't one of this server's emojis.
+  const [serverEmojis, setServerEmojis] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    api.getDiscordEmojis(guildId).then((list) => setServerEmojis(new Set(list.map((e) => e.id)))).catch(() => null);
+  }, [guildId]);
+  const brokenEmoji = (emoji?: string) => {
+    const m = emoji?.match(SERVER_EMOJI_LOOSE);
+    return !!m && !!serverEmojis && !(m[3] && serverEmojis.has(m[3]) && SERVER_EMOJI.test(emoji!));
+  };
   const set = (i: number, patch: Partial<TempGameChoice>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)));
   // A new emoji also replaces the old one at the start of the channel name.
   // Server emojis can't go in channel names, so those only change the menu.
@@ -125,6 +136,11 @@ function GameChoicesField({ guildId, value, onChange }: { guildId: string; value
                   <button onClick={() => onChange(value.filter((_, j) => j !== i))} className="hover:text-rose-400" aria-label="Remove">✕</button>
                 </div>
               </div>
+              {brokenEmoji(g.emoji) && (
+                <p className="text-[11px] text-rose-400 mt-1 pl-1">
+                  This emoji isn't one of this server's emojis, so Discord can't show it. Pick it again from Server emojis. Until then it's left off.
+                </p>
+              )}
               <p className="text-[11px] text-slate-500 mt-1 pl-1">
                 Becomes <span className="text-slate-300">🔊 {fillTempName(g.nameFormat || g.label, { user: "Kuro", index: 1, guild: "Server" })}</span>
                 {g.userLimit ? ` · ${g.userLimit} players` : " · no limit"}
@@ -209,28 +225,30 @@ const label = "text-xs uppercase tracking-wide text-slate-500 block mb-2";
 const field = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
 const hex = (n: number | undefined) => "#" + (n ?? 0x5865f2).toString(16).padStart(6, "0");
 
-// What the panel looks like in Discord.
-function PanelPreview({ value, lobbyName }: { value: Partial<TempChannelLobbyRow>; lobbyName: string }) {
+// What the panel looks like in Discord (apps/bot/src/modules/community/tempChannelPanel.ts).
+function PanelPreview({ value }: { value: Partial<TempChannelLobbyRow> }) {
   const games = value.gamePicker ? value.gameChoices ?? [] : [];
-  const text = (value.panelText ?? "").replace(/{lobby}/g, `🔊 ${lobbyName}`);
+  const join = value.joinToCreate !== false && value.lobbyChannelId ? `<#${value.lobbyChannelId}>` : "the Create a Squad voice channel";
+  const text = (value.panelText ?? "").replace(/{lobby}/g, join);
+  const help = value.guideButton !== false ? <DiscordButton label="How it works" emoji="❓" /> : null;
   return (
-    <div className="rounded-lg bg-[#313338] p-3">
-      <div className="rounded border-l-4 bg-[#2b2d31] p-3" style={{ borderColor: hex(value.panelColor) }}>
-        <p className="font-semibold text-sm text-white">{value.panelTitle || "🔊 Create a Squad"}</p>
-        {text && <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{text}</p>}
-      </div>
+    <DiscordMessage>
+      <DiscordEmbed color={value.panelColor ?? 0x5865f2} title={value.panelTitle || "🔊 Create a Squad"} description={text} />
       {games.length ? (
-        <div className="mt-2 rounded bg-[#1e1f22] px-3 py-2 text-sm text-slate-400 flex justify-between">
-          <span>🎮 Pick your game to make a squad channel</span>
-          <span>⌄</span>
-        </div>
+        <>
+          <DiscordSelect
+            placeholder="🎮 Pick your game to make a squad channel"
+            options={games.map((g) => ({ label: g.label || "…", emoji: g.emoji, description: g.userLimit ? `${g.userLimit}-player limit` : null }))}
+          />
+          {help && <DiscordButtonRow>{help}</DiscordButtonRow>}
+        </>
       ) : (
-        <span className="inline-block mt-2 rounded bg-[#5865f2] px-3 py-1.5 text-sm text-white">➕ Create a Squad</span>
+        <DiscordButtonRow>
+          <DiscordButton label="Create a Squad" emoji="➕" style="primary" />
+          {help}
+        </DiscordButtonRow>
       )}
-      {games.length > 0 && (
-        <p className="text-[11px] text-slate-500 mt-2">Choices: {games.map((g) => (g.emoji && !SERVER_EMOJI.test(g.emoji) ? g.emoji + " " : "") + (g.label || "…")).join(" · ")}</p>
-      )}
-    </div>
+    </DiscordMessage>
   );
 }
 
@@ -238,8 +256,22 @@ function PanelPreview({ value, lobbyName }: { value: Partial<TempChannelLobbyRow
 function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void; lobbyName: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const text = value.panelGuide ?? TEMP_GUIDE_DEFAULT;
-  const preview = text.replace(/{lobby}/g, `🔊 ${lobbyName}`).replace(/{panel}/g, value.panelChannelId ? "#panel" : "the Create a Squad panel")
-    .replace(/{controls}/g, value.controlsWhere === "THREAD" ? "your private squad thread in #squad-threads, which only you are added to" : "your voice channel's chat (the 💬 next to the channel name)");
+  const names = useDiscordNames(guildId);
+  // Same swaps as apps/bot/src/modules/community/tempChannelGuide.ts.
+  const link = (id: string | null | undefined, fallback: string) => {
+    const ch = id ? names?.channels[id] : undefined;
+    return ch ? `[${ch.voice ? "🔊 " : "#"}${ch.name}](https://discord.com/channels/${guildId}/${id})` : fallback;
+  };
+  const preview = text
+    .replace(/{lobby}/g, link(value.joinToCreate !== false ? value.lobbyChannelId : null, "the Create a Squad voice channel"))
+    .replace(/{panel}/g, link(value.panelChannelId, "the Create a Squad panel"))
+    .replace(
+      /{controls}/g,
+      value.controlsWhere === "THREAD" && value.controlsChannelId
+        ? `your private squad thread in ${link(value.controlsChannelId, "the squad threads channel")}, which only you are added to`
+        : "your voice channel's chat (the 💬 next to the channel name)",
+    )
+    .replace(/<#(\d+)>/g, (m, id) => link(id, m));
   return (
     <>
       <div>
@@ -258,13 +290,9 @@ function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string;
           the panel or game categories.
         </p>
       </div>
-      <div className="rounded-lg bg-[#313338] p-3">
-        <div className="rounded border-l-4 bg-[#2b2d31] p-3" style={{ borderColor: hex(value.panelColor) }}>
-          <p className="font-semibold text-sm text-white">❓ How Squad Channels Work</p>
-          <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{preview.replace(/\*\*/g, "")}</p>
-        </div>
-        <p className="text-[11px] text-slate-500 mt-2">Only you can see this · shown to whoever taps ❓ How it works</p>
-      </div>
+      <DiscordMessage ephemeral>
+        <DiscordEmbed color={value.panelColor ?? 0x5865f2} title="❓ How Squad Channels Work" description={preview} />
+      </DiscordMessage>
     </>
   );
 }
@@ -455,7 +483,8 @@ function LobbyFields({
               <textarea rows={4} className={field} maxLength={4000} value={value.panelText ?? ""} onChange={(e) => onChange({ panelText: e.target.value })} />
               <p className="text-[11px] text-slate-500 mt-1">{"{lobby}"} links the Lobby Voice Channel from step 1, when Join to Create is on.</p>
             </div>
-            <PanelPreview value={value} lobbyName={lobbyName} />
+            <PanelPreview value={value} />
+            <p className="text-[11px] text-slate-500">Click the dropdown in the preview to see the game list.</p>
             <p className="text-[11px] text-slate-500">
               {value.gamePicker && (value.gameChoices ?? []).length
                 ? "The dropdown lists the games from step 4."

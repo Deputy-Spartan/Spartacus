@@ -28,6 +28,8 @@ export function cleanTempGameChoices(raw: unknown): TempGameChoice[] {
 
 // A server emoji token, like <:siege:123> or <a:fire:456>.
 export const SERVER_EMOJI = /<(a?):(\w{2,32}):(\d{15,25})>/;
+// Anything that looks like one, including broken or hand-typed codes.
+export const SERVER_EMOJI_LOOSE = /<?(a?):(\w{1,32}):(\d+)>?|^:(\w{1,32}):$/;
 
 // Fills {user}, {index} or {count}, and {guild} in a channel name. Discord
 // channel names only take standard emojis, so server emojis are dropped.

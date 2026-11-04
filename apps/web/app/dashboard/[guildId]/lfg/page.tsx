@@ -1,5 +1,7 @@
 "use client";
 
+import { DiscordEmbed, DiscordMessage, extraEmbedProps } from "../../../../components/ui/DiscordPreview";
+import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
@@ -12,7 +14,6 @@ import { MessageSegmentBuilder, type SegmentToken } from "../../../../components
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { useBotAvatar } from "../../../../lib/useBotAvatar";
 import { api, type LfgCommandRow, type LfgCommandInput, type LfgCategoryRow, type LfgCategoryInput, type DiscordRoleOption } from "../../../../lib/api";
 
 type Tab = "active" | "create";
@@ -72,7 +73,6 @@ function LfgFields({
   useEffect(() => {
     api.getDiscordRoles(guildId).then(setRoles);
   }, [guildId]);
-  const roleLabel = roles.find((r) => r.id === value.roleId)?.name ?? null;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
@@ -180,7 +180,7 @@ function LfgFields({
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           Live preview
         </p>
-        <LfgPreview template={value.message || "Join {members} in {voiceName}"} roleLabel={roleLabel} />
+        <LfgPreview value={value} guildId={guildId} />
         <p className="text-xs text-slate-600 mt-2">
           Shows a stand-in member list and channel — the real announcement uses whoever's actually in the sender's voice channel when they run the
           command.
@@ -190,104 +190,67 @@ function LfgFields({
   );
 }
 
-// Mimics Discord's own dark theme (not the dashboard's neon theme) so what
-// you see here is what actually shows up in Discord — same token-splitting
-// logic as the bot's own substituteLfgTokens, just rendered with styled
-// spans (mention pill, blue link, fenced code block) instead of plain text.
+// Built with the same rules as buildAnnouncement in apps/bot/src/modules/community/lfg.ts,
+// using a stand-in voice channel and members.
 const PREVIEW_MEMBERS = ["BustyBunz", "TT3ouls627-UBI", "Diego the Virgin"];
 const PREVIEW_VOICE_NAME = "[R28] Em | Chill";
 const PREVIEW_NOTE = "em+ good coms chill";
+const SAMPLE_NAMES = {
+  users: Object.fromEntries([["1", "You"], ...PREVIEW_MEMBERS.map((n, i) => [String(i + 2), n])]),
+  channels: { "9": { name: PREVIEW_VOICE_NAME, voice: true } },
+};
 
-function Mention({ children }: { children: React.ReactNode }) {
-  return <span className="text-[#c9cdfb] bg-[#5865f2]/30 rounded px-[2px]">{children}</span>;
-}
-
-function LfgPreview({ template, roleLabel }: { template: string; roleLabel: string | null }) {
-  const avatarUrl = useBotAvatar();
-  const tokenRe = /\{(members|roleTag|voiceName|voice|user|message)\}/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let m: RegExpExecArray | null;
-  let key = 0;
-  let sawMessage = false;
-
-  while ((m = tokenRe.exec(template))) {
-    if (m.index > lastIndex) nodes.push(<span key={key++}>{template.slice(lastIndex, m.index)}</span>);
-    const tok = m[1];
-    if (tok === "members") {
-      nodes.push(
-        <span key={key++}>
-          {PREVIEW_MEMBERS.map((n, i) => (
-            <span key={i}>
-              <Mention>@{n}</Mention>
-              {i < PREVIEW_MEMBERS.length - 1 ? " + " : ""}
-            </span>
-          ))}
-        </span>
-      );
-    } else if (tok === "roleTag") {
-      if (roleLabel) {
-        nodes.push(
-          <span key={key++}>
-            {" <-- "}
-            <Mention>@{roleLabel}</Mention>
-          </span>
-        );
-      }
-    } else if (tok === "voiceName" || tok === "voice") {
-      nodes.push(
-        <span key={key++} className="text-[#00aff4] hover:underline cursor-pointer">
-          {PREVIEW_VOICE_NAME}
-        </span>
-      );
-    } else if (tok === "user") {
-      nodes.push(<Mention key={key++}>@You</Mention>);
-    } else if (tok === "message") {
-      sawMessage = true;
-      nodes.push(
-        <pre key={key++} className="block mt-1.5 bg-[#2b2d31] rounded px-2.5 py-1.5 font-mono text-xs text-[#dbdee1] whitespace-pre-wrap">
-          {PREVIEW_NOTE}
-        </pre>
-      );
-    }
-    lastIndex = tokenRe.lastIndex;
-  }
-  if (lastIndex < template.length) nodes.push(<span key={key++}>{template.slice(lastIndex)}</span>);
-
-  return (
-    <div className="rounded-lg bg-[#313338] p-4 font-sans">
-      <div className="flex gap-3">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient flex items-center justify-center text-sm font-bold text-base-950">S</div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
-            <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
-            <span className="text-[#949ba4] text-xs">Today at 9:20 PM</span>
-          </div>
-
-          <p className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words mt-1 leading-relaxed">{nodes}</p>
-          {!sawMessage && (
-            <pre className="block mt-1.5 bg-[#2b2d31] rounded px-2.5 py-1.5 font-mono text-xs text-[#dbdee1] whitespace-pre-wrap">{PREVIEW_NOTE}</pre>
-          )}
-
-          <div className="mt-2 max-w-sm bg-[#2b2d31] rounded-lg p-2.5 flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-[#f0b232] to-[#c77b1f] flex items-center justify-center text-base shrink-0">
-              🔊
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[#f2f3f5] text-xs font-semibold truncate">{PREVIEW_VOICE_NAME}</p>
-              <p className="text-[#949ba4] text-[11px] truncate">in your server</p>
-            </div>
-            <span className="shrink-0 bg-[#5865f2] text-white text-xs font-semibold px-3 py-1.5 rounded-full">Join Voice</span>
-          </div>
-        </div>
+function LfgPreview({ value, guildId }: { value: LfgCommandInput; guildId: string }) {
+  const jump = `https://discord.com/channels/${guildId}/9`;
+  const tokens: Record<string, string> = {
+    user: "<@1>",
+    voice: `${PREVIEW_VOICE_NAME} (<#9>)`,
+    voiceName: `[${PREVIEW_VOICE_NAME}](${jump})`,
+    members: PREVIEW_MEMBERS.map((_, i) => `<@${i + 2}>`).join(" + "),
+    roleTag: value.roleId ? ` <-- <@&${value.roleId}>` : "",
+    message: PREVIEW_NOTE,
+  };
+  const fill = (t: string, msg = tokens.message) => t.replace(/\{(user|voiceName|voice|members|roleTag|message)\}/g, (_m, k: string) => (k === "message" ? msg : tokens[k]));
+  // Embeds don't ping, so embed and saved-embed posts put the pings above.
+  const ping = [value.roleId ? `<@&${value.roleId}>` : "", value.includeSender !== false ? "<@1>" : ""].filter(Boolean).join(" ");
+  // A channel link on its own line is what Discord turns into the voice card.
+  const voiceLine = "<#9>";
+  const card = (
+    <div className="max-w-[432px] bg-[#2b2d31] rounded-lg p-3 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f0b232] to-[#c77b1f] flex items-center justify-center text-lg shrink-0">🔊</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[#f2f3f5] text-sm font-semibold truncate">{PREVIEW_VOICE_NAME}</p>
+        <p className="text-[#949ba4] text-xs truncate">in your server</p>
       </div>
+      <span className="shrink-0 bg-[#248046] text-white text-sm font-medium px-4 h-8 inline-flex items-center rounded-lg">Join Voice</span>
     </div>
+  );
+
+  if (value.savedEmbedId) {
+    return <SavedEmbedPreview guildId={guildId} savedEmbedId={value.savedEmbedId} content={[ping, voiceLine].filter(Boolean).join("\n")} />;
+  }
+  if (value.mode === "embed") {
+    return (
+      <DiscordMessage content={[ping, voiceLine].filter(Boolean).join("\n")} names={SAMPLE_NAMES}>
+        <DiscordEmbed
+          names={SAMPLE_NAMES}
+          color={value.embedColor || "#7B99BC"}
+          title={value.embedTitle ? fill(value.embedTitle) : null}
+          description={value.embedDescription ? fill(value.embedDescription) : null}
+          {...extraEmbedProps(value.embedExtra ?? undefined)}
+        />
+        {card}
+      </DiscordMessage>
+    );
+  }
+  const template = value.message || "Join {members} in {voiceName}";
+  const fenced = "```\n" + PREVIEW_NOTE + "\n```";
+  let text = fill(template, fenced);
+  if (!template.includes("{message}")) text = [text, fenced].join("\n");
+  return (
+    <DiscordMessage content={[text, voiceLine].join("\n")} names={SAMPLE_NAMES}>
+      {card}
+    </DiscordMessage>
   );
 }
 

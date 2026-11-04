@@ -6,6 +6,7 @@ import {
   StringSelectMenuBuilder,
   type ButtonInteraction,
   type Client,
+  type Guild,
   type StringSelectMenuInteraction,
 } from "discord.js";
 import type { TempChannelLobby } from "@prisma/client";
@@ -24,7 +25,7 @@ import { tempGuideEmbed } from "./tempChannelGuide";
 // Someone who isn't in voice gets this long to join their new channel.
 const JOIN_WINDOW_SEC = 120;
 
-export function tempPanelPayload(lobby: TempChannelLobby) {
+export function tempPanelPayload(lobby: TempChannelLobby, guild?: Guild | null) {
   const games = lobby.gamePicker ? cleanTempGameChoices(lobby.gameChoices) : [];
   const join = lobby.joinToCreate && lobby.lobbyChannelId ? `<#${lobby.lobbyChannelId}>` : "the Create a Squad voice channel";
   const text = (lobby.panelText || "").replace(/{lobby}/g, join);
@@ -34,7 +35,7 @@ export function tempPanelPayload(lobby: TempChannelLobby) {
   const rows = games.length
     ? [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-          new StringSelectMenuBuilder().setCustomId(`tvcp:${lobby.id}`).setPlaceholder("🎮 Pick your game to make a squad channel").addOptions(games.map(menuOption)),
+          new StringSelectMenuBuilder().setCustomId(`tvcp:${lobby.id}`).setPlaceholder("🎮 Pick your game to make a squad channel").addOptions(games.map(menuOption(guild))),
         ),
         ...(help.length ? [new ActionRowBuilder<ButtonBuilder>().addComponents(help)] : []),
       ]
@@ -53,7 +54,7 @@ export async function syncTempPanel(client: Client, lobbyId: string) {
   if (!lobby?.panelChannelId) return;
   const channel = await client.channels.fetch(lobby.panelChannelId).catch(() => null);
   if (!channel?.isTextBased() || !("send" in channel)) return;
-  const payload = tempPanelPayload(lobby);
+  const payload = tempPanelPayload(lobby, "guild" in channel ? channel.guild : null);
   if (lobby.panelMessageId) {
     const message = await channel.messages.fetch(lobby.panelMessageId).catch(() => null);
     if (message) return void (await message.edit(payload));
@@ -87,7 +88,7 @@ export async function handleTempPanel(interaction: StringSelectMenuInteraction |
     if (interaction.isStringSelectMenu() && !game) return void (await interaction.reply({ content: "That game was removed. Pick another one.", ephemeral: true }));
     await interaction.deferReply({ ephemeral: true });
     // Redraw the panel so the dropdown clears and the same game can be picked again.
-    await interaction.message.edit(tempPanelPayload(lobby)).catch(() => null);
+    await interaction.message.edit(tempPanelPayload(lobby, guild)).catch(() => null);
 
     const member = await guild.members.fetch(interaction.user.id);
     // One squad at a time from the panel.

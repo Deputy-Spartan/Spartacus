@@ -12,6 +12,8 @@ import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbed
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import { SendTestButton } from "../../../../components/ui/SendTestButton";
+import { DiscordMessage } from "../../../../components/ui/DiscordPreview";
+import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
@@ -104,17 +106,14 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start mt-4">
         <NeonCard>
-          <div className="rounded-lg bg-[#313338] p-4 font-sans mb-3">
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
-              <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
-            </div>
+          <div className="mb-3">
+            {/* Same text as apps/bot/src/jobs/birthdayAnnouncer.ts */}
             {config.savedEmbedId ? (
-              <p className="text-[#949ba4] text-sm italic">Preview reflects the saved embed once sent.</p>
+              <SavedEmbedPreview guildId={params.guildId} savedEmbedId={config.savedEmbedId} />
             ) : (
-              <p className="text-[#dbdee1] text-sm whitespace-pre-wrap">
-                {(config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, "@member")}
-              </p>
+              <DiscordMessage
+                content={`${config.pingRoleId ? `<@&${config.pingRoleId}> ` : ""}${(config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, "<@0>")}`}
+              />
             )}
           </div>
 

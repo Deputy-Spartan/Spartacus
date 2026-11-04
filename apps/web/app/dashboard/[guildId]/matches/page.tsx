@@ -1,5 +1,6 @@
 "use client";
 
+import { DiscordMarkdown } from "../../../../components/ui/DiscordMarkdown";
 import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
@@ -1072,38 +1073,12 @@ function VoiceSettings({ guildId }: { guildId: string }) {
   );
 }
 
-const HEADING_SIZE: Record<number, string> = { 1: "text-2xl", 2: "text-xl", 3: "text-base" };
-
-// Shows bold, links and # headings the way Discord does, so the preview reads like the real post.
+// Shows text the way Discord does (bold, links, headings, mentions, emojis), so the preview reads like the real post.
 type MentionNames = { channels: Record<string, string>; roles: Record<string, string> };
 
-function Formatted({ text, headings = false, names }: { text: string; headings?: boolean; names?: MentionNames }) {
-  const inline = (line: string) =>
-    line.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\)|<#\d+>|<@&\d+>)/).map((part, i) => {
-      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
-      const mention = part.match(/^<(#|@&)(\d+)>$/);
-      if (mention) {
-        const name = mention[1] === "#" ? names?.channels[mention[2]] : names?.roles[mention[2]];
-        return (
-          <span key={i} className="rounded bg-[#5865F2]/30 px-0.5 text-[#C9CDFB]">
-            {mention[1] === "#" ? `#${name ?? "unknown-channel"}` : `@${name ?? "unknown-role"}`}
-          </span>
-        );
-      }
-      const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
-      if (link) return <span key={i} className="text-[#00A8FC]">{link[1]}</span>;
-      return <span key={i}>{part}</span>;
-    });
-  const lines = text.split("\n");
-  return (
-    <>
-      {lines.map((line, i) => {
-        const heading = headings ? line.match(/^(#{1,3}) (.+)$/) : null;
-        if (heading) return <span key={i} className={`block font-bold text-white leading-tight ${HEADING_SIZE[heading[1].length]}`}>{inline(heading[2])}</span>;
-        return <span key={i}>{inline(line)}{i < lines.length - 1 ? "\n" : ""}</span>;
-      })}
-    </>
-  );
+function Formatted({ text, headings = false }: { text: string; headings?: boolean; names?: MentionNames }) {
+  // Titles only take inline formatting in Discord; descriptions and fields take the rest too.
+  return <DiscordMarkdown as="span" inline={!headings && !text.includes("\n")} text={text} className="block" />;
 }
 
 function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchTextKey }) {
@@ -1364,7 +1339,7 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                   {preview.authorName && (
                     <p className="flex items-center gap-1.5 text-xs font-medium text-white break-words">
                       {preview.authorIcon && <img src={preview.authorIcon} alt="" className="h-5 w-5 rounded-full" />}
-                      {preview.authorName}
+                      <Formatted text={preview.authorName} />
                     </p>
                   )}
                   {preview.title && (
@@ -1381,8 +1356,10 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                     <div className="grid grid-cols-3 gap-2">
                       {[...preview.fields, ...(entry.previewFields ?? []).map((f) => ({ ...f, inline: true }))].map((f, i) => (
                         <div key={i} className={`min-w-0 ${f.inline ? "" : "col-span-3"}`}>
-                          <p className="text-xs font-semibold text-white break-words">{f.name}</p>
-                          <p className="text-xs whitespace-pre-wrap break-words">
+                          <p className="text-sm font-semibold text-white break-words">
+                            <Formatted text={f.name} />
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap break-words">
                             <Formatted text={f.value} names={names} />
                           </p>
                         </div>
@@ -1459,8 +1436,16 @@ function BoardLayout({ config, onChange, onEditText }: { config: MatchmakingConf
               </div>
               <div className="rounded-lg bg-[#313338] p-3">
                 <button type="button" onClick={() => onEditText(part.embed)} className="group block w-full text-left rounded border-l-4 bg-[#2B2D31] p-3 text-sm text-[#DBDEE1] hover:ring-1 hover:ring-neon-blue" style={{ borderLeftColor: look.color }}>
-                  {look.title && <p className="font-semibold text-white break-words">{look.title}</p>}
-                  {look.description && <p className="whitespace-pre-wrap break-words text-xs mt-1 line-clamp-3">{look.description}</p>}
+                  {look.title && (
+                    <p className="font-semibold text-white break-words">
+                      <Formatted text={look.title} />
+                    </p>
+                  )}
+                  {look.description && (
+                    <div className="break-words text-xs mt-1 line-clamp-3">
+                      <Formatted text={look.description} headings />
+                    </div>
+                  )}
                   {look.footer && <p className="text-[11px] text-[#949BA4] mt-1 break-words">{look.footer}</p>}
                   <span className="mt-2 inline-block text-[11px] text-neon-blue opacity-70 group-hover:opacity-100">✎ Edit this embed</span>
                 </button>

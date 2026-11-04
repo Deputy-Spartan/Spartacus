@@ -59,7 +59,12 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
 
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
-  const previewText = config.welcomeText.replace("{server}", "Iron Legion").replace("{user}", "@Draven");
+  // Same swaps as apps/bot/src/modules/community/welcomeRender.ts: the new
+  // member is a real mention, their avatar is the embed thumbnail, and the
+  // mention is repeated above the embed when Ping Above the Embed is on.
+  const previewText = config.welcomeText.replace("{server}", "Iron Legion").replace("{user}", "<@0>");
+  const welcomeContent = config.embedEnabled ? (config.pingAboveEmbed !== false ? "<@0>" : "") : previewText;
+  const previewExtra = { ...(config.embedExtra ?? {}), thumbnailUrl: config.embedExtra?.thumbnailUrl || "https://cdn.discordapp.com/embed/avatars/0.png" };
   const goodbyePreviewText = config.goodbyeText.replace("{server}", "Iron Legion").replace("{user}", "Draven");
 
   return (
@@ -214,13 +219,13 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
               </button>
             </div>
             <StickyPreview
-              content={config.embedEnabled ? "" : previewText}
+              content={welcomeContent}
               embedEnabled={config.embedEnabled}
               embedTitle={config.embedTitle ?? ""}
               embedDescription={previewText}
               embedColor={config.embedColor}
               buttons={[]}
-              embedExtra={config.embedExtra ?? {}}
+              embedExtra={previewExtra}
             />
             {testStatus?.kind === "welcome" && testStatus.state === "sent" && (
               <p className="text-xs text-emerald-400 mt-2">✓ Sent to the welcome channel, standing in for you.</p>
@@ -242,7 +247,7 @@ export default function WelcomePage({ params }: { params: { guildId: string } })
               embedDescription={goodbyePreviewText}
               embedColor={config.embedColor}
               buttons={[]}
-              embedExtra={config.embedExtra ?? {}}
+              embedExtra={previewExtra}
             />
             {testStatus?.kind === "goodbye" && testStatus.state === "sent" && (
               <p className="text-xs text-emerald-400 mt-2">✓ Sent to the welcome channel, standing in for you.</p>

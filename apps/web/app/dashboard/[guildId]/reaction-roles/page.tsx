@@ -1,5 +1,6 @@
 "use client";
 
+import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage, DiscordSelect, extraEmbedProps } from "../../../../components/ui/DiscordPreview";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
@@ -12,9 +13,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { EMPTY_EMBED_EXTRA, type EmbedExtra } from "../../../../lib/embedExtra";
-import { EmbedExtraAuthor, EmbedExtraThumbnail, EmbedExtraImage, EmbedExtraFieldsPreview, EmbedExtraFooter } from "../../../../components/ui/EmbedExtraPreview";
-import { DiscordEmoji, DiscordRoleMention } from "../../../../components/ui/DiscordInline";
-import { useBotAvatar } from "../../../../lib/useBotAvatar";
+import { DiscordEmoji } from "../../../../components/ui/DiscordInline";
 import {
   api,
   type ReactionRolePanelRow,
@@ -432,12 +431,8 @@ function PanelFields({
 // layouts always post as an embed regardless of the toggle (same as the
 // bot's own poster jobs) — only Reactions can be plain content.
 function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles: DiscordRoleOption[]; channels: DiscordChannelOption[] }) {
-  const avatarUrl = useBotAvatar();
   const reactions = draft.layout === "REACTIONS";
-  const asEmbed = !reactions || draft.embedEnabled;
 
-  // Same "emoji — @Role" lines the bot posts (apps/bot/src/jobs/reactionRolePoster.ts),
-  // drawn the way Discord renders them rather than as raw <:emoji:id>/<@&id> text.
   // Mirrors the bot (apps/bot/src/jobs/rolePanelPoster.ts): an unlabeled
   // button is named after the first role/channel it gives, minus any
   // leading emoji in that name so it doesn't repeat the button's own.
@@ -446,112 +441,48 @@ function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles
     const name = (o.roleIds[0] && roles.find((r) => r.id === o.roleIds[0])?.name) || (o.channelIds[0] && channels.find((c) => c.id === o.channelIds[0])?.name) || "";
     return name.replace(/^[^\p{L}\p{N}]+/u, "").trim();
   };
+  const gives = (o: PanelOption) => [...o.roleIds.map((r) => `<@&${r}>`), ...o.channelIds.map((c) => `<#${c}>`)].join(", ") || "(nothing)";
 
-  // Every layout lists what each option gives — buttons can be emoji-only,
-  // so without this a member couldn't tell what they'd get.
-  const listing =
-    draft.options.length > 0 ? (
-      <div className="mt-3 space-y-0.5">
-        {draft.options.map((o, i) => (
-          <div key={i}>
-            {o.emoji ? <DiscordEmoji value={o.emoji} /> : reactions ? "❓" : null}
-            {!reactions && o.label && <b className="ml-1">{o.label}</b>}
-            {!o.emoji && !(!reactions && o.label) && "•"} —{" "}
-            {o.roleIds.length === 0 && o.channelIds.length === 0
-              ? "(nothing)"
-              : [
-                  ...o.roleIds.map((id) => <DiscordRoleMention key={id} roleId={id} roles={roles} />),
-                  ...o.channelIds.map((id) => (
-                    <span key={id} className="rounded px-0.5 font-medium text-[#c9cdfb] bg-[#5865f24d]">
-                      #{channels.find((c) => c.id === id)?.name ?? "unknown"}
-                    </span>
-                  )),
-                ].map((node, j) => (
-                  <span key={j}>
-                    {j > 0 && ", "}
-                    {node}
-                  </span>
-                ))}
-          </div>
-        ))}
-      </div>
-    ) : null;
-
-  const descriptionText = reactions ? draft.description || "React below to get a role." : draft.description || "Click below to pick your roles.";
-  const description = (
-    <>
-      {descriptionText}
-      {listing}
-    </>
-  );
-
-  const color = draft.embedEnabled ? draft.embedColor : reactions ? "#5865f2" : "#3b82f6";
+  // The same text the bot posts: reactionRolePoster.ts for reactions,
+  // rolePanelPoster.ts for buttons and dropdowns.
+  const listing = reactions
+    ? draft.options.map((o) => `${o.emoji || "❓"} — ${gives(o)}`).join("\n")
+    : draft.options.map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${gives(o)}`).join("\n");
+  const description = [draft.description || (reactions ? "React below to get a role." : "Click below to pick your roles."), "", listing].join("\n");
+  const title = draft.name || (reactions ? "Pick your roles" : "");
+  const asEmbed = !reactions || draft.embedEnabled;
+  const color = reactions ? draft.embedColor || "#5865F2" : draft.embedEnabled && draft.embedColor ? draft.embedColor : "#3b82f6";
   const hasAnything = draft.name || draft.description || draft.options.length > 0;
 
   return (
-    <div className="rounded-lg bg-[#313338] p-4 font-sans">
-      <div className="flex gap-3">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient flex items-center justify-center text-sm font-bold text-base-950">S</div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
-            <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
-            <span className="text-[#949ba4] text-xs">Today at 12:00 PM</span>
-          </div>
+    <DiscordMessage content={asEmbed ? null : [draft.name, description].filter(Boolean).join("\n\n")}>
+      {!hasAnything && <p className="text-[#949ba4] text-sm italic">Nothing to preview yet.</p>}
+      {asEmbed && hasAnything && <DiscordEmbed color={color} title={title} description={description} {...extraEmbedProps(draft.embedEnabled ? draft.embedExtra : undefined)} />}
 
-          {!hasAnything && <p className="text-[#949ba4] text-sm italic mt-1">Nothing to preview yet.</p>}
-
-          {asEmbed ? (
-            <div className="mt-2 rounded bg-[#2b2d31] border-l-4 p-3" style={{ borderColor: color }}>
-              <EmbedExtraThumbnail embedExtra={draft.embedExtra} />
-              <EmbedExtraAuthor embedExtra={draft.embedExtra} />
-              {draft.name && <p className="text-[#f2f3f5] font-semibold text-sm mb-1">{draft.name}</p>}
-              <div className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words">{description}</div>
-              <EmbedExtraFieldsPreview embedExtra={draft.embedExtra} />
-              <EmbedExtraImage embedExtra={draft.embedExtra} />
-              <EmbedExtraFooter embedExtra={draft.embedExtra} />
-            </div>
-          ) : (
-            <>
-              {draft.name && <p className="text-[#f2f3f5] font-semibold text-sm mt-1.5">{draft.name}</p>}
-              <div className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words mt-0.5">{description}</div>
-            </>
-          )}
-
-          {reactions && draft.options.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {draft.options.map((o, i) => (
-                <div key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-[10px] px-2 py-0.5 text-sm text-[#dbdee1] flex items-center gap-1.5">
-                  <DiscordEmoji value={o.emoji || "❓"} size={16} /> 1
-                </div>
-              ))}
-            </div>
-          )}
-
-          {draft.layout === "BUTTONS" && draft.options.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {draft.options.map((o, i) => (
-                <div key={i} className="bg-[#4e5058] text-[#f2f3f5] text-sm px-3 py-1.5 rounded flex items-center gap-1.5">
-                  {o.emoji && <DiscordEmoji value={o.emoji} size={18} />}
-                  {buttonLabel(o) && <span>{buttonLabel(o)}</span>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {draft.layout === "DROPDOWN" && (
-            <div className="mt-2 bg-[#2b2d31] border border-[#3f4248] rounded-lg px-3 py-2 text-sm text-[#949ba4] max-w-xs">
-              Select your roles… ▾
-            </div>
-          )}
+      {reactions && draft.options.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {draft.options.map((o, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-[#2b2d31] px-1.5 py-0.5 text-sm text-[#dbdee1]">
+              <DiscordEmoji value={o.emoji || "❓"} size={16} />
+              <span className="text-xs font-semibold">1</span>
+            </span>
+          ))}
         </div>
-      </div>
-    </div>
+      )}
+
+      {draft.layout === "BUTTONS" &&
+        Array.from({ length: Math.ceil(Math.min(draft.options.length, 25) / 5) }, (_, r) => (
+          <DiscordButtonRow key={r}>
+            {draft.options.slice(r * 5, r * 5 + 5).map((o, i) => (
+              <DiscordButton key={i} emoji={o.emoji} label={buttonLabel(o) || (o.emoji ? "" : "Option")} />
+            ))}
+          </DiscordButtonRow>
+        ))}
+
+      {draft.layout === "DROPDOWN" && draft.options.length > 0 && (
+        <DiscordSelect placeholder="Select your roles…" options={draft.options.slice(0, 25).map((o) => ({ label: o.label || "Option", emoji: o.emoji }))} />
+      )}
+    </DiscordMessage>
   );
 }
 

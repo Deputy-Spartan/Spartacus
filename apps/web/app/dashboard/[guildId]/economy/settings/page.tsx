@@ -1,15 +1,14 @@
 "use client";
 
+import { DiscordEmbed, DiscordMessage } from "../../../../../components/ui/DiscordPreview";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
 import { api, type EconomyConfig, type ModuleState } from "../../../../../lib/api";
-import { useBotAvatar } from "../../../../../lib/useBotAvatar";
 
 export default function EconomySettingsPage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<EconomyConfig | null>(null);
   const [enabled, setEnabled] = useState<boolean | null>(null);
-  const avatarUrl = useBotAvatar();
 
   useEffect(() => {
     api.getEconomyConfig(params.guildId).then(setConfig);
@@ -101,29 +100,20 @@ export default function EconomySettingsPage({ params }: { params: { guildId: str
       <NeonCard className="max-w-2xl">
         <p className="font-medium mb-3">Embed preview</p>
         <p className="text-xs text-slate-500 mb-4">What /balance looks like with these settings.</p>
-        <div className="rounded-lg bg-[#313338] p-4 font-sans">
-          <div className="flex gap-3">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-            ) : (
-              <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
-                <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">APP</span>
-                <span className="text-[#949ba4] text-xs">Today</span>
-              </div>
-              <div className="rounded bg-[#2b2d31] border-l-4 p-3 max-w-md" style={{ borderColor: config.embedColor }}>
-                <p className="text-[#949ba4] text-xs uppercase mb-0.5">Wallet</p>
-                <p className="text-[#f2f3f5] font-bold text-lg mb-1">
-                  12,450 {config.currencyIcon} {config.currencyName}
-                </p>
-                <p className="text-[#949ba4] text-xs">Earned 38,210 · Spent 25,760 · Rank #7</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Same embed as apps/bot/src/commands/economy/balance.ts */}
+        <DiscordMessage content={null}>
+          <DiscordEmbed
+            color={config.embedColor || "#E8C547"}
+            author="Draven"
+            authorIconUrl="https://cdn.discordapp.com/embed/avatars/0.png"
+            fields={[
+              { name: "Wallet", value: `12,450 ${config.currencyIcon} ${config.currencyName}` },
+              { name: "Earned", value: "38,210", inline: true },
+              { name: "Spent", value: "25,760", inline: true },
+              { name: "Rank", value: "#7", inline: true },
+            ]}
+          />
+        </DiscordMessage>
       </NeonCard>
     </div>
   );

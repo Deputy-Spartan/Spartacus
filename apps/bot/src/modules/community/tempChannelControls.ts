@@ -10,21 +10,38 @@ import {
   type ButtonInteraction,
   type ModalSubmitInteraction,
   type StringSelectMenuInteraction,
+  type Guild,
   type VoiceChannel,
 } from "discord.js";
 import { logError } from "@spartacus/db";
-import { SERVER_EMOJI, cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
+import { SERVER_EMOJI, SERVER_EMOJI_LOOSE, cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { moveToGameCategory, nextTempName } from "./tempGameCategories";
 import { tempGuideEmbed } from "./tempChannelGuide";
 
+// A server emoji the server doesn't have (deleted, or its code typed by hand)
+// can't show, so it's found again by name or left off.
+export function liveEmoji(emoji: string | undefined, guild?: Guild | null): string | undefined {
+  if (!emoji || !guild) return emoji;
+  const m = emoji.match(SERVER_EMOJI_LOOSE);
+  if (!m) return emoji;
+  const id = m[3];
+  const name = (m[2] ?? m[4] ?? "").toLowerCase();
+  const found = (id && guild.emojis.cache.get(id)) || guild.emojis.cache.find((e) => e.name?.toLowerCase() === name);
+  return found ? found.toString() : undefined;
+}
+
 // A server emoji or a standard one goes in the option's emoji slot. Anything
 // else stays in the label, since Discord refuses the whole message for a bad emoji.
-export function menuOption(g: TempGameChoice, i: number) {
+export function menuOption(guild?: Guild | null) {
+  return (game: TempGameChoice, i: number) => singleOption({ ...game, emoji: liveEmoji(game.emoji, guild) }, i);
+}
+
+function singleOption(g: TempGameChoice, i: number) {
   const custom = g.emoji?.match(SERVER_EMOJI);
   const standard = !custom && g.emoji && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g.emoji) && g.emoji.length <= 16;
   const emoji = custom ? { id: custom[3], name: custom[2], animated: custom[1] === "a" } : standard ? { name: g.emoji! } : undefined;
-  const label = emoji || !g.emoji ? g.label : `${g.emoji} ${g.label}`;
+  const label = emoji || !g.emoji || SERVER_EMOJI_LOOSE.test(g.emoji) ? g.label : `${g.emoji} ${g.label}`;
   return { label: label.slice(0, 100), value: String(i), emoji, description: g.userLimit ? `${g.userLimit}-player limit` : undefined };
 }
 
@@ -35,7 +52,14 @@ export function menuOption(g: TempGameChoice, i: number) {
 // With `thread`, the controls are in a private thread instead of the voice chat.
 export function tempChannelControls(
   channelId: string,
-  { games = [], ownerId, picked, guide = false, thread = false }: { games?: TempGameChoice[]; ownerId?: string; picked?: TempGameChoice; guide?: boolean; thread?: boolean } = {},
+  {
+    games = [],
+    ownerId,
+    picked,
+    guide = false,
+    thread = false,
+    guild,
+  }: { games?: TempGameChoice[]; ownerId?: string; picked?: TempGameChoice; guide?: boolean; thread?: boolean; guild?: Guild | null } = {},
 ) {
   const menu = games.length
     ? [
@@ -44,7 +68,7 @@ export function tempChannelControls(
             .setCustomId(`tvc:game:${channelId}`)
             .setPlaceholder("🎮 What are you playing? Pick a game to name your channel")
             .addOptions(
-              ...games.map(menuOption),
+              ...games.map(menuOption(guild)),
               { label: "Custom name", value: "custom", emoji: { name: "✏️" }, description: "Type your own channel name" },
             ),
         ),

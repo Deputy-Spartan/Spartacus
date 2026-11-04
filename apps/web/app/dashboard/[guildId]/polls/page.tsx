@@ -7,7 +7,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { useBotAvatar } from "../../../../lib/useBotAvatar";
+import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from "../../../../components/ui/DiscordPreview";
+import { DiscordMarkdown } from "../../../../components/ui/DiscordMarkdown";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import { api, type PollRow, type PollInput, type PollDurationMode, type PollResultsStyle, type PollBarStyle } from "../../../../lib/api";
 
@@ -600,8 +601,8 @@ function CreateWizard({
                         <div>
                           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-1">Primary Color</label>
                           <p className="text-[11px] text-slate-600 mb-2">
-                            The filled part of the bar. Discord can't color plain text, so this only affects the preview here — the live bar stays its fixed
-                            look.
+                            The filled part of the results bars here on the dashboard. Discord can't color text, so in Discord the bars show in its normal
+                            text color, as in the preview.
                           </p>
                           <ColorPicker value={draft.barColor} onChange={(c) => onChange({ barColor: c })} />
                         </div>
@@ -698,89 +699,54 @@ function CreateWizard({
   );
 }
 
+// Built the same way as renderPollEmbed in apps/bot/src/modules/engagement/pollVotes.ts,
+// with a few sample votes so the bars have something to show.
 function PollPreview({ draft }: { draft: Draft }) {
-  const avatarUrl = useBotAvatar();
   const filled = draft.options.filter((o) => o.label.trim());
-  const demoVotes = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
-  const total = demoVotes.reduce((a, b) => a + b, 0) || 1;
-  // The real bot message uses 20 segments; this preview card is a fixed,
-  // much narrower width — keep it at 10 so it never overflows the card.
-  const barLen = 10;
+  const counts = filled.map((_, i) => (i === 0 ? 5 : i === 1 ? 3 : 1));
+  const total = counts.reduce((a, b) => a + b, 0);
+  const barLen = 20;
   const [filledChar, emptyChar] = barChars(draft.barStyle);
 
-  const footer = draft.durationMode === "TIMER" ? `⏱ Ends in ${draft.hours || 0}h ${draft.minutes || 0}m` : "🖐 Open until a staff member stops it";
+  const lines = filled.map((o, i) => {
+    if (draft.resultsStyle === "SIMPLE") return `${o.emoji} **${o.label}**`;
+    if (draft.isPrivate) return `${o.emoji} **${o.label}**\n${emptyChar.repeat(barLen)} · 🔒 hidden`;
+    const pct = total ? Math.round((counts[i] / total) * 100) : 0;
+    const on = total ? Math.round((pct / 100) * barLen) : 0;
+    return `${o.emoji} **${o.label}** — ${counts[i]} vote${counts[i] === 1 ? "" : "s"} (${pct}%)\n${filledChar.repeat(on)}${emptyChar.repeat(barLen - on)}`;
+  });
+  const endsAt = Math.floor(Date.now() / 1000) + (Number(draft.hours) || 0) * 3600 + (Number(draft.minutes) || 0) * 60;
+  let status = draft.isPrivate
+    ? "🔒 Results hidden — reaction counts on this message are still visible to anyone, as usual on Discord"
+    : draft.durationMode === "TIMER"
+      ? `⏱️ Ends <t:${endsAt}:R>`
+      : "🖐 Open until a staff member stops it";
+  if (draft.allowWriteIn) status += " · Click ✍️ Write In below to submit your own answer";
+  if (draft.allowLockIn) status += " · Click 🔒 Lock In once you're done to make your answer final";
 
   return (
-    <div className="rounded-lg bg-[#313338] p-4 font-sans">
-      <div className="flex gap-3">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient flex items-center justify-center text-sm font-bold text-base-950">S</div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[#f2f3f5] font-medium text-sm">Spartacus</span>
-            <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">BOT</span>
-            <span className="text-[#949ba4] text-xs">Today at 7:40 PM</span>
-          </div>
-
-          <div className="mt-2 rounded bg-[#2b2d31] border-l-4 p-3 max-w-sm" style={{ borderColor: draft.color }}>
-            <p className="text-[#f2f3f5] font-semibold text-sm mb-2.5">🗳️ {draft.question || "Your question here"}</p>
-            {filled.length === 0 && <p className="text-[#949ba4] text-xs italic">Add some options to see them here.</p>}
-            {filled.map((o, i) => {
-              if (draft.resultsStyle === "SIMPLE") {
-                return (
-                  <p key={i} className="text-xs text-[#dbdee1] mb-1.5">
-                    {o.emoji} {o.label}
-                  </p>
-                );
-              }
-              const pct = draft.isPrivate ? null : Math.round((demoVotes[i] / total) * 100);
-              const filledCount = draft.isPrivate ? 0 : Math.min(barLen, Math.round(((pct ?? 0) / 100) * barLen));
-              const filledPart = draft.isPrivate ? "" : filledChar.repeat(filledCount);
-              const emptyPart = emptyChar.repeat(barLen - filledCount);
-              return (
-                <div key={i} className="mb-2 text-xs">
-                  <div className="flex items-center justify-between mb-1 text-[#dbdee1]">
-                    <span>
-                      {o.emoji} {o.label}
-                    </span>
-                    <span className="text-[#949ba4]">{draft.isPrivate ? "🔒 hidden" : `${pct}%`}</span>
-                  </div>
-                  <div className="leading-none text-[13px] tracking-[2px] whitespace-nowrap overflow-hidden">
-                    {/* Both bar styles are plain characters, so color them directly here —
-                        preview-only, since Discord can't color plain text on the real message. */}
-                    <span style={{ color: draft.barColor }}>{filledPart}</span>
-                    <span style={{ color: draft.barColorSecondary }}>{emptyPart}</span>
-                  </div>
-                </div>
-              );
-            })}
-            <p className="text-[#949ba4] text-[10.5px] mt-2">
-              {draft.isPrivate ? "🔒 Results hidden · " : ""}
-              {footer}
-              {draft.allowWriteIn ? " · Click ✍️ Write In below to submit your own answer" : ""}
-              {draft.allowLockIn ? " · Click 🔒 Lock In once you're done to make your answer final" : ""}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {filled.map((o, i) => (
-              <span key={i} className="bg-[#2b2d31] border border-[#3f4248] rounded-full px-2 py-0.5 text-xs text-[#dbdee1]">
-                {o.emoji} {demoVotes[i]}
-              </span>
-            ))}
-          </div>
-          {(draft.allowWriteIn || draft.allowLockIn) && (
-            <div className="flex gap-1.5 mt-1.5">
-              {draft.allowWriteIn && <span className="bg-[#4e5058] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">✍️ Write In</span>}
-              {draft.allowLockIn && <span className="bg-[#da373c] text-[#f2f3f5] text-xs px-2.5 py-1.5 rounded inline-block">🔒 Lock In</span>}
-            </div>
-          )}
-        </div>
+    <DiscordMessage>
+      <DiscordEmbed
+        color={draft.color || "#00E5FF"}
+        title={`🗳️ ${draft.question || "Your question here"}`}
+        description={filled.length ? [lines.join("\n\n"), status].join("\n\n") : "*Add some options to see them here.*"}
+        footer={`${total} vote${total === 1 ? "" : "s"} total`}
+      />
+      {/* The bot reacts with each option's emoji; members vote by clicking them. */}
+      <div className="flex flex-wrap gap-1">
+        {filled.map((o, i) => (
+          <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-[#2b2d31] border border-transparent px-1.5 py-0.5 text-sm text-[#dbdee1]">
+            <DiscordMarkdown inline text={o.emoji} />
+            <span className="text-xs font-semibold">{counts[i] + 1}</span>
+          </span>
+        ))}
       </div>
-    </div>
+      {(draft.allowWriteIn || draft.allowLockIn) && (
+        <DiscordButtonRow>
+          {draft.allowWriteIn && <DiscordButton label="✍️ Write In" />}
+          {draft.allowLockIn && <DiscordButton label="🔒 Lock In" style="danger" />}
+        </DiscordButtonRow>
+      )}
+    </DiscordMessage>
   );
 }

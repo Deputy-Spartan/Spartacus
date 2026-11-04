@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
+import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
@@ -78,16 +79,20 @@ function StickyFields({
 
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
       <div className="mb-4">
-        {form.savedEmbedId && <p className="text-xs text-slate-600 mb-2">Preview reflects the saved embed once sent.</p>}
-        <StickyPreview
-          content={form.content}
-          embedEnabled={false}
-          embedTitle=""
-          embedDescription=""
-          embedColor="#5865F2"
-          buttons={form.buttons}
-          embedExtra={{}}
-        />
+        {/* Same message as apps/bot/src/lib/stickyRender.ts posts. */}
+        {form.savedEmbedId ? (
+          <SavedEmbedPreview guildId={guildId} savedEmbedId={form.savedEmbedId} />
+        ) : (
+          <StickyPreview
+            content={form.content}
+            embedEnabled={!!form.embedEnabled}
+            embedTitle={form.embedTitle ?? ""}
+            embedDescription={form.embedDescription ?? ""}
+            embedColor={form.embedColor ?? "#5865F2"}
+            buttons={form.buttons}
+            embedExtra={form.embedExtra ?? {}}
+          />
+        )}
       </div>
     </>
   );

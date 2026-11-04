@@ -1,5 +1,6 @@
 "use client";
 
+import { DiscordMarkdown } from "../ui/DiscordMarkdown";
 import { useEffect, useState, type ReactNode } from "react";
 import { MATCH_TEXTS, resolveText, type MatchTextEntry, type MatchTextKey } from "@spartacus/shared";
 import { NeonCard } from "../ui/NeonCard";
@@ -101,12 +102,9 @@ function Frame({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Bold({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/(\*\*[^*]+\*\*)/).map((part, i) => (part.startsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : <span key={i}>{part}</span>))}
-    </>
-  );
+// Text the way Discord shows it: bold, headings, links, mentions and emojis.
+function Bold({ text, inline }: { text: string; inline?: boolean }) {
+  return <DiscordMarkdown as="span" inline={inline} text={text} className="block" />;
 }
 
 function Embed({ texts, item, fields, children }: { texts: unknown; item: MatchTextKey; fields?: Array<{ name: string; value: string }>; children?: ReactNode }) {
@@ -114,18 +112,26 @@ function Embed({ texts, item, fields, children }: { texts: unknown; item: MatchT
   const t = resolveText(texts, item, entry.tokens);
   return (
     <div className="rounded border-l-4 bg-[#2B2D31] p-3 text-sm text-[#DBDEE1] space-y-1.5 max-w-[520px]" style={{ borderLeftColor: t.color }}>
-      {t.title && <p className="font-semibold text-white break-words">{t.title}</p>}
+      {t.title && (
+        <p className="font-semibold text-white break-words">
+          <Bold inline text={t.title} />
+        </p>
+      )}
       {t.description && (
         <p className="whitespace-pre-wrap break-words">
           <Bold text={t.description} />
         </p>
       )}
       {fields && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {fields.map((f) => (
             <div key={f.name} className="min-w-0">
-              <p className="text-xs font-semibold text-white break-words">{f.name}</p>
-              <p className="text-xs whitespace-pre-wrap break-words">{f.value}</p>
+              <p className="text-sm font-semibold text-white break-words">
+                <Bold inline text={f.name} />
+              </p>
+              <div className="text-sm break-words">
+                <Bold text={f.value} />
+              </div>
             </div>
           ))}
         </div>

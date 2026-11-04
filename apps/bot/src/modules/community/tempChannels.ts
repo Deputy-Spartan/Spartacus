@@ -75,7 +75,7 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
 // a private thread only the creator is added to. Falls back to the voice chat
 // if the thread can't be made. Returns the thread's id when there is one.
 async function postControls(guild: Guild, squad: VoiceChannel, lobby: TempChannelLobby, member: GuildMember, games: TempGameChoice[], picked?: TempGameChoice) {
-  const options = { games, ownerId: member.id, picked, guide: lobby.guideButton };
+  const options = { games, ownerId: member.id, picked, guide: lobby.guideButton, guild };
   if (lobby.controlsWhere === "THREAD" && lobby.controlsChannelId) {
     const parent = await guild.channels.fetch(lobby.controlsChannelId).catch(() => null);
     if (parent?.type === ChannelType.GuildText) {

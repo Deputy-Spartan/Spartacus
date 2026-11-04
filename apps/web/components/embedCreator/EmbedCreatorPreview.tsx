@@ -2,191 +2,59 @@
 
 import { useEffect, useState } from "react";
 import { useBotAvatar } from "../../lib/useBotAvatar";
+import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from "../ui/DiscordPreview";
 import { api, type EmbedCreatorComponentRow, type EmbedCreatorState, type DiscordRoleOption, type DiscordChannelOption } from "../../lib/api";
 
-function esc(s: string | undefined): string {
-  return s || "";
-}
-
-// Minimal markdown-to-HTML for the preview only — the actual send always
-// ships raw markdown text to Discord, which renders it for real. This just
-// approximates bold/italic/underline/strike/code/spoiler so the preview
-// looks close to what members will actually see.
-interface MentionNames {
-  roles: Record<string, string>;
-  channels: Record<string, string>;
-}
-
-const MENTION_STYLE = "background:rgba(88,101,242,.3);color:#c9cdfb;border-radius:3px;padding:0 2px;";
-
-function mdToHtml(s: string | undefined, names?: MentionNames): string {
-  if (!s) return "";
-  let out = s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/&lt;(a?):(\w+):(\d+)&gt;/g, (_m, a, n, id) => `<img src="https://cdn.discordapp.com/emojis/${id}.${a ? "gif" : "png"}?size=32" alt=":${n}:" title=":${n}:" style="display:inline;height:1.25em;width:1.25em;vertical-align:-0.3em;" />`)
-    .replace(/&lt;@&amp;(\d+)&gt;/g, (_m, id) => `<span style="${MENTION_STYLE}">@${names?.roles[id] ?? "role"}</span>`)
-    .replace(/&lt;#(\d+)&gt;/g, (_m, id) => `<span style="${MENTION_STYLE}">#${names?.channels[id] ?? "channel"}</span>`)
-    .replace(/&lt;@!?(\d+)&gt;/g, `<span style="${MENTION_STYLE}">@user</span>`);
-
-  // Block-level constructs first, while the text is still plain (no HTML
-  // tags yet to confuse "start of line" matching) — code fences before
-  // anything else so header/quote/list syntax inside a code block is left
-  // untouched rather than being (wrongly) converted too.
-  out = out.replace(
-    /```([\s\S]*?)```/g,
-    (_m, code) => `<pre style="background:#1e1f22;padding:8px 10px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;font-family:monospace;font-size:12px;margin:4px 0;">${code.trim()}</pre>`
-  );
-
-  const QUOTE_STYLE = "border-left:4px solid #4e5058;padding-left:8px;margin:2px 0;color:#9aa0a6;";
-  if (/^&gt;&gt;&gt; /m.test(out)) {
-    // ">>> " swallows every line after it, not just the one it's on.
-    out = out.replace(/^&gt;&gt;&gt; ([\s\S]*)$/m, (_m, rest) => `<div style="${QUOTE_STYLE}">${rest}</div>`);
-  } else {
-    out = out.replace(/^&gt; (.*)$/gm, `<div style="${QUOTE_STYLE}">$1</div>`);
-  }
-
-  out = out
-    .replace(/^### (.+)$/gm, '<div style="font-weight:700;font-size:1em;margin:3px 0;">$1</div>')
-    .replace(/^## (.+)$/gm, '<div style="font-weight:700;font-size:1.15em;margin:3px 0;">$1</div>')
-    .replace(/^# (.+)$/gm, '<div style="font-weight:700;font-size:1.3em;margin:3px 0;">$1</div>')
-    .replace(/^- (.+)$/gm, '<div style="padding-left:1em;">• $1</div>')
-    .replace(/^(\d+)\. (.+)$/gm, '<div style="padding-left:1em;">$1. $2</div>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" style="color:#00a8fc;text-decoration:underline;">$1</a>');
-
-  return out
-    .replace(/\|\|(.+?)\|\|/g, '<span style="background:#202225;color:#202225;border-radius:3px;">$1</span>')
-    .replace(/~~(.+?)~~/g, "<s>$1</s>")
-    .replace(/__(.+?)__/g, "<u>$1</u>")
-    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-    .replace(/\*(.+?)\*/g, "<i>$1</i>")
-    .replace(/`(.+?)`/g, '<code style="background:#1e1f22;padding:1px 4px;border-radius:4px;">$1</code>');
-}
-
-const BUTTON_COLORS: Record<string, string> = { primary: "#5865f2", secondary: "#4e5058", success: "#248046", danger: "#da373c" };
 const SELECT_LABELS: Record<string, string> = { string: "Select Menu", user: "User Select", role: "Role Select", user_role: "User & Role Select", channel: "Channel Select" };
 
 function nowStr(): string {
   return "Today at " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export function EmbedCreatorPreview({ guildId, state }: { guildId: string; state: EmbedCreatorState }) {
+// `extra` is what a module adds under the saved embed, like the Rules panel's Agree buttons.
+export function EmbedCreatorPreview({ guildId, state, extra }: { guildId: string; state: EmbedCreatorState; extra?: React.ReactNode }) {
   const botAvatar = useBotAvatar();
   const usesWebhookProfile = state.deliveryMode === "webhook" && (state.profileName || state.profileAvatar);
   const displayName = usesWebhookProfile && state.profileName ? state.profileName : "Spartacus";
   const avatarUrl = usesWebhookProfile && state.profileAvatar ? state.profileAvatar : botAvatar;
 
-  const [names, setNames] = useState<MentionNames>({ roles: {}, channels: {} });
-  useEffect(() => {
-    Promise.all([api.getDiscordRoles(guildId), api.getDiscordChannels(guildId)])
-      .then(([roles, ch]) =>
-        setNames({
-          roles: Object.fromEntries(roles.map((r) => [r.id, r.name])),
-          channels: Object.fromEntries([...ch.textChannels, ...ch.voiceChannels].map((c) => [c.id, c.name])),
-        })
-      )
-      .catch(() => null);
-  }, [guildId]);
-
-  const hasAnything = state.content.trim() || state.embeds.some(hasEmbedContent) || state.components.some((r) => r.type);
+  const hasAnything = state.content.trim() || state.embeds.some(hasEmbedContent) || state.components.some((r) => r.type) || extra;
   if (!hasAnything) {
     return <p className="text-xs text-slate-600 text-center py-8">Nothing to preview yet — start typing.</p>;
   }
 
   return (
-    <div className="rounded-lg bg-[#313338] p-4 font-sans">
-      <div className="flex gap-3">
-        {avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div className="h-10 w-10 shrink-0 rounded-full bg-neon-gradient flex items-center justify-center text-sm font-bold text-base-950">S</div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-[#f2f3f5] font-medium text-sm">{displayName}</span>
-            <span className="bg-[#5865f2] text-white text-[10px] px-1 rounded">{state.deliveryMode === "webhook" ? "WEBHOOK" : "APP"}</span>
-            <span className="text-[#949ba4] text-xs">{nowStr()}</span>
-          </div>
-
-          {state.content && (
-            <div className="text-[#dbdee1] text-sm mt-1 whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(state.content, names) }} />
-          )}
-
+    <DiscordMessage name={displayName} avatarUrl={avatarUrl} tag="APP" time={nowStr()} content={state.content}>
           {state.embeds.filter(hasEmbedContent).map((em) => (
-            <div key={em.id} className="flex mt-2 max-w-full">
-              <div className="w-1 rounded-l" style={{ background: em.color || "#7B99BC" }} />
-              <div className="bg-[#2b2d31] rounded-r p-3 min-w-0 flex-1">
-                {em.thumbnailUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={em.thumbnailUrl} alt="" className="float-right h-16 w-16 rounded object-cover ml-3 mb-1" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-                )}
-                {em.authorName && (
-                  <div className="flex items-center gap-1.5 mb-1">
-                    {em.authorIconUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={em.authorIconUrl} alt="" className="h-4 w-4 rounded-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-                    )}
-                    <span className="text-[#f2f3f5] text-xs font-semibold">{em.authorName}</span>
-                  </div>
-                )}
-                {em.title && <p className="text-[#f2f3f5] font-semibold text-sm mb-1" dangerouslySetInnerHTML={{ __html: mdToHtml(em.title) }} />}
-                {em.description && <div className="text-[#dbdee1] text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(em.description, names) }} />}
-                {em.fields.filter((f) => f.name || f.value).length > 0 && (
-                  <div className={`grid gap-2 mt-2 ${em.fields.some((f) => f.inline) ? "grid-cols-3" : "grid-cols-1"}`}>
-                    {em.fields
-                      .filter((f) => f.name || f.value)
-                      .map((f, i) => (
-                        <div key={i} className={f.inline ? "" : "col-span-3"}>
-                          <p className="text-[#f2f3f5] text-xs font-semibold" dangerouslySetInnerHTML={{ __html: mdToHtml(f.name || "Field") }} />
-                          <div className="text-[#dbdee1] text-xs whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: mdToHtml(f.value, names) }} />
-                        </div>
-                      ))}
-                  </div>
-                )}
-                {em.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={em.imageUrl} alt="" className="rounded mt-2 max-h-64 w-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-                )}
-                {(em.footerText || em.timestamp) && (
-                  <div className="flex items-center gap-1.5 mt-2">
-                    {em.footerIconUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={em.footerIconUrl} alt="" className="h-4 w-4 rounded-full object-cover" onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} />
-                    )}
-                    <span className="text-[#a8aab0] text-[11px]">
-                      {esc(em.footerText)}
-                      {em.footerText && em.timestamp ? " • " : ""}
-                      {em.timestamp ? nowStr() : ""}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+            <DiscordEmbed
+              key={em.id}
+              color={em.color || "#1e1f22"}
+              author={em.authorName}
+              authorIconUrl={em.authorIconUrl}
+              title={em.title}
+              description={em.description}
+              fields={em.fields}
+              thumbnailUrl={em.thumbnailUrl}
+              imageUrl={em.imageUrl}
+              footer={em.footerText}
+              footerIconUrl={em.footerIconUrl}
+              timestamp={!!em.timestamp}
+            />
           ))}
 
           {state.components.map((row) =>
             row.type === "buttons" ? (
-              <div key={row.id} className="flex flex-wrap gap-2 mt-2">
+              <DiscordButtonRow key={row.id}>
                 {row.items.map((it) => (
-                  <span
-                    key={it.id}
-                    className="text-white text-sm font-medium px-3.5 py-1.5 rounded flex items-center gap-1.5"
-                    style={{ background: it.kind === "link" ? "#4e5058" : BUTTON_COLORS[it.style] }}
-                  >
-                    {it.label || (it.kind === "link" ? "Link" : "Button")}
-                    {it.kind === "link" && <span className="text-xs">↗</span>}
-                  </span>
+                  <DiscordButton key={it.id} label={it.label || (it.kind === "link" ? "Link" : "Button")} style={it.kind === "link" ? "link" : it.style} />
                 ))}
-              </div>
+              </DiscordButtonRow>
             ) : row.type ? (
               <SelectPreview key={row.id} guildId={guildId} row={row} />
             ) : null
           )}
-        </div>
-      </div>
-    </div>
+          {extra}
+    </DiscordMessage>
   );
 }
 
@@ -214,7 +82,7 @@ function SelectPreview({ guildId, row }: { guildId: string; row: EmbedCreatorCom
   const hasCurated = (row.options ?? []).length > 0;
 
   return (
-    <div className="mt-2 max-w-sm">
+    <div className="max-w-sm">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

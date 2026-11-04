@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma, Prisma } from "@spartacus/db";
-import { cleanTempGameChoices } from "@spartacus/shared";
-import { deleteChannelMessage } from "../lib/discordRest";
+import { SERVER_EMOJI_LOOSE, cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
+import { deleteChannelMessage, getGuildEmojis } from "../lib/discordRest";
 import { getBotClient } from "../lib/botClient";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
@@ -33,6 +33,23 @@ function lobbyData(body: Record<string, unknown>) {
   return data;
 }
 
+// A server emoji code is matched to the server's real emoji by id, then by
+// name. One that isn't in the server is dropped so it never shows as raw code.
+async function fixGameEmojis(guildId: string, data: Record<string, unknown>) {
+  const games = data.gameChoices as TempGameChoice[] | undefined;
+  if (!games?.some((g) => g.emoji && SERVER_EMOJI_LOOSE.test(g.emoji))) return;
+  const emojis = await getGuildEmojis(guildId).catch(() => null);
+  if (!emojis) return;
+  data.gameChoices = games.map((g) => {
+    const m = g.emoji?.match(SERVER_EMOJI_LOOSE);
+    if (!m) return g;
+    const name = (m[2] ?? m[4] ?? "").toLowerCase();
+    const e = emojis.find((x) => x.id === m[3]) ?? emojis.find((x) => x.name.toLowerCase() === name);
+    const { emoji: _drop, ...rest } = g;
+    return e ? { ...g, emoji: `<${e.animated ? "a" : ""}:${e.name}:${e.id}>` } : rest;
+  });
+}
+
 // The dashboard saves as you type, so the panel is redrawn once typing stops.
 const redraws = new Map<string, ReturnType<typeof setTimeout>>();
 function redrawPanel(lobbyId: string) {
@@ -55,7 +72,9 @@ router.get("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildPe
 });
 
 router.post("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildPermission, async (req, res) => {
-  const row = await prisma.tempChannelLobby.create({ data: { ...(lobbyData(req.body) as any), guildId: req.params.guildId } });
+  const data = lobbyData(req.body);
+  await fixGameEmojis(req.params.guildId, data);
+  const row = await prisma.tempChannelLobby.create({ data: { ...(data as any), guildId: req.params.guildId } });
   if (row.panelChannelId) redrawPanel(row.id);
   res.status(201).json(row);
 });
@@ -64,6 +83,7 @@ router.put("/guilds/:guildId/temp-channels/lobbies/:id", requireAuth, requireGui
   const existing = await prisma.tempChannelLobby.findFirst({ where: { id: req.params.id, guildId: req.params.guildId } });
   if (!existing) return res.status(404).json({ error: "Lobby not found" });
   const data = lobbyData(req.body);
+  await fixGameEmojis(req.params.guildId, data);
   // A moved or removed panel takes its old message with it.
   const movedPanel = data.panelChannelId !== undefined && data.panelChannelId !== existing.panelChannelId;
   if (movedPanel && existing.panelChannelId && existing.panelMessageId) await deleteChannelMessage(existing.panelChannelId, existing.panelMessageId).catch(() => null);

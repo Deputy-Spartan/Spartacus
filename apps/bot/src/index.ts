@@ -156,6 +156,7 @@ export { refreshRolePanel } from "./jobs/rolePanelPoster";
 export { bumpRulesVersion } from "./modules/community/rulesGate";
 export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 export { checkStreamerNow, sendTestAlert } from "./modules/community/goLive";
+export { runStreamDeck, streamDeckFace, streamDeckOptions } from "./modules/utility/streamDeck";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel, verifyExistingMembers } from "./modules/security/verification";

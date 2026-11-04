@@ -1242,6 +1242,9 @@ model LevelingSettings {
   guildId        String  @unique
   channelId      String?
   levelUpMessage String  @default("🎉 {user} just reached **Level {level}**!")
+  // A server-wide XP boost (Stream Deck's XP Boost dial), e.g. 2x for an hour.
+  xpBoost        Float     @default(1)
+  xpBoostEndsAt  DateTime?
 }
 
 enum XpBlacklistType {
@@ -2737,4 +2740,46 @@ model RoleChangeLog {
   createdAt DateTime @default(now())
 
   @@index([guildId, createdAt])
+}
+
+// ---- Stream Deck ----
+// A connection key for the Spartacus Stream Deck plugin. Only its SHA-256 is
+// stored; the key itself is shown once when it's made. One key controls one
+// server, acts as the person who made it, and can be cancelled any time.
+model StreamDeckKey {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  name       String
+  prefix     String // the first characters, so the dashboard can tell keys apart
+  hash       String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([guildId])
+}
+
+// Every Stream Deck press, for the dashboard's history.
+model StreamDeckLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  keyId     String
+  action    String
+  ok        Boolean
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// What a Stream Deck toggle changed, so pressing it again undoes exactly that
+// (channels that were already locked, the old slowmode, a channel's old name).
+model StreamDeckState {
+  id      String @id @default(cuid())
+  guildId String
+  key     String
+  value   Json
+
+  @@unique([guildId, key])
 }

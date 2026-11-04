@@ -127,6 +127,7 @@ export const OWNER_NAV_SECTION: NavSection = {
   items: [
     { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
     { href: "/owner-panel", label: "Command Center", icon: "🔑" },
+    { href: "/stream-deck", label: "Stream Deck", icon: "🎛️" },
     { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],
 };

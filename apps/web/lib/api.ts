@@ -1736,7 +1736,27 @@ export interface RoleChangeRow {
   createdAt: string;
 }
 
+export interface StreamDeckKeyRow {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt?: string | null;
+  key?: string; // only right after it's made
+}
+export interface StreamDeckLogRow {
+  id: string;
+  action: string;
+  ok: boolean;
+  message: string;
+  createdAt: string;
+}
+
 export const api = {
+  getStreamDeckKeys: (guildId: string) => request<StreamDeckKeyRow[]>(`/guilds/${guildId}/stream-deck/keys`),
+  createStreamDeckKey: (guildId: string, name: string) => request<StreamDeckKeyRow>(`/guilds/${guildId}/stream-deck/keys`, { method: "POST", body: JSON.stringify({ name }) }),
+  revokeStreamDeckKey: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-deck/keys/${id}`, { method: "DELETE" }),
+  getStreamDeckLog: (guildId: string) => request<StreamDeckLogRow[]>(`/guilds/${guildId}/stream-deck/log`),
   getRoleManager: (guildId: string) => request<RoleManagerInfo>(`/guilds/${guildId}/role-manager`),
   setRoleManager: (guildId: string, config: RoleManagerInfo["config"]) =>
     request(`/guilds/${guildId}/role-manager`, { method: "PUT", body: JSON.stringify(config) }),

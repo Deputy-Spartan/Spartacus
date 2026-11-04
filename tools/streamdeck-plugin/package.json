@@ -1,0 +1,15 @@
+{
+  "name": "spartacus-streamdeck-plugin",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Spartacus for Elgato Stream Deck. Not part of the npm workspaces, so it never affects the bot or dashboard deploys.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "pack": "node build.mjs --pack"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "3.0.3",
+    "esbuild": "0.24.0"
+  }
+}

@@ -15,6 +15,7 @@ import { setBotClient } from "./lib/botClient";
 
 import healthRouter from "./routes/health";
 import publicStatsRouter from "./routes/publicStats";
+import streamDeckRouter from "./routes/streamDeck";
 import matchesRouter from "./routes/matches";
 import activityRouter from "./routes/activity";
 import authRouter from "./routes/auth";
@@ -141,6 +142,7 @@ app.use(joinRolesRouter);
 app.use(stickyMessagesRouter);
 app.use(starboardRouter);
 app.use(roleManagerRouter);
+app.use(streamDeckRouter);
 app.use(tempChannelsRouter);
 app.use(ticketsRouter);
 app.use(rolePanelsRouter);

@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Spartacus</title>
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+    <style>
+      .sp-note { font-size: 11px; color: #9a9a9a; margin: 4px 0 8px; line-height: 1.4; }
+      .sp-ok { color: #4ade80; }
+      .sp-bad { color: #f87171; }
+      [data-field] { display: none; }
+      [data-field].on { display: flex; }
+    </style>
+  </head>
+  <body>
+    <!-- Shared by every Spartacus action: the connection key is stored once. -->
+    <sdpi-item label="Connection key">
+      <sdpi-password setting="apiKey" global placeholder="sd_live_…"></sdpi-password>
+    </sdpi-item>
+    <sdpi-item label="">
+      <sdpi-button id="test" value="Test connection"></sdpi-button>
+    </sdpi-item>
+    <p class="sp-note" id="status">Make a key on the dashboard: Owner Only → 🎛️ Stream Deck → Make a Key.</p>
+
+    <!-- Only the fields the current action uses are shown. -->
+    <sdpi-item data-field="channel" label="Channel"><sdpi-select setting="channel" datasource="text" hot-reload placeholder="Pick a channel"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="liveChannel" label="Live channel"><sdpi-select setting="liveChannel" datasource="text" hot-reload placeholder="Channel to rename"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="safeChannel" label="Slowmode in"><sdpi-select setting="safeChannel" datasource="text" hot-reload placeholder="Channel"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="voice" label="Lobby"><sdpi-select setting="voice" datasource="voice" hot-reload placeholder="Voice channel to pull from"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="role" label="Role"><sdpi-select setting="role" datasource="roles" hot-reload placeholder="Pick a role"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="ping" label="Ping"><sdpi-select setting="ping" datasource="roles" hot-reload placeholder="No ping"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="module" label="Module"><sdpi-select setting="module" datasource="modules" hot-reload placeholder="Pick a module"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="embed" label="Saved embed"><sdpi-select setting="embed" datasource="embeds" hot-reload placeholder="From the Embed Creator"></sdpi-select></sdpi-item>
+    <sdpi-item data-field="game" label="Game"><sdpi-textfield setting="game" placeholder="e.g. Rainbow Six Siege"></sdpi-textfield></sdpi-item>
+    <sdpi-item data-field="text" label="Message"><sdpi-textarea setting="text" rows="3" placeholder="What Spartacus says"></sdpi-textarea></sdpi-item>
+    <sdpi-item data-field="question" label="Question"><sdpi-textfield setting="question" placeholder="GG or nah?"></sdpi-textfield></sdpi-item>
+    <sdpi-item data-field="prize" label="Prize"><sdpi-textfield setting="prize" placeholder="Discord Nitro"></sdpi-textfield></sdpi-item>
+    <sdpi-item data-field="minutes" label="Minutes"><sdpi-range setting="minutes" min="5" max="240" step="5" default="60" showlabels></sdpi-range></sdpi-item>
+    <sdpi-item data-field="count" label="Messages"><sdpi-range setting="count" min="1" max="100" step="1" default="10" showlabels></sdpi-range></sdpi-item>
+    <sdpi-item data-field="slow" label="Slowmode"><sdpi-select setting="slow" default="10"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="30">30 seconds</option><option value="60">1 minute</option></sdpi-select></sdpi-item>
+    <sdpi-item data-field="streamer" label="Streamer"><sdpi-textfield setting="streamer" placeholder="Their name"></sdpi-textfield></sdpi-item>
+    <sdpi-item data-field="link" label="Link"><sdpi-textfield setting="link" placeholder="https://twitch.tv/… (optional)"></sdpi-textfield></sdpi-item>
+    <sdpi-item data-field="note" label="Note"><sdpi-textfield setting="note" placeholder="Optional"></sdpi-textfield></sdpi-item>
+    <p class="sp-note" id="tip"></p>
+
+    <script>
+      // Which fields each action uses (kept in step with src/actions.ts).
+      const FIELDS = __FIELDS__;
+      const TIPS = __TIPS__;
+      const client = SDPIComponents.streamDeckClient;
+      client.getConnectionInfo().then((info) => {
+        const id = info.actionInfo.action.split(".").pop();
+        for (const f of FIELDS[id] ?? []) document.querySelectorAll(`[data-field="${f}"]`).forEach((el) => el.classList.add("on"));
+        document.getElementById("tip").textContent = TIPS[id] ?? "";
+      });
+      const status = document.getElementById("status");
+      document.getElementById("test").addEventListener("click", () => {
+        status.textContent = "Checking…";
+        status.className = "sp-note";
+        client.send("sendToPlugin", { event: "test" });
+      });
+      client.sendToPropertyInspector.subscribe((ev) => {
+        const p = ev.payload || {};
+        if (p.event === "test" || p.ok === false) {
+          status.textContent = p.message || (p.ok ? "Connected" : "Not connected");
+          status.className = "sp-note " + (p.ok === false ? "sp-bad" : "sp-ok");
+        }
+      });
+    </script>
+  </body>
+</html>

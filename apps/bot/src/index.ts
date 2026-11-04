@@ -38,6 +38,8 @@ import { startMemberMilestonesJob } from "./jobs/memberMilestones";
 import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
 import { startRulesGateReminderJob } from "./jobs/rulesGateReminder";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
+import { startVerificationReminderJob } from "./jobs/verificationReminder";
+import { onVerificationJoin } from "./modules/security/verification";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 import { startMatchTickerJob } from "./jobs/matchTicker";
 
@@ -154,7 +156,7 @@ export { bumpRulesVersion } from "./modules/community/rulesGate";
 export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
-export { postVerificationPanel } from "./modules/security/verification";
+export { postVerificationPanel, verifyExistingMembers } from "./modules/security/verification";
 // Same reasoning — apps/api's report-settings route posts/reposts the
 // "Report a Player" panel immediately on save.
 export { postPlayerReportPanel } from "./modules/moderation/playerReports";
@@ -244,6 +246,7 @@ export function startBot() {
     startRulesGatePosterJob(c);
     startRulesGateReminderJob(c);
     startVerificationPosterJob(c);
+    startVerificationReminderJob(c);
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
 
@@ -286,6 +289,7 @@ export function startBot() {
   client.on(Events.MessageUpdate, logger.onMessageUpdate);
   client.on(Events.GuildMemberAdd, logger.onMemberAdd);
   client.on(Events.GuildMemberAdd, guildMemberAdd.onMemberJoin);
+  client.on(Events.GuildMemberAdd, (m) => void onVerificationJoin(m).catch(() => null));
   client.on(Events.GuildMemberRemove, logger.onMemberRemove);
   client.on(Events.GuildMemberUpdate, logger.onMemberUpdate);
   client.on(Events.VoiceStateUpdate, logger.onVoiceStateUpdate);

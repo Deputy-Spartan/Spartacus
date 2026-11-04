@@ -1265,7 +1265,44 @@ export interface VerificationConfig {
   verifiedRoleId: string | null;
   minAccountAgeDays: number;
   panelChannelId: string | null;
+  panelMessageId?: string | null;
   savedEmbedId: string | null;
+  defaultEmbedTitle?: string | null;
+  defaultEmbedDescription?: string | null;
+  embedColor?: string | null;
+  buttonLabel?: string | null;
+  buttonEmoji?: string | null;
+  method?: "BUTTON" | "CAPTCHA";
+  requireAvatar?: boolean;
+  accountTooNewMessage?: string | null;
+  noAvatarMessage?: string | null;
+  maxFailures?: number;
+  failAction?: "NONE" | "KICK";
+  unverifiedRoleId?: string | null;
+  giveUnverifiedOnJoin?: boolean;
+  logChannelId?: string | null;
+  dmConfirmEnabled?: boolean;
+  dmConfirmMessage?: string | null;
+  reminderEnabled?: boolean;
+  reminderDelayHours?: number;
+  reminderMessage?: string | null;
+  kickEnabled?: boolean;
+  kickAfterHours?: number;
+  kickMessage?: string | null;
+  verifiedReply?: string | null;
+  alreadyVerifiedReply?: string | null;
+  noRoleReply?: string | null;
+  captchaPrompt?: string | null;
+  captchaWrongReply?: string | null;
+  pendingCount?: number;
+}
+export interface VerificationLogRow {
+  id: string;
+  userId: string;
+  username: string;
+  result: "VERIFIED" | "FAILED" | "TOO_NEW" | "NO_AVATAR" | "KICKED";
+  detail: string | null;
+  createdAt: string;
 }
 export interface AntiNukeConfig {
   guildId: string;
@@ -1997,6 +2034,10 @@ export const api = {
   getEconomyAnalytics: (guildId: string, days: number) => request<EconomyAnalytics>(`/guilds/${guildId}/economy/analytics?days=${days}`),
 
   getVerification: (guildId: string) => request<VerificationConfig>(`/guilds/${guildId}/verification`),
+  repostVerificationPanel: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/verification/repost`, { method: "POST" }),
+  verifyExistingMembers: (guildId: string) => request<{ given: number; failed: number }>(`/guilds/${guildId}/verification/verify-existing`, { method: "POST" }),
+  getVerificationLogs: (guildId: string) => request<VerificationLogRow[]>(`/guilds/${guildId}/verification/logs`),
+  purgeVerificationLogs: (guildId: string) => request<{ deleted: number }>(`/guilds/${guildId}/verification/logs`, { method: "DELETE" }),
   setVerification: (guildId: string, config: Partial<VerificationConfig>) =>
     request<VerificationConfig>(`/guilds/${guildId}/verification`, { method: "PUT", body: JSON.stringify(config) }),
 

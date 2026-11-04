@@ -81,6 +81,14 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // verify:cap:<token>:<choice> — an answer on the verification captcha.
+  if (interaction.isButton() && interaction.customId.startsWith("verify:cap:")) {
+    const [, , token, choice] = interaction.customId.split(":");
+    const { handleCaptchaAnswer } = await import("../modules/security/verification");
+    await handleCaptchaAnswer(interaction, token, Number(choice));
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId === "playerreport:open") {
     if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "PLAYER_REPORTS"))) {
       await interaction.reply({ content: "⚠️ Player Reports is disabled for this server.", ephemeral: true });

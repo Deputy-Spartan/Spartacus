@@ -875,6 +875,71 @@ model VerificationConfig {
   panelChannelId String?
   panelMessageId String?
   savedEmbedId   String? // shared Embed Creator preset used as the panel body; falls back to a bare placeholder embed if unset
+
+  // The panel when no saved embed is picked, and its button.
+  defaultEmbedTitle       String?
+  defaultEmbedDescription String?
+  embedColor              String?
+  buttonLabel             String?
+  buttonEmoji             String?
+
+  // BUTTON = one tap. CAPTCHA = pick the matching code, which stops simple bots.
+  method String @default("BUTTON")
+
+  // Safety checks, run before the role is given.
+  requireAvatar        Boolean @default(false)
+  accountTooNewMessage String?
+  noAvatarMessage      String?
+  maxFailures          Int     @default(3) // wrong captcha answers before failAction
+  failAction           String  @default("NONE") // NONE | KICK
+
+  // Join extras.
+  unverifiedRoleId     String? // removed on verify; optionally given on join
+  giveUnverifiedOnJoin Boolean @default(false)
+  logChannelId         String?
+  dmConfirmEnabled     Boolean @default(false)
+  dmConfirmMessage     String?
+
+  // Reminder DM, and kicking anyone who never verifies.
+  reminderEnabled    Boolean @default(false)
+  reminderDelayHours Int     @default(24)
+  reminderMessage    String?
+  kickEnabled        Boolean @default(false)
+  kickAfterHours     Int     @default(48)
+  kickMessage        String?
+
+  // Editable replies; each falls back to a default when blank. All support {server}.
+  verifiedReply        String?
+  alreadyVerifiedReply String?
+  noRoleReply          String?
+  captchaPrompt        String?
+  captchaWrongReply    String?
+}
+
+// Members who joined and haven't verified yet, for reminders and auto-kick.
+// Created on join, deleted on verify.
+model VerificationPendingMember {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  joinedAt   DateTime  @default(now())
+  remindedAt DateTime?
+  failures   Int       @default(0)
+
+  @@unique([guildId, userId])
+}
+
+// The Activity tab's audit trail: every verify, failed try and kick.
+model VerificationLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  username  String
+  result    String // VERIFIED | FAILED | TOO_NEW | NO_AVATAR | KICKED
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
 }
 
 // ---- Quarantine ----

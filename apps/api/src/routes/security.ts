@@ -7,65 +7,128 @@ import { getBotClient } from "../lib/botClient";
 const router = Router();
 
 // --- Verification ---
+// Fields the dashboard may set, by kind, so nothing else can be written.
+const V_TEXT = [
+  "verifiedRoleId", "panelChannelId", "savedEmbedId", "defaultEmbedTitle", "defaultEmbedDescription", "embedColor", "buttonLabel", "buttonEmoji",
+  "accountTooNewMessage", "noAvatarMessage", "unverifiedRoleId", "logChannelId", "dmConfirmMessage", "reminderMessage", "kickMessage",
+  "verifiedReply", "alreadyVerifiedReply", "noRoleReply", "captchaPrompt", "captchaWrongReply",
+] as const;
+const V_BOOL = ["requireAvatar", "giveUnverifiedOnJoin", "dmConfirmEnabled", "reminderEnabled", "kickEnabled"] as const;
+const V_INT: Record<string, [number, number]> = { minAccountAgeDays: [0, 365], maxFailures: [0, 10], reminderDelayHours: [1, 336], kickAfterHours: [1, 720] };
+// Changing any of these redraws the panel.
+const V_PANEL = ["panelChannelId", "savedEmbedId", "defaultEmbedTitle", "defaultEmbedDescription", "embedColor", "buttonLabel", "buttonEmoji"];
+
+function verificationData(body: Record<string, unknown>) {
+  const data: Record<string, unknown> = {};
+  for (const k of V_TEXT) if (k in body) data[k] = typeof body[k] === "string" && (body[k] as string).trim() ? (body[k] as string).slice(0, 2000) : null;
+  for (const k of V_BOOL) if (typeof body[k] === "boolean") data[k] = body[k];
+  for (const [k, [lo, hi]] of Object.entries(V_INT)) if (k in body && Number.isFinite(Number(body[k]))) data[k] = Math.min(hi, Math.max(lo, Math.round(Number(body[k]))));
+  if (body.method === "BUTTON" || body.method === "CAPTCHA") data.method = body.method;
+  if (body.failAction === "NONE" || body.failAction === "KICK") data.failAction = body.failAction;
+  return data;
+}
+
+// Deletes the old panel and posts the current one.
+async function repostVerificationPanel(guildId: string, old?: { panelChannelId: string | null; panelMessageId: string | null } | null) {
+  const client = getBotClient();
+  if (!client) return false;
+  if (old?.panelMessageId && old.panelChannelId) {
+    const oldChannel = await client.channels.fetch(old.panelChannelId).catch(() => null);
+    if (oldChannel?.isTextBased()) await oldChannel.messages.delete(old.panelMessageId).catch(() => null);
+  }
+  const config = await prisma.verificationConfig.update({ where: { guildId }, data: { panelMessageId: null } });
+  if (!config.panelChannelId) return false;
+  const { postVerificationPanel } = await import("@spartacus/bot");
+  return postVerificationPanel(client, config).catch(() => false);
+}
+
+// Redraws a moment after the last change, so typing doesn't repost each keystroke.
+const panelTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function repostSoon(guildId: string, old: { panelChannelId: string | null; panelMessageId: string | null } | null) {
+  const pendingOld = panelTimers.has(guildId) ? null : old;
+  clearTimeout(panelTimers.get(guildId));
+  panelTimers.set(
+    guildId,
+    setTimeout(async () => {
+      panelTimers.delete(guildId);
+      const current = await prisma.verificationConfig.findUnique({ where: { guildId } });
+      // Delete whichever message is up now (the old channel's if it moved).
+      await repostVerificationPanel(guildId, pendingOld?.panelMessageId ? pendingOld : current).catch(() => null);
+    }, 1500),
+  );
+}
+
 router.get("/guilds/:guildId/verification", requireAuth, requireGuildPermission, async (req, res) => {
   const config = await prisma.verificationConfig.findUnique({ where: { guildId: req.params.guildId } });
-  res.json(
-    config ?? {
+  const pending = await prisma.verificationPendingMember.count({ where: { guildId: req.params.guildId } });
+  res.json({
+    ...(config ?? {
       guildId: req.params.guildId,
       verifiedRoleId: null,
       minAccountAgeDays: 0,
       panelChannelId: null,
+      panelMessageId: null,
       savedEmbedId: null,
-    }
-  );
+      method: "BUTTON",
+      maxFailures: 3,
+      failAction: "NONE",
+      requireAvatar: false,
+      giveUnverifiedOnJoin: false,
+      dmConfirmEnabled: false,
+      reminderEnabled: false,
+      reminderDelayHours: 24,
+      kickEnabled: false,
+      kickAfterHours: 48,
+    }),
+    pendingCount: pending,
+  });
 });
 
 router.put("/guilds/:guildId/verification", requireAuth, requireGuildPermission, async (req, res) => {
-  const { verifiedRoleId, minAccountAgeDays, panelChannelId, savedEmbedId } = req.body as {
-    verifiedRoleId?: string | null;
-    minAccountAgeDays?: number;
-    panelChannelId?: string | null;
-    savedEmbedId?: string | null;
-  };
+  const guildId = req.params.guildId;
+  const data = verificationData(req.body ?? {});
+  const existing = await prisma.verificationConfig.findUnique({ where: { guildId } });
+  const config = await prisma.verificationConfig.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });
 
-  const existing = await prisma.verificationConfig.findUnique({ where: { guildId: req.params.guildId } });
-  // Mirrors apps/api/src/routes/rulesGateSettings.ts — any change that
-  // affects what the panel looks like clears panelMessageId so it gets
-  // redrawn/reposted instead of editing a now-stale message.
-  const channelChanged = panelChannelId !== undefined && existing && existing.panelChannelId !== panelChannelId;
-  const embedChanged = savedEmbedId !== undefined && existing && existing.savedEmbedId !== savedEmbedId;
-
-  const config = await prisma.verificationConfig.upsert({
-    where: { guildId: req.params.guildId },
-    create: {
-      guildId: req.params.guildId,
-      verifiedRoleId,
-      minAccountAgeDays,
-      panelChannelId: panelChannelId ?? null,
-      savedEmbedId: savedEmbedId ?? null,
-    },
-    update: {
-      verifiedRoleId,
-      minAccountAgeDays,
-      ...(panelChannelId !== undefined ? { panelChannelId } : {}),
-      ...(savedEmbedId !== undefined ? { savedEmbedId } : {}),
-      ...(channelChanged || embedChanged ? { panelMessageId: null } : {}),
-    },
-  });
-
-  if ((channelChanged || embedChanged) && config.panelChannelId) {
-    const client = getBotClient();
-    if (client) {
-      if (existing?.panelMessageId && existing.panelChannelId) {
-        const oldChannel = await client.channels.fetch(existing.panelChannelId).catch(() => null);
-        if (oldChannel?.isTextBased()) await oldChannel.messages.delete(existing.panelMessageId).catch(() => null);
-      }
-      const { postVerificationPanel } = await import("@spartacus/bot");
-      await postVerificationPanel(client, config).catch(() => null);
-    }
+  const panelChanged = V_PANEL.some((k) => k in data && (existing as Record<string, unknown> | null)?.[k] !== data[k]);
+  if (panelChanged && (config.panelChannelId || existing?.panelMessageId)) {
+    if (!config.panelChannelId && existing?.panelMessageId) {
+      // Panel switched off: just take the old one down.
+      const client = getBotClient();
+      const ch = client && existing.panelChannelId ? await client.channels.fetch(existing.panelChannelId).catch(() => null) : null;
+      if (ch?.isTextBased()) await ch.messages.delete(existing.panelMessageId).catch(() => null);
+      await prisma.verificationConfig.update({ where: { guildId }, data: { panelMessageId: null } });
+    } else repostSoon(guildId, existing);
   }
-
   res.json(config);
+});
+
+router.post("/guilds/:guildId/verification/repost", requireAuth, requireGuildPermission, async (req, res) => {
+  const existing = await prisma.verificationConfig.findUnique({ where: { guildId: req.params.guildId } });
+  if (!existing?.panelChannelId) return res.status(400).json({ error: "Pick a panel channel first." });
+  if (!getBotClient()) return res.status(503).json({ error: "The bot isn't connected right now — try again in a moment." });
+  const ok = await repostVerificationPanel(req.params.guildId, existing);
+  if (!ok) return res.status(502).json({ error: "Spartacus couldn't post in that channel. Check it can see and send messages there." });
+  res.json({ ok: true });
+});
+
+// Gives the Verified role to everyone already in the server.
+router.post("/guilds/:guildId/verification/verify-existing", requireAuth, requireGuildPermission, async (req, res) => {
+  const client = getBotClient();
+  if (!client) return res.status(503).json({ error: "The bot isn't connected right now — try again in a moment." });
+  const { verifyExistingMembers } = await import("@spartacus/bot");
+  res.json(await verifyExistingMembers(client, req.params.guildId));
+});
+
+router.get("/guilds/:guildId/verification/logs", requireAuth, requireGuildPermission, async (req, res) => {
+  const rows = await prisma.verificationLog.findMany({ where: { guildId: req.params.guildId }, orderBy: { createdAt: "desc" }, take: 200 });
+  res.json(rows);
+});
+
+// Owner only, same as the Rules audit trail.
+router.delete("/guilds/:guildId/verification/logs", requireAuth, requireGuildPermission, requireGuildOwner, async (req, res) => {
+  const result = await prisma.verificationLog.deleteMany({ where: { guildId: req.params.guildId } });
+  res.json({ deleted: result.count });
 });
 
 // --- Anti-Nuke ---

@@ -10,7 +10,7 @@ export function tempGuideEmbed(guild: Guild, lobby: TempChannelLobby) {
     return channel ? `[${channel.isVoiceBased() ? "🔊 " : "#"}${channel.name}](https://discord.com/channels/${guild.id}/${channel.id})` : fallback;
   };
   const text = (lobby.panelGuide || TEMP_GUIDE_DEFAULT)
-    .replace(/{lobby}/g, link(lobby.lobbyChannelId, "the Create a Squad voice channel"))
+    .replace(/{lobby}/g, link(lobby.joinToCreate ? lobby.lobbyChannelId : null, "the Create a Squad voice channel"))
     .replace(/{panel}/g, link(lobby.panelChannelId, "the Create a Squad panel"))
     .replace(
       /{controls}/g,

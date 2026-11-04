@@ -97,7 +97,7 @@ async function handleJoin(state: VoiceState) {
   const lobby = await prisma.tempChannelLobby.findFirst({
     where: { guildId: state.guild.id, lobbyChannelId: state.channelId as string },
   });
-  if (!lobby || !state.member) return;
+  if (!lobby || !lobby.joinToCreate || !state.member) return;
   await createSquad(state.guild, state.member, lobby);
 }
 

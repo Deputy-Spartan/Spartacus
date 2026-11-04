@@ -613,6 +613,7 @@ model TempChannelLobby {
   deleteAfterEmptySec Int  @default(0)
   pairTextChannel  Boolean @default(false)
   hideTextFromNonMembers Boolean @default(true)
+  joinToCreate     Boolean @default(true) // off: joining lobbyChannelId does nothing, only the panel makes squads
   gamePicker       Boolean @default(false) // false: named from nameFormat only. true: also shows the game menu
   gameCategories   Boolean @default(false) // picking a game moves the squad into a category for that game
   gameChoices      Json    @default("[]") // [{ label, emoji, nameFormat, userLimit }]: the "What are you playing?" menu

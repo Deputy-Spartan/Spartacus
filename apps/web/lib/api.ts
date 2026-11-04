@@ -777,6 +777,7 @@ export interface TempChannelLobbyRow {
   deleteAfterEmptySec: number;
   pairTextChannel: boolean;
   hideTextFromNonMembers: boolean;
+  joinToCreate: boolean;
   gamePicker: boolean;
   gameCategories: boolean;
   panelChannelId: string | null;

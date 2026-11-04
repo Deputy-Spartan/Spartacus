@@ -26,7 +26,8 @@ const JOIN_WINDOW_SEC = 120;
 
 export function tempPanelPayload(lobby: TempChannelLobby) {
   const games = lobby.gamePicker ? cleanTempGameChoices(lobby.gameChoices) : [];
-  const text = (lobby.panelText || "").replace(/{lobby}/g, `<#${lobby.lobbyChannelId}>`);
+  const join = lobby.joinToCreate && lobby.lobbyChannelId ? `<#${lobby.lobbyChannelId}>` : "the Create a Squad voice channel";
+  const text = (lobby.panelText || "").replace(/{lobby}/g, join);
   const embed = new EmbedBuilder().setColor(lobby.panelColor).setTitle(lobby.panelTitle || "🔊 Create a Squad");
   if (text) embed.setDescription(text.slice(0, 4000));
   const help = lobby.guideButton ? [new ButtonBuilder().setCustomId(`tvcp:${lobby.id}:help`).setLabel("How it works").setEmoji("❓").setStyle(ButtonStyle.Secondary)] : [];

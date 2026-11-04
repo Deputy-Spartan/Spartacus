@@ -43,6 +43,7 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   deleteAfterEmptySec: 0,
   pairTextChannel: false,
   hideTextFromNonMembers: true,
+  joinToCreate: true,
   gamePicker: false,
   gameCategories: false,
   gameChoices: [],
@@ -72,46 +73,6 @@ function NameFormatField({ value, onChange }: { value: string; onChange: (next: 
   );
 }
 
-// Name Format names the channel straight away. Game Picker does too, then
-// asks the creator what they're playing and renames it for that game.
-function NamingMode({ gamePicker, onChange }: { gamePicker: boolean; onChange: (gamePicker: boolean) => void }) {
-  const modes = [
-    { on: false, id: "nameformat", title: "Name Format", desc: "Channels are named from the Channel Name Format above, like Kuro's Channel. No menu." },
-    { on: true, id: "gamepicker", title: "Game Picker", desc: 'Same start, then the creator gets a "What are you playing?" menu that renames it for their game, like 🟧 R6 Squad 1.' },
-  ];
-  return (
-    <div>
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">How New Channels Get Named</label>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {modes.map((m) => (
-          <div
-            key={m.title}
-            role="button"
-            tabIndex={0}
-            onClick={() => onChange(m.on)}
-            onKeyDown={(e) => {
-              if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
-                e.preventDefault();
-                onChange(m.on);
-              }
-            }}
-            aria-pressed={gamePicker === m.on}
-            className={[
-              "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon-blue",
-              "text-left rounded-lg border p-3 transition-colors",
-              gamePicker === m.on ? "border-neon-blue bg-neon-blue/10" : "border-white/10 bg-base-950 hover:border-white/20",
-            ].join(" ")}
-          >
-            <p className="text-sm font-medium">{m.title}</p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              <EditableText id={`temp.naming.${m.id}.desc`}>{m.desc}</EditableText>
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // The "What are you playing?" menu posted in each new channel. Picking a
 // game renames the channel to that game's name and sets its limit.
@@ -200,12 +161,31 @@ function GameChoicesField({ guildId, value, onChange }: { guildId: string; value
 }
 
 // One numbered step of the lobby setup.
-function Step({ id, n, title, desc, children }: { id: string; n: number; title: string; desc: string; children: React.ReactNode }) {
+// Optional steps pass `on` and `onToggle` and get a switch; required steps don't.
+function Step({
+  id,
+  n,
+  title,
+  desc,
+  on,
+  onToggle,
+  children,
+}: {
+  id: string;
+  n: number;
+  title: string;
+  desc: string;
+  on?: boolean;
+  onToggle?: (on: boolean) => void;
+  children: React.ReactNode;
+}) {
+  const optional = onToggle !== undefined;
+  const open = !optional || on;
   return (
-    <section className="rounded-lg border border-white/10 bg-base-950/40 p-4">
-      <div className="flex gap-3 mb-3">
-        <span className="w-6 h-6 shrink-0 rounded-full bg-base-800 text-xs flex items-center justify-center text-neon-blue">{n}</span>
-        <div className="min-w-0">
+    <section className={["rounded-lg border p-4 transition-colors", open ? "border-white/10 bg-base-950/40" : "border-white/5 bg-base-950/20"].join(" ")}>
+      <div className={["flex gap-3", open ? "mb-3" : ""].join(" ")}>
+        <span className={["w-6 h-6 shrink-0 rounded-full bg-base-800 text-xs flex items-center justify-center", open ? "text-neon-blue" : "text-slate-500"].join(" ")}>{n}</span>
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">
             <EditableText id={`temp.step.${id}.title`}>{title}</EditableText>
           </p>
@@ -213,8 +193,14 @@ function Step({ id, n, title, desc, children }: { id: string; n: number; title: 
             <EditableText id={`temp.step.${id}.desc`}>{desc}</EditableText>
           </p>
         </div>
+        {optional && (
+          <div className="flex items-center gap-2 shrink-0 self-start">
+            <span className="text-xs text-slate-500">{on ? "On" : "Off"}</span>
+            <ToggleSwitch enabled={!!on} onChange={onToggle} label={`Turn ${title} on or off`} />
+          </div>
+        )}
       </div>
-      <div className="space-y-4">{children}</div>
+      {open && <div className="space-y-4">{children}</div>}
     </section>
   );
 }
@@ -256,42 +242,29 @@ function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string;
     .replace(/{controls}/g, value.controlsWhere === "THREAD" ? "your private squad thread in #squad-threads, which only you are added to" : "your voice channel's chat (the 💬 next to the channel name)");
   return (
     <>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
-        <div>
-          <p className="text-sm font-medium">Show the ❓ How it works Button</p>
-          <p className="text-xs text-slate-500">
-            <EditableText id="temp.guide.button.desc">{"On the panel and in every squad channel's chat. It shows this guide privately to whoever taps it."}</EditableText>
-          </p>
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs uppercase tracking-wide text-slate-500">Guide Text</label>
+          {value.panelGuide != null && (
+            <button type="button" onClick={() => onChange({ panelGuide: null })} className="text-xs text-slate-500 hover:text-neon-blue">
+              Reset to the built-in guide
+            </button>
+          )}
         </div>
-        <ToggleSwitch enabled={value.guideButton !== false} onChange={(guideButton) => onChange({ guideButton })} label="Show the How it works button" />
+        <MarkdownToolbar guildId={guildId} textareaRef={ref} value={text} onChange={(next) => onChange({ panelGuide: next })} />
+        <textarea ref={ref} rows={12} className={field + " font-mono text-xs"} maxLength={4000} value={text} onChange={(e) => onChange({ panelGuide: e.target.value })} />
+        <p className="text-[11px] text-slate-500 mt-1">
+          {"{lobby}"} links the Lobby Voice Channel and {"{panel}"} links the panel's channel. Edit it to match your setup, for example if you don't use
+          the panel or game categories.
+        </p>
       </div>
-      {value.guideButton !== false && (
-        <>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs uppercase tracking-wide text-slate-500">Guide Text</label>
-              {value.panelGuide != null && (
-                <button type="button" onClick={() => onChange({ panelGuide: null })} className="text-xs text-slate-500 hover:text-neon-blue">
-                  Reset to the built-in guide
-                </button>
-              )}
-            </div>
-            <MarkdownToolbar guildId={guildId} textareaRef={ref} value={text} onChange={(next) => onChange({ panelGuide: next })} />
-            <textarea ref={ref} rows={12} className={field + " font-mono text-xs"} maxLength={4000} value={text} onChange={(e) => onChange({ panelGuide: e.target.value })} />
-            <p className="text-[11px] text-slate-500 mt-1">
-              {"{lobby}"} links the Lobby Voice Channel and {"{panel}"} links the panel's channel. Edit it to match your setup, for example if you don't use
-              the panel or game categories.
-            </p>
-          </div>
-          <div className="rounded-lg bg-[#313338] p-3">
-            <div className="rounded border-l-4 bg-[#2b2d31] p-3" style={{ borderColor: hex(value.panelColor) }}>
-              <p className="font-semibold text-sm text-white">❓ How Squad Channels Work</p>
-              <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{preview.replace(/\*\*/g, "")}</p>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-2">Only you can see this · shown to whoever taps ❓ How it works</p>
-          </div>
-        </>
-      )}
+      <div className="rounded-lg bg-[#313338] p-3">
+        <div className="rounded border-l-4 bg-[#2b2d31] p-3" style={{ borderColor: hex(value.panelColor) }}>
+          <p className="font-semibold text-sm text-white">❓ How Squad Channels Work</p>
+          <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{preview.replace(/\*\*/g, "")}</p>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-2">Only you can see this · shown to whoever taps ❓ How it works</p>
+      </div>
     </>
   );
 }
@@ -362,9 +335,18 @@ function LobbyFields({
   onChange: (patch: Partial<TempChannelLobbyRow>) => void;
   lobbyName: string;
 }) {
+  // The panel's switch stays on while a channel is still being picked.
+  const [panelOn, setPanelOn] = useState(!!value.panelChannelId);
   return (
     <div className="space-y-3">
-      <Step id="join" n={1} title="Join to Create" desc="The original way in: members join this voice channel and get their own channel, then get moved into it.">
+      <Step
+        id="join"
+        n={1}
+        title="Join to Create"
+        desc="The original way in: members join this voice channel and get their own channel, then get moved into it."
+        on={value.joinToCreate !== false}
+        onToggle={(joinToCreate) => onChange({ joinToCreate })}
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={label}>Lobby Voice Channel</label>
@@ -409,56 +391,47 @@ function LobbyFields({
         <ControlsWhere guildId={guildId} value={value} onChange={onChange} />
       </Step>
 
-      <Step id="naming" n={4} title="Naming" desc="Keep the Name Format, or let people pick their game to name the channel.">
-        <NamingMode
-          gamePicker={!!value.gamePicker}
-          onChange={(gamePicker) => {
-            // Turning the picker on with no games starts from the usual ones.
-            const empty = !(value.gameChoices ?? []).length;
-            onChange(gamePicker && empty ? { gamePicker, gameChoices: blueprintGameChoices(DEFAULT_BLUEPRINT_GAMES) } : { gamePicker });
-          }}
-        />
-      </Step>
-
-      <Step id="games" n={5} title="Games" desc="The games people can pick, in the channel's menu and on the panel.">
-        {value.gamePicker ? (
-          <>
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium">Group Squads by Game</p>
-                <p className="text-xs text-slate-500">
-                  <EditableText id="temp.games.group.desc">
-                    {"Squads go in a category for their game, like 🟧 Rainbow Six Siege, so everyone can see who's playing what. The category is made with the first squad and deleted when its last squad empties. It copies the Spawn Category's access."}
-                  </EditableText>
-                </p>
-              </div>
-              <ToggleSwitch enabled={!!value.gameCategories} onChange={(gameCategories) => onChange({ gameCategories })} label="Group squads by game" />
-            </div>
-            <GameChoicesField guildId={guildId} value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />
-          </>
-        ) : (
-          <p className="text-xs text-slate-500">Choose Game Picker in step 4 to list games.</p>
-        )}
+      <Step
+        id="gamepicker"
+        n={4}
+        title="Game Picker"
+        desc="Let people pick their game to name the channel, like 🟧 R6 Squad 1, and set that game's limit. Off: channels keep the Name Format from step 2."
+        on={!!value.gamePicker}
+        onToggle={(gamePicker) => {
+          // Turning the picker on with no games starts from the usual ones.
+          const empty = !(value.gameChoices ?? []).length;
+          onChange(gamePicker && empty ? { gamePicker, gameChoices: blueprintGameChoices(DEFAULT_BLUEPRINT_GAMES) } : { gamePicker });
+        }}
+      >
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
+          <div>
+            <p className="text-sm font-medium">Group Squads by Game</p>
+            <p className="text-xs text-slate-500">
+              <EditableText id="temp.games.group.desc">
+                {"Squads go in a category for their game, like 🟧 Rainbow Six Siege, so everyone can see who's playing what. The category is made with the first squad and deleted when its last squad empties. It copies the Spawn Category's access."}
+              </EditableText>
+            </p>
+          </div>
+          <ToggleSwitch enabled={!!value.gameCategories} onChange={(gameCategories) => onChange({ gameCategories })} label="Group squads by game" />
+        </div>
+        <GameChoicesField guildId={guildId} value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />
       </Step>
 
       <Step
         id="panel"
-        n={6}
-        title="Create Panel (optional)"
+        n={5}
+        on={panelOn}
+        onToggle={(on) => {
+          setPanelOn(on);
+          if (!on) onChange({ panelChannelId: null });
+        }}
+        title="Create Panel"
         desc="The text channel way in: an embed with a game dropdown. Picking a game makes the voice channel, named for that game and in its category. Works alongside step 1."
       >
         <div>
           <label className={label}>Panel Channel</label>
-          <div className="flex gap-2">
-            <div className="flex-1 min-w-0">
-              <ChannelSelect guildId={guildId} kind="text" value={value.panelChannelId ?? null} onChange={(id) => onChange({ panelChannelId: id })} placeholder="No panel" />
-            </div>
-            {value.panelChannelId && (
-              <button type="button" onClick={() => onChange({ panelChannelId: null })} className="shrink-0 rounded-lg border border-white/10 px-3 text-xs text-slate-400 hover:text-rose-400">
-                Remove Panel
-              </button>
-            )}
-          </div>
+          <ChannelSelect guildId={guildId} kind="text" value={value.panelChannelId ?? null} onChange={(id) => onChange({ panelChannelId: id })} placeholder="Pick a text channel" />
+          {!value.panelChannelId && <p className="text-[11px] text-slate-500 mt-1">Pick a channel to post the panel. Turning this off deletes the posted panel.</p>}
         </div>
         {value.panelChannelId && (
           <>
@@ -480,12 +453,12 @@ function LobbyFields({
             <div>
               <label className={label}>Description</label>
               <textarea rows={4} className={field} maxLength={4000} value={value.panelText ?? ""} onChange={(e) => onChange({ panelText: e.target.value })} />
-              <p className="text-[11px] text-slate-500 mt-1">{"{lobby}"} links the Lobby Voice Channel from step 1.</p>
+              <p className="text-[11px] text-slate-500 mt-1">{"{lobby}"} links the Lobby Voice Channel from step 1, when Join to Create is on.</p>
             </div>
             <PanelPreview value={value} lobbyName={lobbyName} />
             <p className="text-[11px] text-slate-500">
               {value.gamePicker && (value.gameChoices ?? []).length
-                ? "The dropdown lists the games from step 5."
+                ? "The dropdown lists the games from step 4."
                 : "With no games listed, the panel shows one Create a Squad button."}{" "}
               Someone who isn't in voice gets 2 minutes to join their new channel before it's removed. Each person can have one squad at a time.
               Changes update the posted panel a moment after you stop typing.
@@ -494,7 +467,14 @@ function LobbyFields({
         )}
       </Step>
 
-      <Step id="guide" n={7} title="How It Works Guide" desc="A step-by-step guide for members: both ways to make a channel, the game menu, and what each button does.">
+      <Step
+        id="guide"
+        n={6}
+        title="How It Works Guide"
+        desc="A ❓ How it works button on the panel and in every squad channel. It privately shows members a step-by-step guide: both ways to make a channel, the game menu, and what each button does."
+        on={value.guideButton !== false}
+        onToggle={(guideButton) => onChange({ guideButton })}
+      >
         <GuideFields guildId={guildId} value={value} onChange={onChange} lobbyName={lobbyName} />
       </Step>
     </div>
@@ -541,8 +521,10 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
     refresh();
   }
 
+  const canCreate = draft.joinToCreate !== false ? !!draft.lobbyChannelId : !!draft.panelChannelId;
+
   async function createLobby() {
-    if (!draft.lobbyChannelId) return;
+    if (!canCreate) return;
     setCreating(true);
     try {
       await api.addTempChannelLobby(guildId, draft);
@@ -654,7 +636,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
           <div className="space-y-4 mb-4">
             <LobbyFields guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} lobbyName={channelLabel(draft.lobbyChannelId ?? null).replace(/^.*\/ #|^#/, "")} />
           </div>
-          <button onClick={createLobby} disabled={!draft.lobbyChannelId || creating} className="neon-button disabled:opacity-50">
+          <button onClick={createLobby} disabled={!canCreate || creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Lobby"}
           </button>
         </NeonCard>

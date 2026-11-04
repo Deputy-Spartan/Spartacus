@@ -216,13 +216,13 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     before: ["Create a lobby voice channel and a category for the new channels.", "For the panel, pick the text channel it goes in, like #looking-for-group."],
     steps: [
       "Tap + Create New and name the lobby.",
-      "Step 1, Join to Create: pick the Lobby Voice Channel and the Spawn Category.",
+      "Optional steps have an On/Off switch in their header. Steps without one are always used.",
+      "Step 1, Join to Create (switch): pick the Lobby Voice Channel and the Spawn Category. Turn it off if you only want the panel.",
       "Step 2, Channel Settings: set the Name Format, User Limit, Bitrate and Delete After Empty.",
       "Step 3, Controls: put each squad's buttons in its voice channel chat, or in a private thread (in a text channel you pick) that only the creator is added to.",
-      "Step 4, Naming: keep Name Format, or choose Game Picker so people name the channel by picking their game.",
-      "Step 5, Games: add your games with an emoji, channel name and limit. Turn on Group Squads by Game to put each game's squads in their own category.",
-      "Step 6, Create Panel: pick a text channel to post an embed with a game dropdown, then edit its title, description and color.",
-      "Step 7, How It Works Guide: keep the ❓ How it works button on and edit the guide members see, or reset it to the built-in one.",
+      "Step 4, Game Picker (switch): add your games with an emoji, channel name and limit. Turn on Group Squads by Game to put each game's squads in their own category. Off keeps the Name Format.",
+      "Step 5, Create Panel (switch): pick a text channel to post an embed with a game dropdown, then edit its title, description and color.",
+      "Step 6, How It Works Guide (switch): edit the guide members see, or reset it to the built-in one.",
       "Test both ways: join the lobby voice channel, and pick a game on the panel.",
     ],
     members: [

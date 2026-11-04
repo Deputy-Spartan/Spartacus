@@ -48,6 +48,7 @@ interface PanelOption {
   label: string;
   roleIds: string[];
   channelIds: string[];
+  note: string; // small text under this option in the panel
 }
 
 interface PanelDraft {
@@ -133,6 +134,7 @@ function draftFromReactionPanel(p: ReactionRolePanelRow): PanelDraft {
       label: "",
       roleIds: [o.roleId, ...(o.extraRoleIds ?? [])].filter(Boolean),
       channelIds: o.channelIds ?? [],
+      note: o.note ?? "",
     })),
   };
 }
@@ -152,6 +154,7 @@ function draftFromRolePanel(p: RolePanelRow): PanelDraft {
       label: o.label,
       roleIds: [...(o.roleIds ?? []), ...(o.roleId ? [o.roleId] : [])],
       channelIds: o.channelIds ?? [],
+      note: o.note ?? "",
     })),
   };
 }
@@ -205,7 +208,7 @@ function MultiPick({
   );
 }
 
-const EMPTY_OPTION: PanelOption = { emoji: "", label: "", roleIds: [], channelIds: [] };
+const EMPTY_OPTION: PanelOption = { emoji: "", label: "", roleIds: [], channelIds: [], note: "" };
 
 function PanelFields({
   guildId,
@@ -241,7 +244,7 @@ function PanelFields({
 
   function addOption() {
     if (!canAdd) return;
-    onChange({ options: [...draft.options, { ...pick, emoji: pick.emoji.trim(), label: pick.label.trim() }] });
+    onChange({ options: [...draft.options, { ...pick, emoji: pick.emoji.trim(), label: pick.label.trim(), note: pick.note.trim() }] });
     setPick(EMPTY_OPTION);
   }
 
@@ -360,7 +363,8 @@ function PanelFields({
       </label>
       <div className="space-y-1.5 mb-3">
         {draft.options.map((o, i) => (
-          <div key={i} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-base-800 border border-white/10 text-sm">
+          <div key={i} className="px-3 py-2 rounded-lg bg-base-800 border border-white/10 text-sm">
+          <div className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate">
               {o.emoji && (
                 <span className="mr-1.5">
@@ -373,6 +377,14 @@ function PanelFields({
             <button onClick={() => onChange({ options: draft.options.filter((_, j) => j !== i) })} className="text-slate-500 hover:text-rose-400 shrink-0">
               ×
             </button>
+          </div>
+            <input
+              className="mt-1.5 w-full bg-transparent border-0 border-t border-white/5 pt-1.5 text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none"
+              placeholder="＋ Add a note under this role (optional)"
+              maxLength={200}
+              value={o.note}
+              onChange={(e) => onChange({ options: draft.options.map((x, j) => (j === i ? { ...x, note: e.target.value } : x)) })}
+            />
           </div>
         ))}
         {draft.options.length === 0 && <span className="text-xs text-slate-500">Nothing added yet.</span>}
@@ -398,6 +410,15 @@ function PanelFields({
         </div>
         <MultiPick label="Gives roles" prefix="@" items={roles} chosen={pick.roleIds} onChange={(roleIds) => setPick({ ...pick, roleIds })} />
         <MultiPick label="Unlocks channels" prefix="#" items={channels} chosen={pick.channelIds} onChange={(channelIds) => setPick({ ...pick, channelIds })} />
+        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1 mt-3">Note (optional)</p>
+        <input
+          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+          placeholder="e.g. Ranked squads, scrims and LFG pings"
+          maxLength={200}
+          value={pick.note}
+          onChange={(e) => setPick({ ...pick, note: e.target.value })}
+        />
+        <p className="text-[11px] text-slate-600 mt-1">Small grey text under this role in the panel.{draft.layout === "DROPDOWN" ? " In a dropdown it's also the option's description." : ""}</p>
         <p className="text-xs text-slate-600 mb-3">
           Pick roles, channels, or both. Channel access works by giving the member their own view permission, so hide the channel from @everyone and make sure the
           bot can Manage Channels.
@@ -446,8 +467,8 @@ function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles
   // The same text the bot posts: reactionRolePoster.ts for reactions,
   // rolePanelPoster.ts for buttons and dropdowns.
   const listing = reactions
-    ? draft.options.map((o) => `${o.emoji || "❓"} — ${gives(o)}`).join("\n")
-    : draft.options.map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${gives(o)}`).join("\n");
+    ? draft.options.map((o) => `${o.emoji || "❓"} — ${gives(o)}${o.note.trim() ? `\n-# ${o.note.trim()}` : ""}`).join("\n")
+    : draft.options.map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${gives(o)}${o.note.trim() ? `\n-# ${o.note.trim()}` : ""}`).join("\n");
   const description = [draft.description || (reactions ? "React below to get a role." : "Click below to pick your roles."), "", listing].join("\n");
   const title = draft.name || (reactions ? "Pick your roles" : "");
   const asEmbed = !reactions || draft.embedEnabled;
@@ -480,7 +501,7 @@ function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles
         ))}
 
       {draft.layout === "DROPDOWN" && draft.options.length > 0 && (
-        <DiscordSelect placeholder="Select your roles…" options={draft.options.slice(0, 25).map((o) => ({ label: o.label || "Option", emoji: o.emoji }))} />
+        <DiscordSelect placeholder="Select your roles…" options={draft.options.slice(0, 25).map((o) => ({ label: o.label || "Option", emoji: o.emoji, description: o.note.trim() ? o.note.trim().slice(0, 100) : null }))} />
       )}
     </DiscordMessage>
   );
@@ -589,7 +610,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
         embedExtra: d.embedExtra,
         savedEmbedId: null,
         notifyMode: d.notifyMode,
-        options: d.options.map((o) => ({ emoji: o.emoji, roleIds: o.roleIds, channelIds: o.channelIds })),
+        options: d.options.map((o) => ({ emoji: o.emoji, roleIds: o.roleIds, channelIds: o.channelIds, note: o.note.trim() || undefined })),
       };
     }
     return {
@@ -602,7 +623,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
       embedExtra: d.embedExtra,
       savedEmbedId: null,
       notifyMode: d.notifyMode,
-      options: d.options.map((o) => ({ label: o.label, emoji: o.emoji || undefined, roleIds: o.roleIds, channelIds: o.channelIds })),
+      options: d.options.map((o) => ({ label: o.label, emoji: o.emoji || undefined, roleIds: o.roleIds, channelIds: o.channelIds, note: o.note.trim() || undefined })),
     };
   }
 

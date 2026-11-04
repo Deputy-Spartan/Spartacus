@@ -10,14 +10,15 @@ export interface AccessTarget {
 export interface PanelOption extends AccessTarget {
   label?: string;
   emoji?: string;
+  note?: string;
 }
 
 // Stored options can be the legacy `{ roleId, label, emoji }` shape or the
 // newer `{ roleIds, channelIds, ... }` one.
 export function normalizeOption(raw: unknown): PanelOption {
-  const o = (raw ?? {}) as { roleId?: string; roleIds?: string[]; channelIds?: string[]; label?: string; emoji?: string };
+  const o = (raw ?? {}) as { roleId?: string; roleIds?: string[]; channelIds?: string[]; label?: string; emoji?: string; note?: string };
   const roleIds = [...new Set([...(o.roleIds ?? []), ...(o.roleId ? [o.roleId] : [])].filter(Boolean))];
-  return { roleIds, channelIds: (o.channelIds ?? []).filter(Boolean), label: o.label, emoji: o.emoji };
+  return { roleIds, channelIds: (o.channelIds ?? []).filter(Boolean), label: o.label, emoji: o.emoji, note: o.note?.trim() || undefined };
 }
 
 // A custom emoji is stored as "<:name:id>" (or "<a:name:id>"), but Discord

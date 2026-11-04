@@ -17,7 +17,7 @@ async function buildPayload(client: Client, panel: RolePanel) {
   // button still says what it gives.
   const listing = options
     .slice(0, 25)
-    .map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${describeAccess(o) || "(nothing)"}`)
+    .map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${describeAccess(o) || "(nothing)"}${o.note ? `\n-# ${o.note}` : ""}`)
     .join("\n");
   const description = [panel.description || "Click below to pick your roles.", "", listing].join("\n").slice(0, 4096);
 
@@ -42,7 +42,7 @@ async function buildPayload(client: Client, panel: RolePanel) {
       .setPlaceholder("Select your roles…")
       .setMinValues(0)
       .setMaxValues(Math.min(options.length, 25))
-      .addOptions(options.slice(0, 25).map((o, i) => ({ label: o.label || "Option", value: `o${i}`, emoji: o.emoji || undefined })));
+      .addOptions(options.slice(0, 25).map((o, i) => ({ label: o.label || "Option", value: `o${i}`, emoji: o.emoji || undefined, description: o.note ? o.note.slice(0, 100) : undefined })));
     return { embeds, components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)] };
   }
 

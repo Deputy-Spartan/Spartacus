@@ -553,6 +553,7 @@ model ReactionRole {
   roleId    String
   extraRoleIds Json @default("[]")
   channelIds   Json @default("[]")
+  note         String? // small text under this option in the panel
 
   @@unique([messageId, emoji])
   @@index([guildId])
@@ -1902,7 +1903,7 @@ model RolePanel {
   channelId    String
   description  String?
   layout       RolePanelLayout @default(BUTTONS)
-  options      Json            @default("[]") // [{ roleId, label, emoji }]
+  options      Json            @default("[]") // [{ roleIds, channelIds, label, emoji, note }]
   messageId    String?
   embedEnabled Boolean         @default(false)
   embedColor   String?

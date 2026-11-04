@@ -569,6 +569,7 @@ export interface ReactionRoleOption {
   roleId: string;
   extraRoleIds?: string[];
   channelIds?: string[];
+  note?: string | null;
 }
 export interface DiscordEmojiOption {
   id: string;
@@ -816,6 +817,7 @@ export interface RolePanelOption {
   channelIds?: string[];
   label: string;
   emoji?: string;
+  note?: string;
 }
 
 export interface RolePanelRow {

@@ -30,6 +30,7 @@ import giveawayReroll from "./engagement/giveawayReroll";
 import prestige from "./leveling/prestige";
 import remindme from "./utility/remindme";
 import serverSetup from "./utility/serverSetup";
+import role from "./utility/role";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -64,6 +65,7 @@ for (const command of [
   prestige,
   remindme,
   serverSetup,
+  role,
 ]) {
   commands.set(command.data.name, command);
 }

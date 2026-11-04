@@ -131,6 +131,20 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     steps: ["Tap + Create New and name the backup.", "Save it after any big server change.", "To recover, find the backup under Active Backups and restore it, then confirm."],
     tips: ["Restoring only recreates what's missing by name. It never deletes or overwrites what already exists.", "Messages aren't backed up, only roles and channels."],
   },
+  "/role-manager": {
+    title: "Role Manager",
+    purpose: "Give and take members' roles, change many at once, give roles for a set time, and see every change.",
+    before: ["Spartacus's role must sit above every role you want to manage. Greyed-out roles show why they can't be changed."],
+    steps: [
+      "Members: search someone, tap ✕ on a role to take it, or pick a role (and an optional time) and press Give.",
+      "Bulk: pick give or take, the role, and who (everyone, has a role, doesn't have a role, joined recently). Check the count, then Run. Undo works for 24 hours.",
+      "Timed Roles: see roles given for a set time, and end one early.",
+      "History: every change made through Spartacus, with who did it.",
+      "Settings: staff roles that can use /role, a log channel, and roles to hide.",
+    ],
+    members: ["Staff can use /role give, /role take and /role list in Discord. /role give has an optional time, like 2h, 3d or 1w."],
+    tips: ["Nobody can give a role at or above their own top role.", "Roles with powerful permissions, like Administrator or Ban Members, are server-owner only."],
+  },
   "/verification": {
     title: "Verification",
     purpose: "Posts a Verify panel. New members pass your checks to get a role that unlocks the server.",

@@ -177,6 +177,7 @@ enum ModuleKey {
   EMBED_CREATOR
   SUPPORT_INTAKE
   MATCHES
+  ROLE_MANAGER
 }
 
 model GrowthSnapshot {
@@ -2637,4 +2638,67 @@ model DashboardText {
   key       String   @id
   text      String
   updatedAt DateTime @updatedAt
+}
+
+// ---- Role Manager ----
+// Give and take roles from the dashboard or /role, in bulk, or for a set
+// time (apps/bot/src/modules/utility/roleManager.ts).
+model RoleManagerConfig {
+  id            String   @id @default(cuid())
+  guildId       String   @unique
+  staffRoleIds  String[] // besides Manage Roles, these can use /role
+  logChannelId  String?
+  hiddenRoleIds String[] // never shown or changed here, e.g. Booster
+}
+
+// A role given for a set time; taken off when it ends.
+model TimedRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roleId    String
+  expiresAt DateTime
+  byUserId  String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId, roleId])
+  @@index([expiresAt])
+}
+
+// One bulk give or take, kept so it can be undone for 24 hours.
+model BulkRoleJob {
+  id         String    @id @default(cuid())
+  guildId    String
+  roleId     String
+  action     String // GIVE | TAKE
+  filter     Json
+  total      Int       @default(0)
+  done       Int       @default(0)
+  failed     Int       @default(0)
+  status     String    @default("RUNNING") // RUNNING | DONE | UNDOING | UNDONE
+  changedIds String[] // members actually changed, for undo
+  byUserId   String
+  byName     String
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([guildId, createdAt])
+}
+
+// Every role change made through Spartacus.
+model RoleChangeLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  username  String
+  roleId    String
+  roleName  String
+  action    String // GIVE | TAKE | EXPIRED
+  source    String // DASHBOARD | DISCORD | BULK | TIMER | UNDO
+  detail    String?
+  byUserId  String?
+  byName    String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
 }

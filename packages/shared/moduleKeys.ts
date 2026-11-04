@@ -58,6 +58,7 @@ export const MODULE_KEYS = [
   "EMBED_CREATOR",
   "SUPPORT_INTAKE",
   "MATCHES",
+  "ROLE_MANAGER",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -122,6 +123,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   EMBED_CREATOR: "Embed Creator",
   SUPPORT_INTAKE: "Support DM Intake",
   MATCHES: "Matchmaking",
+  ROLE_MANAGER: "Role Manager",
 };
 
 export const SIGNUP_ROLES = [

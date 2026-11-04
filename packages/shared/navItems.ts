@@ -109,6 +109,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     section: "Utility",
     items: [
+      { href: "/role-manager", label: "Role Manager", icon: "🎭", moduleKey: "ROLE_MANAGER" },
       { href: "/channel-locks", label: "Channel Locks", icon: "🔒", moduleKey: "CHANNEL_LOCKS" },
       { href: "/slow-mode", label: "Slow Mode", icon: "🐢", moduleKey: "SLOW_MODE" },
       { href: "/stat-channels", label: "Server Stat Channels", icon: "📈", moduleKey: "STAT_CHANNELS" },

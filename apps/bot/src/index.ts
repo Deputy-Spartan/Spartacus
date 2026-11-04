@@ -39,6 +39,7 @@ import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
 import { startRulesGateReminderJob } from "./jobs/rulesGateReminder";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
 import { startVerificationReminderJob } from "./jobs/verificationReminder";
+import { startRoleManagerJobs } from "./modules/utility/roleManager";
 import { onVerificationJoin } from "./modules/security/verification";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 import { startMatchTickerJob } from "./jobs/matchTicker";
@@ -157,6 +158,7 @@ export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel, verifyExistingMembers } from "./modules/security/verification";
+export { changeRole, roleBlockReason, bulkTargets, startBulk, undoBulk, isPowerful, type BulkFilter } from "./modules/utility/roleManager";
 // Same reasoning — apps/api's report-settings route posts/reposts the
 // "Report a Player" panel immediately on save.
 export { postPlayerReportPanel } from "./modules/moderation/playerReports";
@@ -247,6 +249,7 @@ export function startBot() {
     startRulesGateReminderJob(c);
     startVerificationPosterJob(c);
     startVerificationReminderJob(c);
+    startRoleManagerJobs(c);
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
 

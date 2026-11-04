@@ -1635,7 +1635,86 @@ export interface AccessAuditEntryRow {
   createdAt: string;
 }
 
+export interface RoleManagerRole {
+  id: string;
+  name: string;
+  color: string | null;
+  managed: boolean;
+  powerful: boolean;
+  blocked: string | null; // why it can't be changed here, or null
+}
+export interface RoleManagerInfo {
+  config: { staffRoleIds: string[]; logChannelId: string | null; hiddenRoleIds: string[] };
+  roles: RoleManagerRole[];
+  isOwner: boolean;
+}
+export interface RoleManagerMember {
+  id: string;
+  displayName: string;
+  username: string;
+  avatar: string;
+  bot: boolean;
+  joinedAt: string | null;
+  roleIds: string[];
+  timed?: Array<{ roleId: string; expiresAt: string }>;
+}
+export interface BulkRoleFilter {
+  who: "everyone" | "has" | "missing";
+  filterRoleId?: string | null;
+  joinedWithinDays?: number | null;
+  includeBots?: boolean;
+}
+export interface BulkRoleJobRow {
+  id: string;
+  roleId: string;
+  action: "GIVE" | "TAKE";
+  total: number;
+  done: number;
+  failed: number;
+  status: "RUNNING" | "DONE" | "UNDOING" | "UNDONE" | "STOPPED";
+  changedCount: number;
+  byName: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
+export interface TimedRoleRow {
+  id: string;
+  userId: string;
+  displayName: string;
+  roleId: string;
+  expiresAt: string;
+}
+export interface RoleChangeRow {
+  id: string;
+  userId: string;
+  username: string;
+  roleId: string;
+  roleName: string;
+  action: "GIVE" | "TAKE" | "EXPIRED";
+  source: "DASHBOARD" | "DISCORD" | "BULK" | "TIMER" | "UNDO";
+  detail: string | null;
+  byName: string | null;
+  createdAt: string;
+}
+
 export const api = {
+  getRoleManager: (guildId: string) => request<RoleManagerInfo>(`/guilds/${guildId}/role-manager`),
+  setRoleManager: (guildId: string, config: RoleManagerInfo["config"]) =>
+    request(`/guilds/${guildId}/role-manager`, { method: "PUT", body: JSON.stringify(config) }),
+  searchRoleMembers: (guildId: string, q: string) => request<RoleManagerMember[]>(`/guilds/${guildId}/role-manager/members?q=${encodeURIComponent(q)}`),
+  getRoleMember: (guildId: string, userId: string) => request<RoleManagerMember>(`/guilds/${guildId}/role-manager/members/${userId}`),
+  changeMemberRole: (guildId: string, userId: string, roleId: string, action: "GIVE" | "TAKE", minutes?: number | null) =>
+    request<{ ok: boolean; message: string }>(`/guilds/${guildId}/role-manager/members/${userId}/roles`, { method: "POST", body: JSON.stringify({ roleId, action, minutes }) }),
+  previewBulkRole: (guildId: string, roleId: string, action: "GIVE" | "TAKE", filter: BulkRoleFilter) =>
+    request<{ count: number; sample: string[]; blocked: string | null }>(`/guilds/${guildId}/role-manager/bulk/preview`, { method: "POST", body: JSON.stringify({ roleId, action, filter }) }),
+  startBulkRole: (guildId: string, roleId: string, action: "GIVE" | "TAKE", filter: BulkRoleFilter) =>
+    request<{ ok: boolean; jobId: string }>(`/guilds/${guildId}/role-manager/bulk`, { method: "POST", body: JSON.stringify({ roleId, action, filter }) }),
+  getBulkRoleJobs: (guildId: string) => request<BulkRoleJobRow[]>(`/guilds/${guildId}/role-manager/bulk`),
+  undoBulkRole: (guildId: string, jobId: string) => request<{ ok: boolean; message: string }>(`/guilds/${guildId}/role-manager/bulk/${jobId}/undo`, { method: "POST" }),
+  getTimedRoles: (guildId: string) => request<TimedRoleRow[]>(`/guilds/${guildId}/role-manager/timed`),
+  endTimedRole: (guildId: string, id: string) => request<{ ok: boolean; message: string }>(`/guilds/${guildId}/role-manager/timed/${id}`, { method: "DELETE" }),
+  getRoleHistory: (guildId: string) => request<RoleChangeRow[]>(`/guilds/${guildId}/role-manager/history`),
+
   uploadImage: (guildId: string, file: File) => uploadFile(`/guilds/${guildId}/upload-image`, file),
 
   getMe: () => request<CurrentUser>("/me"),

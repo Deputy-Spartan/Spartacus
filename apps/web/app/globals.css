@@ -180,3 +180,12 @@
     background-position: -100% 0;
   }
 }
+
+/* Login page: the feature details panel fading in. */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #feature-details * { animation: none !important; }
+}

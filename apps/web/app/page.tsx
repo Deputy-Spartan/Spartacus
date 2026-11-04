@@ -142,42 +142,57 @@ function LandingContent() {
         <h1 className="relative mt-10 text-3xl sm:text-4xl font-extrabold leading-tight max-w-xl">Run your gaming community from one dashboard.</h1>
         <p className="relative mt-3 text-slate-400 max-w-md">Everything your server needs, set up in minutes and managed in one place. Tap a box to see what it does.</p>
 
-        <div className="relative mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-2xl">
-          {FEATURES.map((f, i) => {
-            const isOpen = open === i;
-            return (
-              <button
-                key={f.title}
-                type="button"
-                aria-expanded={isOpen}
-                onClick={() => setOpen(isOpen ? null : i)}
-                className={`group text-left rounded-xl border px-4 py-3 transition-all duration-200 ${
-                  isOpen ? "sm:col-span-2 border-neon-blue/50 bg-neon-blue/10 shadow-[0_8px_30px_rgba(94,127,166,0.25)]" : "border-white/[0.07] bg-white/[0.03] hover:border-neon-blue/40 hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
-                }`}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="text-xl transition-transform duration-200 group-hover:scale-110">{f.icon}</span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-sm font-semibold">{f.title}</span>
-                    <span className="block text-xs text-slate-400">{f.short}</span>
-                  </span>
-                  <span className={`text-slate-500 text-xs transition-transform duration-200 ${isOpen ? "rotate-180 text-neon-blue" : ""}`}>▼</span>
-                </span>
-                <span className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
-                  <span className="overflow-hidden">
-                    <span className="block space-y-1.5 border-t border-white/10 pt-3">
-                      {f.details.map((d) => (
-                        <span key={d} className="flex gap-2 text-[13px] text-slate-300">
-                          <span className="text-neon-blue">✓</span>
-                          {d}
-                        </span>
-                      ))}
+        {/* The six boxes stay put; the open one's details slide out underneath,
+            so nothing jumps around when you click through them. */}
+        <div className="relative mt-8 max-w-2xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {FEATURES.map((f, i) => {
+              const isOpen = open === i;
+              return (
+                <button
+                  key={f.title}
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls="feature-details"
+                  onClick={() => setOpen(isOpen ? null : i)}
+                  className={`group h-full text-left rounded-xl border px-4 py-3 transition-all duration-200 ${
+                    isOpen
+                      ? "border-neon-blue/60 bg-neon-blue/[0.14] shadow-[0_8px_26px_rgba(94,127,166,0.28)]"
+                      : "border-white/[0.07] bg-white/[0.03] hover:border-neon-blue/40 hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className={`text-xl transition-transform duration-200 ${isOpen ? "scale-110" : "group-hover:scale-110"}`}>{f.icon}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold">{f.title}</span>
+                      <span className="block text-xs text-slate-400">{f.short}</span>
                     </span>
+                    <span className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180 text-neon-blue" : "text-slate-500"}`}>▼</span>
                   </span>
-                </span>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
+          <div id="feature-details" className={`grid transition-all duration-300 ease-out ${open !== null ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
+            <div className="overflow-hidden">
+              {open !== null && (
+                <div key={open} className="rounded-xl border border-neon-blue/30 bg-black/20 px-4 py-3.5 animate-[fadeIn_.25s_ease-out]">
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <span className="text-lg">{FEATURES[open].icon}</span>
+                    {FEATURES[open].title}
+                  </p>
+                  <ul className="mt-2.5 space-y-1.5">
+                    {FEATURES[open].details.map((d) => (
+                      <li key={d} className="flex gap-2 text-[13px] text-slate-300">
+                        <span className="text-neon-blue">✓</span>
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="relative mt-auto pt-10 flex gap-8">

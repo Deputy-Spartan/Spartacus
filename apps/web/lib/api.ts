@@ -778,6 +778,12 @@ export interface TempChannelLobbyRow {
   pairTextChannel: boolean;
   hideTextFromNonMembers: boolean;
   gamePicker: boolean;
+  gameCategories: boolean;
+  panelChannelId: string | null;
+  panelMessageId: string | null;
+  panelTitle: string;
+  panelText: string;
+  panelColor: number;
   gameChoices: TempGameChoice[];
 }
 

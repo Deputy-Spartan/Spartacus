@@ -441,9 +441,9 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       const gameChoices = blueprintGameChoices(opts.games);
       const existing = await prisma.tempChannelLobby.findFirst({ where: { guildId: g, lobbyChannelId: lobby } });
       if (!existing) {
-        await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a Squad", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s Squad", userLimit: 5, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000), gamePicker: true, gameChoices } });
+        await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a Squad", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s Squad", userLimit: 5, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000), gamePicker: true, gameCategories: true, gameChoices } });
       } else if (!Array.isArray(existing.gameChoices) || existing.gameChoices.length === 0) {
-        await prisma.tempChannelLobby.update({ where: { id: existing.id }, data: { gamePicker: true, gameChoices } });
+        await prisma.tempChannelLobby.update({ where: { id: existing.id }, data: { gamePicker: true, gameCategories: true, gameChoices } });
       }
     }],
     ["Stats", async () => {

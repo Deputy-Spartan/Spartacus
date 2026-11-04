@@ -13,12 +13,13 @@ import {
   type VoiceChannel,
 } from "discord.js";
 import { logError } from "@spartacus/db";
-import { SERVER_EMOJI, cleanTempGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { SERVER_EMOJI, cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
+import { moveToGameCategory, nextTempName } from "./tempGameCategories";
 
 // A server emoji or a standard one goes in the option's emoji slot. Anything
 // else stays in the label, since Discord refuses the whole message for a bad emoji.
-function menuOption(g: TempGameChoice, i: number) {
+export function menuOption(g: TempGameChoice, i: number) {
   const custom = g.emoji?.match(SERVER_EMOJI);
   const standard = !custom && g.emoji && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g.emoji) && g.emoji.length <= 16;
   const emoji = custom ? { id: custom[3], name: custom[2], animated: custom[1] === "a" } : standard ? { name: g.emoji! } : undefined;
@@ -68,15 +69,6 @@ async function editSoon(channel: VoiceChannel, data: { name: string; userLimit?:
 }
 const HELD = "Discord allows 2 renames every 10 minutes, so it will change once that opens up.";
 
-// The lowest free number for {index}, so two R6 squads are 1 and 2, not 2 and 2.
-function nextName(channel: VoiceChannel, format: string, user: string): string {
-  const taken = new Set(channel.guild.channels.cache.filter((c) => c.id !== channel.id && c.parentId === channel.parentId).map((c) => c.name.toLowerCase()));
-  for (let n = 1; ; n++) {
-    const name = fillTempName(format, { user, index: n, guild: channel.guild.name });
-    if (!/{index}|{count}/.test(format) || !taken.has(name.toLowerCase()) || n >= 99) return name;
-  }
-}
-
 async function ownedChannel(interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction, channelId: string): Promise<VoiceChannel | string> {
   const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId } });
   if (!instance) return "This squad channel is gone.";
@@ -104,8 +96,9 @@ export async function handleTempChannelControl(interaction: ButtonInteraction | 
       const game = cleanTempGameChoices(lobby?.gameChoices)[Number(pick)];
       if (!game) return void (await interaction.reply({ content: "That game was removed. Pick another one.", ephemeral: true }));
       await interaction.deferReply({ ephemeral: true });
+      if (lobby?.gameCategories) await moveToGameCategory(channel, lobby, game, instance?.textChannelId);
       const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
-      const name = nextName(channel, game.nameFormat, member?.displayName ?? interaction.user.username);
+      const name = nextTempName(channel.guild, channel.parentId, game.nameFormat, member?.displayName ?? interaction.user.username, channel.id);
       const done = await editSoon(channel, { name, ...(game.userLimit ? { userLimit: game.userLimit } : {}) });
       const limit = game.userLimit ? ` with a ${game.userLimit}-player limit` : "";
       if (done === false) return void (await interaction.editReply("That didn't work. Spartacus may need Manage Channels here."));

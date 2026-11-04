@@ -171,6 +171,7 @@ export { sendBirthdayTest } from "./jobs/birthdayAnnouncer";
 // start a season or void a result through the same queue players' clicks use.
 export { refreshMatchPanel, deleteMatch, matchRoster, voidMatchResult } from "./modules/matches/flow";
 export { cancelRoom, syncMatchmakingPanel } from "./modules/matches/matchmaking";
+export { syncTempPanel } from "./modules/community/tempChannelPanel";
 export { startBoardSeason, syncBoard } from "./modules/matches/leaderboard";
 
 export function startBot() {
@@ -221,6 +222,7 @@ export function startBot() {
     startGiveawayEnderJob(c);
     startGiveawayPosterJob(c);
     startTicketPanelPosterJob(c);
+    import("./modules/community/tempChannelPanel").then((m) => m.syncAllTempPanels(c)).catch(() => null);
     startRolePanelPosterJob(c);
     startReactionRolePosterJob(c);
     startPollPosterJob(c);

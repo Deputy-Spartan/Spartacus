@@ -9,6 +9,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../../../lib/api";
 import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 
 type Tab = "active" | "create";
 
@@ -25,7 +26,7 @@ function EmptyState({ icon, title, desc, action }: { icon: string; title: string
 
 const NAME_FORMAT_TOKENS = [
   { token: "{user}", description: "The joining member's display name" },
-  { token: "{index}", description: "Counts up as new channels are created (1, 2, 3…) — resets as channels empty out" },
+  { token: "{index}", description: "The lowest free number in the category (1, 2, 3…)" },
   { token: "{count}", description: "Same as {index}, if you prefer the alias" },
   { token: "{guild}", description: "This server's name" },
 ];
@@ -41,7 +42,12 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   pairTextChannel: false,
   hideTextFromNonMembers: true,
   gamePicker: false,
+  gameCategories: false,
   gameChoices: [],
+  panelChannelId: null,
+  panelTitle: "🔊 Create a Squad",
+  panelText: "Pick the game you're playing below and Spartacus makes a voice channel for your squad.\n\nOr join {lobby} to make one straight away.",
+  panelColor: 0x5865f2,
 };
 
 function NameFormatField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
@@ -177,80 +183,191 @@ function GameChoicesField({ guildId, value, onChange }: { guildId: string; value
   );
 }
 
-// The full field set — shared by the inline editor on an existing lobby
+// One numbered step of the lobby setup.
+function Step({ n, title, desc, children }: { n: number; title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-white/10 bg-base-950/40 p-4">
+      <div className="flex gap-3 mb-3">
+        <span className="w-6 h-6 shrink-0 rounded-full bg-base-800 text-xs flex items-center justify-center text-neon-blue">{n}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs text-slate-500">{desc}</p>
+        </div>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+const label = "text-xs uppercase tracking-wide text-slate-500 block mb-2";
+const field = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
+const hex = (n: number | undefined) => "#" + (n ?? 0x5865f2).toString(16).padStart(6, "0");
+
+// What the panel looks like in Discord.
+function PanelPreview({ value, lobbyName }: { value: Partial<TempChannelLobbyRow>; lobbyName: string }) {
+  const games = value.gamePicker ? value.gameChoices ?? [] : [];
+  const text = (value.panelText ?? "").replace(/{lobby}/g, `🔊 ${lobbyName}`);
+  return (
+    <div className="rounded-lg bg-[#313338] p-3">
+      <div className="rounded border-l-4 bg-[#2b2d31] p-3" style={{ borderColor: hex(value.panelColor) }}>
+        <p className="font-semibold text-sm text-white">{value.panelTitle || "🔊 Create a Squad"}</p>
+        {text && <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{text}</p>}
+      </div>
+      {games.length ? (
+        <div className="mt-2 rounded bg-[#1e1f22] px-3 py-2 text-sm text-slate-400 flex justify-between">
+          <span>🎮 Pick your game to make a squad channel</span>
+          <span>⌄</span>
+        </div>
+      ) : (
+        <span className="inline-block mt-2 rounded bg-[#5865f2] px-3 py-1.5 text-sm text-white">➕ Create a Squad</span>
+      )}
+      {games.length > 0 && (
+        <p className="text-[11px] text-slate-500 mt-2">Choices: {games.map((g) => (g.emoji && !SERVER_EMOJI.test(g.emoji) ? g.emoji + " " : "") + (g.label || "…")).join(" · ")}</p>
+      )}
+    </div>
+  );
+}
+
+// The full setup in steps — shared by the inline editor on an existing lobby
 // (Active tab) and the fresh-draft form (Create tab), just wired to
 // whichever value/onChange the caller passes in.
 function LobbyFields({
   guildId,
   value,
   onChange,
+  lobbyName,
 }: {
   guildId: string;
   value: Partial<TempChannelLobbyRow>;
   onChange: (patch: Partial<TempChannelLobbyRow>) => void;
+  lobbyName: string;
 }) {
   return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Lobby Voice Channel</label>
-          <ChannelSelect guildId={guildId} kind="voice" value={value.lobbyChannelId ?? null} onChange={(id) => onChange({ lobbyChannelId: id ?? "" })} />
+    <div className="space-y-3">
+      <Step n={1} title="Join to Create" desc="The original way in: members join this voice channel and get their own channel, then get moved into it.">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={label}>Lobby Voice Channel</label>
+            <ChannelSelect guildId={guildId} kind="voice" value={value.lobbyChannelId ?? null} onChange={(id) => onChange({ lobbyChannelId: id ?? "" })} />
+          </div>
+          <div>
+            <label className={label}>Spawn Category</label>
+            <ChannelSelect guildId={guildId} kind="category" value={value.categoryId ?? null} onChange={(id) => onChange({ categoryId: id })} />
+          </div>
         </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Spawn Category</label>
-          <ChannelSelect guildId={guildId} kind="category" value={value.categoryId ?? null} onChange={(id) => onChange({ categoryId: id })} />
-        </div>
+      </Step>
+
+      <Step n={2} title="Channel Settings" desc="Every new channel starts with these, whichever way it was made.">
         <NameFormatField value={value.nameFormat ?? ""} onChange={(v) => onChange({ nameFormat: v })} />
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">User Limit (0 = unlimited)</label>
-          <input
-            type="number"
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            value={value.userLimit ?? 0}
-            onChange={(e) => onChange({ userLimit: Number(e.target.value) })}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className={label}>User Limit (0 = none)</label>
+            <input type="number" className={field} value={value.userLimit ?? 0} onChange={(e) => onChange({ userLimit: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={label}>Bitrate (bps)</label>
+            <input type="number" className={field} value={value.bitrate ?? 64000} onChange={(e) => onChange({ bitrate: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className={label}>Delete After Empty (sec)</label>
+            <input type="number" className={field} value={value.deleteAfterEmptySec ?? 0} onChange={(e) => onChange({ deleteAfterEmptySec: Number(e.target.value) })} />
+          </div>
         </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Bitrate (bps)</label>
-          <input
-            type="number"
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            value={value.bitrate ?? 64000}
-            onChange={(e) => onChange({ bitrate: Number(e.target.value) })}
-          />
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={!!value.pairTextChannel} onChange={(e) => onChange({ pairTextChannel: e.target.checked })} />
+            Pair a text channel
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={!!value.hideTextFromNonMembers} onChange={(e) => onChange({ hideTextFromNonMembers: e.target.checked })} />
+            Hide text from non-members
+          </label>
         </div>
-        <div>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Delete After Empty (sec)</label>
-          <input
-            type="number"
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            value={value.deleteAfterEmptySec ?? 0}
-            onChange={(e) => onChange({ deleteAfterEmptySec: Number(e.target.value) })}
-          />
-        </div>
-      </div>
+      </Step>
 
-      <div className="flex gap-6 text-xs text-slate-400">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={!!value.pairTextChannel} onChange={(e) => onChange({ pairTextChannel: e.target.checked })} />
-          Pair a text channel
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={!!value.hideTextFromNonMembers} onChange={(e) => onChange({ hideTextFromNonMembers: e.target.checked })} />
-          Hide text from non-members
-        </label>
-      </div>
+      <Step n={3} title="Naming" desc="Keep the Name Format, or let people pick their game to name the channel.">
+        <NamingMode
+          gamePicker={!!value.gamePicker}
+          onChange={(gamePicker) => {
+            // Turning the picker on with no games starts from the usual ones.
+            const empty = !(value.gameChoices ?? []).length;
+            onChange(gamePicker && empty ? { gamePicker, gameChoices: blueprintGameChoices(DEFAULT_BLUEPRINT_GAMES) } : { gamePicker });
+          }}
+        />
+      </Step>
 
-      <NamingMode
-        gamePicker={!!value.gamePicker}
-        onChange={(gamePicker) => {
-          // Turning the picker on with no games starts from the usual ones.
-          const empty = !(value.gameChoices ?? []).length;
-          onChange(gamePicker && empty ? { gamePicker, gameChoices: blueprintGameChoices(DEFAULT_BLUEPRINT_GAMES) } : { gamePicker });
-        }}
-      />
-      {value.gamePicker && <GameChoicesField guildId={guildId} value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />}
-    </>
+      <Step n={4} title="Games" desc="The games people can pick, in the channel's menu and on the panel.">
+        {value.gamePicker ? (
+          <>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Group Squads by Game</p>
+                <p className="text-xs text-slate-500">
+                  Squads go in a category for their game, like 🟧 Rainbow Six Siege, so everyone can see who's playing what. The category is made with
+                  the first squad and deleted when its last squad empties. It copies the Spawn Category's access.
+                </p>
+              </div>
+              <ToggleSwitch enabled={!!value.gameCategories} onChange={(gameCategories) => onChange({ gameCategories })} label="Group squads by game" />
+            </div>
+            <GameChoicesField guildId={guildId} value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />
+          </>
+        ) : (
+          <p className="text-xs text-slate-500">Choose Game Picker in step 3 to list games.</p>
+        )}
+      </Step>
+
+      <Step
+        n={5}
+        title="Create Panel (optional)"
+        desc="The text channel way in: an embed with a game dropdown. Picking a game makes the voice channel, named for that game and in its category. Works alongside step 1."
+      >
+        <div>
+          <label className={label}>Panel Channel</label>
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <ChannelSelect guildId={guildId} kind="text" value={value.panelChannelId ?? null} onChange={(id) => onChange({ panelChannelId: id })} placeholder="No panel" />
+            </div>
+            {value.panelChannelId && (
+              <button type="button" onClick={() => onChange({ panelChannelId: null })} className="shrink-0 rounded-lg border border-white/10 px-3 text-xs text-slate-400 hover:text-rose-400">
+                Remove Panel
+              </button>
+            )}
+          </div>
+        </div>
+        {value.panelChannelId && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_7rem] gap-4">
+              <div>
+                <label className={label}>Title</label>
+                <input className={field} maxLength={256} value={value.panelTitle ?? ""} onChange={(e) => onChange({ panelTitle: e.target.value })} />
+              </div>
+              <div>
+                <label className={label}>Color</label>
+                <input
+                  type="color"
+                  className="h-[42px] w-full rounded-lg border border-white/10 bg-base-950 p-1"
+                  value={hex(value.panelColor)}
+                  onChange={(e) => onChange({ panelColor: parseInt(e.target.value.slice(1), 16) })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className={label}>Description</label>
+              <textarea rows={4} className={field} maxLength={4000} value={value.panelText ?? ""} onChange={(e) => onChange({ panelText: e.target.value })} />
+              <p className="text-[11px] text-slate-500 mt-1">{"{lobby}"} links the Lobby Voice Channel from step 1.</p>
+            </div>
+            <PanelPreview value={value} lobbyName={lobbyName} />
+            <p className="text-[11px] text-slate-500">
+              {value.gamePicker && (value.gameChoices ?? []).length
+                ? "The dropdown lists the games from step 4."
+                : "With no games listed, the panel shows one Create a Squad button."}{" "}
+              Someone who isn't in voice gets 2 minutes to join their new channel before it's removed. Each person can have one squad at a time.
+              Changes update the posted panel a moment after you stop typing.
+            </p>
+          </>
+        )}
+      </Step>
+    </div>
   );
 }
 
@@ -385,7 +502,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
                         onChange={(e) => updateLobby(l.id, { name: e.target.value })}
                       />
                     </div>
-                    <LobbyFields guildId={guildId} value={l} onChange={(patch) => updateLobby(l.id, patch)} />
+                    <LobbyFields guildId={guildId} value={l} onChange={(patch) => updateLobby(l.id, patch)} lobbyName={channelLabel(l.lobbyChannelId).replace(/^.*\/ #|^#/, "")} />
                   </div>
                 )}
               </NeonCard>
@@ -405,7 +522,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
             />
           </div>
           <div className="space-y-4 mb-4">
-            <LobbyFields guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+            <LobbyFields guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} lobbyName={channelLabel(draft.lobbyChannelId ?? null).replace(/^.*\/ #|^#/, "")} />
           </div>
           <button onClick={createLobby} disabled={!draft.lobbyChannelId || creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Lobby"}

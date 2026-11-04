@@ -22,6 +22,12 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith("tvcp:")) {
+    const { handleTempPanel } = await import("../modules/community/tempChannelPanel");
+    await handleTempPanel(interaction);
+    return;
+  }
+
   if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^tvcm?:/.test(interaction.customId)) {
     const { handleTempChannelControl } = await import("../modules/community/tempChannelControls");
     await handleTempChannelControl(interaction);

@@ -614,8 +614,28 @@ model TempChannelLobby {
   pairTextChannel  Boolean @default(false)
   hideTextFromNonMembers Boolean @default(true)
   gamePicker       Boolean @default(false) // false: named from nameFormat only. true: also shows the game menu
+  gameCategories   Boolean @default(false) // picking a game moves the squad into a category for that game
   gameChoices      Json    @default("[]") // [{ label, emoji, nameFormat, userLimit }]: the "What are you playing?" menu
+  // The text channel way in: an embed with a game dropdown that makes the squad channel.
+  panelChannelId   String?
+  panelMessageId   String?
+  panelTitle       String  @default("🔊 Create a Squad")
+  panelText        String  @default("Pick the game you're playing below and Spartacus makes a voice channel for your squad.\n\nOr join {lobby} to make one straight away.")
+  panelColor       Int     @default(5793266)
 
+  @@index([guildId])
+}
+
+// A category made for one game's squads. Deleted once its last squad is gone.
+model TempGameCategory {
+  id         String   @id @default(cuid())
+  guildId    String
+  lobbyId    String
+  label      String // the game's name, lowercased
+  categoryId String   @unique
+  createdAt  DateTime @default(now())
+
+  @@unique([lobbyId, label])
   @@index([guildId])
 }
 

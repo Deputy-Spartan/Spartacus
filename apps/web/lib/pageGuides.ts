@@ -211,16 +211,29 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   },
   "/temp-channels": {
     title: "Temp Channels",
-    purpose: "Members join a lobby voice channel and get their own voice channel, which deletes itself when empty.",
-    before: ["Create a lobby voice channel and a category for the new channels."],
+    purpose:
+      "Members get their own voice channel that deletes itself when empty. There are two ways in, and you can use both: joining a lobby voice channel, or picking a game on a panel in a text channel.",
+    before: ["Create a lobby voice channel and a category for the new channels.", "For the panel, pick the text channel it goes in, like #looking-for-group."],
     steps: [
-      "Tap + Create New.",
-      "Pick the Lobby Voice Channel and Spawn Category.",
-      "Set the Channel Name Format, using {user} for the member's name.",
-      "Set the User Limit (0 is unlimited), Bitrate and Delete After Empty.",
-      "Join the lobby to test it.",
+      "Tap + Create New and name the lobby.",
+      "Step 1, Join to Create: pick the Lobby Voice Channel and the Spawn Category.",
+      "Step 2, Channel Settings: set the Name Format, User Limit, Bitrate and Delete After Empty.",
+      "Step 3, Naming: keep Name Format, or choose Game Picker so people name the channel by picking their game.",
+      "Step 4, Games: add your games with an emoji, channel name and limit. Turn on Group Squads by Game to put each game's squads in their own category.",
+      "Step 5, Create Panel: pick a text channel to post an embed with a game dropdown, then edit its title, description and color.",
+      "Test both ways: join the lobby voice channel, and pick a game on the panel.",
     ],
-    tips: ["Spartacus needs Manage Channels and Move Members."],
+    members: [
+      "Join the lobby voice channel to get a squad channel and be moved into it. Its chat has a What are you playing? menu and Lock, Rename and Limit buttons.",
+      "Or pick a game on the panel. The channel is made, named for that game and put in its category. Anyone already in voice is moved in; others get a link and 2 minutes to join.",
+      "Picking a game names the channel, like 🟧 R6 Squad 1, and sets that game's player limit.",
+      "When everyone leaves, the channel is deleted, and its game category too once it's empty.",
+    ],
+    tips: [
+      "Spartacus needs Manage Channels and Move Members.",
+      "Discord allows 2 renames per channel every 10 minutes.",
+      "Server emojis show in the menus, but channel and category names only take standard emojis.",
+    ],
   },
   "/ai-chat": {
     title: "AI Chat",

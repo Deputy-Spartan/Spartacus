@@ -68,4 +68,24 @@ router.put("/guilds/:guildId/bump-reminder", requireAuth, requireGuildPermission
   res.json(row);
 });
 
+// Send Now on the dashboard. lastBumpAt (optional) lines the timer up with a
+// bump Spartacus didn't see; it must be within the last day and not in the future.
+router.post("/guilds/:guildId/bump-reminder/send", requireAuth, requireGuildPermission, async (req, res) => {
+  const raw = (req.body as { lastBumpAt?: string | null }).lastBumpAt;
+  let lastBumpAt: Date | null = null;
+  if (raw) {
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime()) || d.getTime() > Date.now() + 60_000 || d.getTime() < Date.now() - 24 * 60 * 60 * 1000) {
+      return res.status(400).json({ error: "The last bump time has to be within the last 24 hours." });
+    }
+    lastBumpAt = d;
+  }
+  const client = getBotClient();
+  if (!client) return res.status(503).json({ error: "The bot isn't connected right now — try again in a moment." });
+  const { sendBumpStatusNow } = await import("@spartacus/bot");
+  const result = await sendBumpStatusNow(client, req.params.guildId, lastBumpAt);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json(result);
+});
+
 export default router;

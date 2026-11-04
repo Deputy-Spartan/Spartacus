@@ -151,7 +151,7 @@ export { postRulesGatePanel } from "./jobs/rulesGatePoster";
 export { refreshReactionRolePanel } from "./jobs/reactionRolePoster";
 export { refreshRolePanel } from "./jobs/rolePanelPoster";
 export { bumpRulesVersion } from "./modules/community/rulesGate";
-export { refreshBumpStatus } from "./lib/bumpStatus";
+export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel } from "./modules/security/verification";

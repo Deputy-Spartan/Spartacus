@@ -25,7 +25,8 @@ export function buildBumpPayload(row: Row, stage: BumpStage, serverName: string)
   let msg = cleanBumpMessages(row.bumpMessages)[stage];
   // A stage left completely empty falls back to the default so Discord accepts it.
   if (!msg.content.trim() && !(msg.embedEnabled && hasEmbedBody(msg))) msg = BUMP_DEFAULTS[stage];
-  const ready = row.nextReminderAt ?? new Date(Date.now() + COOLDOWN_MS);
+  // Before any bump is recorded, "Bump done" counts 2 hours from now and Ready counts from now.
+  const ready = row.nextReminderAt ?? new Date(stage === "bumped" ? Date.now() + COOLDOWN_MS : Date.now());
   const filled = fillBumpStage(msg, {
     userId: row.lastBumpedById,
     roleId: row.mentionRoleId,
@@ -84,6 +85,31 @@ export async function showBumpStage(client: Client, guildId: string, stage: Bump
     return null;
   });
   await prisma.bumpReminderSettings.update({ where: { id: row.id }, data: { statusMessageId: posted?.id ?? null } });
+}
+
+// The dashboard's Send Now: optionally sets when the last bump was, then
+// posts the current stage's message with fresh timers (no ping).
+export async function sendBumpStatusNow(client: Client, guildId: string, lastBumpAt?: Date | null): Promise<{ ok: boolean; error?: string; stage?: BumpStage }> {
+  let row = await prisma.bumpReminderSettings.findUnique({ where: { guildId } });
+  if (!row?.channelId) return { ok: false, error: "Pick a bump channel first." };
+  const channelId = row.channelId;
+  if (lastBumpAt) {
+    const next = new Date(lastBumpAt.getTime() + COOLDOWN_MS);
+    row = await prisma.bumpReminderSettings.update({
+      where: { id: row.id },
+      // Already past: it's ready now, and the missed-bump timer runs from then.
+      // Who bumped isn't known for a bump Spartacus didn't see, so {user} reads "someone".
+      data: { lastBumpAt, lastBumpedById: null, nextReminderAt: next, reminded: next.getTime() <= Date.now(), missedAlerts: 0 },
+    });
+  }
+  const stage = currentBumpStage(row) ?? "ready";
+  if (stage === "bumped" && !cleanBumpMessages(row.bumpMessages).bumped.enabled) {
+    return { ok: false, error: "The Bump Done message is switched off, so there's nothing to send until the bump is ready." };
+  }
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!isSendableChannel(channel)) return { ok: false, error: "Spartacus can't post in the bump channel." };
+  await showBumpStage(client, guildId, stage, { ping: false });
+  return { ok: true, stage };
 }
 
 // After the message is changed on the dashboard: redraw the current one, no ping.

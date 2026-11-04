@@ -39,6 +39,27 @@ export default function BumpReminderPage({ params }: { params: { guildId: string
   const [bumper, setBumper] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [stage, setStage] = useState<BumpStage>("bumped");
+  const [lastBumpInput, setLastBumpInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendNote, setSendNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function sendNow() {
+    setSending(true);
+    setSendNote(null);
+    try {
+      const iso = lastBumpInput ? new Date(lastBumpInput).toISOString() : null;
+      const r = await api.sendBumpStatusNow(params.guildId, iso);
+      const s = await api.getBumpReminderSettings(params.guildId);
+      setSettings(s);
+      setLastBumpInput("");
+      const names: Record<string, string> = { bumped: "Bump Done", ready: "Ready", missed: "Missed" };
+      setSendNote({ ok: true, text: `Sent the ${names[r.stage ?? ""] ?? ""} message to the bump channel.` });
+    } catch (err) {
+      setSendNote({ ok: false, text: err instanceof Error ? err.message : "Couldn't send it." });
+    } finally {
+      setSending(false);
+    }
+  }
 
   useEffect(() => {
     api.getBumpReminderSettings(params.guildId).then((s) => {
@@ -119,6 +140,26 @@ export default function BumpReminderPage({ params }: { params: { guildId: string
           {ready && <p className="text-xs text-slate-500 mt-1">Next bump ready: {new Date(ready).toLocaleString()}</p>}
           {!!settings?.bumpCount && <p className="text-xs text-slate-500 mt-1">Bumps counted: {settings.bumpCount}</p>}
           {!!settings?.missedAlerts && <p className="text-xs text-rose-400/80 mt-1">Missed in a row: {settings.missedAlerts}</p>}
+
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <label className={label}>Last Bump Was At (optional)</label>
+            <input
+              type="datetime-local"
+              className={field}
+              value={lastBumpInput}
+              max={new Date(now - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+              onChange={(e) => setLastBumpInput(e.target.value)}
+            />
+            <p className="text-xs text-slate-600 mt-1 mb-3">
+              Set this if someone bumped while Spartacus wasn't watching, so the countdown matches Disboard. Leave it empty to use the bump Spartacus saw last.
+            </p>
+            <button onClick={sendNow} disabled={sending || !settings?.channelId} className="neon-button-sm disabled:opacity-50">
+              {sending ? "Sending…" : "📨 Send Now"}
+            </button>
+            {!settings?.channelId && <p className="text-xs text-slate-500 mt-2">Pick a bump channel first.</p>}
+            {sendNote && <p className={`text-xs mt-2 ${sendNote.ok ? "text-emerald-400" : "text-rose-400"}`}>{sendNote.text}</p>}
+            <p className="text-xs text-slate-600 mt-2">Posts the current stage's message with fresh live timers, replacing the old one. It doesn't ping.</p>
+          </div>
         </NeonCard>
 
         <NeonCard>

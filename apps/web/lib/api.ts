@@ -2081,6 +2081,8 @@ export const api = {
     request<PrestigeSettingsRow>(`/guilds/${guildId}/prestige-settings`, { method: "PUT", body: JSON.stringify(input) }),
 
   getBumpReminderSettings: (guildId: string) => request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`),
+  sendBumpStatusNow: (guildId: string, lastBumpAt?: string | null) =>
+    request<{ ok: boolean; stage?: string }>(`/guilds/${guildId}/bump-reminder/send`, { method: "POST", body: JSON.stringify({ lastBumpAt: lastBumpAt ?? null }) }),
   updateBumpReminderSettings: (guildId: string, input: Partial<BumpReminderSettingsRow>) =>
     request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`, { method: "PUT", body: JSON.stringify(input) }),
 

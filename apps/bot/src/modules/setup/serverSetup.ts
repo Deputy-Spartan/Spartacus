@@ -261,6 +261,23 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   }
   await step(`🎭 Roles: ${createdRoles} new, ${renamedRoles} renamed, ${plan.roles.length - createdRoles - renamedRoles} already right`);
 
+  // New roles land at the bottom in whatever order Discord gives them, so
+  // put them in the blueprint's order: Admin highest, ping roles lowest,
+  // all under Spartacus's own role. Roles above Spartacus can't be moved.
+  const ordered = plan.roles
+    .map(({ spec }) => guild.roles.cache.get(ids.roles.get(spec.key) ?? ""))
+    .filter((r): r is Role => !!r && !!me && me.roles.highest.comparePositionTo(r) > 0);
+  if (ordered.length > 1) {
+    const sorted = await guild.roles
+      .setPositions(ordered.map((role, i) => ({ role, position: ordered.length - i })))
+      .then(() => true, (err) => {
+        logError("bot", err, guild.id);
+        return false;
+      });
+    if (!sorted) notes.push("Couldn't sort the roles. Move Spartacus's role to the top in Server Settings → Roles, then run this again.");
+  }
+  if (ordered.length < ids.roles.size) notes.push("Some roles are above Spartacus's role, so they keep their place. Move Spartacus's role to the top in Server Settings → Roles, then run this again to sort them.");
+
   // Categories in order, then their channels.
   let position = 0;
   for (const { spec, existing } of plan.categories) {

@@ -145,8 +145,8 @@ export function blueprintCategories(games: BlueprintGameId[]): BlueprintCategory
     ]},
     { key: "mm", name: "⚔️ Matchmaking", aliases: ["matchmaking"], access: mmRead, channels: [
       { key: "mm-board", name: "⚔️・matchmaking", kind: "text", topic: "Queue, challenge, start a pickup match or manage your team.", aliases: ["start-matchmaking", "matchmaking-board"] },
-      { key: "mm-threads", name: "🧵・match-threads", kind: "text", topic: "Challenges and private match threads.", aliases: ["match-threads", "matchmaking"] },
       { key: "mm-leaderboard", name: "🏆・leaderboard", kind: "text", topic: "Top players and teams.", aliases: ["leaderboard", "leaderboards"] },
+      { key: "mm-threads", name: "💯・matches", kind: "text", topic: "Challenges and private match threads.", aliases: ["matches", "match-threads", "matchmaking"] },
       { key: "mm-tournaments", name: "🏟️・tournaments", kind: "text", topic: "Tournament sign-ups and results.", aliases: ["tournaments", "match-results", "results"] },
       { key: "mm-lobby", name: "🎯 Matchmaking Lobby", kind: "voice", aliases: ["lobby", "matchmaking-lobby"], access: { see: "role", role: "mm", talk: true } },
     ]},

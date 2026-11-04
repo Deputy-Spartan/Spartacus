@@ -248,23 +248,54 @@ export async function postVerificationPanel(client: Client, config: Verification
 }
 
 // Maintenance: gives the Verified role to everyone already in the server, so
-// turning verification on doesn't lock out existing members.
-export async function verifyExistingMembers(client: Client, guildId: string): Promise<{ given: number; failed: number }> {
+// turning verification on doesn't lock out existing members. Pages through the
+// member list over REST (the gateway's "fetch all members" is rate limited and
+// can fail quietly), and says why when it can't run.
+export interface VerifyExistingResult {
+  given: number;
+  failed: number;
+  already: number;
+  checked: number;
+  error?: string;
+}
+
+export async function verifyExistingMembers(client: Client, guildId: string): Promise<VerifyExistingResult> {
+  const result: VerifyExistingResult = { given: 0, failed: 0, already: 0, checked: 0 };
   const config = await prisma.verificationConfig.findUnique({ where: { guildId } });
-  if (!config?.verifiedRoleId) return { given: 0, failed: 0 };
+  if (!config?.verifiedRoleId) return { ...result, error: "Pick a Verified role in step 1 first." };
   const guild = await client.guilds.fetch(guildId).catch(() => null);
-  if (!guild) return { given: 0, failed: 0 };
-  const members = await guild.members.fetch().catch(() => null);
-  let given = 0;
-  let failed = 0;
-  for (const m of members?.values() ?? []) {
-    if (m.user.bot || m.roles.cache.has(config.verifiedRoleId)) continue;
-    const ok = await m.roles.add(config.verifiedRoleId, "Verified existing members (dashboard)").then(() => true, () => false);
-    if (ok) {
-      given++;
-      if (config.unverifiedRoleId && m.roles.cache.has(config.unverifiedRoleId)) await m.roles.remove(config.unverifiedRoleId).catch(() => null);
-    } else failed++;
+  if (!guild) return { ...result, error: "Spartacus isn't in this server." };
+  const role = await guild.roles.fetch(config.verifiedRoleId).catch(() => null);
+  if (!role) return { ...result, error: "The Verified role no longer exists. Pick it again in step 1." };
+  const me = guild.members.me ?? (await guild.members.fetchMe().catch(() => null));
+  if (!me?.permissions.has("ManageRoles")) return { ...result, error: "Spartacus needs the Manage Roles permission." };
+  if (me.roles.highest.comparePositionTo(role) <= 0) {
+    return { ...result, error: `Spartacus's role is below ${role.name}, so it can't give it. Drag Spartacus above it in Server Settings → Roles, then try again.` };
+  }
+
+  let after: string | undefined;
+  for (let page = 0; page < 200; page++) {
+    const batch = await guild.members.list({ limit: 1000, after, cache: false }).catch((err) => {
+      logError("bot", err, guildId);
+      return null;
+    });
+    if (!batch) return { ...result, error: "Discord wouldn't send the member list. Try again in a minute." };
+    for (const m of batch.values()) {
+      if (m.user.bot) continue;
+      result.checked++;
+      if (m.roles.cache.has(config.verifiedRoleId)) {
+        result.already++;
+        continue;
+      }
+      const ok = await m.roles.add(config.verifiedRoleId, "Verified existing members (dashboard)").then(() => true, () => false);
+      if (ok) {
+        result.given++;
+        if (config.unverifiedRoleId && m.roles.cache.has(config.unverifiedRoleId)) await m.roles.remove(config.unverifiedRoleId).catch(() => null);
+      } else result.failed++;
+    }
+    if (batch.size < 1000) break;
+    after = batch.lastKey();
   }
   await prisma.verificationPendingMember.deleteMany({ where: { guildId } }).catch(() => null);
-  return { given, failed };
+  return result;
 }

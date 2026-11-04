@@ -459,7 +459,11 @@ function MaintenanceStep({ guildId, config }: { guildId: string; config: Verific
         setNote({ ok: true, text: "Reposted the Verify panel." });
       } else {
         const r = await api.verifyExistingMembers(guildId);
-        setNote({ ok: true, text: `Gave the Verified role to ${r.given} member${r.given === 1 ? "" : "s"}.${r.failed ? ` ${r.failed} couldn't be given it (check Spartacus's role is above it).` : ""}` });
+        const parts = [`Gave the Verified role to ${r.given} member${r.given === 1 ? "" : "s"}.`];
+        if (r.already) parts.push(`${r.already} already had it.`);
+        if (r.failed) parts.push(`${r.failed} couldn't be given it.`);
+        parts.push(`Checked ${r.checked} member${r.checked === 1 ? "" : "s"} (bots skipped).`);
+        setNote({ ok: r.failed === 0, text: parts.join(" ") });
       }
     } catch (err) {
       setNote({ ok: false, text: err instanceof Error ? err.message : "That didn't work." });

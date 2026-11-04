@@ -117,7 +117,9 @@ router.post("/guilds/:guildId/verification/verify-existing", requireAuth, requir
   const client = getBotClient();
   if (!client) return res.status(503).json({ error: "The bot isn't connected right now — try again in a moment." });
   const { verifyExistingMembers } = await import("@spartacus/bot");
-  res.json(await verifyExistingMembers(client, req.params.guildId));
+  const result = await verifyExistingMembers(client, req.params.guildId);
+  if (result.error) return res.status(400).json(result);
+  res.json(result);
 });
 
 router.get("/guilds/:guildId/verification/logs", requireAuth, requireGuildPermission, async (req, res) => {

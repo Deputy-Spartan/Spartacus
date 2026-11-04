@@ -2035,7 +2035,7 @@ export const api = {
 
   getVerification: (guildId: string) => request<VerificationConfig>(`/guilds/${guildId}/verification`),
   repostVerificationPanel: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/verification/repost`, { method: "POST" }),
-  verifyExistingMembers: (guildId: string) => request<{ given: number; failed: number }>(`/guilds/${guildId}/verification/verify-existing`, { method: "POST" }),
+  verifyExistingMembers: (guildId: string) => request<{ given: number; failed: number; already: number; checked: number }>(`/guilds/${guildId}/verification/verify-existing`, { method: "POST" }),
   getVerificationLogs: (guildId: string) => request<VerificationLogRow[]>(`/guilds/${guildId}/verification/logs`),
   purgeVerificationLogs: (guildId: string) => request<{ deleted: number }>(`/guilds/${guildId}/verification/logs`, { method: "DELETE" }),
   setVerification: (guildId: string, config: Partial<VerificationConfig>) =>

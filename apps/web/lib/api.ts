@@ -754,6 +754,7 @@ export interface StickyButton {
 export interface StickyMessageRow {
   id: string;
   channelId: string;
+  label?: string | null;
   content: string;
   embedEnabled: boolean;
   embedTitle: string | null;
@@ -764,6 +765,7 @@ export interface StickyMessageRow {
   savedEmbedId?: string | null;
 }
 export interface StickyMessageInput {
+  label?: string | null;
   content: string;
   embedEnabled: boolean;
   embedTitle: string | null;

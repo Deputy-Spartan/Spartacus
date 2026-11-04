@@ -564,6 +564,8 @@ model StickyMessage {
   guild            Guild   @relation(fields: [guildId], references: [id])
   guildId          String
   channelId        String  @unique
+  // A name for the dashboard list; never posted in Discord.
+  label            String?
   content          String
   lastMessageId    String?
   embedEnabled     Boolean @default(false)

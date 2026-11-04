@@ -12,11 +12,13 @@ import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbed
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { useDiscordNames } from "../../../../components/ui/DiscordMarkdown";
 import { api, type StickyMessageInput, type StickyMessageRow } from "../../../../lib/api";
 
 type Tab = "active" | "create";
 
 const EMPTY_FORM: StickyMessageInput = {
+  label: "",
   content: "",
   embedEnabled: false,
   embedTitle: "",
@@ -26,6 +28,11 @@ const EMPTY_FORM: StickyMessageInput = {
   embedExtra: {},
   savedEmbedId: null,
 };
+
+// A saved embed is a whole message by itself, so the text is optional then.
+function hasMessage(f: StickyMessageInput) {
+  return !!f.savedEmbedId || !!f.content.trim() || !!f.embedTitle?.trim() || !!f.embedDescription?.trim();
+}
 
 // The full field set — shared by the Active tab's inline editor and the
 // Create tab's fresh draft, wired to whichever value/onChange the caller
@@ -62,7 +69,20 @@ function StickyFields({
       />
       {channelLocked && <p className="text-xs text-slate-600 -mt-3 mb-4">Channel can't be changed once created.</p>}
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Name</label>
+      <input
+        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+        value={form.label ?? ""}
+        maxLength={80}
+        placeholder="e.g. R6 stats command"
+        onChange={(e) => onChange({ label: e.target.value })}
+      />
+      <p className="text-xs text-slate-600 mt-1 mb-4">Only shows here in the list. It's never posted in Discord.</p>
+
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
+        Message{" "}
+        {form.savedEmbedId && <span className="normal-case tracking-normal text-slate-600">(optional with a saved embed)</span>}
+      </label>
       <MarkdownToolbar guildId={guildId} textareaRef={contentRef} value={form.content} onChange={(v) => onChange({ content: v })} />
       <textarea
         ref={contentRef}
@@ -115,6 +135,21 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
     api.getStickyMessages(params.guildId).then(setRows);
   }
   useEffect(refresh, [params.guildId]);
+  const [embedNames, setEmbedNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    api
+      .getSavedEmbeds(params.guildId)
+      .then((list) => setEmbedNames(Object.fromEntries(list.map((e) => [e.id, e.name]))))
+      .catch(() => null);
+  }, [params.guildId]);
+  const channelNames = useDiscordNames(params.guildId)?.channels ?? {};
+  // What a sticky is called in the list: its name, else whatever best describes it.
+  const titleOf = (r: StickyMessageRow) =>
+    r.label?.trim() ||
+    r.embedTitle?.trim() ||
+    (r.savedEmbedId && embedNames[r.savedEmbedId] ? `Saved embed: ${embedNames[r.savedEmbedId]}` : "") ||
+    r.content.replace(/[#*_`>~|]/g, "").trim() ||
+    "Untitled sticky";
 
   function resetDraft() {
     setDraftChannelId(null);
@@ -126,6 +161,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
     setEditingId(row.id);
     setChannelId(row.channelId);
     setForm({
+      label: row.label ?? "",
       content: row.content,
       embedEnabled: row.embedEnabled,
       embedTitle: row.embedTitle ?? "",
@@ -140,9 +176,8 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
 
   async function saveEdit() {
     if (!editingId) return;
-    const hasContent = !!form.content.trim() || !!form.embedTitle?.trim() || !!form.embedDescription?.trim();
-    if (!hasContent) {
-      setError("Fill in at least one message field before saving.");
+    if (!hasMessage(form)) {
+      setError("Write a message or pick a saved embed before saving.");
       return;
     }
     setError(null);
@@ -152,9 +187,8 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
   }
 
   async function create() {
-    const hasContent = !!draft.content.trim() || !!draft.embedTitle?.trim() || !!draft.embedDescription?.trim();
-    if (!draftChannelId || !hasContent) {
-      setCreateError("Select a channel and fill in at least one message field before saving.");
+    if (!draftChannelId || !hasMessage(draft)) {
+      setCreateError("Select a channel, then write a message or pick a saved embed.");
       return;
     }
     setCreateError(null);
@@ -228,11 +262,15 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
               <NeonCard key={r.id}>
                 <div className="flex items-center justify-between gap-3">
                   <button className="min-w-0 flex-1 text-left" onClick={() => (editingId === r.id ? setEditingId(null) : openEdit(r))}>
-                    <span className="text-slate-300 truncate block">{r.embedTitle || r.content}</span>
+                    <span className="text-slate-300 truncate block">{titleOf(r)}</span>
                     <span className="text-slate-600 text-xs">
-                      {r.embedEnabled && "Embed"}
-                      {r.embedEnabled && r.buttons.length > 0 && " · "}
-                      {r.buttons.length > 0 && `${r.buttons.length} button${r.buttons.length === 1 ? "" : "s"}`}
+                      {[
+                        channelNames[r.channelId] ? `#${channelNames[r.channelId].name}` : null,
+                        r.savedEmbedId ? "Saved embed" : r.embedEnabled ? "Embed" : "Text",
+                        r.buttons.length > 0 ? `${r.buttons.length} button${r.buttons.length === 1 ? "" : "s"}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   </button>
                   <div className="flex items-center gap-3 shrink-0">

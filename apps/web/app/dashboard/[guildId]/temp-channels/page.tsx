@@ -7,7 +7,8 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../../../lib/api";
-import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 
 type Tab = "active" | "create";
 
@@ -92,8 +93,18 @@ function NamingMode({ gamePicker, onChange }: { gamePicker: boolean; onChange: (
 
 // The "What are you playing?" menu posted in each new channel. Picking a
 // game renames the channel to that game's name and sets its limit.
-function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChange: (next: TempGameChoice[]) => void }) {
+function GameChoicesField({ guildId, value, onChange }: { guildId: string; value: TempGameChoice[]; onChange: (next: TempGameChoice[]) => void }) {
   const set = (i: number, patch: Partial<TempGameChoice>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+  // A new emoji also replaces the old one at the start of the channel name.
+  // Server emojis can't go in channel names, so those only change the menu.
+  const setEmoji = (i: number, emoji: string) => {
+    const g = value[i];
+    const old = g.emoji ?? "";
+    const rest = old && g.nameFormat.startsWith(old) ? g.nameFormat.slice(old.length).trimStart() : g.nameFormat;
+    const changed = old && g.nameFormat.startsWith(old);
+    const nameFormat = changed ? (emoji && !SERVER_EMOJI.test(emoji) ? `${emoji} ${rest}` : rest) : g.nameFormat;
+    set(i, { emoji, nameFormat });
+  };
   const move = (i: number, by: number) => {
     const next = [...value];
     const [g] = next.splice(i, 1);
@@ -111,7 +122,7 @@ function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChan
       </p>
       {value.length > 0 && (
         <div className="space-y-3 mb-3">
-          <div className="hidden sm:grid grid-cols-[3.5rem_1fr_1fr_4.5rem_4.5rem] gap-2 text-[11px] uppercase tracking-wide text-slate-500">
+          <div className="hidden sm:grid grid-cols-[8.5rem_1fr_1fr_4.5rem_4.5rem] gap-2 text-[11px] uppercase tracking-wide text-slate-500">
             <span>Emoji</span>
             <span>Game</span>
             <span>Channel Name</span>
@@ -120,8 +131,8 @@ function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChan
           </div>
           {value.map((g, i) => (
             <div key={i}>
-              <div className="grid grid-cols-[3.5rem_1fr] sm:grid-cols-[3.5rem_1fr_1fr_4.5rem_4.5rem] gap-2 items-center">
-                <input className={input + " text-center"} value={g.emoji ?? ""} maxLength={32} placeholder="🎮" onChange={(e) => set(i, { emoji: e.target.value })} />
+              <div className="grid grid-cols-[8.5rem_1fr] sm:grid-cols-[8.5rem_1fr_1fr_4.5rem_4.5rem] gap-2 items-center">
+                <EmojiPicker guildId={guildId} value={g.emoji ?? ""} onChange={(emoji) => setEmoji(i, emoji)} popover placeholder="Emoji" />
                 <input className={input} value={g.label} maxLength={80} placeholder="Game name" onChange={(e) => set(i, { label: e.target.value })} />
                 <input className={input + " col-span-2 sm:col-span-1"} value={g.nameFormat} maxLength={90} placeholder="🎮 Squad {index}" onChange={(e) => set(i, { nameFormat: e.target.value })} />
                 <input type="number" min={0} max={99} className={input} value={g.userLimit ?? 0} onChange={(e) => set(i, { userLimit: Number(e.target.value) })} />
@@ -158,7 +169,8 @@ function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChan
         </div>
       )}
       <p className="text-[11px] text-slate-500 mt-3">
-        Channel names can use {"{user}"} and {"{index}"}. {"{index}"} takes the lowest free number, so two R6 squads are R6 Squad 1 and R6 Squad 2.
+        Pick any standard emoji or one of this server's own. Server emojis show in the menu, but Discord only allows standard emojis in channel
+        names, so they're left out of the name. Channel names can use {"{user}"} and {"{index}"}. {"{index}"} takes the lowest free number, so two R6 squads are R6 Squad 1 and R6 Squad 2.
         Discord allows 2 renames per channel every 10 minutes.
       </p>
     </div>
@@ -237,7 +249,7 @@ function LobbyFields({
           onChange(gamePicker && empty ? { gamePicker, gameChoices: blueprintGameChoices(DEFAULT_BLUEPRINT_GAMES) } : { gamePicker });
         }}
       />
-      {value.gamePicker && <GameChoicesField value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />}
+      {value.gamePicker && <GameChoicesField guildId={guildId} value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />}
     </>
   );
 }

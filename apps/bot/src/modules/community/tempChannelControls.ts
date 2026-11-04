@@ -13,8 +13,18 @@ import {
   type VoiceChannel,
 } from "discord.js";
 import { logError } from "@spartacus/db";
-import { cleanTempGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { SERVER_EMOJI, cleanTempGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
+
+// A server emoji or a standard one goes in the option's emoji slot. Anything
+// else stays in the label, since Discord refuses the whole message for a bad emoji.
+function menuOption(g: TempGameChoice, i: number) {
+  const custom = g.emoji?.match(SERVER_EMOJI);
+  const standard = !custom && g.emoji && /\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(g.emoji) && g.emoji.length <= 16;
+  const emoji = custom ? { id: custom[3], name: custom[2], animated: custom[1] === "a" } : standard ? { name: g.emoji! } : undefined;
+  const label = emoji || !g.emoji ? g.label : `${g.emoji} ${g.label}`;
+  return { label: label.slice(0, 100), value: String(i), emoji, description: g.userLimit ? `${g.userLimit}-player limit` : undefined };
+}
 
 // The Lock, Rename and Limit buttons posted in a squad channel's own chat,
 // with a "What are you playing?" menu when the lobby lists games.
@@ -27,8 +37,8 @@ export function tempChannelControls(channelId: string, games: TempGameChoice[] =
             .setCustomId(`tvc:game:${channelId}`)
             .setPlaceholder("🎮 What are you playing? Pick a game to name your channel")
             .addOptions(
-              ...games.map((g, i) => ({ label: `${g.emoji ? g.emoji + " " : ""}${g.label}`.slice(0, 100), value: String(i), description: g.userLimit ? `${g.userLimit}-player limit` : undefined })),
-              { label: "✏️ Custom name", value: "custom", description: "Type your own channel name" },
+              ...games.map(menuOption),
+              { label: "Custom name", value: "custom", emoji: { name: "✏️" }, description: "Type your own channel name" },
             ),
         ),
       ]

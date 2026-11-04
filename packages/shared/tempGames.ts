@@ -26,11 +26,18 @@ export function cleanTempGameChoices(raw: unknown): TempGameChoice[] {
   return out;
 }
 
-// Fills {user}, {index} or {count}, and {guild} in a channel name.
+// A server emoji token, like <:siege:123> or <a:fire:456>.
+export const SERVER_EMOJI = /<(a?):(\w{2,32}):(\d{15,25})>/;
+
+// Fills {user}, {index} or {count}, and {guild} in a channel name. Discord
+// channel names only take standard emojis, so server emojis are dropped.
 export function fillTempName(format: string, tokens: { user: string; index: number; guild: string }): string {
   return format
+    .replace(new RegExp(SERVER_EMOJI.source, "g"), "")
     .replace(/{user}/g, tokens.user)
     .replace(/{index}|{count}/g, String(tokens.index))
     .replace(/{guild}/g, tokens.guild)
+    .replace(/\s{2,}/g, " ")
+    .trim()
     .slice(0, 100);
 }

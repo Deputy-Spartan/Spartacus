@@ -63,6 +63,9 @@ interface EmojiPickerProps {
   guildId: string;
   value: string;
   onChange: (emoji: string) => void;
+  // Floats the panel over the page instead of pushing the layout down, for narrow columns.
+  popover?: boolean;
+  placeholder?: string;
 }
 
 // Picker for any emoji — a standard Unicode one (the full curated set, not
@@ -70,13 +73,13 @@ interface EmojiPickerProps {
 // emojis. The stored value is either the raw unicode character or the
 // server emoji's full <:name:id> token; the button face renders whichever
 // one it currently holds instead of only recognizing custom-emoji tokens.
-export function EmojiPicker({ guildId, value, onChange }: EmojiPickerProps) {
+export function EmojiPicker({ guildId, value, onChange, popover, placeholder = "Choose an emoji…" }: EmojiPickerProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"standard" | "server">("standard");
   const customMatch = value.match(/^<(a?):(\w+):(\d+)>$/);
 
   return (
-    <div>
+    <div className={popover ? "relative" : undefined}>
       <div className="flex gap-1.5">
         <button
           type="button"
@@ -92,7 +95,7 @@ export function EmojiPicker({ guildId, value, onChange }: EmojiPickerProps) {
           ) : value ? (
             <span className="text-lg leading-none">{value}</span>
           ) : (
-            <span className="text-slate-500">Choose an emoji…</span>
+            <span className="text-slate-500 truncate">{placeholder}</span>
           )}
         </button>
         {value && (
@@ -102,7 +105,13 @@ export function EmojiPicker({ guildId, value, onChange }: EmojiPickerProps) {
         )}
       </div>
       {open && (
-        <div className="mt-2 rounded-lg border border-white/10 bg-base-900 p-3">
+        <div
+          className={
+            popover
+              ? "absolute left-0 top-full z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-white/10 bg-base-900 p-3 shadow-2xl"
+              : "mt-2 rounded-lg border border-white/10 bg-base-900 p-3"
+          }
+        >
           <div className="flex gap-1 mb-2">
             <button
               type="button"

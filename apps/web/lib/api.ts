@@ -1385,6 +1385,11 @@ export interface BumpReminderSettingsRow {
   channelId: string | null;
   mentionRoleId: string | null;
   nextReminderAt: string | null;
+  lastBumpAt?: string | null;
+  lastBumpedById?: string | null;
+  missedAlertEnabled?: boolean;
+  missedAfterMin?: number;
+  missedAlerts?: number;
 }
 
 export interface RulesGateSettingsRow {

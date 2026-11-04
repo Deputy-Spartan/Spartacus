@@ -203,6 +203,13 @@ model BumpReminderSettings {
   mentionRoleId  String?
   nextReminderAt DateTime?
   reminded       Boolean   @default(true) // true = nothing pending; set false the moment a bump is detected
+  lastBumpAt     DateTime?
+  lastBumpedById String?
+  // Post "Bump missed!" when nobody bumps this many minutes after it's ready,
+  // then again for every 2-hour window missed after that.
+  missedAlertEnabled Boolean @default(true)
+  missedAfterMin     Int     @default(30)
+  missedAlerts       Int     @default(0) // alerts sent since the last bump
 }
 
 // ---- Suggestion Analytics ----

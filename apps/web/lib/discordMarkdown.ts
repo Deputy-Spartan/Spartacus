@@ -81,6 +81,8 @@ export function discordMarkdownToHtml(text: string | null | undefined, names?: D
     })
     .replace(/&lt;@!?(\d+)&gt;/g, (_m, id) => hold(`<span style="${MENTION}">@${escape(names?.users?.[id] ?? "Member")}</span>`))
     .replace(/@(everyone|here)\b/g, (_m, w) => hold(`<span style="${MENTION}">@${w}</span>`))
+    // </name:id> clickable slash commands
+    .replace(/&lt;\/([\w-]+(?: [\w-]+){0,2}):(\d+)&gt;/g, (_m, cmd) => hold(`<span style="${MENTION}">/${escape(cmd)}</span>`))
     .replace(/&lt;t:(-?\d+)(?::([tTdDfFR]))?&gt;/g, (m, unix, style) => {
       const t = timestamp(unix, style ?? "f");
       return t ? hold(`<span style="background:rgba(255,255,255,.06);border-radius:3px;padding:0 2px;">${t}</span>`) : m;

@@ -1,0 +1,103 @@
+import { EmbedBuilder, type BaseMessageOptions, type Client } from "discord.js";
+import { cleanBumpMessages, fillBumpStage, BUMP_DEFAULTS, type BumpStage, type BumpStageMessage } from "@spartacus/shared";
+import { prisma } from "./prisma";
+import { isSendableChannel } from "./channels";
+import { applyEmbedExtra } from "./embedExtra";
+import { logError } from "@spartacus/db";
+
+type Row = NonNullable<Awaited<ReturnType<typeof prisma.bumpReminderSettings.findUnique>>>;
+
+const COOLDOWN_MS = 2 * 60 * 60 * 1000;
+
+// Where the bump stands right now, or null before the first bump.
+export function currentBumpStage(row: Row, now = Date.now()): BumpStage | null {
+  if (!row.nextReminderAt) return null;
+  if (now < row.nextReminderAt.getTime()) return "bumped";
+  return row.missedAlerts > 0 ? "missed" : "ready";
+}
+
+function hasEmbedBody(m: BumpStageMessage) {
+  const e = m.extra;
+  return !!(m.title || m.description || e.imageUrl || e.thumbnailUrl || e.footerText || e.authorName || e.fields?.length);
+}
+
+export function buildBumpPayload(row: Row, stage: BumpStage, serverName: string): BaseMessageOptions {
+  let msg = cleanBumpMessages(row.bumpMessages)[stage];
+  // A stage left completely empty falls back to the default so Discord accepts it.
+  if (!msg.content.trim() && !(msg.embedEnabled && hasEmbedBody(msg))) msg = BUMP_DEFAULTS[stage];
+  const ready = row.nextReminderAt ?? new Date(Date.now() + COOLDOWN_MS);
+  const filled = fillBumpStage(msg, {
+    userId: row.lastBumpedById,
+    roleId: row.mentionRoleId,
+    nextAt: ready,
+    serverName,
+    missed: row.missedAlerts,
+    count: row.bumpCount,
+  });
+  const embeds: EmbedBuilder[] = [];
+  if (filled.embedEnabled && hasEmbedBody(filled)) {
+    const embed = new EmbedBuilder().setColor(filled.color as `#${string}`);
+    if (filled.title) embed.setTitle(filled.title);
+    if (filled.description) embed.setDescription(filled.description);
+    applyEmbedExtra(embed, filled.extra);
+    embeds.push(embed);
+  }
+  return {
+    content: filled.content || (embeds.length ? "" : "​"),
+    embeds,
+    allowedMentions: { roles: row.mentionRoleId ? [row.mentionRoleId] : [], users: row.lastBumpedById ? [row.lastBumpedById] : [] },
+  };
+}
+
+// Shows `stage` as the one Spartacus bump message in the channel. It edits
+// the message when it's still the newest one there and nobody needs a ping;
+// otherwise it deletes the old one and posts a new one (Discord only pings
+// on new messages, and a new one sits below Disboard's reply).
+export async function showBumpStage(client: Client, guildId: string, stage: BumpStage, opts: { ping: boolean }) {
+  const row = await prisma.bumpReminderSettings.findUnique({ where: { guildId } });
+  if (!row?.channelId) return;
+  const channel = await client.channels.fetch(row.channelId).catch(() => null);
+  if (!isSendableChannel(channel) || !("messages" in channel)) return;
+
+  const messages = cleanBumpMessages(row.bumpMessages);
+  const old = row.statusMessageId ? await channel.messages.fetch(row.statusMessageId).catch(() => null) : null;
+
+  // "Bump done" switched off: just clear the old reminder away.
+  if (stage === "bumped" && !messages.bumped.enabled) {
+    await old?.delete().catch(() => null);
+    if (row.statusMessageId) await prisma.bumpReminderSettings.update({ where: { id: row.id }, data: { statusMessageId: null } });
+    return;
+  }
+
+  const guild = client.guilds.cache.get(guildId);
+  const payload = buildBumpPayload(row, stage, guild?.name ?? "the server");
+  const pings = opts.ping && /<@&?\d+>/.test(payload.content ?? "");
+  const newest = "lastMessageId" in channel ? channel.lastMessageId : null;
+
+  if (old && !pings && newest === old.id) {
+    const edited = await old.edit(payload).catch(() => null);
+    if (edited) return;
+  }
+  await old?.delete().catch(() => null);
+  const posted = await channel.send(payload).catch((err) => {
+    logError("bot", err, guildId);
+    return null;
+  });
+  await prisma.bumpReminderSettings.update({ where: { id: row.id }, data: { statusMessageId: posted?.id ?? null } });
+}
+
+// After the message is changed on the dashboard: redraw the current one, no ping.
+export async function refreshBumpStatus(client: Client, guildId: string) {
+  const row = await prisma.bumpReminderSettings.findUnique({ where: { guildId } });
+  if (!row?.channelId || !row.statusMessageId) return;
+  const stage = currentBumpStage(row);
+  if (!stage) return;
+  const channel = await client.channels.fetch(row.channelId).catch(() => null);
+  if (!isSendableChannel(channel) || !("messages" in channel)) return;
+  const old = await channel.messages.fetch(row.statusMessageId).catch(() => null);
+  if (!old) return;
+  const messages = cleanBumpMessages(row.bumpMessages);
+  if (stage === "bumped" && !messages.bumped.enabled) return;
+  const guild = client.guilds.cache.get(guildId);
+  await old.edit(buildBumpPayload(row, stage, guild?.name ?? "the server")).catch(() => null);
+}

@@ -6,3 +6,4 @@ export * from "./rankGroups";
 
 export * from "./serverBlueprint";
 export * from "./tempGames";
+export * from "./bumpMessages";

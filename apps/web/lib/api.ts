@@ -1390,6 +1390,8 @@ export interface BumpReminderSettingsRow {
   missedAlertEnabled?: boolean;
   missedAfterMin?: number;
   missedAlerts?: number;
+  bumpCount?: number;
+  bumpMessages?: import("@spartacus/shared").BumpMessages;
 }
 
 export interface RulesGateSettingsRow {

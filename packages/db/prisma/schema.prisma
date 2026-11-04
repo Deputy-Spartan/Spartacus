@@ -210,6 +210,11 @@ model BumpReminderSettings {
   missedAlertEnabled Boolean @default(true)
   missedAfterMin     Int     @default(30)
   missedAlerts       Int     @default(0) // alerts sent since the last bump
+  // The one Spartacus message in the bump channel, edited or replaced at
+  // each stage, and how each stage looks (see packages/shared/bumpMessages.ts).
+  statusMessageId    String?
+  bumpMessages       Json?
+  bumpCount          Int     @default(0)
 }
 
 // ---- Suggestion Analytics ----

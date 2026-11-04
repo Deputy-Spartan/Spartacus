@@ -1,6 +1,7 @@
 import { Events, type Message } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
+import { showBumpStage } from "../../lib/bumpStatus";
 
 export const name = Events.MessageCreate;
 
@@ -28,7 +29,9 @@ export async function execute(message: Message) {
   const data = { nextReminderAt: new Date(now.getTime() + COOLDOWN_MS), reminded: false, lastBumpAt: now, lastBumpedById: bumper, missedAlerts: 0 };
   await prisma.bumpReminderSettings.upsert({
     where: { guildId: message.guildId },
-    create: { guildId: message.guildId, ...data },
-    update: data,
+    create: { guildId: message.guildId, ...data, bumpCount: 1 },
+    update: { ...data, bumpCount: { increment: 1 } },
   });
+  // Swap the reminder for the "Bump done" message under Disboard's reply.
+  await showBumpStage(message.client, message.guildId, "bumped", { ping: false }).catch(() => null);
 }

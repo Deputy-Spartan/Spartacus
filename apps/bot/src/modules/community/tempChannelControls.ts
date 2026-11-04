@@ -16,6 +16,7 @@ import { logError } from "@spartacus/db";
 import { SERVER_EMOJI, cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { moveToGameCategory, nextTempName } from "./tempGameCategories";
+import { tempGuideEmbed } from "./tempChannelGuide";
 
 // A server emoji or a standard one goes in the option's emoji slot. Anything
 // else stays in the label, since Discord refuses the whole message for a bad emoji.
@@ -31,7 +32,7 @@ export function menuOption(g: TempGameChoice, i: number) {
 // with a "What are you playing?" menu when the lobby lists games.
 // Only the person who made the channel can use them.
 // With `picked`, the game was already chosen on the panel, so there is no menu.
-export function tempChannelControls(channelId: string, games: TempGameChoice[] = [], ownerId?: string, picked?: TempGameChoice) {
+export function tempChannelControls(channelId: string, games: TempGameChoice[] = [], ownerId?: string, picked?: TempGameChoice, guide = false) {
   const menu = games.length
     ? [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -58,6 +59,7 @@ export function tempChannelControls(channelId: string, games: TempGameChoice[] =
         new ButtonBuilder().setCustomId(`tvc:lock:${channelId}`).setLabel("Lock / Unlock").setEmoji("🔒").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`tvc:rename:${channelId}`).setLabel("Rename").setEmoji("✏️").setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId(`tvc:limit:${channelId}`).setLabel("Limit").setEmoji("👥").setStyle(ButtonStyle.Secondary),
+        ...(guide ? [new ButtonBuilder().setCustomId(`tvc:help:${channelId}`).setLabel("How it works").setEmoji("❓").setStyle(ButtonStyle.Secondary)] : []),
       ),
     ],
   };
@@ -88,6 +90,14 @@ function renameModal(channelId: string, current: string) {
 export async function handleTempChannelControl(interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction) {
   const [prefix, action, channelId] = interaction.customId.split(":");
   try {
+    // Anyone in the channel can read the guide, not just its owner.
+    if (prefix === "tvc" && action === "help") {
+      const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId } });
+      const lobby = instance && (await prisma.tempChannelLobby.findUnique({ where: { id: instance.lobbyId } }));
+      if (!lobby || !interaction.guild) return void (await interaction.reply({ content: "This squad channel is gone.", ephemeral: true }));
+      return void (await interaction.reply({ embeds: [tempGuideEmbed(interaction.guild, lobby)], ephemeral: true }));
+    }
+
     const channel = await ownedChannel(interaction, channelId);
     if (typeof channel === "string") return void (await interaction.reply({ content: channel, ephemeral: true }));
 

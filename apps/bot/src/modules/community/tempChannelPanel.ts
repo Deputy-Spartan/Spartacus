@@ -15,6 +15,7 @@ import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { menuOption } from "./tempChannelControls";
 import { createSquad, scheduleEmptyCheck } from "./tempChannels";
+import { tempGuideEmbed } from "./tempChannelGuide";
 
 // The text channel way to make a squad: an embed with a game dropdown (or one
 // button when the lobby has no games). Picking makes the voice channel, named
@@ -28,14 +29,21 @@ export function tempPanelPayload(lobby: TempChannelLobby) {
   const text = (lobby.panelText || "").replace(/{lobby}/g, `<#${lobby.lobbyChannelId}>`);
   const embed = new EmbedBuilder().setColor(lobby.panelColor).setTitle(lobby.panelTitle || "🔊 Create a Squad");
   if (text) embed.setDescription(text.slice(0, 4000));
-  const row = games.length
-    ? new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
-        new StringSelectMenuBuilder().setCustomId(`tvcp:${lobby.id}`).setPlaceholder("🎮 Pick your game to make a squad channel").addOptions(games.map(menuOption)),
-      )
-    : new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId(`tvcp:${lobby.id}`).setLabel("Create a Squad").setEmoji("➕").setStyle(ButtonStyle.Primary),
-      );
-  return { embeds: [embed], components: [row], allowedMentions: { parse: [] } };
+  const help = lobby.guideButton ? [new ButtonBuilder().setCustomId(`tvcp:${lobby.id}:help`).setLabel("How it works").setEmoji("❓").setStyle(ButtonStyle.Secondary)] : [];
+  const rows = games.length
+    ? [
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          new StringSelectMenuBuilder().setCustomId(`tvcp:${lobby.id}`).setPlaceholder("🎮 Pick your game to make a squad channel").addOptions(games.map(menuOption)),
+        ),
+        ...(help.length ? [new ActionRowBuilder<ButtonBuilder>().addComponents(help)] : []),
+      ]
+    : [
+        new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder().setCustomId(`tvcp:${lobby.id}`).setLabel("Create a Squad").setEmoji("➕").setStyle(ButtonStyle.Primary),
+          ...help,
+        ),
+      ];
+  return { embeds: [embed], components: rows, allowedMentions: { parse: [] } };
 }
 
 // Posts the panel, or edits it in place when it's still there.
@@ -66,11 +74,12 @@ export async function syncAllTempPanels(client: Client) {
 const link = (guildId: string, id: string, name: string) => `[🔊 ${name}](https://discord.com/channels/${guildId}/${id})`;
 
 export async function handleTempPanel(interaction: StringSelectMenuInteraction | ButtonInteraction) {
-  const lobbyId = interaction.customId.split(":")[1];
+  const [, lobbyId, action] = interaction.customId.split(":");
   const guild = interaction.guild;
   try {
     const lobby = await prisma.tempChannelLobby.findUnique({ where: { id: lobbyId } });
     if (!guild || !lobby || lobby.guildId !== guild.id) return void (await interaction.reply({ content: "This panel isn't set up anymore.", ephemeral: true }));
+    if (action === "help") return void (await interaction.reply({ embeds: [tempGuideEmbed(guild, lobby)], ephemeral: true }));
     if (!(await isModuleEnabled(guild.id, "TEMP_CHANNELS"))) return void (await interaction.reply({ content: "⚠️ Temp Channels is turned off for this server.", ephemeral: true }));
 
     const game = interaction.isStringSelectMenu() ? cleanTempGameChoices(lobby.gameChoices)[Number(interaction.values[0])] : undefined;

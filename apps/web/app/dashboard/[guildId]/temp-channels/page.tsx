@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../../../lib/api";
-import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, TEMP_GUIDE_DEFAULT, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 
@@ -48,6 +49,8 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   panelTitle: "🔊 Create a Squad",
   panelText: "Pick the game you're playing below and Spartacus makes a voice channel for your squad.\n\nOr join {lobby} to make one straight away.",
   panelColor: 0x5865f2,
+  guideButton: true,
+  panelGuide: null,
 };
 
 function NameFormatField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
@@ -228,6 +231,51 @@ function PanelPreview({ value, lobbyName }: { value: Partial<TempChannelLobbyRow
   );
 }
 
+// Step 6: the private guide behind the How it works buttons.
+function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void; lobbyName: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const text = value.panelGuide ?? TEMP_GUIDE_DEFAULT;
+  const preview = text.replace(/{lobby}/g, `🔊 ${lobbyName}`).replace(/{panel}/g, value.panelChannelId ? "#panel" : "the Create a Squad panel");
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
+        <div>
+          <p className="text-sm font-medium">Show the ❓ How it works Button</p>
+          <p className="text-xs text-slate-500">On the panel and in every squad channel's chat. It shows this guide privately to whoever taps it.</p>
+        </div>
+        <ToggleSwitch enabled={value.guideButton !== false} onChange={(guideButton) => onChange({ guideButton })} label="Show the How it works button" />
+      </div>
+      {value.guideButton !== false && (
+        <>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs uppercase tracking-wide text-slate-500">Guide Text</label>
+              {value.panelGuide != null && (
+                <button type="button" onClick={() => onChange({ panelGuide: null })} className="text-xs text-slate-500 hover:text-neon-blue">
+                  Reset to the built-in guide
+                </button>
+              )}
+            </div>
+            <MarkdownToolbar guildId={guildId} textareaRef={ref} value={text} onChange={(next) => onChange({ panelGuide: next })} />
+            <textarea ref={ref} rows={12} className={field + " font-mono text-xs"} maxLength={4000} value={text} onChange={(e) => onChange({ panelGuide: e.target.value })} />
+            <p className="text-[11px] text-slate-500 mt-1">
+              {"{lobby}"} links the Lobby Voice Channel and {"{panel}"} links the panel's channel. Edit it to match your setup, for example if you don't use
+              the panel or game categories.
+            </p>
+          </div>
+          <div className="rounded-lg bg-[#313338] p-3">
+            <div className="rounded border-l-4 bg-[#2b2d31] p-3" style={{ borderColor: hex(value.panelColor) }}>
+              <p className="font-semibold text-sm text-white">❓ How Squad Channels Work</p>
+              <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{preview.replace(/\*\*/g, "")}</p>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">Only you can see this · shown to whoever taps ❓ How it works</p>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 // The full setup in steps — shared by the inline editor on an existing lobby
 // (Active tab) and the fresh-draft form (Create tab), just wired to
 // whichever value/onChange the caller passes in.
@@ -366,6 +414,10 @@ function LobbyFields({
             </p>
           </>
         )}
+      </Step>
+
+      <Step n={6} title="How It Works Guide" desc="A step-by-step guide for members: both ways to make a channel, the game menu, and what each button does.">
+        <GuideFields guildId={guildId} value={value} onChange={onChange} lobbyName={lobbyName} />
       </Step>
     </div>
   );

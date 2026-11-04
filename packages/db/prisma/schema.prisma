@@ -622,6 +622,8 @@ model TempChannelLobby {
   panelTitle       String  @default("🔊 Create a Squad")
   panelText        String  @default("Pick the game you're playing below and Spartacus makes a voice channel for your squad.\n\nOr join {lobby} to make one straight away.")
   panelColor       Int     @default(5793266)
+  guideButton      Boolean @default(true) // the "How it works" button on the panel and in squad channels
+  panelGuide       String? // the guide's text; empty uses the built-in step-by-step guide
 
   @@index([guildId])
 }

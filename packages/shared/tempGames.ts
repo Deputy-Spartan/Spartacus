@@ -41,3 +41,31 @@ export function fillTempName(format: string, tokens: { user: string; index: numb
     .trim()
     .slice(0, 100);
 }
+
+// The step-by-step guide behind the "How it works" buttons. {lobby} and
+// {panel} become links to the lobby voice channel and the panel's channel.
+export const TEMP_GUIDE_DEFAULT = [
+  "**There are two ways to get your own voice channel.**",
+  "",
+  "**1️⃣ Join to create**",
+  "Join {lobby}. Spartacus makes your own voice channel and moves you into it.",
+  "",
+  "**2️⃣ Pick your game**",
+  "Pick your game in the dropdown on {panel}. Your channel is made, named for that game, and put in that game's category. If you're already in voice, you're moved in. If not, you get a link and 2 minutes to join.",
+  "",
+  "**🎮 Naming your channel**",
+  "A channel made by joining shows a *What are you playing?* menu in its chat. Pick a game to rename it, like 🟧 R6 Squad 1, and set that game's player limit. Or pick ✏️ Custom name to type your own.",
+  "",
+  "**🛠️ Your channel's buttons**",
+  "Open your voice channel's chat (the 💬 next to the channel name) to find them. Only the person who made the channel can use them.",
+  "🔒 **Lock / Unlock**: locking lets only the people inside right now join. Unlock opens it to everyone again.",
+  "✏️ **Rename**: type a new name for the channel.",
+  "👥 **Limit**: set how many people can join, from 1 to 99, or 0 for no limit.",
+  "❓ **How it works**: shows this guide.",
+  "",
+  "**🧹 When you're done**",
+  "Just leave. The channel deletes itself once it's empty, and so does its game category when no squads are left in it. You can have one squad at a time.",
+  "",
+  "**ℹ️ Good to know**",
+  "Discord allows 2 renames per channel every 10 minutes, so a rename can take a few minutes to show.",
+].join("\n");

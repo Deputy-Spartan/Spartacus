@@ -7,7 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../../../lib/api";
-import { BLUEPRINT_GAMES, MAX_TEMP_GAMES, fillTempName, type TempGameChoice } from "@spartacus/shared";
+import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
 
 type Tab = "active" | "create";
 
@@ -39,6 +39,7 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   deleteAfterEmptySec: 0,
   pairTextChannel: false,
   hideTextFromNonMembers: true,
+  gamePicker: false,
   gameChoices: [],
 };
 
@@ -58,6 +59,37 @@ function NameFormatField({ value, onChange }: { value: string; onChange: (next: 
   );
 }
 
+// Name Format names the channel straight away. Game Picker does too, then
+// asks the creator what they're playing and renames it for that game.
+function NamingMode({ gamePicker, onChange }: { gamePicker: boolean; onChange: (gamePicker: boolean) => void }) {
+  const modes = [
+    { on: false, title: "Name Format", desc: "Channels are named from the Channel Name Format above, like Kuro's Channel. No menu." },
+    { on: true, title: "Game Picker", desc: 'Same start, then the creator gets a "What are you playing?" menu that renames it for their game, like 🟧 R6 Squad 1.' },
+  ];
+  return (
+    <div>
+      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">How New Channels Get Named</label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {modes.map((m) => (
+          <button
+            key={m.title}
+            type="button"
+            onClick={() => onChange(m.on)}
+            aria-pressed={gamePicker === m.on}
+            className={[
+              "text-left rounded-lg border p-3 transition-colors",
+              gamePicker === m.on ? "border-neon-blue bg-neon-blue/10" : "border-white/10 bg-base-950 hover:border-white/20",
+            ].join(" ")}
+          >
+            <p className="text-sm font-medium">{m.title}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{m.desc}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // The "What are you playing?" menu posted in each new channel. Picking a
 // game renames the channel to that game's name and sets its limit.
 function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChange: (next: TempGameChoice[]) => void }) {
@@ -72,10 +104,10 @@ function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChan
   const input = "bg-base-950 border border-white/10 rounded-lg p-2 text-sm min-w-0";
   return (
     <div className="rounded-lg border border-white/10 bg-base-950/50 p-3">
-      <p className="text-sm font-medium">Game Picker</p>
+      <p className="text-sm font-medium">Games</p>
       <p className="text-xs text-slate-500 mb-3">
-        New channels show a "What are you playing?" menu to the person who made it. Picking a game renames the channel to that game's name and
-        sets its limit. A Custom name option is always included. Leave this empty to skip the menu.
+        The menu lists these games. Picking one renames the channel to that game's channel name and sets its limit. A Custom name option is always
+        included.
       </p>
       {value.length > 0 && (
         <div className="space-y-3 mb-3">
@@ -197,7 +229,15 @@ function LobbyFields({
         </label>
       </div>
 
-      <GameChoicesField value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />
+      <NamingMode
+        gamePicker={!!value.gamePicker}
+        onChange={(gamePicker) => {
+          // Turning the picker on with no games starts from the usual ones.
+          const empty = !(value.gameChoices ?? []).length;
+          onChange(gamePicker && empty ? { gamePicker, gameChoices: blueprintGameChoices(DEFAULT_BLUEPRINT_GAMES) } : { gamePicker });
+        }}
+      />
+      {value.gamePicker && <GameChoicesField value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />}
     </>
   );
 }
@@ -310,7 +350,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
                   <button className="min-w-0 flex-1 text-left" onClick={() => setExpandedId(expandedId === l.id ? null : l.id)}>
                     <p className="text-sm font-medium truncate">{l.name}</p>
                     <p className="text-xs text-slate-500 truncate">
-                      {channelLabel(l.lobbyChannelId)} → {channelLabel(l.categoryId)} · limit {l.userLimit || "∞"} · {l.bitrate / 1000}kbps
+                      {channelLabel(l.lobbyChannelId)} → {channelLabel(l.categoryId)} · limit {l.userLimit || "∞"} · {l.bitrate / 1000}kbps · {l.gamePicker ? "Game Picker" : "Name Format"}
                     </p>
                   </button>
                   <div className="flex items-center gap-3 shrink-0">

@@ -777,6 +777,7 @@ export interface TempChannelLobbyRow {
   deleteAfterEmptySec: number;
   pairTextChannel: boolean;
   hideTextFromNonMembers: boolean;
+  gamePicker: boolean;
   gameChoices: TempGameChoice[];
 }
 

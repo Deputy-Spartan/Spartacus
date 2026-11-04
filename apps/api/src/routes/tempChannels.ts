@@ -12,7 +12,7 @@ router.get("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildPe
 });
 
 router.post("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, lobbyChannelId, categoryId, nameFormat, userLimit, bitrate, deleteAfterEmptySec, pairTextChannel, hideTextFromNonMembers, gameChoices } =
+  const { name, lobbyChannelId, categoryId, nameFormat, userLimit, bitrate, deleteAfterEmptySec, pairTextChannel, hideTextFromNonMembers, gamePicker, gameChoices } =
     req.body;
   const row = await prisma.tempChannelLobby.create({
     data: {
@@ -26,6 +26,7 @@ router.post("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildP
       deleteAfterEmptySec,
       pairTextChannel,
       hideTextFromNonMembers,
+      gamePicker: gamePicker === true,
       gameChoices: cleanTempGameChoices(gameChoices) as unknown as Prisma.InputJsonValue,
     },
   });

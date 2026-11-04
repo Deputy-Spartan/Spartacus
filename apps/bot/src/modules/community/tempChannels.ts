@@ -50,7 +50,7 @@ async function handleJoin(state: VoiceState) {
   if (!created) return;
 
   await state.member.voice.setChannel(created.id).catch(() => null);
-  await created.send(tempChannelControls(created.id, cleanTempGameChoices(lobby.gameChoices), state.member.id)).catch(() => null);
+  await created.send(tempChannelControls(created.id, lobby.gamePicker ? cleanTempGameChoices(lobby.gameChoices) : [], state.member.id)).catch(() => null);
 
   let textChannelId: string | undefined;
   if (lobby.pairTextChannel) {

@@ -16,6 +16,7 @@ import {
   Client,
   PartialUser,
   SendableChannels,
+  AuditLogEvent,
 } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
@@ -227,7 +228,70 @@ async function logChannelChange(channel: Channel, verb: string, configKey: "logC
 }
 export const onChannelCreate = (channel: Channel) => logChannelChange(channel, "created", "logChannelCreated");
 export const onChannelDelete = (channel: Channel) => logChannelChange(channel, "deleted", "logChannelDeleted");
-export const onChannelUpdate = (_oldChannel: Channel, newChannel: Channel) => logChannelChange(newChannel, "updated", "logChannelUpdated");
+// What actually changed between two versions of a channel. Position is left
+// out on purpose: creating, deleting or dragging one channel makes Discord
+// renumber every channel below it and send an update for each, which used to
+// flood the log with empty "Channel updated" lines.
+type ChannelLike = Channel & {
+  name?: string;
+  topic?: string | null;
+  nsfw?: boolean;
+  rateLimitPerUser?: number | null;
+  parentId?: string | null;
+  bitrate?: number;
+  userLimit?: number;
+  permissionOverwrites?: { cache: Map<string, { allow: { bitfield: bigint }; deny: { bitfield: bigint } }> };
+};
+
+function overwriteKey(c: ChannelLike) {
+  const cache = c.permissionOverwrites?.cache;
+  if (!cache) return "";
+  return [...cache.entries()]
+    .map(([id, o]) => `${id}:${o.allow.bitfield}:${o.deny.bitfield}`)
+    .sort()
+    .join("|");
+}
+
+export function describeChannelChanges(oldC: ChannelLike, newC: ChannelLike): string[] {
+  const out: string[] = [];
+  const cut = (t: string | null | undefined) => (t ? (t.length > 120 ? `${t.slice(0, 117)}…` : t) : "*(none)*");
+  if (oldC.name !== newC.name) out.push(`**Name:** #${oldC.name} → #${newC.name}`);
+  if ((oldC.topic ?? "") !== (newC.topic ?? "")) out.push(`**Topic:** ${cut(oldC.topic)} → ${cut(newC.topic)}`);
+  if ((oldC.parentId ?? null) !== (newC.parentId ?? null)) {
+    const cat = (id: string | null | undefined) => (id ? `<#${id}>` : "no category");
+    out.push(`**Category:** ${cat(oldC.parentId)} → ${cat(newC.parentId)}`);
+  }
+  if ((oldC.rateLimitPerUser ?? 0) !== (newC.rateLimitPerUser ?? 0)) out.push(`**Slowmode:** ${oldC.rateLimitPerUser ?? 0}s → ${newC.rateLimitPerUser ?? 0}s`);
+  if (!!oldC.nsfw !== !!newC.nsfw) out.push(`**Age-restricted:** ${oldC.nsfw ? "on" : "off"} → ${newC.nsfw ? "on" : "off"}`);
+  if (oldC.bitrate !== undefined && oldC.bitrate !== newC.bitrate) out.push(`**Bitrate:** ${Math.round((oldC.bitrate ?? 0) / 1000)} → ${Math.round((newC.bitrate ?? 0) / 1000)} kbps`);
+  if (oldC.userLimit !== undefined && oldC.userLimit !== newC.userLimit) out.push(`**User limit:** ${oldC.userLimit || "none"} → ${newC.userLimit || "none"}`);
+  if (overwriteKey(oldC) !== overwriteKey(newC)) out.push("**Permissions** changed");
+  return out;
+}
+
+// Who made the change, from the audit log, when Spartacus can see it.
+async function changedBy(guild: Guild, channelId: string): Promise<string | null> {
+  const types = [AuditLogEvent.ChannelUpdate, AuditLogEvent.ChannelOverwriteCreate, AuditLogEvent.ChannelOverwriteUpdate, AuditLogEvent.ChannelOverwriteDelete];
+  for (const type of types) {
+    const logs = await guild.fetchAuditLogs({ type, limit: 5 }).catch(() => null);
+    const entry = logs?.entries.find((e) => (e.target as { id?: string } | null)?.id === channelId && Date.now() - e.createdTimestamp < 15_000);
+    if (entry?.executorId) return entry.executorId;
+  }
+  return null;
+}
+
+export async function onChannelUpdate(oldChannel: Channel, newChannel: Channel) {
+  const guild = "guild" in newChannel ? (newChannel as { guild?: Guild }).guild : undefined;
+  if (!guild) return;
+  const changes = describeChannelChanges(oldChannel as ChannelLike, newChannel as ChannelLike);
+  if (changes.length === 0) return;
+  const result = await getLogChannel(guild.id, newChannel.client);
+  if (!result?.channel || !result.config.logChannelUpdated) return;
+  if (isIgnoredChannel(result.config, newChannel.id)) return;
+  const by = await changedBy(guild, newChannel.id);
+  const lines = [`📺 Channel updated: <#${newChannel.id}>${by ? ` by <@${by}>` : ""}`, ...changes];
+  await result.channel.send({ embeds: [baseEmbed(result.config).setDescription(lines.join("\n").slice(0, 4096))], allowedMentions: { parse: [] } }).catch(() => null);
+}
 
 // ---- Invites ----
 

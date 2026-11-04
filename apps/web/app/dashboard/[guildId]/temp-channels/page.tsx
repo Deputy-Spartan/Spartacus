@@ -7,6 +7,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../../../lib/api";
+import { BLUEPRINT_GAMES, MAX_TEMP_GAMES, fillTempName, type TempGameChoice } from "@spartacus/shared";
 
 type Tab = "active" | "create";
 
@@ -38,6 +39,7 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   deleteAfterEmptySec: 0,
   pairTextChannel: false,
   hideTextFromNonMembers: true,
+  gameChoices: [],
 };
 
 function NameFormatField({ value, onChange }: { value: string; onChange: (next: string) => void }) {
@@ -52,6 +54,81 @@ function NameFormatField({ value, onChange }: { value: string; onChange: (next: 
         onChange={(e) => onChange(e.target.value)}
       />
       <PlaceholderExamples items={NAME_FORMAT_TOKENS} inputRef={ref} value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+// The "What are you playing?" menu posted in each new channel. Picking a
+// game renames the channel to that game's name and sets its limit.
+function GameChoicesField({ value, onChange }: { value: TempGameChoice[]; onChange: (next: TempGameChoice[]) => void }) {
+  const set = (i: number, patch: Partial<TempGameChoice>) => onChange(value.map((g, j) => (j === i ? { ...g, ...patch } : g)));
+  const move = (i: number, by: number) => {
+    const next = [...value];
+    const [g] = next.splice(i, 1);
+    next.splice(i + by, 0, g);
+    onChange(next);
+  };
+  const missing = BLUEPRINT_GAMES.filter((b) => !value.some((g) => g.label.toLowerCase() === b.name.toLowerCase()));
+  const input = "bg-base-950 border border-white/10 rounded-lg p-2 text-sm min-w-0";
+  return (
+    <div className="rounded-lg border border-white/10 bg-base-950/50 p-3">
+      <p className="text-sm font-medium">Game Picker</p>
+      <p className="text-xs text-slate-500 mb-3">
+        New channels show a "What are you playing?" menu to the person who made it. Picking a game renames the channel to that game's name and
+        sets its limit. A Custom name option is always included. Leave this empty to skip the menu.
+      </p>
+      {value.length > 0 && (
+        <div className="space-y-3 mb-3">
+          <div className="hidden sm:grid grid-cols-[3.5rem_1fr_1fr_4.5rem_4.5rem] gap-2 text-[11px] uppercase tracking-wide text-slate-500">
+            <span>Emoji</span>
+            <span>Game</span>
+            <span>Channel Name</span>
+            <span>Limit</span>
+            <span />
+          </div>
+          {value.map((g, i) => (
+            <div key={i}>
+              <div className="grid grid-cols-[3.5rem_1fr] sm:grid-cols-[3.5rem_1fr_1fr_4.5rem_4.5rem] gap-2 items-center">
+                <input className={input + " text-center"} value={g.emoji ?? ""} maxLength={32} placeholder="🎮" onChange={(e) => set(i, { emoji: e.target.value })} />
+                <input className={input} value={g.label} maxLength={80} placeholder="Game name" onChange={(e) => set(i, { label: e.target.value })} />
+                <input className={input + " col-span-2 sm:col-span-1"} value={g.nameFormat} maxLength={90} placeholder="🎮 Squad {index}" onChange={(e) => set(i, { nameFormat: e.target.value })} />
+                <input type="number" min={0} max={99} className={input} value={g.userLimit ?? 0} onChange={(e) => set(i, { userLimit: Number(e.target.value) })} />
+                <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
+                  <button disabled={i === 0} onClick={() => move(i, -1)} className="hover:text-neon-blue disabled:opacity-30" aria-label="Move up">▲</button>
+                  <button disabled={i === value.length - 1} onClick={() => move(i, 1)} className="hover:text-neon-blue disabled:opacity-30" aria-label="Move down">▼</button>
+                  <button onClick={() => onChange(value.filter((_, j) => j !== i))} className="hover:text-rose-400" aria-label="Remove">✕</button>
+                </div>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 pl-1">
+                Becomes <span className="text-slate-300">🔊 {fillTempName(g.nameFormat || g.label, { user: "Kuro", index: 1, guild: "Server" })}</span>
+                {g.userLimit ? ` · ${g.userLimit} players` : " · no limit"}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+      {value.length < MAX_TEMP_GAMES && (
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => onChange([...value, { label: "", emoji: "🎮", nameFormat: "🎮 Squad {index}", userLimit: 0 }])} className="neon-button text-xs">
+            + Add Game
+          </button>
+          {missing.map((b) => (
+            <button
+              key={b.id}
+              onClick={() =>
+                onChange([...value, { label: b.name, emoji: b.emoji, nameFormat: b.id === "other" ? `${b.emoji} {user}'s Squad` : `${b.emoji} ${b.short} Squad {index}`, userLimit: b.squad }])
+              }
+              className="text-xs rounded-full border border-white/10 px-3 py-1 text-slate-400 hover:border-neon-blue hover:text-neon-blue"
+            >
+              + {b.emoji} {b.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <p className="text-[11px] text-slate-500 mt-3">
+        Channel names can use {"{user}"} and {"{index}"}. {"{index}"} takes the lowest free number, so two R6 squads are R6 Squad 1 and R6 Squad 2.
+        Discord allows 2 renames per channel every 10 minutes.
+      </p>
     </div>
   );
 }
@@ -119,6 +196,8 @@ function LobbyFields({
           Hide text from non-members
         </label>
       </div>
+
+      <GameChoicesField value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />
     </>
   );
 }

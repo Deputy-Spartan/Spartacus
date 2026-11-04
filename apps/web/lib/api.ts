@@ -1,4 +1,4 @@
-import type { TextOverrides } from "@spartacus/shared";
+import type { TempGameChoice, TextOverrides } from "@spartacus/shared";
 import type { EmbedExtra } from "./embedExtra";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -777,6 +777,7 @@ export interface TempChannelLobbyRow {
   deleteAfterEmptySec: number;
   pairTextChannel: boolean;
   hideTextFromNonMembers: boolean;
+  gameChoices: TempGameChoice[];
 }
 
 export type RolePanelLayout = "BUTTONS" | "DROPDOWN";

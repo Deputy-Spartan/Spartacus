@@ -12,19 +12,31 @@ export interface BlueprintGame {
   emoji: string;
   slug: string;
   aliases: string[];
+  short: string; // used in squad channel names, like "🟧 R6 Squad 1"
+  squad: number; // squad channel limit for this game, 0 for none
 }
 
 export const BLUEPRINT_GAMES: BlueprintGame[] = [
-  { id: "r6", name: "Rainbow Six Siege", emoji: "🟧", slug: "r6-siege", aliases: ["rainbow-six-siege", "r6", "siege", "rainbow-six"] },
-  { id: "cod", name: "Call of Duty", emoji: "🪖", slug: "call-of-duty", aliases: ["cod", "warzone"] },
-  { id: "bf", name: "Battlefield", emoji: "🟦", slug: "battlefield", aliases: ["bf"] },
-  { id: "val", name: "Valorant", emoji: "🟥", slug: "valorant", aliases: ["val"] },
-  { id: "cs2", name: "Counter-Strike 2", emoji: "🟨", slug: "cs2", aliases: ["counter-strike", "csgo"] },
-  { id: "apex", name: "Apex Legends", emoji: "🔺", slug: "apex-legends", aliases: ["apex"] },
-  { id: "ow", name: "Overwatch 2", emoji: "🟠", slug: "overwatch-2", aliases: ["overwatch"] },
-  { id: "other", name: "Other Games", emoji: "🎮", slug: "other-games", aliases: ["variety"] },
+  { id: "r6", name: "Rainbow Six Siege", emoji: "🟧", slug: "r6-siege", aliases: ["rainbow-six-siege", "r6", "siege", "rainbow-six"], short: "R6", squad: 5 },
+  { id: "cod", name: "Call of Duty", emoji: "🪖", slug: "call-of-duty", aliases: ["cod", "warzone"], short: "CoD", squad: 4 },
+  { id: "bf", name: "Battlefield", emoji: "🟦", slug: "battlefield", aliases: ["bf"], short: "BF", squad: 4 },
+  { id: "val", name: "Valorant", emoji: "🟥", slug: "valorant", aliases: ["val"], short: "Valorant", squad: 5 },
+  { id: "cs2", name: "Counter-Strike 2", emoji: "🟨", slug: "cs2", aliases: ["counter-strike", "csgo"], short: "CS2", squad: 5 },
+  { id: "apex", name: "Apex Legends", emoji: "🔺", slug: "apex-legends", aliases: ["apex"], short: "Apex", squad: 3 },
+  { id: "ow", name: "Overwatch 2", emoji: "🟠", slug: "overwatch-2", aliases: ["overwatch"], short: "OW2", squad: 5 },
+  { id: "other", name: "Other Games", emoji: "🎮", slug: "other-games", aliases: ["variety"], short: "Squad", squad: 0 },
 ];
 export const DEFAULT_BLUEPRINT_GAMES: BlueprintGameId[] = ["r6", "cod", "bf", "other"];
+
+// The squad channel game menu for the picked games, like "🟧 R6 Squad 1".
+export function blueprintGameChoices(games: BlueprintGameId[]) {
+  return BLUEPRINT_GAMES.filter((g) => games.includes(g.id)).map((g) => ({
+    label: g.name,
+    emoji: g.emoji,
+    nameFormat: g.id === "other" ? `${g.emoji} {user}'s Squad` : `${g.emoji} ${g.short} Squad {index}`,
+    userLimit: g.squad,
+  }));
+}
 
 // Roles are referred to by key everywhere else in the blueprint.
 export type RoleKey = string;

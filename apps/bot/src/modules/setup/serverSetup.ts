@@ -20,6 +20,7 @@ import {
   BLUEPRINT_RULES,
   BLUEPRINT_TICKET_TYPES,
   blueprintCategories,
+  blueprintGameChoices,
   blueprintOnboarding,
   blueprintPickers,
   blueprintSlug,
@@ -436,8 +437,13 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
     }],
     ["Temp Channels", async () => {
       const lobby = ch("squad");
-      if (lobby && !(await prisma.tempChannelLobby.findFirst({ where: { guildId: g, lobbyChannelId: lobby } }))) {
-        await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a Squad", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s Squad", userLimit: 5, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000) } });
+      if (!lobby) return;
+      const gameChoices = blueprintGameChoices(opts.games);
+      const existing = await prisma.tempChannelLobby.findFirst({ where: { guildId: g, lobbyChannelId: lobby } });
+      if (!existing) {
+        await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a Squad", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s Squad", userLimit: 5, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000), gameChoices } });
+      } else if (!Array.isArray(existing.gameChoices) || existing.gameChoices.length === 0) {
+        await prisma.tempChannelLobby.update({ where: { id: existing.id }, data: { gameChoices } });
       }
     }],
     ["Stats", async () => {

@@ -5,3 +5,4 @@ export * from "./matchTexts";
 export * from "./rankGroups";
 
 export * from "./serverBlueprint";
+export * from "./tempGames";

@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
+import { prisma, Prisma } from "@spartacus/db";
+import { cleanTempGameChoices } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -11,7 +12,7 @@ router.get("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildPe
 });
 
 router.post("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, lobbyChannelId, categoryId, nameFormat, userLimit, bitrate, deleteAfterEmptySec, pairTextChannel, hideTextFromNonMembers } =
+  const { name, lobbyChannelId, categoryId, nameFormat, userLimit, bitrate, deleteAfterEmptySec, pairTextChannel, hideTextFromNonMembers, gameChoices } =
     req.body;
   const row = await prisma.tempChannelLobby.create({
     data: {
@@ -25,13 +26,16 @@ router.post("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildP
       deleteAfterEmptySec,
       pairTextChannel,
       hideTextFromNonMembers,
+      gameChoices: cleanTempGameChoices(gameChoices) as unknown as Prisma.InputJsonValue,
     },
   });
   res.status(201).json(row);
 });
 
 router.put("/guilds/:guildId/temp-channels/lobbies/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const row = await prisma.tempChannelLobby.update({ where: { id: req.params.id }, data: req.body });
+  const data = { ...req.body };
+  if ("gameChoices" in data) data.gameChoices = cleanTempGameChoices(data.gameChoices);
+  const row = await prisma.tempChannelLobby.update({ where: { id: req.params.id }, data });
   res.json(row);
 });
 

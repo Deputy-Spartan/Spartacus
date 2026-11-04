@@ -22,7 +22,7 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if ((interaction.isButton() || interaction.isModalSubmit()) && /^tvcm?:/.test(interaction.customId)) {
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^tvcm?:/.test(interaction.customId)) {
     const { handleTempChannelControl } = await import("../modules/community/tempChannelControls");
     await handleTempChannelControl(interaction);
     return;

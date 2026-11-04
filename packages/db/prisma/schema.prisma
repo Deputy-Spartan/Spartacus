@@ -613,6 +613,7 @@ model TempChannelLobby {
   deleteAfterEmptySec Int  @default(0)
   pairTextChannel  Boolean @default(false)
   hideTextFromNonMembers Boolean @default(true)
+  gameChoices      Json    @default("[]") // [{ label, emoji, nameFormat, userLimit }]: the "What are you playing?" menu
 
   @@index([guildId])
 }

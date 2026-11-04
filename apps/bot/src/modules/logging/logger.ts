@@ -21,6 +21,8 @@ import {
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
+import { claimEvent, sweepEventClaims } from "../../lib/eventClaims";
+import { createHash } from "node:crypto";
 import type { LoggingConfig } from "@spartacus/db";
 
 const LOG_COLOR = 0x00e5ff;
@@ -45,8 +47,21 @@ function isIgnoredChannel(config: LoggingConfig, channelId: string | null | unde
   return ignored.includes(channelId);
 }
 
+// During a deploy the old and new bot both run for a moment and both see
+// every event, which posted log lines twice (like an invite logged twice).
+// Whichever copy claims a line first posts it; the claim is keyed on what the
+// line says, per 15 seconds, so the same event is only posted once.
+async function firstToPost(channelId: string, embed: EmbedBuilder) {
+  const text = embed.data.description ?? JSON.stringify(embed.data.fields ?? []);
+  const hash = createHash("sha1").update(text).digest("hex").slice(0, 16);
+  void sweepEventClaims();
+  return claimEvent(`log:${channelId}:${hash}:${Math.floor(Date.now() / 15_000)}`).catch(() => true);
+}
+
 async function send(channel: SendableChannels | null | undefined, embed: EmbedBuilder) {
-  await channel?.send({ embeds: [embed] }).catch(() => null);
+  if (!channel) return;
+  if (!(await firstToPost(channel.id, embed))) return;
+  await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => null);
 }
 
 function baseEmbed(_config: LoggingConfig, color = LOG_COLOR) {
@@ -290,7 +305,7 @@ export async function onChannelUpdate(oldChannel: Channel, newChannel: Channel) 
   if (isIgnoredChannel(result.config, newChannel.id)) return;
   const by = await changedBy(guild, newChannel.id);
   const lines = [`📺 Channel updated: <#${newChannel.id}>${by ? ` by <@${by}>` : ""}`, ...changes];
-  await result.channel.send({ embeds: [baseEmbed(result.config).setDescription(lines.join("\n").slice(0, 4096))], allowedMentions: { parse: [] } }).catch(() => null);
+  await send(result.channel, baseEmbed(result.config).setDescription(lines.join("\n").slice(0, 4096)));
 }
 
 // ---- Invites ----

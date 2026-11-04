@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardTextProvider } from "../../../components/ui/EditableText";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "../../../components/nav/Sidebar";
@@ -76,6 +77,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <DashboardTextProvider isOwner={isOwner}>
     <ConfirmProvider>
       <div className="min-h-screen bg-base-950">
         <CommandPalette guildId={params.guildId} />
@@ -104,5 +106,6 @@ export default function DashboardLayout({
         </div>
       </div>
     </ConfirmProvider>
+    </DashboardTextProvider>
   );
 }

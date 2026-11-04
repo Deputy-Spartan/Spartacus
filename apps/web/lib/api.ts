@@ -1582,6 +1582,9 @@ export const api = {
     request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean; owner: boolean }>>("/guilds"),
 
   getAccessStatus: () => request<AccessStatus>("/access-status"),
+  getDashboardTexts: () => request<Record<string, string>>("/dashboard-texts"),
+  setDashboardText: (key: string, text: string) =>
+    request<{ key: string; text: string | null }>(`/dashboard-texts/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ text }) }),
   requestAccess: (message?: string) =>
     request<AccessRequestRow>("/access-requests", { method: "POST", body: JSON.stringify({ message }) }),
   getAccessRequests: () => request<AccessRequestRow[]>("/access-requests"),

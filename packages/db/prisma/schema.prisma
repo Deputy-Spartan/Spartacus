@@ -2551,3 +2551,10 @@ model MatchRoom {
   @@index([guildId, status])
   @@index([status, expiresAt])
 }
+
+// The owner's wording for dashboard explanation text, keyed by where it shows.
+model DashboardText {
+  key       String   @id
+  text      String
+  updatedAt DateTime @updatedAt
+}

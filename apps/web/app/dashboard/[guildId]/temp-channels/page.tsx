@@ -11,6 +11,7 @@ import { api, type DiscordChannelOption, type TempChannelLobbyRow } from "../../
 import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI, TEMP_GUIDE_DEFAULT, blueprintGameChoices, fillTempName, type TempGameChoice } from "@spartacus/shared";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
+import { EditableText } from "../../../../components/ui/EditableText";
 
 type Tab = "active" | "create";
 
@@ -75,27 +76,37 @@ function NameFormatField({ value, onChange }: { value: string; onChange: (next: 
 // asks the creator what they're playing and renames it for that game.
 function NamingMode({ gamePicker, onChange }: { gamePicker: boolean; onChange: (gamePicker: boolean) => void }) {
   const modes = [
-    { on: false, title: "Name Format", desc: "Channels are named from the Channel Name Format above, like Kuro's Channel. No menu." },
-    { on: true, title: "Game Picker", desc: 'Same start, then the creator gets a "What are you playing?" menu that renames it for their game, like 🟧 R6 Squad 1.' },
+    { on: false, id: "nameformat", title: "Name Format", desc: "Channels are named from the Channel Name Format above, like Kuro's Channel. No menu." },
+    { on: true, id: "gamepicker", title: "Game Picker", desc: 'Same start, then the creator gets a "What are you playing?" menu that renames it for their game, like 🟧 R6 Squad 1.' },
   ];
   return (
     <div>
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">How New Channels Get Named</label>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {modes.map((m) => (
-          <button
+          <div
             key={m.title}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onChange(m.on)}
+            onKeyDown={(e) => {
+              if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                onChange(m.on);
+              }
+            }}
             aria-pressed={gamePicker === m.on}
             className={[
+              "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon-blue",
               "text-left rounded-lg border p-3 transition-colors",
               gamePicker === m.on ? "border-neon-blue bg-neon-blue/10" : "border-white/10 bg-base-950 hover:border-white/20",
             ].join(" ")}
           >
             <p className="text-sm font-medium">{m.title}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{m.desc}</p>
-          </button>
+            <p className="text-xs text-slate-500 mt-0.5">
+              <EditableText id={`temp.naming.${m.id}.desc`}>{m.desc}</EditableText>
+            </p>
+          </div>
         ))}
       </div>
     </div>
@@ -189,14 +200,18 @@ function GameChoicesField({ guildId, value, onChange }: { guildId: string; value
 }
 
 // One numbered step of the lobby setup.
-function Step({ n, title, desc, children }: { n: number; title: string; desc: string; children: React.ReactNode }) {
+function Step({ id, n, title, desc, children }: { id: string; n: number; title: string; desc: string; children: React.ReactNode }) {
   return (
     <section className="rounded-lg border border-white/10 bg-base-950/40 p-4">
       <div className="flex gap-3 mb-3">
         <span className="w-6 h-6 shrink-0 rounded-full bg-base-800 text-xs flex items-center justify-center text-neon-blue">{n}</span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold">{title}</p>
-          <p className="text-xs text-slate-500">{desc}</p>
+          <p className="text-sm font-semibold">
+            <EditableText id={`temp.step.${id}.title`}>{title}</EditableText>
+          </p>
+          <p className="text-xs text-slate-500">
+            <EditableText id={`temp.step.${id}.desc`}>{desc}</EditableText>
+          </p>
         </div>
       </div>
       <div className="space-y-4">{children}</div>
@@ -244,7 +259,9 @@ function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string;
       <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
         <div>
           <p className="text-sm font-medium">Show the ❓ How it works Button</p>
-          <p className="text-xs text-slate-500">On the panel and in every squad channel's chat. It shows this guide privately to whoever taps it.</p>
+          <p className="text-xs text-slate-500">
+            <EditableText id="temp.guide.button.desc">{"On the panel and in every squad channel's chat. It shows this guide privately to whoever taps it."}</EditableText>
+          </p>
         </div>
         <ToggleSwitch enabled={value.guideButton !== false} onChange={(guideButton) => onChange({ guideButton })} label="Show the How it works button" />
       </div>
@@ -283,26 +300,36 @@ function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string;
 function ControlsWhere({ guildId, value, onChange }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void }) {
   const thread = value.controlsWhere === "THREAD";
   const modes = [
-    { key: "VOICE" as const, title: "Voice Channel Chat", desc: "In the squad channel's own chat, the 💬 next to its name. Anyone in the channel sees them." },
-    { key: "THREAD" as const, title: "Private Thread", desc: "A private thread in a text channel you pick. Only the creator is added, and it's deleted with the squad." },
+    { key: "VOICE" as const, id: "voice", title: "Voice Channel Chat", desc: "In the squad channel's own chat, the 💬 next to its name. Anyone in the channel sees them." },
+    { key: "THREAD" as const, id: "thread", title: "Private Thread", desc: "A private thread in a text channel you pick. Only the creator is added, and it's deleted with the squad." },
   ];
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {modes.map((m) => (
-          <button
+          <div
             key={m.key}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onChange({ controlsWhere: m.key })}
+            onKeyDown={(e) => {
+              if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                onChange({ controlsWhere: m.key });
+              }
+            }}
             aria-pressed={(value.controlsWhere ?? "VOICE") === m.key}
             className={[
+              "cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-neon-blue",
               "text-left rounded-lg border p-3 transition-colors",
               (value.controlsWhere ?? "VOICE") === m.key ? "border-neon-blue bg-neon-blue/10" : "border-white/10 bg-base-950 hover:border-white/20",
             ].join(" ")}
           >
             <p className="text-sm font-medium">{m.title}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{m.desc}</p>
-          </button>
+            <p className="text-xs text-slate-500 mt-0.5">
+              <EditableText id={`temp.controls.${m.id}.desc`}>{m.desc}</EditableText>
+            </p>
+          </div>
         ))}
       </div>
       {thread && (
@@ -337,7 +364,7 @@ function LobbyFields({
 }) {
   return (
     <div className="space-y-3">
-      <Step n={1} title="Join to Create" desc="The original way in: members join this voice channel and get their own channel, then get moved into it.">
+      <Step id="join" n={1} title="Join to Create" desc="The original way in: members join this voice channel and get their own channel, then get moved into it.">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={label}>Lobby Voice Channel</label>
@@ -350,7 +377,7 @@ function LobbyFields({
         </div>
       </Step>
 
-      <Step n={2} title="Channel Settings" desc="Every new channel starts with these, whichever way it was made.">
+      <Step id="settings" n={2} title="Channel Settings" desc="Every new channel starts with these, whichever way it was made.">
         <NameFormatField value={value.nameFormat ?? ""} onChange={(v) => onChange({ nameFormat: v })} />
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
@@ -378,11 +405,11 @@ function LobbyFields({
         </div>
       </Step>
 
-      <Step n={3} title="Controls" desc="Where each squad's Lock, Rename, Limit and game menu go.">
+      <Step id="controls" n={3} title="Controls" desc="Where each squad's Lock, Rename, Limit and game menu go.">
         <ControlsWhere guildId={guildId} value={value} onChange={onChange} />
       </Step>
 
-      <Step n={4} title="Naming" desc="Keep the Name Format, or let people pick their game to name the channel.">
+      <Step id="naming" n={4} title="Naming" desc="Keep the Name Format, or let people pick their game to name the channel.">
         <NamingMode
           gamePicker={!!value.gamePicker}
           onChange={(gamePicker) => {
@@ -393,15 +420,16 @@ function LobbyFields({
         />
       </Step>
 
-      <Step n={5} title="Games" desc="The games people can pick, in the channel's menu and on the panel.">
+      <Step id="games" n={5} title="Games" desc="The games people can pick, in the channel's menu and on the panel.">
         {value.gamePicker ? (
           <>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
               <div>
                 <p className="text-sm font-medium">Group Squads by Game</p>
                 <p className="text-xs text-slate-500">
-                  Squads go in a category for their game, like 🟧 Rainbow Six Siege, so everyone can see who's playing what. The category is made with
-                  the first squad and deleted when its last squad empties. It copies the Spawn Category's access.
+                  <EditableText id="temp.games.group.desc">
+                    {"Squads go in a category for their game, like 🟧 Rainbow Six Siege, so everyone can see who's playing what. The category is made with the first squad and deleted when its last squad empties. It copies the Spawn Category's access."}
+                  </EditableText>
                 </p>
               </div>
               <ToggleSwitch enabled={!!value.gameCategories} onChange={(gameCategories) => onChange({ gameCategories })} label="Group squads by game" />
@@ -414,6 +442,7 @@ function LobbyFields({
       </Step>
 
       <Step
+        id="panel"
         n={6}
         title="Create Panel (optional)"
         desc="The text channel way in: an embed with a game dropdown. Picking a game makes the voice channel, named for that game and in its category. Works alongside step 1."
@@ -465,7 +494,7 @@ function LobbyFields({
         )}
       </Step>
 
-      <Step n={7} title="How It Works Guide" desc="A step-by-step guide for members: both ways to make a channel, the game menu, and what each button does.">
+      <Step id="guide" n={7} title="How It Works Guide" desc="A step-by-step guide for members: both ways to make a channel, the game menu, and what each button does.">
         <GuideFields guildId={guildId} value={value} onChange={onChange} lobbyName={lobbyName} />
       </Step>
     </div>

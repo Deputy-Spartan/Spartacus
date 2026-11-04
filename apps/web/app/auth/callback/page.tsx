@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { setToken, api } from "../../../lib/api";
+import { rememberLastUser } from "../../../lib/lastUser";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -15,6 +16,8 @@ export default function AuthCallbackPage() {
       return;
     }
     setToken(match[1]);
+    // For the login page next time: "Welcome back" with their avatar.
+    api.getMe().then(rememberLastUser).catch(() => null);
 
     api
       .getAccessStatus()

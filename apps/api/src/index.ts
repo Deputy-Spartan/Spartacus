@@ -14,6 +14,7 @@ import { logError } from "@spartacus/db";
 import { setBotClient } from "./lib/botClient";
 
 import healthRouter from "./routes/health";
+import publicStatsRouter from "./routes/publicStats";
 import matchesRouter from "./routes/matches";
 import activityRouter from "./routes/activity";
 import authRouter from "./routes/auth";
@@ -120,6 +121,7 @@ app.use(cookieParser());
 // Mounted before any auth middleware — must stay public so external
 // monitors (UptimeRobot etc.) can hit it without credentials.
 app.use(healthRouter);
+app.use(publicStatsRouter);
 app.use(activityRouter);
 
 app.use(authRouter);

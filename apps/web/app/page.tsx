@@ -1,33 +1,246 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { forgetLastUser, readLastUser, type LastUser } from "../lib/lastUser";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+// The six things Spartacus does, each opening into what it means.
+const FEATURES: Array<{ icon: string; title: string; short: string; details: string[] }> = [
+  {
+    icon: "🛡️",
+    title: "Moderation & Automod",
+    short: "Keep chat clean without watching it all day.",
+    details: [
+      "Automod for spam, links, caps, mass mentions and bad words, with warnings that escalate on their own.",
+      "Anti-raid lockdown, anti-nuke protection and AI moderation for the stuff filters miss.",
+      "Every action lands in a case log, with appeals your members can send from their DMs.",
+    ],
+  },
+  {
+    icon: "⚔️",
+    title: "Matchmaking & leaderboards",
+    short: "Queues, matches and rankings for your games.",
+    details: [
+      "1v1s, pickups and team matches with queues members join from a button.",
+      "Results are reported and confirmed in Discord, and feed a live leaderboard per game.",
+      "Teams, captains, tournaments and a Looking for a Team board.",
+    ],
+  },
+  {
+    icon: "🔊",
+    title: "Temp squad channels",
+    short: "Voice channels that appear when needed, gone when empty.",
+    details: [
+      "Join a lobby or pick a game from a panel to get your own squad channel.",
+      "Squads are grouped into a category per game, and named from your settings.",
+      "Owners can lock, rename and set the user limit from buttons, in the channel or a private thread.",
+    ],
+  },
+  {
+    icon: "🔴",
+    title: "Going-live alerts",
+    short: "Tell the server when your streamers go live.",
+    details: [
+      "Twitch, YouTube, Kick and TikTok are checked automatically. /golive covers every other site.",
+      "Alerts show the title, game, viewers and a live preview, and update while they stream.",
+      "Streamers get a Live Now role, and the alert becomes a summary when they stop.",
+    ],
+  },
+  {
+    icon: "🎭",
+    title: "Roles, rules & verification",
+    short: "Get new members in, set up and safe.",
+    details: [
+      "Role pickers with buttons, dropdowns or reactions, and a Role Manager for bulk and timed roles.",
+      "A rules gate with an I Agree button, and verification with account-age checks and a captcha.",
+      "Welcome messages, onboarding and join roles, all set up step by step.",
+    ],
+  },
+  {
+    icon: "📊",
+    title: "Live stats & logs",
+    short: "See what's happening at a glance.",
+    details: [
+      "Stat channels for member counts, plus growth, voice and suggestion analytics.",
+      "A full server log: messages, members, roles, channels and moves, without the noise.",
+      "Bump reminders, a status channel and a weekly staff report.",
+    ],
+  },
+];
+
+function useServerCount() {
+  const [stats, setStats] = useState<{ servers: number; members: number; botAvatar: string | null } | null>(null);
+  useEffect(() => {
+    fetch(`${API_URL}/public/stats`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j && setStats(j))
+      .catch(() => null);
+  }, []);
+  return stats;
+}
+
+const compact = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
+
+function Helmet({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+      <defs>
+        <linearGradient id="spartacusHelm" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#9fb6d3" />
+          <stop offset="1" stopColor="#5e7fa6" />
+        </linearGradient>
+      </defs>
+      <path d="M32 4c-7 0-12 3-15 8l-4 9c-2 5-2 11 0 17l3 10c1 4 4 7 8 8l4 1V40h8v17l4-1c4-1 7-4 8-8l3-10c2-6 2-12 0-17l-4-9c-3-5-8-8-15-8z" fill="url(#spartacusHelm)" />
+      <path d="M24 30h16v8H24z" fill="#1c1d20" opacity=".85" />
+      <path d="M30 4h4v26h-4z" fill="#d9e3ef" opacity=".55" />
+    </svg>
+  );
+}
+
+function DiscordLogo() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+      <path
+        fill="currentColor"
+        d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.2a18.3 18.3 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.4C.6 9 0 13.6.3 18.1a19.9 19.9 0 0 0 6 3l1.3-2a13 13 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 11.8 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.8 19.8 0 0 0 6-3c.4-5.3-.7-9.8-3.4-13.7zM8.5 15.4c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4zm7 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4z"
+      />
+    </svg>
+  );
+}
 
 function LandingContent() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
   const params = useSearchParams();
   const expired = params.get("expired") === "1";
   const idle = params.get("idle") === "1";
   const signinFailed = params.get("error") === "signin";
+  const stats = useServerCount();
+  const [open, setOpen] = useState<number | null>(null);
+  const [lastUser, setLastUser] = useState<LastUser | null>(null);
+  const [going, setGoing] = useState(false);
+
+  useEffect(() => setLastUser(readLastUser()), []);
+
+  const notice = idle
+    ? "You were signed out after 30 minutes of inactivity."
+    : signinFailed
+      ? "Sign-in didn't go through — the dashboard couldn't reach the server after Discord authorized you. Check your connection and try again."
+      : expired
+        ? "Your session expired — please sign in again."
+        : null;
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-base-950 text-center px-6">
-      <h1 className="text-4xl font-bold bg-neon-gradient bg-clip-text text-transparent mb-3">Spartacus</h1>
-      <p className="text-slate-400 max-w-md mb-8">
-        Community management, stream alerts, and event coordination — unified in one dashboard.
-      </p>
-      {(expired || idle || signinFailed) && (
-        <p className="text-amber-400 text-sm bg-amber-500/10 border border-amber-500/20 rounded-lg px-4 py-2 mb-6 max-w-sm">
-          {idle
-            ? "You were signed out after 30 minutes of inactivity."
-            : signinFailed
-            ? "Sign-in didn't go through — the dashboard couldn't reach the server after Discord authorized you. Check your connection and try again."
-            : "Your session expired — please sign in again."}
-        </p>
-      )}
-      <a href={`${apiUrl}/auth/discord`} className="neon-button">
-        Log in with Discord
-      </a>
+    <main className="min-h-screen bg-base-950 text-slate-100 grid lg:grid-cols-[1.15fr_1fr]">
+      {/* Left: what Spartacus does */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#23262c] to-[#141518] px-6 py-10 sm:px-12 lg:py-14 flex flex-col">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(123,153,188,0.32),transparent_65%)]" />
+        <div className="relative flex items-center gap-2.5">
+          <Helmet className="h-9 w-9" />
+          <span className="text-xl font-extrabold tracking-tight">Spartacus</span>
+        </div>
+        <h1 className="relative mt-10 text-3xl sm:text-4xl font-extrabold leading-tight max-w-xl">Run your gaming community from one dashboard.</h1>
+        <p className="relative mt-3 text-slate-400 max-w-md">Everything your server needs, set up in minutes and managed in one place. Tap a box to see what it does.</p>
+
+        <div className="relative mt-8 grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-2xl">
+          {FEATURES.map((f, i) => {
+            const isOpen = open === i;
+            return (
+              <button
+                key={f.title}
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() => setOpen(isOpen ? null : i)}
+                className={`group text-left rounded-xl border px-4 py-3 transition-all duration-200 ${
+                  isOpen ? "sm:col-span-2 border-neon-blue/50 bg-neon-blue/10 shadow-[0_8px_30px_rgba(94,127,166,0.25)]" : "border-white/[0.07] bg-white/[0.03] hover:border-neon-blue/40 hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <span className="text-xl transition-transform duration-200 group-hover:scale-110">{f.icon}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-semibold">{f.title}</span>
+                    <span className="block text-xs text-slate-400">{f.short}</span>
+                  </span>
+                  <span className={`text-slate-500 text-xs transition-transform duration-200 ${isOpen ? "rotate-180 text-neon-blue" : ""}`}>▼</span>
+                </span>
+                <span className={`grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
+                  <span className="overflow-hidden">
+                    <span className="block space-y-1.5 border-t border-white/10 pt-3">
+                      {f.details.map((d) => (
+                        <span key={d} className="flex gap-2 text-[13px] text-slate-300">
+                          <span className="text-neon-blue">✓</span>
+                          {d}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative mt-auto pt-10 flex gap-8">
+          <div>
+            <p className="text-2xl font-extrabold text-[#9fb6d3]">{stats ? compact(stats.servers) : "…"}</p>
+            <p className="text-xs text-slate-500">{stats?.servers === 1 ? "server" : "servers"} right now</p>
+          </div>
+          <div>
+            <p className="text-2xl font-extrabold text-[#9fb6d3]">{stats ? compact(stats.members) : "…"}</p>
+            <p className="text-xs text-slate-500">members looked after</p>
+          </div>
+          <div>
+            <p className="text-2xl font-extrabold text-[#9fb6d3]">27</p>
+            <p className="text-xs text-slate-500">modules</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Right: sign in */}
+      <section className="relative flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-base-900 p-7 shadow-[0_20px_60px_rgba(0,0,0,0.4)] text-center">
+          {lastUser?.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={lastUser.avatarUrl} alt="" className="mx-auto h-16 w-16 rounded-full ring-2 ring-neon-blue/40" />
+          ) : stats?.botAvatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={stats.botAvatar} alt="" className="mx-auto h-16 w-16 rounded-full ring-2 ring-white/10" />
+          ) : (
+            <Helmet className="mx-auto h-14 w-14" />
+          )}
+          <h2 className="mt-4 text-xl font-bold">{lastUser ? `Welcome back, ${lastUser.name}` : "Welcome"}</h2>
+          <p className="mt-1 text-sm text-slate-400">Sign in with the Discord account that manages your server.</p>
+          {notice && <p className="mt-4 text-amber-300 text-sm bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">{notice}</p>}
+          <a
+            href={`${API_URL}/auth/discord`}
+            onClick={() => setGoing(true)}
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#5865F2] px-4 py-3 font-semibold text-white shadow-[0_8px_22px_rgba(88,101,242,0.35)] transition hover:-translate-y-0.5 hover:bg-[#4752C4] hover:shadow-[0_12px_28px_rgba(88,101,242,0.45)]"
+          >
+            {going ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Opening Discord…
+              </>
+            ) : (
+              <>
+                <DiscordLogo /> {lastUser ? `Continue as ${lastUser.name}` : "Log in with Discord"}
+              </>
+            )}
+          </a>
+          {lastUser && (
+            <button
+              type="button"
+              onClick={() => {
+                forgetLastUser();
+                setLastUser(null);
+              }}
+              className="mt-3 text-xs text-slate-500 hover:text-slate-300"
+            >
+              Not you? Use a different account
+            </button>
+          )}
+        </div>
+        <p className="absolute bottom-5 text-[11px] text-slate-600">Spartacus · Discord sign-in only, no password stored</p>
+      </section>
     </main>
   );
 }

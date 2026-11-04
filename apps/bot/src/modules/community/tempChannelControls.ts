@@ -30,7 +30,8 @@ export function menuOption(g: TempGameChoice, i: number) {
 // The Lock, Rename and Limit buttons posted in a squad channel's own chat,
 // with a "What are you playing?" menu when the lobby lists games.
 // Only the person who made the channel can use them.
-export function tempChannelControls(channelId: string, games: TempGameChoice[] = [], ownerId?: string) {
+// With `picked`, the game was already chosen on the panel, so there is no menu.
+export function tempChannelControls(channelId: string, games: TempGameChoice[] = [], ownerId?: string, picked?: TempGameChoice) {
   const menu = games.length
     ? [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -45,7 +46,9 @@ export function tempChannelControls(channelId: string, games: TempGameChoice[] =
       ]
     : [];
   return {
-    content: games.length
+    content: picked
+      ? `${ownerId ? `<@${ownerId}> ` : ""}🔊 This is your **${picked.label}** squad channel. It's deleted when everyone leaves.`
+      : games.length
       ? `${ownerId ? `<@${ownerId}> ` : ""}🔊 This is your squad channel. Pick what you're playing to name it. It's deleted when everyone leaves.`
       : "🔊 This is your squad channel. It's deleted when everyone leaves.",
     allowedMentions: { users: ownerId ? [ownerId] : [] },

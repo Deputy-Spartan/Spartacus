@@ -46,7 +46,9 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
   }
 
   if (member.voice.channelId) await member.voice.setChannel(created.id).catch(() => null);
-  await created.send(tempChannelControls(created.id, lobby.gamePicker ? cleanTempGameChoices(lobby.gameChoices) : [], member.id)).catch(() => null);
+  // A game picked on the panel already named the channel, so it skips the game menu.
+  const games = lobby.gamePicker && !game ? cleanTempGameChoices(lobby.gameChoices) : [];
+  await created.send(tempChannelControls(created.id, games, member.id, game)).catch(() => null);
 
   let textChannelId: string | undefined;
   if (lobby.pairTextChannel) {

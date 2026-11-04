@@ -1,5 +1,6 @@
 import type { TempGameChoice, TextOverrides } from "@spartacus/shared";
 import type { EmbedExtra } from "./embedExtra";
+import { cacheable, cachedGet, clearApiCache, forgetArea } from "./apiCache";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const TOKEN_KEY = "spartacus_token";
@@ -10,14 +11,28 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string) {
+  clearApiCache();
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearToken() {
+  clearApiCache();
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Loads go through the shared memory in apiCache, so pages you've opened show
+// their values straight away. Saves, creates and deletes go straight to the
+// API and make the memory forget that part of the dashboard.
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method === "GET" && cacheable(path)) return cachedGet<T>(path, () => send(path, init).then((res) => res.text()));
+  const res = await send(path, init);
+  if (method !== "GET") forgetArea(path);
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -46,8 +61,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => null);
     throw new Error((body && typeof body.error === "string" && body.error) || `API ${path} failed: ${res.status}`);
   }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  return res;
 }
 
 // Separate from request() because a file upload must let the browser set

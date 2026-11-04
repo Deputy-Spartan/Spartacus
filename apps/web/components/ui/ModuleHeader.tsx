@@ -34,8 +34,17 @@ export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleH
         <p className="text-slate-400">{typeof description === "string" ? <EditableText id={`module.${moduleKey}.description`}>{description}</EditableText> : description}</p>
       </div>
       <div className="flex items-center gap-3 shrink-0 bg-base-900 border border-white/5 rounded-lg px-3 py-2">
-        <span className="text-xs text-slate-400">{enabled ? "Enabled" : "Disabled"}</span>
-        <ToggleSwitch enabled={enabled ?? false} onChange={toggle} label={`Toggle ${title}`} disabled={enabled === null} />
+        {enabled === null ? (
+          <>
+            <span className="h-3 w-14 animate-pulse rounded bg-white/5" />
+            <span className="h-6 w-11 animate-pulse rounded-full bg-white/5" aria-label="Loading" />
+          </>
+        ) : (
+          <>
+            <span className="text-xs text-slate-400">{enabled ? "Enabled" : "Disabled"}</span>
+            <ToggleSwitch enabled={enabled} onChange={toggle} label={`Toggle ${title}`} />
+          </>
+        )}
       </div>
     </div>
   );

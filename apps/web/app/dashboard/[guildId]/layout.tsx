@@ -10,6 +10,8 @@ import { PageGuideButton } from "../../../components/nav/PageGuideButton";
 import { ConfirmProvider } from "../../../components/ui/ConfirmDialog";
 import { api, clearToken, type CurrentUser } from "../../../lib/api";
 import { useIdleLogout } from "../../../lib/useIdleLogout";
+import { PageGate } from "../../../components/nav/PageGate";
+import { preloadGuild } from "../../../lib/prefetch";
 
 export default function DashboardLayout({
   children,
@@ -54,6 +56,7 @@ export default function DashboardLayout({
               router.push("/dashboard");
             } else {
               setAccess("allowed");
+              preloadGuild(params.guildId);
             }
           })
           .catch(() => {
@@ -101,7 +104,7 @@ export default function DashboardLayout({
               without that side effect. */}
           <main className="p-3 sm:p-6 overflow-x-clip">
             <PageGuideButton guildId={params.guildId} />
-            {children}
+            <PageGate>{children}</PageGate>
           </main>
         </div>
       </div>

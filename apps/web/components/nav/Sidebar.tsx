@@ -7,6 +7,7 @@ import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION } 
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api, type ModuleState } from "../../lib/api";
 import { usePinnedModules } from "../../lib/usePinnedModules";
+import { hoverPrefetch } from "../../lib/prefetch";
 
 // NAV_SECTIONS/NAV_MODULE_KEYS/MODULE_KEY_TO_HREF/OWNER_NAV_SECTION now live
 // in packages/shared/navItems.ts — the bot's !setup-test-server scaffold
@@ -200,6 +201,7 @@ export function Sidebar({
                             key={rawHref}
                             href={href}
                             onClick={onNavigate}
+                            {...hoverPrefetch(guildId, href)}
                             className={[
                               "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                               active
@@ -228,7 +230,7 @@ export function Sidebar({
                     // selected (i.e. the plain All Categories view).
                     const active = pathname === href && (item.href !== "/modules" || !activeSection);
                     const moduleKey = NAV_MODULE_KEYS[item.href];
-                    const enabled = moduleKey ? (modules?.[moduleKey]?.enabled ?? false) : null;
+                    const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
                     const pinned = isPinned(item.href);
                     return (
                       <div
@@ -248,7 +250,7 @@ export function Sidebar({
                             active ? "h-5 opacity-100" : "h-0 opacity-0"
                           }`}
                         />
-                        <Link href={href} onClick={onNavigate} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
+                        <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
                           <span>{item.icon}</span>
                           <span className="flex-1 min-w-0 truncate">{item.label}</span>
                           {enabled !== null && (

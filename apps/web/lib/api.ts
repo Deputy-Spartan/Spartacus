@@ -784,6 +784,8 @@ export interface TempChannelLobbyRow {
   panelTitle: string;
   panelText: string;
   panelColor: number;
+  controlsWhere: "VOICE" | "THREAD";
+  controlsChannelId: string | null;
   guideButton: boolean;
   panelGuide: string | null;
   gameChoices: TempGameChoice[];

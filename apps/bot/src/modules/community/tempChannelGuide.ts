@@ -12,6 +12,12 @@ export function tempGuideEmbed(guild: Guild, lobby: TempChannelLobby) {
   const text = (lobby.panelGuide || TEMP_GUIDE_DEFAULT)
     .replace(/{lobby}/g, link(lobby.lobbyChannelId, "the Create a Squad voice channel"))
     .replace(/{panel}/g, link(lobby.panelChannelId, "the Create a Squad panel"))
+    .replace(
+      /{controls}/g,
+      lobby.controlsWhere === "THREAD" && lobby.controlsChannelId
+        ? `your private squad thread in ${link(lobby.controlsChannelId, "the squad threads channel")}, which only you are added to`
+        : "your voice channel's chat (the 💬 next to the channel name)",
+    )
     .replace(/<#(\d+)>/g, (m, id) => link(id, m));
   return new EmbedBuilder().setColor(lobby.panelColor).setTitle("❓ How Squad Channels Work").setDescription(text.slice(0, 4096));
 }

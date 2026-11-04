@@ -103,10 +103,12 @@ export async function handleTempPanel(interaction: StringSelectMenuInteraction |
     // Removed if nobody is in it once the join window is up.
     await scheduleEmptyCheck(guild, squad.id, Math.max(JOIN_WINDOW_SEC, lobby.deleteAfterEmptySec));
     const where = squad.parent ? ` in **${squad.parent.name}**` : "";
+    const made = await prisma.tempChannelInstance.findFirst({ where: { channelId: squad.id } });
+    const controls = made?.controlsThreadId ? ` Your buttons are in [your squad thread](https://discord.com/channels/${guild.id}/${made.controlsThreadId}).` : "";
     await interaction.editReply(
-      inVoice
+      (inVoice
         ? `🎮 Made ${link(guild.id, squad.id, squad.name)}${where} and moved you in.`
-        : `🎮 Made ${link(guild.id, squad.id, squad.name)}${where}. Join it within 2 minutes, or it's removed.`,
+        : `🎮 Made ${link(guild.id, squad.id, squad.name)}${where}. Join it within 2 minutes, or it's removed.`) + controls,
     );
   } catch (err) {
     logError("bot", err, interaction.guildId ?? undefined);

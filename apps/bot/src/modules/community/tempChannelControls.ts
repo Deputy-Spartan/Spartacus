@@ -32,7 +32,11 @@ export function menuOption(g: TempGameChoice, i: number) {
 // with a "What are you playing?" menu when the lobby lists games.
 // Only the person who made the channel can use them.
 // With `picked`, the game was already chosen on the panel, so there is no menu.
-export function tempChannelControls(channelId: string, games: TempGameChoice[] = [], ownerId?: string, picked?: TempGameChoice, guide = false) {
+// With `thread`, the controls are in a private thread instead of the voice chat.
+export function tempChannelControls(
+  channelId: string,
+  { games = [], ownerId, picked, guide = false, thread = false }: { games?: TempGameChoice[]; ownerId?: string; picked?: TempGameChoice; guide?: boolean; thread?: boolean } = {},
+) {
   const menu = games.length
     ? [
         new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
@@ -47,11 +51,7 @@ export function tempChannelControls(channelId: string, games: TempGameChoice[] =
       ]
     : [];
   return {
-    content: picked
-      ? `${ownerId ? `<@${ownerId}> ` : ""}🔊 This is your **${picked.label}** squad channel. It's deleted when everyone leaves.`
-      : games.length
-      ? `${ownerId ? `<@${ownerId}> ` : ""}🔊 This is your squad channel. Pick what you're playing to name it. It's deleted when everyone leaves.`
-      : "🔊 This is your squad channel. It's deleted when everyone leaves.",
+    content: controlsText(channelId, games, ownerId, picked, thread),
     allowedMentions: { users: ownerId ? [ownerId] : [] },
     components: [
       ...menu,
@@ -65,6 +65,14 @@ export function tempChannelControls(channelId: string, games: TempGameChoice[] =
   };
 }
 
+function controlsText(channelId: string, games: TempGameChoice[], ownerId: string | undefined, picked: TempGameChoice | undefined, thread: boolean) {
+  const what = picked ? `your **${picked.label}** squad channel` : "your squad channel";
+  const intro = thread ? `🔊 These are the controls for ${what}, <#${channelId}>.` : `🔊 This is ${what}.`;
+  const ask = !picked && games.length ? " Pick what you're playing to name it." : "";
+  const ping = ownerId && (thread || picked || games.length) ? `<@${ownerId}> ` : "";
+  return `${ping}${intro}${ask} It's deleted when everyone leaves.`;
+}
+
 // Discord allows 2 renames per channel every 10 minutes and holds any more
 // until the window opens, so stop waiting after a few seconds and say so.
 // Returns true when renamed, false when it failed, null when Discord is holding it.
@@ -72,6 +80,15 @@ async function editSoon(channel: VoiceChannel, data: { name: string; userLimit?:
   const done = channel.edit(data).then(() => true, () => false);
   return Promise.race([done, new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
 }
+// Keeps a private controls thread named after its squad. Not awaited: Discord
+// limits thread renames too, and the squad rename is what matters.
+async function renameThread(channelId: string, interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction, name: string) {
+  const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId } });
+  if (!instance?.controlsThreadId) return;
+  const thread = await interaction.guild?.channels.fetch(instance.controlsThreadId).catch(() => null);
+  if (thread?.isThread()) void thread.setName(`🔧 ${name}`.slice(0, 100)).catch(() => null);
+}
+
 const HELD = "Discord allows 2 renames every 10 minutes, so it will change once that opens up.";
 
 async function ownedChannel(interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction, channelId: string): Promise<VoiceChannel | string> {
@@ -113,6 +130,7 @@ export async function handleTempChannelControl(interaction: ButtonInteraction | 
       const member = await interaction.guild!.members.fetch(interaction.user.id).catch(() => null);
       const name = nextTempName(channel.guild, channel.parentId, game.nameFormat, member?.displayName ?? interaction.user.username, channel.id);
       const done = await editSoon(channel, { name, ...(game.userLimit ? { userLimit: game.userLimit } : {}) });
+      if (done !== false) await renameThread(channelId, interaction, name);
       const limit = game.userLimit ? ` with a ${game.userLimit}-player limit` : "";
       if (done === false) return void (await interaction.editReply("That didn't work. Spartacus may need Manage Channels here."));
       return void (await interaction.editReply(done ? `🎮 Your channel is now **${name}**${limit}.` : `🎮 Your channel will be **${name}**${limit}. ${HELD}`));
@@ -149,6 +167,7 @@ export async function handleTempChannelControl(interaction: ButtonInteraction | 
         if (!value) return void (await interaction.reply({ content: "The name can't be empty.", ephemeral: true }));
         await interaction.deferReply({ ephemeral: true });
         const done = await editSoon(channel, { name: value.slice(0, 90) });
+        if (done !== false) await renameThread(channelId, interaction, value.slice(0, 90));
         if (done === false) return void (await interaction.editReply("That didn't work. Spartacus may need Manage Channels here."));
         return void (await interaction.editReply(done ? `✏️ Renamed to **${value.slice(0, 90)}**. Discord allows 2 renames every 10 minutes.` : `✏️ It will be **${value.slice(0, 90)}**. ${HELD}`));
       }

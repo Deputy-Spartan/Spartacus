@@ -49,6 +49,8 @@ const EMPTY: Partial<TempChannelLobbyRow> = {
   panelTitle: "🔊 Create a Squad",
   panelText: "Pick the game you're playing below and Spartacus makes a voice channel for your squad.\n\nOr join {lobby} to make one straight away.",
   panelColor: 0x5865f2,
+  controlsWhere: "VOICE",
+  controlsChannelId: null,
   guideButton: true,
   panelGuide: null,
 };
@@ -235,7 +237,8 @@ function PanelPreview({ value, lobbyName }: { value: Partial<TempChannelLobbyRow
 function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void; lobbyName: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const text = value.panelGuide ?? TEMP_GUIDE_DEFAULT;
-  const preview = text.replace(/{lobby}/g, `🔊 ${lobbyName}`).replace(/{panel}/g, value.panelChannelId ? "#panel" : "the Create a Squad panel");
+  const preview = text.replace(/{lobby}/g, `🔊 ${lobbyName}`).replace(/{panel}/g, value.panelChannelId ? "#panel" : "the Create a Squad panel")
+    .replace(/{controls}/g, value.controlsWhere === "THREAD" ? "your private squad thread in #squad-threads, which only you are added to" : "your voice channel's chat (the 💬 next to the channel name)");
   return (
     <>
       <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
@@ -271,6 +274,48 @@ function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string;
             <p className="text-[11px] text-slate-500 mt-2">Only you can see this · shown to whoever taps ❓ How it works</p>
           </div>
         </>
+      )}
+    </>
+  );
+}
+
+// Where each squad's Lock, Rename and Limit buttons are posted.
+function ControlsWhere({ guildId, value, onChange }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void }) {
+  const thread = value.controlsWhere === "THREAD";
+  const modes = [
+    { key: "VOICE" as const, title: "Voice Channel Chat", desc: "In the squad channel's own chat, the 💬 next to its name. Anyone in the channel sees them." },
+    { key: "THREAD" as const, title: "Private Thread", desc: "A private thread in a text channel you pick. Only the creator is added, and it's deleted with the squad." },
+  ];
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {modes.map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => onChange({ controlsWhere: m.key })}
+            aria-pressed={(value.controlsWhere ?? "VOICE") === m.key}
+            className={[
+              "text-left rounded-lg border p-3 transition-colors",
+              (value.controlsWhere ?? "VOICE") === m.key ? "border-neon-blue bg-neon-blue/10" : "border-white/10 bg-base-950 hover:border-white/20",
+            ].join(" ")}
+          >
+            <p className="text-sm font-medium">{m.title}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{m.desc}</p>
+          </button>
+        ))}
+      </div>
+      {thread && (
+        <div>
+          <label className={label}>Thread Channel</label>
+          <ChannelSelect guildId={guildId} kind="text" value={value.controlsChannelId ?? null} onChange={(id) => onChange({ controlsChannelId: id })} placeholder="Pick a text channel" />
+          <p className="text-[11px] text-slate-500 mt-1">
+            {value.controlsChannelId
+              ? "Each squad gets a thread here named after it, like 🔧 🟧 R6 Squad 1. Members can be in this channel without seeing anyone else's threads."
+              : "Pick a channel, or the buttons stay in the voice channel chat."}{" "}
+            Spartacus needs Create Private Threads and Manage Threads there.
+          </p>
+        </div>
       )}
     </>
   );
@@ -333,7 +378,11 @@ function LobbyFields({
         </div>
       </Step>
 
-      <Step n={3} title="Naming" desc="Keep the Name Format, or let people pick their game to name the channel.">
+      <Step n={3} title="Controls" desc="Where each squad's Lock, Rename, Limit and game menu go.">
+        <ControlsWhere guildId={guildId} value={value} onChange={onChange} />
+      </Step>
+
+      <Step n={4} title="Naming" desc="Keep the Name Format, or let people pick their game to name the channel.">
         <NamingMode
           gamePicker={!!value.gamePicker}
           onChange={(gamePicker) => {
@@ -344,7 +393,7 @@ function LobbyFields({
         />
       </Step>
 
-      <Step n={4} title="Games" desc="The games people can pick, in the channel's menu and on the panel.">
+      <Step n={5} title="Games" desc="The games people can pick, in the channel's menu and on the panel.">
         {value.gamePicker ? (
           <>
             <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
@@ -360,12 +409,12 @@ function LobbyFields({
             <GameChoicesField guildId={guildId} value={value.gameChoices ?? []} onChange={(gameChoices) => onChange({ gameChoices })} />
           </>
         ) : (
-          <p className="text-xs text-slate-500">Choose Game Picker in step 3 to list games.</p>
+          <p className="text-xs text-slate-500">Choose Game Picker in step 4 to list games.</p>
         )}
       </Step>
 
       <Step
-        n={5}
+        n={6}
         title="Create Panel (optional)"
         desc="The text channel way in: an embed with a game dropdown. Picking a game makes the voice channel, named for that game and in its category. Works alongside step 1."
       >
@@ -407,7 +456,7 @@ function LobbyFields({
             <PanelPreview value={value} lobbyName={lobbyName} />
             <p className="text-[11px] text-slate-500">
               {value.gamePicker && (value.gameChoices ?? []).length
-                ? "The dropdown lists the games from step 4."
+                ? "The dropdown lists the games from step 5."
                 : "With no games listed, the panel shows one Create a Squad button."}{" "}
               Someone who isn't in voice gets 2 minutes to join their new channel before it's removed. Each person can have one squad at a time.
               Changes update the posted panel a moment after you stop typing.
@@ -416,7 +465,7 @@ function LobbyFields({
         )}
       </Step>
 
-      <Step n={6} title="How It Works Guide" desc="A step-by-step guide for members: both ways to make a channel, the game menu, and what each button does.">
+      <Step n={7} title="How It Works Guide" desc="A step-by-step guide for members: both ways to make a channel, the game menu, and what each button does.">
         <GuideFields guildId={guildId} value={value} onChange={onChange} lobbyName={lobbyName} />
       </Step>
     </div>

@@ -48,7 +48,7 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
   if (member.voice.channelId) await member.voice.setChannel(created.id).catch(() => null);
   // A game picked on the panel already named the channel, so it skips the game menu.
   const games = lobby.gamePicker && !game ? cleanTempGameChoices(lobby.gameChoices) : [];
-  await created.send(tempChannelControls(created.id, games, member.id, game, lobby.guideButton)).catch(() => null);
+  const controlsThreadId = await postControls(guild, created, lobby, member, games, game);
 
   let textChannelId: string | undefined;
   if (lobby.pairTextChannel) {
@@ -66,9 +66,31 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
   }
 
   await prisma.tempChannelInstance.create({
-    data: { guildId: guild.id, lobbyId: lobby.id, channelId: created.id, textChannelId, ownerId: member.id },
+    data: { guildId: guild.id, lobbyId: lobby.id, channelId: created.id, textChannelId, controlsThreadId, ownerId: member.id },
   });
   return created;
+}
+
+// Puts the Lock, Rename and Limit buttons in the voice channel's chat, or in
+// a private thread only the creator is added to. Falls back to the voice chat
+// if the thread can't be made. Returns the thread's id when there is one.
+async function postControls(guild: Guild, squad: VoiceChannel, lobby: TempChannelLobby, member: GuildMember, games: TempGameChoice[], picked?: TempGameChoice) {
+  const options = { games, ownerId: member.id, picked, guide: lobby.guideButton };
+  if (lobby.controlsWhere === "THREAD" && lobby.controlsChannelId) {
+    const parent = await guild.channels.fetch(lobby.controlsChannelId).catch(() => null);
+    if (parent?.type === ChannelType.GuildText) {
+      const thread = await parent.threads
+        .create({ name: `🔧 ${squad.name}`.slice(0, 100), type: ChannelType.PrivateThread, invitable: false, autoArchiveDuration: 10080 })
+        .catch(() => null);
+      if (thread) {
+        await thread.members.add(member.id).catch(() => null);
+        await thread.send(tempChannelControls(squad.id, { ...options, thread: true })).catch(() => null);
+        return thread.id;
+      }
+    }
+  }
+  await squad.send(tempChannelControls(squad.id, options)).catch(() => null);
+  return undefined;
 }
 
 async function handleJoin(state: VoiceState) {
@@ -99,9 +121,10 @@ export async function scheduleEmptyCheck(guild: Guild, channelId: string, delayS
 
       const parentId = stillEmpty?.parentId;
       await stillEmpty?.delete().catch(() => null);
-      if (instance.textChannelId) {
-        const textChannel = await guild.channels.fetch(instance.textChannelId).catch(() => null);
-        await textChannel?.delete().catch(() => null);
+      for (const id of [instance.textChannelId, instance.controlsThreadId]) {
+        if (!id) continue;
+        const extra = await guild.channels.fetch(id).catch(() => null);
+        await extra?.delete().catch(() => null);
       }
       await prisma.tempChannelInstance.delete({ where: { id: instance.id } }).catch(() => null);
       // The last squad in a game's category takes the category with it.

@@ -35,10 +35,31 @@ import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 
+export type SetupPart = "roles" | "channels" | "settings" | "modules" | "onboarding";
+
+// What a run can build, each switched on or off on the /server-setup screen.
+export const SETUP_PARTS: Array<{ id: SetupPart; emoji: string; label: string; description: string }> = [
+  { id: "roles", emoji: "🎭", label: "Roles", description: "Create, rename and sort the roles" },
+  { id: "channels", emoji: "💬", label: "Channels", description: "Categories, channels and their permissions" },
+  { id: "settings", emoji: "⚙️", label: "Server settings", description: "AFK channel, join messages, Community" },
+  { id: "modules", emoji: "🧩", label: "Modules", description: "Welcome, rules, pickers, tickets, Matchmaking and more" },
+  { id: "onboarding", emoji: "🧭", label: "Onboarding", description: "The questions new members answer" },
+];
+
 export interface SetupOptions {
   games: BlueprintGameId[];
   archiveOthers: boolean;
+  // Leaving these out builds everything.
+  parts?: SetupPart[];
+  categories?: string[];
 }
+
+export const partOn = (opts: SetupOptions, part: SetupPart) => !opts.parts || opts.parts.includes(part);
+export const categoryOn = (opts: SetupOptions, key: string) => !opts.categories || opts.categories.includes(key);
+// Old channels only move to the archive when every category is being built,
+// so channels from a category that was skipped never get swept up.
+export const archiveOn = (opts: SetupOptions) =>
+  opts.archiveOthers && partOn(opts, "channels") && blueprintCategories(opts.games).every((c) => categoryOn(opts, c.key));
 
 type ChannelMatch = { spec: BlueprintChannel; category: BlueprintCategory; existing: GuildBasedChannel | null };
 type CategoryMatch = { spec: BlueprintCategory; existing: CategoryChannel | null };
@@ -147,14 +168,16 @@ export async function planSetup(guild: Guild, opts: SetupOptions): Promise<Setup
   return { roles, categories, channels, archive, hideCategories };
 }
 
-export function summarizePlan(plan: SetupPlan) {
+// Counts what a run would change. With `opts`, only the parts and categories picked.
+export function summarizePlan(plan: SetupPlan, opts?: SetupOptions) {
   const count = <T>(list: T[], pick: (x: T) => unknown) => ({ reuse: list.filter((x) => pick(x)).length, create: list.filter((x) => !pick(x)).length });
+  const channels = !opts || partOn(opts, "channels");
   return {
-    roles: count(plan.roles, (r) => r.existing),
-    categories: count(plan.categories, (c) => c.existing),
-    channels: count(plan.channels, (c) => c.existing),
-    archive: plan.archive.length,
-    hideCategories: plan.hideCategories.length,
+    roles: count(!opts || partOn(opts, "roles") ? plan.roles : [], (r) => r.existing),
+    categories: count(channels ? plan.categories.filter((c) => !opts || categoryOn(opts, c.spec.key)) : [], (c) => c.existing),
+    channels: count(channels ? plan.channels.filter((c) => !opts || categoryOn(opts, c.category.key)) : [], (c) => c.existing),
+    archive: !opts || archiveOn(opts) ? plan.archive.length : 0,
+    hideCategories: !opts || archiveOn(opts) ? plan.hideCategories.length : 0,
   };
 }
 
@@ -237,50 +260,61 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
     throw err;
   });
 
-  // Roles, created bottom-up so the first in the list ends up highest.
-  let createdRoles = 0, renamedRoles = 0;
-  for (const { spec, existing } of [...plan.roles].reverse()) {
-    if (existing) {
-      ids.roles.set(spec.key, existing.id);
-      if (existing.name !== spec.name && existing.position < topPosition) {
-        await existing.setName(spec.name, "Server Setup").then(() => renamedRoles++, () => notes.push(`Couldn't rename the ${existing.name} role.`));
+  if (partOn(opts, "roles")) {
+    // Roles, created bottom-up so the first in the list ends up highest.
+    let createdRoles = 0, renamedRoles = 0;
+    for (const { spec, existing } of [...plan.roles].reverse()) {
+      if (existing) {
+        ids.roles.set(spec.key, existing.id);
+        if (existing.name !== spec.name && existing.position < topPosition) {
+          await existing.setName(spec.name, "Server Setup").then(() => renamedRoles++, () => notes.push(`Couldn't rename the ${existing.name} role.`));
+        }
+        continue;
       }
-      continue;
+      const role = await guild.roles
+        .create({ name: spec.name, color: spec.color || undefined, hoist: spec.hoist ?? false, permissions: PERMS[spec.perms ?? "none"], mentionable: spec.key.startsWith("ping:"), reason: "Server Setup" })
+        .catch((err) => {
+          logError("bot", err, guild.id);
+          notes.push(`Couldn't create the ${spec.name} role.`);
+          return null;
+        });
+      if (role) {
+        ids.roles.set(spec.key, role.id);
+        createdRoles++;
+      }
     }
-    const role = await guild.roles
-      .create({ name: spec.name, color: spec.color || undefined, hoist: spec.hoist ?? false, permissions: PERMS[spec.perms ?? "none"], mentionable: spec.key.startsWith("ping:"), reason: "Server Setup" })
-      .catch((err) => {
-        logError("bot", err, guild.id);
-        notes.push(`Couldn't create the ${spec.name} role.`);
-        return null;
-      });
-    if (role) {
-      ids.roles.set(spec.key, role.id);
-      createdRoles++;
-    }
-  }
-  await step(`🎭 Roles: ${createdRoles} new, ${renamedRoles} renamed, ${plan.roles.length - createdRoles - renamedRoles} already right`);
+    await step(`🎭 Roles: ${createdRoles} new, ${renamedRoles} renamed, ${plan.roles.length - createdRoles - renamedRoles} already right`);
 
-  // New roles land at the bottom in whatever order Discord gives them, so
-  // put them in the blueprint's order: Admin highest, ping roles lowest,
-  // all under Spartacus's own role. Roles above Spartacus can't be moved.
-  const ordered = plan.roles
-    .map(({ spec }) => guild.roles.cache.get(ids.roles.get(spec.key) ?? ""))
-    .filter((r): r is Role => !!r && !!me && me.roles.highest.comparePositionTo(r) > 0);
-  if (ordered.length > 1) {
-    const sorted = await guild.roles
-      .setPositions(ordered.map((role, i) => ({ role, position: ordered.length - i })))
-      .then(() => true, (err) => {
-        logError("bot", err, guild.id);
-        return false;
-      });
-    if (!sorted) notes.push("Couldn't sort the roles. Move Spartacus's role to the top in Server Settings → Roles, then run this again.");
+    // New roles land at the bottom in whatever order Discord gives them, so
+    // put them in the blueprint's order: Admin highest, ping roles lowest,
+    // all under Spartacus's own role. Roles above Spartacus can't be moved.
+    const ordered = plan.roles
+      .map(({ spec }) => guild.roles.cache.get(ids.roles.get(spec.key) ?? ""))
+      .filter((r): r is Role => !!r && !!me && me.roles.highest.comparePositionTo(r) > 0);
+    if (ordered.length > 1) {
+      const sorted = await guild.roles
+        .setPositions(ordered.map((role, i) => ({ role, position: ordered.length - i })))
+        .then(() => true, (err) => {
+          logError("bot", err, guild.id);
+          return false;
+        });
+      if (!sorted) notes.push("Couldn't sort the roles. Move Spartacus's role to the top in Server Settings → Roles, then run this again.");
+    }
+    if (ordered.length < ids.roles.size) notes.push("Some roles are above Spartacus's role, so they keep their place. Move Spartacus's role to the top in Server Settings → Roles, then run this again to sort them.");
+  } else {
+    // Skipped: channels and onboarding still use the roles that are already there.
+    for (const { spec, existing } of plan.roles) if (existing) ids.roles.set(spec.key, existing.id);
   }
-  if (ordered.length < ids.roles.size) notes.push("Some roles are above Spartacus's role, so they keep their place. Move Spartacus's role to the top in Server Settings → Roles, then run this again to sort them.");
 
   // Categories in order, then their channels.
+  const buildChannels = partOn(opts, "channels");
   let position = 0;
   for (const { spec, existing } of plan.categories) {
+    if (!buildChannels || !categoryOn(opts, spec.key)) {
+      if (existing) ids.categories.set(spec.key, existing.id);
+      position++;
+      continue;
+    }
     const overwrites = overwritesFor(guild, spec.access, false, ids);
     const cat =
       existing ??
@@ -296,12 +330,17 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
     }
     await cat.setPosition(position++).catch(() => null);
   }
-  await step(`📁 Categories: ${plan.categories.filter((c) => !c.existing).length} new, ${plan.categories.filter((c) => c.existing).length} renamed and sorted`);
+  const chosenCategories = plan.categories.filter((c) => buildChannels && categoryOn(opts, c.spec.key));
+  if (buildChannels) await step(`📁 Categories: ${chosenCategories.filter((c) => !c.existing).length} new, ${chosenCategories.filter((c) => c.existing).length} renamed and sorted`);
 
   const maxBitrate = guild.maximumBitrate ?? 96000;
   let createdChannels = 0, movedChannels = 0;
   const order = new Map<string, number>();
   for (const { spec, category, existing } of plan.channels) {
+    if (!buildChannels || !categoryOn(opts, category.key)) {
+      if (existing) ids.channels.set(spec.key, existing.id);
+      continue;
+    }
     const parent = ids.categories.get(category.key);
     const voice = isVoiceKind(spec.kind);
     const access = spec.key === "stat-members" ? ({ see: "everyone", talk: false } as Access) : spec.access ?? category.access;
@@ -333,10 +372,10 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
     order.set(category.key, n + 1);
     if ("setPosition" in channel) await (channel as { setPosition: (p: number) => Promise<unknown> }).setPosition(n).catch(() => null);
   }
-  await step(`💬 Channels: ${createdChannels} new, ${movedChannels} renamed and moved`);
+  if (buildChannels) await step(`💬 Channels: ${createdChannels} new, ${movedChannels} renamed and moved`);
 
   // Everything else goes into a hidden archive. Nothing is deleted.
-  if (plan.archive.length || plan.hideCategories.length) {
+  if (archiveOn(opts) && (plan.archive.length || plan.hideCategories.length)) {
     const staffOnly = overwritesFor(guild, { see: "staff", talk: true }, false, ids);
     const archiveCat =
       (guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === ARCHIVE_CATEGORY) as CategoryChannel | undefined) ??
@@ -352,11 +391,15 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
     await step(`📦 Archived ${archived} old channel${archived === 1 ? "" : "s"} into ${ARCHIVE_CATEGORY} (hidden, nothing deleted)`);
   }
 
-  await setupServerSettings(guild, ids, notes);
-  await step("⚙️ Server settings: AFK channel, join messages and Community");
-  await setupModules(guild, opts, ids, notes);
-  await step(`🧩 Modules set up and switched on: ${MODULES_ON.length}`);
-  await setupOnboarding(guild, opts, ids, notes).then((line) => step(line));
+  if (partOn(opts, "settings")) {
+    await setupServerSettings(guild, ids, notes);
+    await step("⚙️ Server settings: AFK channel, join messages and Community");
+  }
+  if (partOn(opts, "modules")) {
+    await setupModules(guild, opts, ids, notes);
+    await step(`🧩 Modules set up and switched on: ${MODULES_ON.length}`);
+  }
+  if (partOn(opts, "onboarding")) await setupOnboarding(guild, opts, ids, notes).then((line) => step(line));
 
   const mods = guild.roles.cache.filter((r) => !r.managed && r.permissions.has(PermissionFlagsBits.Administrator) && r.members.some((m) => !m.user.bot));
   if (mods.size) notes.push(`These roles give people Administrator: ${mods.map((r) => r.name).join(", ")}. Consider giving them only the permissions they need.`);

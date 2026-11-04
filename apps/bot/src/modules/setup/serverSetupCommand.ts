@@ -11,9 +11,9 @@ import {
   type InteractionEditReplyOptions,
   type Interaction,
 } from "discord.js";
-import { ARCHIVE_CATEGORY, BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, type BlueprintGameId } from "@spartacus/shared";
+import { ARCHIVE_CATEGORY, BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, blueprintCategories, type BlueprintGameId } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
-import { planSetup, runSetup, summarizePlan, type SetupOptions } from "./serverSetup";
+import { SETUP_PARTS, archiveOn, categoryOn, partOn, planSetup, runSetup, summarizePlan, type SetupOptions, type SetupPart } from "./serverSetup";
 
 // One pending setup per person per server, so two admins can't clash.
 const pending = new Map<string, SetupOptions & { expires: number }>();
@@ -36,47 +36,85 @@ function missingBotPerms(guild: Guild): string[] {
 
 async function planScreen(guild: Guild, opts: SetupOptions): Promise<InteractionEditReplyOptions> {
   const plan = await planSetup(guild, opts);
-  const s = summarizePlan(plan);
+  const s = summarizePlan(plan, opts);
   const line = (label: string, x: { reuse: number; create: number }) => `**${label}:** ${x.create} new${x.reuse ? `, ${x.reuse} of yours reused and renamed` : ""}`;
   const games = BLUEPRINT_GAMES.filter((g) => opts.games.includes(g.id));
+  const categories = blueprintCategories(opts.games);
+  const chosen = categories.filter((cat) => categoryOn(opts, cat.key));
   const top = guild.members.me?.roles.highest;
   const above = guild.roles.cache.filter((r) => !r.managed && r.id !== guild.id && top !== undefined && r.position >= top.position).size;
+  const on = SETUP_PARTS.filter((p) => partOn(opts, p.id));
+  const skipped = (label: string) => `**${label}:** skipped`;
+  const allCategories = chosen.length === categories.length;
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle("🏗️ Server Setup")
     .setDescription(
       [
-        "Builds a clean layout for an FPS gaming community: roles, channels, voice, role pickers, onboarding, welcome and leave messages, tickets, applications, Matchmaking and more. Every module gets connected so the dashboard shows it.",
+        "Builds a clean layout for an FPS gaming community. Pick what to build below: everything, or only some parts and categories. Parts you skip stay as they are, and the parts you build use what's already there.",
         "",
-        line("Roles", s.roles),
-        line("Categories", s.categories),
-        line("Channels", s.channels),
-        opts.archiveOthers ? `**Old channels:** ${s.archive} move into a hidden ${ARCHIVE_CATEGORY}` : "**Old channels:** stay where they are",
+        `**Building:** ${on.length ? on.map((p) => `${p.emoji} ${p.label}`).join(" · ") : "nothing yet"}`,
+        partOn(opts, "roles") ? line("Roles", s.roles) : skipped("Roles"),
+        partOn(opts, "channels") ? line("Categories", s.categories) : skipped("Categories"),
+        partOn(opts, "channels") ? line("Channels", s.channels) : skipped("Channels"),
+        partOn(opts, "channels") && !allCategories ? `**Only these categories:** ${chosen.map((cat) => cat.name).join(", ")}` : null,
+        archiveOn(opts)
+          ? `**Old channels:** ${s.archive} move into a hidden ${ARCHIVE_CATEGORY}`
+          : opts.archiveOthers && partOn(opts, "channels") && !allCategories
+            ? "**Old channels:** stay where they are (archiving only runs when every category is picked)"
+            : "**Old channels:** stay where they are",
         `**Games:** ${games.map((g) => `${g.emoji} ${g.name}`).join(", ")}`,
         "",
         "🗄️ A backup is saved first. Nothing is deleted, and running it again only fixes what's missing.",
-        above ? `\n⚠️ ${above} role${above === 1 ? " is" : "s are"} above Spartacus's role, so ${above === 1 ? "it" : "they"} can't be renamed or given. Move Spartacus's role to the top in Server Settings → Roles for the best result.` : "",
-      ].join("\n"),
+        above && partOn(opts, "roles") ? `\n⚠️ ${above} role${above === 1 ? " is" : "s are"} above Spartacus's role, so ${above === 1 ? "it" : "they"} can't be renamed, sorted or given. Move Spartacus's role to the top in Server Settings → Roles for the best result.` : null,
+      ]
+        .filter((l): l is string => l !== null)
+        .join("\n"),
     )
-    .setFooter({ text: "Only you can see this. Pick games or the archive choice below, then tap Build." });
+    .setFooter({ text: "Only you can see this. Pick what to build, then tap Build." });
 
+  // Single-pick menus that switch one thing at a time, so Discord never stacks picked chips over the message.
+  const partMenu = new StringSelectMenuBuilder()
+    .setCustomId("srvsetup:part")
+    .setPlaceholder("Choose what to build")
+    .addOptions(
+      ...SETUP_PARTS.map((p) => ({
+        label: `${partOn(opts, p.id) ? "✅" : "⬜"} ${p.label}`,
+        value: p.id,
+        emoji: p.emoji,
+        description: `${partOn(opts, p.id) ? "Tap to skip" : "Tap to build"} · ${p.description}`.slice(0, 100),
+      })),
+      {
+        label: `${opts.archiveOthers ? "✅" : "⬜"} Archive old channels`,
+        value: "archive",
+        emoji: "📦",
+        description: `${opts.archiveOthers ? "Tap to skip" : "Tap to build"} · Move channels not in the layout into a hidden ${ARCHIVE_CATEGORY}`.slice(0, 100),
+      },
+      { label: "Build everything", value: "all", emoji: "🏗️", description: "Switch every part and category on" },
+    );
+  const categoryMenu = new StringSelectMenuBuilder()
+    .setCustomId("srvsetup:cat")
+    .setPlaceholder(allCategories ? "Channels: all categories (tap to choose some)" : `Channels: ${chosen.length} of ${categories.length} categories`)
+    .addOptions(
+      ...categories.map((cat) => ({
+        label: `${categoryOn(opts, cat.key) ? "✅" : "⬜"} ${cat.name}`.slice(0, 100),
+        value: cat.key,
+        description: `${categoryOn(opts, cat.key) ? "Tap to skip" : "Tap to build"} · ${cat.channels.length} channel${cat.channels.length === 1 ? "" : "s"}`,
+      })),
+      { label: "All categories", value: "all", emoji: "📁" },
+    );
   const gameMenu = new StringSelectMenuBuilder()
     .setCustomId("srvsetup:game")
     .setPlaceholder("Add or drop a game")
     .addOptions(BLUEPRINT_GAMES.map((g) => ({ label: `${opts.games.includes(g.id) ? "Drop" : "Add"} ${g.name}`, value: g.id, emoji: g.emoji })));
-  const archiveMenu = new StringSelectMenuBuilder()
-    .setCustomId("srvsetup:archive")
-    .addOptions(
-      { label: `Move old channels into a hidden ${ARCHIVE_CATEGORY}`, value: "yes", default: opts.archiveOthers },
-      { label: "Leave old channels where they are", value: "no", default: !opts.archiveOthers },
-    );
   return {
     embeds: [embed],
     components: [
+      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(partMenu),
+      ...(partOn(opts, "channels") ? [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(categoryMenu)] : []),
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(gameMenu),
-      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(archiveMenu),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("srvsetup:build").setLabel("Build").setEmoji("🏗️").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("srvsetup:build").setLabel("Build").setEmoji("🏗️").setStyle(ButtonStyle.Success).setDisabled(on.length === 0 && !archiveOn(opts)),
         new ButtonBuilder().setCustomId("srvsetup:cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary),
       ),
     ],
@@ -90,7 +128,13 @@ export async function runServerSetupCommand(interaction: ChatInputCommandInterac
   await interaction.deferReply({ ephemeral: true });
   const missing = missingBotPerms(guild);
   if (missing.length) return void (await interaction.editReply(`Spartacus needs these permissions first: ${missing.join(", ")}. Give its role Administrator, or those, in Server Settings → Roles.`));
-  const opts = { games: [...DEFAULT_BLUEPRINT_GAMES], archiveOthers: true, expires: Date.now() + PENDING_MS };
+  const opts: SetupOptions & { expires: number } = {
+    games: [...DEFAULT_BLUEPRINT_GAMES],
+    archiveOthers: true,
+    parts: SETUP_PARTS.map((p) => p.id),
+    categories: blueprintCategories(DEFAULT_BLUEPRINT_GAMES).map((cat) => cat.key),
+    expires: Date.now() + PENDING_MS,
+  };
   pending.set(keyOf(guild.id, interaction.user.id), opts);
   await interaction.editReply(await planScreen(guild, opts));
 }
@@ -117,8 +161,30 @@ export async function handleServerSetupInteraction(interaction: Interaction) {
       await interaction.deferUpdate();
       return void (await interaction.editReply(await planScreen(guild, opts)));
     }
-    if (interaction.isStringSelectMenu() && action === "archive") {
-      opts.archiveOthers = interaction.values[0] === "yes";
+    if (interaction.isStringSelectMenu() && action === "part") {
+      const pick = interaction.values[0];
+      if (pick === "all") {
+        opts.parts = SETUP_PARTS.map((p) => p.id);
+        opts.categories = blueprintCategories(opts.games).map((cat) => cat.key);
+        opts.archiveOthers = true;
+      } else if (pick === "archive") opts.archiveOthers = !opts.archiveOthers;
+      else {
+        const part = pick as SetupPart;
+        const parts = opts.parts ?? SETUP_PARTS.map((p) => p.id);
+        opts.parts = parts.includes(part) ? parts.filter((p) => p !== part) : SETUP_PARTS.map((p) => p.id).filter((p) => p === part || parts.includes(p));
+      }
+      await interaction.deferUpdate();
+      return void (await interaction.editReply(await planScreen(guild, opts)));
+    }
+    if (interaction.isStringSelectMenu() && action === "cat") {
+      const all = blueprintCategories(opts.games).map((cat) => cat.key);
+      const pick = interaction.values[0];
+      const current = opts.categories ?? all;
+      if (pick === "all") opts.categories = all;
+      // At least one category stays picked; skip Channels above to build none.
+      else if (current.includes(pick)) {
+        if (current.length > 1) opts.categories = current.filter((k) => k !== pick);
+      } else opts.categories = all.filter((k) => k === pick || current.includes(k));
       await interaction.deferUpdate();
       return void (await interaction.editReply(await planScreen(guild, opts)));
     }

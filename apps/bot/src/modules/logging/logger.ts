@@ -17,6 +17,7 @@ import {
   PartialUser,
   SendableChannels,
   AuditLogEvent,
+  ChannelType,
 } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
@@ -295,11 +296,103 @@ async function changedBy(guild: Guild, channelId: string): Promise<string | null
   return null;
 }
 
+// ---- Channel moves ----
+// Dragging one channel makes Discord renumber a whole batch of channels at
+// once. The batch is gathered for a moment, then the channels that really
+// moved are worked out: in each group (a category's channels, or the
+// categories themselves), the longest run that kept its order just shifted,
+// and anything outside that run was moved.
+const MOVE_WAIT_MS = 2000;
+const pendingMoves = new Map<string, { guild: Guild; old: Map<string, number>; timer: ReturnType<typeof setTimeout> }>();
+
+function queueMove(guild: Guild, channelId: string, oldPosition: number) {
+  let batch = pendingMoves.get(guild.id);
+  if (!batch) {
+    batch = { guild, old: new Map(), timer: setTimeout(() => void flushMoves(guild.id), MOVE_WAIT_MS) };
+    pendingMoves.set(guild.id, batch);
+  }
+  // Keep the first old position seen for a channel in this batch.
+  if (!batch.old.has(channelId)) batch.old.set(channelId, oldPosition);
+}
+
+// Indexes of the longest increasing run in a list.
+export function longestKeptOrder(values: number[]): Set<number> {
+  const tails: number[] = [];
+  const prev = new Array<number>(values.length).fill(-1);
+  for (let i = 0; i < values.length; i++) {
+    let lo = 0;
+    let hi = tails.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (values[tails[mid]] < values[i]) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo > 0) prev[i] = tails[lo - 1];
+    tails[lo] = i;
+  }
+  const keep = new Set<number>();
+  for (let k = tails.length ? tails[tails.length - 1] : -1; k >= 0; k = prev[k]) keep.add(k);
+  return keep;
+}
+
+export interface MoveItem {
+  id: string;
+  oldPos: number;
+  newPos: number;
+}
+
+// Which items in one group were actually moved.
+export function movedInGroup(items: MoveItem[]): string[] {
+  const byOld = [...items].sort((x, y) => x.oldPos - y.oldPos || x.id.localeCompare(y.id));
+  const keep = longestKeptOrder(byOld.map((x) => x.newPos));
+  return byOld.filter((_, i) => !keep.has(i)).map((x) => x.id);
+}
+
+type Positioned = { id: string; rawPosition: number; parentId: string | null; type: number; name: string };
+const kindOf = (type: number) => (type === ChannelType.GuildCategory ? "cat" : type === ChannelType.GuildVoice || type === ChannelType.GuildStageVoice ? "voice" : "text");
+
+async function flushMoves(guildId: string) {
+  const batch = pendingMoves.get(guildId);
+  pendingMoves.delete(guildId);
+  if (!batch) return;
+  const guild = batch.guild;
+  const result = await getLogChannel(guild.id, guild.client);
+  if (!result?.channel || !result.config.logChannelUpdated) return;
+
+  // Brand-new channels are logged as created, not moved, and would only muddle the order.
+  const fresh = Date.now() - 15_000;
+  const all = [...guild.channels.cache.values()].filter((c) => "rawPosition" in c && !c.isThread() && c.createdTimestamp < fresh) as unknown as Positioned[];
+  const groupKey = (c: Positioned) => (kindOf(c.type) === "cat" ? "cat" : `${c.parentId ?? "none"}:${kindOf(c.type)}`);
+  const touched = new Set([...batch.old.keys()].map((id) => all.find((c) => c.id === id)).filter(Boolean).map((c) => groupKey(c!)));
+
+  const lines: string[] = [];
+  for (const key of touched) {
+    const group = all.filter((c) => groupKey(c) === key);
+    const moved = movedInGroup(group.map((c) => ({ id: c.id, oldPos: batch.old.get(c.id) ?? c.rawPosition, newPos: c.rawPosition })));
+    const order = [...group].sort((x, y) => x.rawPosition - y.rawPosition);
+    for (const id of moved) {
+      const c = order.find((x) => x.id === id)!;
+      if (isIgnoredChannel(result.config, id)) continue;
+      const i = order.indexOf(c);
+      const above = order[i - 1];
+      const where = above ? `now below ${kindOf(above.type) === "cat" ? `**${above.name}**` : `<#${above.id}>`}` : c.parentId ? `now at the top of <#${c.parentId}>` : "now at the top";
+      lines.push(kindOf(c.type) === "cat" ? `↕️ Category moved: **${c.name}**, ${where}` : `↕️ Channel moved: <#${c.id}>, ${where}`);
+    }
+  }
+  if (!lines.length) return;
+  await send(result.channel, baseEmbed(result.config).setDescription(lines.slice(0, 20).join("\n")));
+}
+
 export async function onChannelUpdate(oldChannel: Channel, newChannel: Channel) {
   const guild = "guild" in newChannel ? (newChannel as { guild?: Guild }).guild : undefined;
   if (!guild) return;
   const changes = describeChannelChanges(oldChannel as ChannelLike, newChannel as ChannelLike);
-  if (changes.length === 0) return;
+  if (changes.length === 0) {
+    const before = (oldChannel as { rawPosition?: number }).rawPosition;
+    const after = (newChannel as { rawPosition?: number }).rawPosition;
+    if (before !== undefined && after !== undefined && before !== after) queueMove(guild, newChannel.id, before);
+    return;
+  }
   const result = await getLogChannel(guild.id, newChannel.client);
   if (!result?.channel || !result.config.logChannelUpdated) return;
   if (isIgnoredChannel(result.config, newChannel.id)) return;

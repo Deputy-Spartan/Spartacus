@@ -1741,6 +1741,29 @@ export interface RoleChangeRow {
   createdAt: string;
 }
 
+export interface ShopItemRow {
+  id: string;
+  emoji: string;
+  name: string;
+  description: string;
+  price: number;
+  type: import("@spartacus/shared").ShopItemType;
+  roleId: string | null;
+  durationDays: number | null;
+  boostMult: number | null;
+  boostMinutes: number | null;
+  crateRarity: string | null;
+  stock: number | null;
+  enabled: boolean;
+}
+export interface EconomyHubView {
+  settings: import("@spartacus/shared").EconomyPlusSettings;
+  panel: { channelId: string | null; posted?: boolean; title: string; text: string; error?: string | null };
+  items: ShopItemRow[];
+  purchases: Array<{ id: string; userId: string; itemName: string; price: number; createdAt: string }>;
+  levelRoles: Array<{ level: number; roleId: string }>;
+}
+
 export interface ProfileCardSettingsRow {
   stats: import("@spartacus/shared").ProfileStatKey[];
   allowBios: boolean;
@@ -1781,6 +1804,13 @@ export interface StreamDeckLogRow {
 }
 
 export const api = {
+  getEconomyHub: (guildId: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub`),
+  saveEconomyHub: (guildId: string, body: { settings: import("@spartacus/shared").EconomyPlusSettings; panel: EconomyHubView["panel"]; repost?: boolean }) =>
+    request<EconomyHubView>(`/guilds/${guildId}/economy-hub`, { method: "PUT", body: JSON.stringify(body) }),
+  addShopItem: (guildId: string, item: unknown) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items`, { method: "POST", body: JSON.stringify(item) }),
+  addStarterShopItems: (guildId: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items/starter`, { method: "POST", body: "{}" }),
+  updateShopItem: (guildId: string, id: string, item: unknown) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items/${id}`, { method: "PUT", body: JSON.stringify(item) }),
+  deleteShopItem: (guildId: string, id: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items/${id}`, { method: "DELETE" }),
   getProfileCardSettings: (guildId: string) => request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`),
   setProfileCardSettings: (guildId: string, s: ProfileCardSettingsRow & { repost?: boolean }) =>
     request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`, { method: "PUT", body: JSON.stringify(s) }),

@@ -22,6 +22,19 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // Economy Hub: the shop, its panel, and loot crates.
+  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith("eshop:")) {
+    const shop = await import("../modules/economy/shop");
+    if (interaction.isButton() && interaction.customId.startsWith("eshop:panel:")) await shop.handleShopPanel(interaction);
+    else await shop.handleShopComponent(interaction);
+    return;
+  }
+  if (interaction.isButton() && interaction.customId.startsWith("ecrate:")) {
+    const { handleCrateButton } = await import("../modules/economy/crates");
+    await handleCrateButton(interaction);
+    return;
+  }
+
   // Profile Cards: Edit my card, Compare, and the edit menu.
   if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isUserSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("pcard:")) {
     const { handleProfileComponent } = await import("../modules/leveling/profile");

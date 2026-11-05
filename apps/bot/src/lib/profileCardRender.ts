@@ -67,7 +67,7 @@ function wrap(s: string, width: number, lines: number): string[] {
 }
 
 const imageCache = new Map<string, Buffer | null>();
-async function fetchImage(url: string): Promise<Buffer | null> {
+export async function fetchImage(url: string): Promise<Buffer | null> {
   if (imageCache.has(url)) return imageCache.get(url) ?? null;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -99,7 +99,7 @@ async function avatarImage(url: string): Promise<Buffer | null> {
 }
 
 // A square picture cut into a circle, size px wide.
-async function circle(buf: Buffer, size: number): Promise<Buffer> {
+export async function circle(buf: Buffer, size: number): Promise<Buffer> {
   const mask = Buffer.from(`<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#fff"/></svg>`);
   return sharp(buf).resize(size, size, { fit: "cover" }).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
 }

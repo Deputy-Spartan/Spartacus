@@ -44,6 +44,7 @@ import { startRoleManagerJobs } from "./modules/utility/roleManager";
 import { onVerificationJoin } from "./modules/security/verification";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 import { startProfilePanelPosterJob } from "./jobs/profilePanelPoster";
+import { startEconomyJobs } from "./jobs/economyJobs";
 import { startMatchTickerJob } from "./jobs/matchTicker";
 
 import * as logger from "./modules/logging/logger";
@@ -140,6 +141,8 @@ export { commands } from "./commands";
 export { isLeader } from "./lib/leader";
 export { renderProfile } from "./modules/leveling/profile";
 export { postProfilePanel } from "./jobs/profilePanelPoster";
+export { postShopPanel } from "./jobs/economyJobs";
+export { forgetEconomyPlus } from "./lib/economyPlus";
 // Re-exported so apps/api's "Resend Now" button can repost a sticky through
 // the exact same guarded delete+send logic the bot itself uses, instead of
 // a separate raw REST call that the bot's in-memory duplicate-post guards
@@ -275,6 +278,7 @@ export function startBot() {
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
     startProfilePanelPosterJob(c);
+    startEconomyJobs(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);

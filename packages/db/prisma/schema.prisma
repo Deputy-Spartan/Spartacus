@@ -2829,3 +2829,114 @@ model ProfileCardSettings {
   panelColor     String?
   panelPublic    Boolean  @default(false) // cards from the panel: in the channel for everyone, or only the clicker sees them
 }
+
+// ---- Economy Hub (one module: Economy) ----
+// Every toggle and option on the Economy Hub page. One row per server.
+model EconomyPlus {
+  id                 String   @id @default(cuid())
+  guildId            String   @unique
+  levelColors        Boolean  @default(true)
+  levelUpCard        Boolean  @default(true)
+  levelUpCoins       Int      @default(50)
+  keepTopLevelRole   Boolean  @default(true)
+  shopEnabled        Boolean  @default(false)
+  shopLogChannelId   String?
+  shopPanelChannelId String?
+  shopPanelMessageId String?
+  shopPanelTitle     String?
+  shopPanelText      String?
+  cratesEnabled      Boolean  @default(false)
+  crateEveryLevels   Int      @default(5)
+  crateOnStreak      Boolean  @default(true)
+  crateChannelId     String?
+  voiceXpEnabled     Boolean  @default(false)
+  voiceXpPerMin      Int      @default(5)
+  voiceCoinsPer10    Int      @default(3)
+  timezone           String   @default("America/New_York")
+  weekendEnabled     Boolean  @default(false)
+  weekendMult        Float    @default(2)
+  happyEnabled       Boolean  @default(false)
+  happyHour          Int      @default(20)
+  happyMult          Float    @default(1.5)
+  eventChannelId     String?
+  eventState         String? // "weekend" | "happy" | null, so start/end are announced once
+  prestigeBonusPct   Int      @default(10)
+  champsEnabled      Boolean  @default(false)
+  champsChannelId    String?
+  champsRoleId       String?
+  champsCategories   String[] @default(["xp", "coins", "voice", "streak"])
+  lastChampsWeek     String?
+}
+
+model ShopItem {
+  id           String   @id @default(cuid())
+  guildId      String
+  emoji        String   @default("🛒")
+  name         String
+  description  String   @default("")
+  price        Int
+  type         String // ROLE | XP_BOOST | CRATE | STREAK_FREEZE | CUSTOM
+  roleId       String?
+  durationDays Int?
+  boostMult    Float?
+  boostMinutes Int?
+  crateRarity  String?
+  stock        Int? // null = unlimited
+  enabled      Boolean  @default(true)
+  sort         Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([guildId])
+}
+
+model ShopPurchase {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  itemName  String
+  price     Int
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// Crates, streak freezes and a running XP potion, per member per server.
+model EconomyInventory {
+  id            String    @id @default(cuid())
+  guildId       String
+  userId        String
+  common        Int       @default(0)
+  rare          Int       @default(0)
+  epic          Int       @default(0)
+  legendary     Int       @default(0)
+  streakFreezes Int       @default(0)
+  boostUntil    DateTime?
+  boostMult     Float     @default(1)
+
+  @@unique([guildId, userId])
+}
+
+// Roles bought in the shop for a number of days.
+model EconomyTimedRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roleId    String
+  expiresAt DateTime
+
+  @@unique([guildId, userId, roleId])
+  @@index([expiresAt])
+}
+
+// XP and voice minutes per week, for Weekly Champions.
+model WeeklyStat {
+  id       String @id @default(cuid())
+  guildId  String
+  userId   String
+  week     String // Monday's date in the server's timezone
+  xp       Int    @default(0)
+  voiceMin Int    @default(0)
+
+  @@unique([guildId, userId, week])
+  @@index([guildId, week])
+}

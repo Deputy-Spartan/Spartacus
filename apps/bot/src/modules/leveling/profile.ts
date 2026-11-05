@@ -25,6 +25,7 @@ import {
   PROFILE_THEMES,
   PROFILE_TITLES,
   cleanProfileStats,
+  xpForLevel,
   type ProfileStatKey,
   type ProfileTheme,
 } from "@spartacus/shared";
@@ -32,7 +33,7 @@ import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { drawProfileCard, drawSideBySide, type ProfileCardData } from "../../lib/profileCardRender";
 
-const xpForNextLevel = (level: number) => 5 * level * level + 50 * level + 100;
+const xpForNextLevel = (level: number) => xpForLevel(level + 1);
 const num = (n: number) => n.toLocaleString("en-US");
 
 type Earned = { type: string; emoji: string; label: string };

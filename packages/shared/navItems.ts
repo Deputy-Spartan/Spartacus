@@ -85,6 +85,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     section: "Levelling & Economy",
     items: [
+      { href: "/economy-hub", label: "Economy Hub", icon: "💰", moduleKey: "ECONOMY" },
       { href: "/leveling", label: "Leaderboard", icon: "📈", moduleKey: "LEVELING" },
       { href: "/level-roles", label: "Level Roles", icon: "🏅", moduleKey: "LEVELING" },
       { href: "/prestige", label: "Prestige", icon: "⭐", moduleKey: "PRESTIGE" },

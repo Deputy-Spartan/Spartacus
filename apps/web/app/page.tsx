@@ -2,73 +2,23 @@
 
 import { Suspense, useEffect, useState, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
+import { FRONT_PAGE_DEFAULTS, type FrontPageCard } from "@spartacus/shared";
 import { forgetLastUser, readLastUser, type LastUser } from "../lib/lastUser";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-// The six things Spartacus does, each opening into what it means.
-const FEATURES: Array<{ icon: string; title: string; short: string; details: string[] }> = [
-  {
-    icon: "🛡️",
-    title: "Moderation & Automod",
-    short: "Keep chat clean without watching it all day.",
-    details: [
-      "Automod for spam, links, caps, mass mentions and bad words, with warnings that escalate on their own.",
-      "Anti-raid lockdown, anti-nuke protection and AI moderation for the stuff filters miss.",
-      "Every action lands in a case log, with appeals your members can send from their DMs.",
-    ],
-  },
-  {
-    icon: "⚔️",
-    title: "Matchmaking & leaderboards",
-    short: "Queues, matches and rankings for your games.",
-    details: [
-      "1v1s, pickups and team matches with queues members join from a button.",
-      "Results are reported and confirmed in Discord, and feed a live leaderboard per game.",
-      "Teams, captains, tournaments and a Looking for a Team board.",
-    ],
-  },
-  {
-    icon: "🔊",
-    title: "Temp squad channels",
-    short: "Voice channels that appear when needed, gone when empty.",
-    details: [
-      "Join a lobby or pick a game from a panel to get your own squad channel.",
-      "Squads are grouped into a category per game, and named from your settings.",
-      "Owners can lock, rename and set the user limit from buttons, in the channel or a private thread.",
-    ],
-  },
-  {
-    icon: "🔴",
-    title: "Going-live alerts",
-    short: "Tell the server when your streamers go live.",
-    details: [
-      "Twitch, YouTube, Kick and TikTok are checked automatically. /golive covers every other site.",
-      "Alerts show the title, game, viewers and a live preview, and update while they stream.",
-      "Streamers get a Live Now role, and the alert becomes a summary when they stop.",
-    ],
-  },
-  {
-    icon: "🎭",
-    title: "Roles, rules & verification",
-    short: "Get new members in, set up and safe.",
-    details: [
-      "Role pickers with buttons, dropdowns or reactions, and a Role Manager for bulk and timed roles.",
-      "A rules gate with an I Agree button, and verification with account-age checks and a captcha.",
-      "Welcome messages, onboarding and join roles, all set up step by step.",
-    ],
-  },
-  {
-    icon: "📊",
-    title: "Live stats & logs",
-    short: "See what's happening at a glance.",
-    details: [
-      "Stat channels for member counts, plus growth, voice and suggestion analytics.",
-      "A full server log: messages, members, roles, channels and moves, without the noise.",
-      "Bump reminders, a status channel and a weekly staff report.",
-    ],
-  },
-];
+// The info boxes, each opening into what it means. The owner edits them in
+// Owner Only → Front Page; the built-in set shows until that loads (or if it fails).
+function useFrontPage() {
+  const [cards, setCards] = useState<FrontPageCard[]>(FRONT_PAGE_DEFAULTS);
+  useEffect(() => {
+    fetch(`${API_URL}/public/front-page`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j && Array.isArray(j.cards) && j.cards.length && setCards(j.cards))
+      .catch(() => null);
+  }, []);
+  return cards;
+}
 
 function useServerCount() {
   const [stats, setStats] = useState<{ servers: number; members: number; botAvatar: string | null } | null>(null);
@@ -98,8 +48,7 @@ function BotLogo({ src, failed, className = "" }: { src: string | null | undefin
   return <img src={url} alt="Spartacus" onError={() => setBroken(true)} className={`rounded-full object-cover ${className}`} />;
 }
 
-function FeatureDetails({ i }: { i: number }) {
-  const f = FEATURES[i];
+function FeatureDetails({ f }: { f: FrontPageCard }) {
   return (
     <div className="rounded-xl border border-neon-blue/30 bg-black/20 px-4 py-3.5 animate-[fadeIn_.25s_ease-out]">
       <p className="flex items-center gap-2 text-sm font-semibold">
@@ -107,8 +56,8 @@ function FeatureDetails({ i }: { i: number }) {
         {f.title}
       </p>
       <ul className="mt-2.5 space-y-1.5">
-        {f.details.map((d) => (
-          <li key={d} className="flex gap-2 text-[13px] text-slate-300">
+        {f.details.map((d, k) => (
+          <li key={k} className="flex gap-2 text-[13px] text-slate-300">
             <span className="text-neon-blue">✓</span>
             {d}
           </li>
@@ -135,6 +84,7 @@ function LandingContent() {
   const idle = params.get("idle") === "1";
   const signinFailed = params.get("error") === "signin";
   const { stats, failed: statsFailed } = useServerCount();
+  const cards = useFrontPage();
   const [open, setOpen] = useState<number | null>(null);
   const [lastUser, setLastUser] = useState<LastUser | null>(null);
   const [going, setGoing] = useState(false);
@@ -167,10 +117,10 @@ function LandingContent() {
             right under the box that was tapped. */}
         <div className="relative mt-8 max-w-2xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {FEATURES.map((f, i) => {
+            {cards.map((f, i) => {
               const isOpen = open === i;
               return (
-                <Fragment key={f.title}>
+                <Fragment key={`${i}-${f.title}`}>
                 <button
                   type="button"
                   aria-expanded={isOpen}
@@ -192,15 +142,15 @@ function LandingContent() {
                   </span>
                 </button>
                 <div className={`sm:hidden grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 -mt-1" : "grid-rows-[0fr] opacity-0 -mt-2.5"}`}>
-                  <div className="overflow-hidden">{isOpen && <FeatureDetails i={i} />}</div>
+                  <div className="overflow-hidden">{isOpen && <FeatureDetails f={f} />}</div>
                 </div>
-                {i % 2 === 1 && open !== null && (open === i || open === i - 1) && (
+                {(i % 2 === 1 || i === cards.length - 1) && open !== null && (open === i || (i % 2 === 1 && open === i - 1)) && cards[open] && (
                   <div id={`feature-details-${open}`} key={`row-${open}`} className="relative hidden sm:block sm:col-span-2 pt-1.5 animate-[fadeIn_.25s_ease-out]">
                     <span
                       aria-hidden="true"
-                      className={`absolute top-0 z-10 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-neon-blue/30 bg-[#1b1d22] ${open === i ? "left-3/4" : "left-1/4"}`}
+                      className={`absolute top-0 z-10 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-neon-blue/30 bg-[#1b1d22] ${open % 2 === 1 ? "left-3/4" : "left-1/4"}`}
                     />
-                    <FeatureDetails i={open} />
+                    <FeatureDetails f={cards[open]} />
                   </div>
                 )}
                 </Fragment>

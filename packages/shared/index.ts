@@ -14,3 +14,4 @@ export * from "./profileCards";
 export * from "./economyPlus";
 export * from "./tournaments";
 export * from "./playingNow";
+export * from "./frontPage";

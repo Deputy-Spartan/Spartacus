@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardTextProvider } from "../../../components/ui/EditableText";
+import { rememberLastUser } from "../../../lib/lastUser";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "../../../components/nav/Sidebar";
@@ -68,7 +69,15 @@ export default function DashboardLayout({
         clearToken();
         router.push("/");
       });
-    api.getMe().then(setUser).catch(() => null);
+    api
+      .getMe()
+      .then((me) => {
+        setUser(me);
+        // Keeps the sign-in page's "Welcome back" avatar current, even for
+        // people who signed in before it was added or changed their avatar.
+        rememberLastUser(me);
+      })
+      .catch(() => null);
   }, [router, params.guildId]);
 
   if (access !== "allowed") {

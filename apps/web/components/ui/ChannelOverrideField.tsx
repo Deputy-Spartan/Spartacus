@@ -42,7 +42,10 @@ export function ChannelOverrideField({ guildId, value, onChange, label, fallback
         />
       </div>
       {enabled ? (
-        <ChannelSelect guildId={guildId} value={value} onChange={onChange} kind={kind} />
+        <>
+          <ChannelSelect guildId={guildId} value={value} onChange={onChange} kind={kind} />
+          {!value && <p className="text-xs text-amber-300/80 -mt-2 mb-1">Pick a channel to save this. Until then: {fallbackNote.replace(/^Off\s*[—-]\s*/, "")}</p>}
+        </>
       ) : (
         <p className="text-xs text-slate-600">{fallbackNote}</p>
       )}

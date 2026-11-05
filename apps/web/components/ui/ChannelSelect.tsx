@@ -114,8 +114,10 @@ export function ChannelSelect({ guildId, value, onChange, kind = "text", placeho
           className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
           value={categoryId}
           onChange={(e) => {
+            // Only narrows the channel list. The saved channel stays until a
+            // new one is picked: clearing it here made auto-saving pages save
+            // "no channel" mid-pick (and flip their on/off toggle back off).
             setCategoryId(e.target.value);
-            onChange(""); // category changed — force an explicit re-pick of the channel
           }}
         >
           <option value="">Select a category…</option>
@@ -129,7 +131,7 @@ export function ChannelSelect({ guildId, value, onChange, kind = "text", placeho
 
         <select
           className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm disabled:opacity-50"
-          value={value ?? ""}
+          value={value && channelsInCategory.some((c) => c.id === value) ? value : ""}
           disabled={!categoryId}
           onChange={(e) => onChange(e.target.value)}
         >

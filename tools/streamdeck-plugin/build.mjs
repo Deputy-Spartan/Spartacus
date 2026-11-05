@@ -84,21 +84,49 @@ writeFileSync(join(plugin, "ui/settings.html"), html);
 // The plugin code is an ES module.
 writeFileSync(join(plugin, "bin/package.json"), JSON.stringify({ type: "module" }));
 
-// 3. Icons: a dark tile with the action's color. (Text and emoji go in the
-//    key's title, which Stream Deck draws itself.)
+// 3. Icons, all made from the bot's real logo (its Discord avatar), so the
+//    plugin looks like Spartacus everywhere. Each action is the logo inside a
+//    ring of the action's color, so they're still easy to tell apart. (Text and
+//    emoji go in the key's title, which Stream Deck draws itself.)
+//    logo.png is refreshed from the live bot each build, and the saved copy
+//    is used when offline.
 const COLORS = { raid: "#ef4444", safe: "#22c55e", golive: "#f43f5e", liveind: "#ef4444", post: "#9146ff", bump: "#f59e0b", lock: "#64748b", slow: "#0ea5e9", module: "#6366f1", role: "#a855f7", squadlock: "#38bdf8", mute: "#94a3b8", pull: "#14b8a6", newsquad: "#22c55e", online: "#3b82f6", tickets: "#eab308", claim: "#f97316", apps: "#10b981", giveaway: "#facc15", purge: "#f87171", poll: "#5865f2", say: "#7b99bc", shout: "#9146ff", event: "#06b6d4", sticky: "#f472b6", status: "#22c55e", botstat: "#10b981" };
-const helmet = (c) =>
-  `<path d="M36 12c-6 0-11 3-13 7l-4 8c-2 4-2 10 0 15l3 9c1 3 3 6 7 7l3 1V45h8v14l3-1c4-1 6-4 7-7l3-9c2-5 2-11 0-15l-4-8c-2-4-7-7-13-7z" fill="${c}"/><path d="M29 34h14v7H29z" fill="#0b0c0f" opacity=".8"/>`;
-const tile = (c) => `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72"><rect width="72" height="72" rx="14" fill="#16181d"/><rect x="3" y="3" width="66" height="66" rx="12" fill="none" stroke="${c}" stroke-width="3" opacity=".9"/>${helmet(c)}</svg>`;
+const sharp = (await import("sharp")).default;
+const logoFile = join(here, "logo.png");
+try {
+  const res = await fetch("https://api.spartc.us/bot-avatar");
+  if (res.ok) writeFileSync(logoFile, Buffer.from(await res.arrayBuffer()));
+} catch {
+  // offline: keep the saved logo
+}
+if (!existsSync(logoFile)) throw new Error("logo.png is missing and the bot avatar couldn't be downloaded.");
+const logo = readFileSync(logoFile);
+const roundLogo = (size) =>
+  sharp(logo)
+    .resize(size, size)
+    .composite([{ input: Buffer.from(`<svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="#fff"/></svg>`), blend: "dest-in" }])
+    .png()
+    .toBuffer();
+const actionTile = async (color, size) => {
+  const ring = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 72 72"><rect width="72" height="72" rx="14" fill="#16181d"/><rect x="3" y="3" width="66" height="66" rx="12" fill="none" stroke="${color}" stroke-width="4"/></svg>`;
+  const inner = Math.round(size * 0.72);
+  return sharp(Buffer.from(ring))
+    .composite([{ input: await roundLogo(inner), top: Math.round((size - inner) / 2), left: Math.round((size - inner) / 2) }])
+    .png()
+    .toBuffer();
+};
+rmSync(join(plugin, "imgs"), { recursive: true, force: true });
 mkdirSync(join(plugin, "imgs/actions"), { recursive: true });
 mkdirSync(join(plugin, "imgs/plugin"), { recursive: true });
-for (const a of [...KEYS, ...DIALS]) writeFileSync(join(plugin, `imgs/actions/${a.id}.svg`), tile(COLORS[a.id] ?? "#7b99bc"));
-// The main icon has to be a PNG.
-const { iconPng } = await import("./icon-png.mjs");
-rmSync(join(plugin, "imgs/plugin/icon.svg"), { force: true });
-writeFileSync(join(plugin, "imgs/plugin/icon.png"), iconPng(256));
-writeFileSync(join(plugin, "imgs/plugin/icon@2x.png"), iconPng(512));
-writeFileSync(join(plugin, "imgs/plugin/category.svg"), `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="12 10 48 52">${helmet("#ffffff")}</svg>`);
+for (const a of [...KEYS, ...DIALS]) {
+  const color = COLORS[a.id] ?? "#7b99bc";
+  writeFileSync(join(plugin, `imgs/actions/${a.id}.png`), await actionTile(color, 72));
+  writeFileSync(join(plugin, `imgs/actions/${a.id}@2x.png`), await actionTile(color, 144));
+}
+writeFileSync(join(plugin, "imgs/plugin/icon.png"), await roundLogo(256));
+writeFileSync(join(plugin, "imgs/plugin/icon@2x.png"), await roundLogo(512));
+writeFileSync(join(plugin, "imgs/plugin/category.png"), await roundLogo(28));
+writeFileSync(join(plugin, "imgs/plugin/category@2x.png"), await roundLogo(56));
 
 // 4. Pack it: a .streamDeckPlugin is a zip with the .sdPlugin folder inside.
 if (process.argv.includes("--pack")) {

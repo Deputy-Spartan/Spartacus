@@ -59,6 +59,7 @@ export const MODULE_KEYS = [
   "SUPPORT_INTAKE",
   "MATCHES",
   "ROLE_MANAGER",
+  "PROFILE_CARDS",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -114,6 +115,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   BUMP_REMINDER: "Bump Reminder",
   SUGGESTION_ANALYTICS: "Suggestion Analytics",
   RANK_CARDS: "Rank Cards",
+  PROFILE_CARDS: "Profile Cards",
   CONFESSIONS: "Anonymous",
   MEMBER_MILESTONES: "Member Milestones",
   RULES_GATE: "Rules Gate",

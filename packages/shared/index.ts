@@ -10,3 +10,4 @@ export * from "./bumpMessages";
 export * from "./goLive";
 export * from "./quickLinks";
 export * from "./aiChat";
+export * from "./profileCards";

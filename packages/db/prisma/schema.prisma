@@ -178,6 +178,7 @@ enum ModuleKey {
   SUPPORT_INTAKE
   MATCHES
   ROLE_MANAGER
+  PROFILE_CARDS
 }
 
 model GrowthSnapshot {
@@ -2795,4 +2796,29 @@ model StreamDeckState {
   value   Json
 
   @@unique([guildId, key])
+}
+
+// ---- Profile Cards (/profile) ----
+// What a member picked for their card in one server.
+model ProfileCard {
+  id             String   @id @default(cuid())
+  guildId        String
+  userId         String
+  title          String?
+  bio            String?
+  theme          String?
+  badges         String[] @default([]) // Achievement.type values, up to 3
+  games          String[] @default([])
+  unlockedThemes String[] @default([]) // themes bought with coins
+  updatedAt      DateTime @updatedAt
+
+  @@unique([guildId, userId])
+}
+
+// Per-server Profile Card settings.
+model ProfileCardSettings {
+  id        String   @id @default(cuid())
+  guildId   String   @unique
+  stats     String[] @default(["rank", "voice", "matches", "coins", "invites", "achievements"])
+  allowBios Boolean  @default(true)
 }

@@ -1741,6 +1741,11 @@ export interface RoleChangeRow {
   createdAt: string;
 }
 
+export interface ProfileCardSettingsRow {
+  stats: import("@spartacus/shared").ProfileStatKey[];
+  allowBios: boolean;
+}
+
 export interface QuickLinksStatus {
   bot: "online" | "updating" | "offline";
   botMessage: string | null;
@@ -1769,6 +1774,18 @@ export interface StreamDeckLogRow {
 }
 
 export const api = {
+  getProfileCardSettings: (guildId: string) => request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`),
+  setProfileCardSettings: (guildId: string, s: ProfileCardSettingsRow) =>
+    request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`, { method: "PUT", body: JSON.stringify(s) }),
+  // Returns an object URL for the drawn PNG (revoke it when done).
+  getProfileCardPreview: async (guildId: string) => {
+    const res = await send(`/guilds/${guildId}/profile-cards/preview`);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? "Couldn't draw the preview.");
+    }
+    return URL.createObjectURL(await res.blob());
+  },
   getQuickLinks: () => request<QuickLinksResponse>("/owner/quick-links"),
   saveQuickLinks: (groups: import("@spartacus/shared").QuickLinkGroup[]) =>
     request<{ groups: import("@spartacus/shared").QuickLinkGroup[] }>("/owner/quick-links", { method: "PUT", body: JSON.stringify({ groups }) }),

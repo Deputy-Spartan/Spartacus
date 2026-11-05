@@ -90,6 +90,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/prestige", label: "Prestige", icon: "⭐", moduleKey: "PRESTIGE" },
       { href: "/voice-activity", label: "Voice Activity", icon: "🎙️", moduleKey: "VOICE_ACTIVITY" },
       { href: "/achievements", label: "Achievements", icon: "🏆", moduleKey: "ACHIEVEMENTS" },
+      { href: "/profile-cards", label: "Profile Cards", icon: "🪪", moduleKey: "PROFILE_CARDS" },
       { href: "/growth-analytics", label: "Growth Analytics", icon: "📉", moduleKey: "GROWTH_ANALYTICS" },
       { href: "/economy/settings", label: "Economy Settings", icon: "⚙️", moduleKey: "ECONOMY" },
       { href: "/economy/earning", label: "Economy Earning", icon: "📈", moduleKey: "ECONOMY" },

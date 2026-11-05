@@ -22,6 +22,13 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  // Profile Cards: Edit my card, Compare, and the edit menu.
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("pcard:")) {
+    const { handleProfileComponent } = await import("../modules/leveling/profile");
+    await handleProfileComponent(interaction);
+    return;
+  }
+
   // /golive setup: the step-by-step Going Live wizard.
   if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("glw:")) {
     const { handleGoLiveSetup } = await import("../modules/community/goLiveSetup");

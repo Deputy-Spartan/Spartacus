@@ -5,7 +5,9 @@ FROM node:20-alpine AS base
 WORKDIR /app
 
 # Prisma's schema engine needs OpenSSL, which alpine doesn't ship by default.
-RUN apk add --no-cache openssl
+# fontconfig + DejaVu: the /rank and /profile cards are SVGs drawn by sharp,
+# and alpine has no fonts, so their text wouldn't draw without these.
+RUN apk add --no-cache openssl fontconfig font-dejavu
 
 # Install dependencies for the whole workspace first (better layer caching)
 COPY package.json ./

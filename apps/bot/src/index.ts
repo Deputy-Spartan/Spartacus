@@ -137,6 +137,7 @@ async function sendHeartbeat(client: Client) {
 
 export { commands } from "./commands";
 export { isLeader } from "./lib/leader";
+export { renderProfile } from "./modules/leveling/profile";
 // Re-exported so apps/api's "Resend Now" button can repost a sticky through
 // the exact same guarded delete+send logic the bot itself uses, instead of
 // a separate raw REST call that the bot's in-memory duplicate-post guards

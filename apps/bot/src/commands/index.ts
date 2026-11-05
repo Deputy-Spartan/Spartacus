@@ -32,6 +32,7 @@ import remindme from "./utility/remindme";
 import serverSetup from "./utility/serverSetup";
 import role from "./utility/role";
 import golive from "./community/golive";
+import profile from "./leveling/profile";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -68,6 +69,7 @@ for (const command of [
   serverSetup,
   role,
   golive,
+  profile,
 ]) {
   commands.set(command.data.name, command);
 }

@@ -1447,6 +1447,14 @@ model EventClaim {
   @@index([createdAt])
 }
 
+// Which running copy of the bot is the active one (see apps/bot/src/lib/leader.ts).
+// One row; the active copy refreshes heartbeatAt every few seconds.
+model BotLeader {
+  id          String   @id
+  instanceId  String
+  heartbeatAt DateTime
+}
+
 model ErrorLog {
   id        String   @id @default(cuid())
   guildId   String?

@@ -29,7 +29,7 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
         guildId={params.guildId}
         moduleKey="AI_CHAT"
         title="AI Chat"
-        description="Mention the bot anywhere it can see and it replies using an AI model. Requires an Anthropic API key to be configured on the bot."
+        description="Mention the bot and it answers with Claude Haiku 5.5. It remembers the last few messages in the channel for 15 minutes, so follow-up questions work, and each person can ask 5 questions a minute. Needs ANTHROPIC_API_KEY set in Render."
       />
 
       <NeonCard>

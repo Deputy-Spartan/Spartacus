@@ -6,6 +6,7 @@ import { ActivityType, Client, Events, GatewayIntentBits, Options, Partials, typ
 import { logError, prisma } from "@spartacus/db";
 import { commands } from "./commands";
 import { registerCommands } from "./lib/registerCommands";
+import { isLeader, startLeaderLoop, takeLeadership } from "./lib/leader";
 import * as interactionCreate from "./events/interactionCreate";
 import * as messageCreate from "./events/messageCreate";
 import * as guildMemberAdd from "./events/guildMemberAdd";
@@ -135,6 +136,7 @@ async function sendHeartbeat(client: Client) {
 }
 
 export { commands } from "./commands";
+export { isLeader } from "./lib/leader";
 // Re-exported so apps/api's "Resend Now" button can repost a sticky through
 // the exact same guarded delete+send logic the bot itself uses, instead of
 // a separate raw REST call that the bot's in-memory duplicate-post guards
@@ -214,8 +216,23 @@ export function startBot() {
 
   client.commands = commands;
 
+  // Only the active copy acts on Discord events (see lib/leader.ts). During a
+  // deploy the old copy keeps its connection but stops answering, so nothing
+  // is posted twice. Connection events still go through on every copy.
+  const ALWAYS = new Set<string>([
+    Events.ClientReady, "ready", Events.Error, Events.Warn, Events.Debug, Events.Invalidated, Events.CacheSweep,
+    Events.ShardReady, Events.ShardResume, Events.ShardDisconnect, Events.ShardError, Events.ShardReconnecting,
+  ]);
+  const realEmit = client.emit.bind(client) as (event: string | symbol, ...args: unknown[]) => boolean;
+  client.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (typeof event === "string" && !ALWAYS.has(event) && !isLeader()) return false;
+    return realEmit(event, ...args);
+  }) as typeof client.emit;
+  startLeaderLoop();
+
   client.once("ready", async (c) => {
     console.log(`[bot] Logged in as ${c.user.tag}`);
+    await takeLeadership();
 
     registerCommands()
       .then(({ count, scope }) => console.log(`[bot] Registered ${count} slash command(s) ${scope}.`))

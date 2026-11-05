@@ -19,7 +19,7 @@ export async function execute(message: Message) {
   const enabled = await isModuleEnabled(message.guildId, "AI_MODERATION");
   if (!enabled) return;
 
-  const verdict = await askClaude(CLASSIFY_PROMPT, message.content, 10);
+  const verdict = await askClaude(CLASSIFY_PROMPT, message.content.slice(0, 2000), 512);
   if (verdict?.trim().toUpperCase().startsWith("VIOLATION")) {
     await handleViolation(message, "AI-flagged content");
   }

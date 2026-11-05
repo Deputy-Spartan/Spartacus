@@ -98,6 +98,7 @@ import milestoneSettingsRouter from "./routes/milestoneSettings";
 import rulesGateSettingsRouter from "./routes/rulesGateSettings";
 import lfgCommandsRouter from "./routes/lfgCommands";
 import embedCreatorRouter from "./routes/embedCreator";
+import { setLeaderCheck } from "./lib/jobGate";
 
 const app = express();
 
@@ -223,9 +224,10 @@ app.listen(port, () => {
 // instead (keeps the bot's discord.js cache memory isolated from API
 // request-handling memory, if your host gives you two free services).
 if (process.env.RUN_BOT_INLINE !== "false") {
-  import("@spartacus/bot").then(({ startBot }) => {
+  import("@spartacus/bot").then(({ startBot, isLeader }) => {
     const client = startBot();
     setBotClient(client);
+    setLeaderCheck(isLeader);
   });
 }
 

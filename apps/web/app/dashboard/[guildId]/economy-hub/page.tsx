@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import type { ModuleKey } from "@spartacus/shared";
 import {
   CHAMP_CATEGORIES,
   CRATE_INFO,
@@ -16,7 +17,17 @@ import {
   type ShopItemType,
 } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { EmbeddedPage } from "../../../../components/ui/EmbeddedPage";
+import LevelingPage from "../leveling/page";
+import LevelRolesPage from "../level-roles/page";
+import PrestigePage from "../prestige/page";
+import VoiceActivityPage from "../voice-activity/page";
+import AchievementsPage from "../achievements/page";
+import ProfileCardsPage from "../profile-cards/page";
+import EconomySettingsPage from "../economy/settings/page";
+import EconomyEarningPage from "../economy/earning/page";
+import EconomyLeaderboardPage from "../economy/leaderboard/page";
+import EconomyAnalyticsPage from "../economy/analytics/page";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
@@ -29,7 +40,7 @@ const select = "bg-base-950 border border-white/10 rounded-lg px-2.5 py-2 text-s
 const label = "text-xs uppercase tracking-wide text-slate-500 block mb-1.5";
 
 function Step({ n, title, desc, on, onToggle, children }: { n: number; title: string; desc: string; on?: boolean; onToggle?: (v: boolean) => void; children?: ReactNode }) {
-  const [open, setOpen] = useState(n <= 2);
+  const [open, setOpen] = useState(true);
   return (
     <NeonCard>
       <div className="flex items-start gap-3">
@@ -43,28 +54,64 @@ function Step({ n, title, desc, on, onToggle, children }: { n: number; title: st
         </button>
         {onToggle && <ToggleSwitch enabled={!!on} onChange={onToggle} label={title} />}
       </div>
-      {open && <div className="mt-4 space-y-4">{children}</div>}
+      {open && children && <div className="mt-4 space-y-4">{children}</div>}
     </NeonCard>
   );
 }
 
 const BLANK_ITEM = { emoji: "🛒", name: "", description: "", price: 500, type: "ROLE" as ShopItemType, roleId: null as string | null, durationDays: 7 as number | null, boostMult: 2, boostMinutes: 60, crateRarity: "rare" as CrateRarity, stock: null as number | null, enabled: true };
 
+const TABS = [
+  ["start", "🚀 Start"],
+  ["levels", "⚡ Levels"],
+  ["roles", "🎖️ Level Roles"],
+  ["coins", "🪙 Coins"],
+  ["shop", "🛒 Shop"],
+  ["boosts", "🎉 Boosts"],
+  ["achievements", "🏆 Achievements"],
+  ["profile", "🪪 Profile Cards"],
+  ["stats", "📊 Leaderboards"],
+] as const;
+type Tab = (typeof TABS)[number][0];
+type HubModule = "LEVELING" | "ECONOMY" | "PRESTIGE" | "VOICE_ACTIVITY" | "ACHIEVEMENTS" | "PROFILE_CARDS";
+const HUB_MODULES: HubModule[] = ["LEVELING", "ECONOMY", "PRESTIGE", "VOICE_ACTIVITY", "ACHIEVEMENTS", "PROFILE_CARDS"];
+
+// A full settings page shown as one step of a tab.
+function Embed({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-black/10 p-3 sm:p-4">
+      <EmbeddedPage>{children}</EmbeddedPage>
+    </div>
+  );
+}
+
 export default function EconomyHubPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
   const confirm = useConfirm();
+  const [tab, setTabState] = useState<Tab>("start");
   const [hub, setHub] = useState<EconomyHubView | null>(null);
-  const [modules, setModules] = useState<{ LEVELING: boolean; ECONOMY: boolean }>({ LEVELING: false, ECONOMY: false });
+  const [modules, setModules] = useState<Record<HubModule, boolean>>({ LEVELING: false, ECONOMY: false, PRESTIGE: false, VOICE_ACTIVITY: false, ACHIEVEMENTS: false, PROFILE_CARDS: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<typeof BLANK_ITEM & { id?: string }>(BLANK_ITEM);
   const [editing, setEditing] = useState(false);
-  const [levelChannel, setLevelChannel] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Opens on the tab in the link (?tab=coins), and keeps the link in step.
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t && TABS.some(([k]) => k === t)) setTabState(t as Tab);
+  }, []);
+  function setTab(t: Tab) {
+    setTabState(t);
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", t);
+    window.history.replaceState(null, "", url.toString());
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   useEffect(() => {
     api.getEconomyHub(guildId).then(setHub).catch((e) => setError(e instanceof Error ? e.message : "Couldn't load."));
-    api.getModules(guildId).then((m) => setModules({ LEVELING: !!m.LEVELING?.enabled, ECONOMY: !!m.ECONOMY?.enabled }));
-    api.getLevelingSettings(guildId).then((s) => setLevelChannel(s.channelId)).catch(() => null);
+    api.getModules(guildId).then((m) => setModules(Object.fromEntries(HUB_MODULES.map((k) => [k, !!m[k]?.enabled])) as Record<HubModule, boolean>));
   }, [guildId]);
 
   if (!hub) return <p className="text-slate-400">{error ?? "Loading…"}</p>;
@@ -83,9 +130,9 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
       setSaving(false);
     }
   }
-  async function setModule(key: "LEVELING" | "ECONOMY", on: boolean) {
+  async function setModule(key: HubModule, on: boolean) {
     setModules((m) => ({ ...m, [key]: on }));
-    await api.setModule(guildId, key, on).catch(() => setModules((m) => ({ ...m, [key]: !on })));
+    await api.setModule(guildId, key as ModuleKey, on).catch(() => setModules((m) => ({ ...m, [key]: !on })));
   }
   async function saveItem() {
     try {
@@ -111,43 +158,95 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
       ))}
     </select>
   );
+  const mod = (key: HubModule) => ({ on: modules[key], onToggle: (v: boolean) => setModule(key, v) });
+
+  // The Start tab's checklist: what's on, and where to go next.
+  const parts: Array<[string, string, boolean, Tab]> = [
+    ["⚡", "XP & levels", modules.LEVELING, "levels"],
+    ["🎖️", `Level role ladder (${ladderLinked}/${LEVEL_LADDER.length} linked)`, ladderLinked > 0, "roles"],
+    ["🪙", "Coins", modules.ECONOMY, "coins"],
+    ["🛒", `Shop (${hub.items.filter((i) => i.enabled).length} items)`, s.shopEnabled, "shop"],
+    ["🧾", "Shop panel", !!hub.panel.channelId, "shop"],
+    ["🎁", "Loot crates", s.cratesEnabled, "shop"],
+    ["🎙️", "Voice XP", s.voiceXpEnabled, "boosts"],
+    ["⏰", "XP events", s.weekendEnabled || s.happyEnabled, "boosts"],
+    ["⭐", "Prestige", modules.PRESTIGE, "boosts"],
+    ["🏆", "Achievements", modules.ACHIEVEMENTS, "achievements"],
+    ["🪪", "Profile Cards", modules.PROFILE_CARDS, "profile"],
+    ["📅", "Weekly champions", s.champsEnabled, "stats"],
+  ];
 
   return (
     <div>
-      <ModuleHeader
-        guildId={guildId}
-        moduleKey="ECONOMY"
-        title="Economy Hub"
-        description="Levels, coins and everything worth earning, in one place. Go through the steps in order; each part has its own on/off switch."
-      />
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold mb-1">💰 Economy Hub</h1>
+        <p className="text-slate-400">Levels, coins and everything worth earning, in one place. Pick a tab; each one has numbered steps and its own on/off switches. Tap Guide at the top for the whole walkthrough.</p>
+      </div>
+
+      <div className="sticky top-0 z-20 -mx-1 mb-4 overflow-x-auto bg-base-950/90 px-1 py-2 backdrop-blur">
+        <div className="flex gap-1.5 min-w-max" role="tablist">
+          {TABS.map(([k, t]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={`rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${tab === k ? "bg-neon-blue/15 text-neon-blue border border-neon-blue/40" : "border border-white/10 text-slate-400 hover:text-slate-100"}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && <p className="text-sm text-rose-400 mb-3">{error}</p>}
       {saving && <p className="text-xs text-slate-500 mb-2">Saving…</p>}
 
-      <div className="space-y-4 max-w-4xl">
-        <Step n={1} title="Turn on XP and coins" desc="Members earn XP and coins by chatting (once a minute) and, with step 7, in voice.">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
-              <span className="text-sm">
-                <b>XP &amp; Levels</b>
-                <span className="block text-xs text-slate-500">100 XP per level: level 10 = 1,000 XP, 20 = 2,000…</span>
-              </span>
-              <ToggleSwitch enabled={modules.LEVELING} onChange={(v) => setModule("LEVELING", v)} label="XP and levels" />
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
-              <span className="text-sm">
-                <b>Coins</b>
-                <span className="block text-xs text-slate-500">Turned on with the switch at the top</span>
-              </span>
-              <ToggleSwitch enabled={modules.ECONOMY} onChange={(v) => setModule("ECONOMY", v)} label="Coins" />
-            </div>
-          </div>
-          <p className="text-xs text-slate-500">
-            Coin amounts, /daily and multipliers are on <a className="text-neon-blue hover:underline" href={`/dashboard/${guildId}/economy/earning`}>Economy Earning</a>. The level-up message text and channel are on the{" "}
-            <a className="text-neon-blue hover:underline" href={`/dashboard/${guildId}/leveling`}>Leaderboard</a> page ({levelChannel ? "a set channel" : "posts where the member chatted"}).
-          </p>
-        </Step>
+      <div className="space-y-4 max-w-5xl">
+        {tab === "start" && (
+          <>
+            <Step n={1} title="What's set up" desc="Everything in the hub at a glance. Tap one to go to its tab.">
+              <div className="grid sm:grid-cols-2 gap-2">
+                {parts.map(([icon, name, on, t]) => (
+                  <button key={name} type="button" onClick={() => setTab(t)} className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-left text-sm hover:border-neon-blue/40">
+                    <span>{icon}</span>
+                    <span className="flex-1">{name}</span>
+                    <span className={`text-xs ${on ? "text-emerald-400" : "text-slate-500"}`}>{on ? "● On" : "○ Off"}</span>
+                  </button>
+                ))}
+              </div>
+            </Step>
+            <Step n={2} title="Quick start" desc="The fastest way to a working economy.">
+              <ol className="space-y-2 text-sm text-slate-300 list-decimal pl-5">
+                <li>
+                  <b>⚡ Levels:</b> turn on XP &amp; Levels. Members earn 15–25 XP a message (once a minute), 100 XP per level.
+                </li>
+                <li>
+                  <b>🎖️ Level Roles:</b> run <code className="text-neon-blue">/levelroles</code> in Discord to make the 11 colored roles.
+                </li>
+                <li>
+                  <b>🪙 Coins:</b> turn on Coins and name your currency.
+                </li>
+                <li>
+                  <b>🛒 Shop:</b> add the 4 starter items (or your own), turn the shop on, and pick a channel for the shop panel.
+                </li>
+                <li>
+                  <b>🎉 Boosts:</b> turn on Voice XP, and an XP weekend if you like.
+                </li>
+                <li>Everything else is optional: achievements, profile cards and weekly champions.</li>
+              </ol>
+              <button type="button" className="neon-button-sm" onClick={() => setTab("levels")}>
+                Start with Levels →
+              </button>
+            </Step>
+          </>
+        )}
 
-        <Step n={2} title="Level-up moments" desc="Every level has its own color, from grey to gold, and level-ups come with rewards.">
+        {tab === "levels" && (
+          <>
+            <Step n={1} title="Turn on XP & levels" desc="Members earn 15–25 XP per message (once a minute). 100 XP per level: level 10 = 1,000 XP, 20 = 2,000, 30 = 3,000." {...mod("LEVELING")} />
+            <Step n={2} title="Level-up moments" desc="Every level has its own color, from grey to gold, and level-ups come with rewards.">
           <div className="flex flex-wrap gap-1.5" aria-label="Level colors">
             {Array.from({ length: 50 }, (_, i) => i + 1).map((l) => (
               <span key={l} title={`Level ${l}`} className="w-5 h-5 rounded" style={{ background: levelColor(l) }} />
@@ -165,9 +264,18 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <span>Coins for every level gained:</span>
             {sel(s.levelUpCoins, [0, 10, 25, 50, 100, 250, 500].map((n) => [n, n ? `${n}` : "None"] as [number, string]), (v) => save({ levelUpCoins: v }), "Coins per level")}
           </div>
-        </Step>
+            </Step>
+            <Step n={3} title="Level-up message, channel and leaderboard" desc="What the level-up says, where it posts, and who's on top.">
+              <Embed>
+                <LevelingPage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
 
-        <Step n={3} title="Level role ladder" desc={`11 colored roles from Recruit to Spartan Legend. ${ladderLinked}/${LEVEL_LADDER.length} linked in this server.`}>
+        {tab === "roles" && (
+          <>
+            <Step n={1} title="The level role ladder" desc={`11 colored roles from Recruit to Spartan Legend. ${ladderLinked}/${LEVEL_LADDER.length} linked in this server.`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -206,9 +314,34 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <span>Keep only the newest level role (so the name color always matches their level)</span>
             <ToggleSwitch enabled={s.keepTopLevelRole} onChange={(v) => save({ keepTopLevelRole: v })} />
           </label>
-        </Step>
+            </Step>
+            <Step n={2} title="Level roles and XP blacklist" desc="Change which role each level gives, add your own, and pick channels or roles that earn no XP.">
+              <Embed>
+                <LevelRolesPage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
 
-        <Step n={4} title="Reward Shop" desc="Things to spend coins on: roles, XP potions, crates, streak freezes, or anything staff hand out." on={s.shopEnabled} onToggle={(v) => save({ shopEnabled: v })}>
+        {tab === "coins" && (
+          <>
+            <Step n={1} title="Turn on coins" desc="Members earn coins by chatting, from /daily, voice, level-ups and crates." {...mod("ECONOMY")} />
+            <Step n={2} title="Your currency" desc="Its name, icon, color and the biggest balance allowed.">
+              <Embed>
+                <EconomySettingsPage params={params} />
+              </Embed>
+            </Step>
+            <Step n={3} title="How coins are earned" desc="Coins per message, /daily and streaks, sending coins, and channel or role multipliers.">
+              <Embed>
+                <EconomyEarningPage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
+
+        {tab === "shop" && (
+          <>
+            <Step n={1} title="Reward Shop" desc="Things to spend coins on: roles, XP potions, crates, streak freezes, or anything staff hand out." on={s.shopEnabled} onToggle={(v) => save({ shopEnabled: v })}>
           <div className="space-y-2">
             {hub.items.length === 0 && (
               <p className="text-sm text-slate-400">
@@ -311,9 +444,8 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
               </ul>
             </div>
           )}
-        </Step>
-
-        <Step n={5} title="Shop panel" desc="An embed in a channel with Shop, My Crates, Daily and Balance buttons. No commands needed." on={!!hub.panel.channelId}>
+            </Step>
+            <Step n={2} title="Shop panel" desc="An embed in a channel with Shop, My Crates, Daily and Balance buttons. No commands needed." on={!!hub.panel.channelId}>
           <div>
             <span className={label}>Channel</span>
             <ChannelSelect guildId={guildId} value={hub.panel.channelId} onChange={(id) => save({}, { ...hub.panel, channelId: id || null })} placeholder="No panel" />
@@ -329,12 +461,11 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
                 </button>
               </div>
               {hub.panel.error && <p className="text-xs text-rose-400">{hub.panel.error}</p>}
-              <p className="text-xs text-slate-500">Each button opens just for the person who pressed it, so the channel stays clean. Shop and My Crates follow the switches in steps 4 and 6.</p>
+              <p className="text-xs text-slate-500">Each button opens just for the person who pressed it, so the channel stays clean. Shop and My Crates follow the switches in steps 1 and 3.</p>
             </>
           )}
-        </Step>
-
-        <Step n={6} title="Loot crates" desc="Common, Rare, Epic and Legendary crates with a spinning reveal. Opened with /crates or the panel." on={s.cratesEnabled} onToggle={(v) => save({ cratesEnabled: v })}>
+            </Step>
+            <Step n={3} title="Loot crates" desc="Common, Rare, Epic and Legendary crates with a spinning reveal. Opened with /crates or the panel." on={s.cratesEnabled} onToggle={(v) => save({ cratesEnabled: v })}>
           <div className="grid sm:grid-cols-2 gap-2">
             {CRATE_RARITIES.map((r) => (
               <div key={r} className="rounded-lg border p-2.5 text-xs" style={{ borderColor: CRATE_INFO[r].color + "55" }}>
@@ -364,9 +495,13 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <span className={label}>Announce Epic and Legendary pulls in</span>
             <ChannelSelect guildId={guildId} value={s.crateChannelId} onChange={(id) => save({ crateChannelId: id || null })} placeholder="Only where they're opened" />
           </div>
-        </Step>
+            </Step>
+          </>
+        )}
 
-        <Step n={7} title="Voice XP" desc="XP every minute and coins every 10 minutes for people talking in voice." on={s.voiceXpEnabled} onToggle={(v) => save({ voiceXpEnabled: v })}>
+        {tab === "boosts" && (
+          <>
+            <Step n={1} title="Voice XP" desc="XP every minute and coins every 10 minutes for people talking in voice." on={s.voiceXpEnabled} onToggle={(v) => save({ voiceXpEnabled: v })}>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             {sel(s.voiceXpPerMin, [1, 2, 3, 5, 8, 10, 15].map((n) => [n, `${n} XP`] as [number, string]), (v) => save({ voiceXpPerMin: v }), "XP per minute")}
             <span>per minute, and</span>
@@ -374,9 +509,13 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <span>per 10 minutes</span>
           </div>
           <p className="text-xs text-slate-500">Only counts with at least 2 people in the channel, not muted or deafened, and not in the AFK channel, so it can't be farmed alone. Counted live every minute.</p>
-        </Step>
-
-        <Step n={8} title="XP events" desc="Double XP Weekends and a daily Happy Hour, announced automatically." on={s.weekendEnabled || s.happyEnabled}>
+            </Step>
+            <Step n={2} title="Voice time tracking" desc="Total time in voice per member, voice achievements and the voice leaderboard." {...mod("VOICE_ACTIVITY")}>
+              <Embed>
+                <VoiceActivityPage params={params} />
+              </Embed>
+            </Step>
+            <Step n={3} title="XP events" desc="Weekend boosts and a daily Happy Hour, announced automatically." on={s.weekendEnabled || s.happyEnabled}>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span>Server time zone:</span>
             {sel(s.timezone, EVENT_TIMEZONES.map((t) => [t, t.replace("_", " ")] as [string, string]), (v) => save({ timezone: v }), "Time zone")}
@@ -401,20 +540,45 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <ChannelSelect guildId={guildId} value={s.eventChannelId} onChange={(id) => save({ eventChannelId: id || null })} placeholder="Don't announce" />
           </div>
           <p className="text-xs text-slate-500">Events multiply XP and message coins. They stack with the Stream Deck XP dial and personal potions.</p>
-        </Step>
-
-        <Step n={9} title="Prestige perks" desc="At the top, /prestige resets to level 0. Each prestige now gives a permanent bonus." on={s.prestigeBonusPct > 0}>
+            </Step>
+            <Step n={4} title="Prestige" desc="At the max level, /prestige resets to level 0 for a prestige rank, a role, and a permanent bonus." {...mod("PRESTIGE")}>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span>Bonus XP and coins per prestige:</span>
             {sel(s.prestigeBonusPct, [[0, "None"], [5, "+5%"], [10, "+10%"], [15, "+15%"], [20, "+20%"], [25, "+25%"]], (v) => save({ prestigeBonusPct: v }), "Prestige bonus")}
             <span className="text-xs text-slate-500">(capped at +100%)</span>
           </div>
-          <p className="text-xs text-slate-500">
-            The max level and prestige role are on the <a className="text-neon-blue hover:underline" href={`/dashboard/${guildId}/prestige`}>Prestige</a> page.
-          </p>
-        </Step>
+              <Embed>
+                <PrestigePage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
 
-        <Step n={10} title="Weekly champions" desc="Every Monday at noon: last week's top members get a role for the week and a Rare crate." on={s.champsEnabled} onToggle={(v) => save({ champsEnabled: v })}>
+        {tab === "achievements" && (
+          <>
+            <Step n={1} title="Turn on achievements" desc="Badges for milestones: first message, levels, streaks, voice hours, and your own." {...mod("ACHIEVEMENTS")} />
+            <Step n={2} title="Set them up" desc="Where they're announced, the built-in ones, and your own custom achievements.">
+              <Embed>
+                <AchievementsPage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
+
+        {tab === "profile" && (
+          <>
+            <Step n={1} title="Turn on Profile Cards" desc="/profile and a button panel show a card with level, stats, badges and games." {...mod("PROFILE_CARDS")} />
+            <Step n={2} title="Set them up" desc="Which stats show, bios, the button panel and a preview of your card.">
+              <Embed>
+                <ProfileCardsPage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
+
+        {tab === "stats" && (
+          <>
+            <Step n={1} title="Weekly champions" desc="Every Monday at noon: last week's top members get a role for the week and a Rare crate." on={s.champsEnabled} onToggle={(v) => save({ champsEnabled: v })}>
           <div className="grid sm:grid-cols-2 gap-2">
             {(Object.keys(CHAMP_CATEGORIES) as Array<keyof typeof CHAMP_CATEGORIES>).map((c) => (
               <label key={c} className="flex items-center gap-2 text-sm">
@@ -433,8 +597,20 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
               <RoleSelect guildId={guildId} value={s.champsRoleId} onChange={(id) => save({ champsRoleId: id || null })} placeholder="No role" />
             </div>
           </div>
-          <p className="text-xs text-slate-500">Uses this server's time zone from step 8. Tracking starts when this is turned on, so the first post covers the first full week.</p>
-        </Step>
+          <p className="text-xs text-slate-500">Uses this server's time zone (Boosts tab, XP events). Tracking starts when this is turned on, so the first post covers the first full week.</p>
+            </Step>
+            <Step n={2} title="Coin leaderboard" desc="The richest members right now.">
+              <Embed>
+                <EconomyLeaderboardPage params={params} />
+              </Embed>
+            </Step>
+            <Step n={3} title="Economy analytics" desc="How coins are being earned and spent over time.">
+              <Embed>
+                <EconomyAnalyticsPage params={params} />
+              </Embed>
+            </Step>
+          </>
+        )}
       </div>
     </div>
   );

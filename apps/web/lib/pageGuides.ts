@@ -10,6 +10,31 @@ export interface PageGuide {
 }
 
 export const PAGE_GUIDES: Record<string, PageGuide> = {
+  "/economy-hub": {
+    title: "Economy Hub",
+    purpose: "Everything about levels and coins in one place: XP and level-ups, the colored level role ladder, coins, the shop and crates, boosts, achievements, profile cards and leaderboards. Each tab has numbered steps and its own on/off switches.",
+    before: ["Spartacus's role should sit near the top of your role list, so it can give the level roles and shop roles."],
+    steps: [
+      "Start tab: see what's on at a glance and follow the quick start.",
+      "Levels tab: turn on XP & Levels, choose level-up colors, the card image and coins per level, then the level-up message and channel.",
+      "Level Roles tab: run /levelroles in Discord to make the 11 colored roles (Recruit to Spartan Legend), then add or change any level roles and the XP blacklist.",
+      "Coins tab: turn on Coins, name your currency, and set how coins are earned (messages, /daily, multipliers).",
+      "Shop tab: add items (or the 4 starters), turn the shop on, pick a channel for the shop panel, and turn on loot crates.",
+      "Boosts tab: Voice XP, voice time tracking, XP weekends and Happy Hour, and prestige with its permanent bonus.",
+      "Achievements and Profile Cards tabs: turn each on and set it up.",
+      "Leaderboards tab: Weekly Champions, the coin leaderboard and economy analytics.",
+    ],
+    members: [
+      "Chatting earns 15–25 XP a minute; 100 XP per level (level 10 = 1,000 XP). Level-ups post a colored card with rewards.",
+      "/shop to buy rewards, /crates to open loot crates, /daily every day (streak freezes save a missed day), /profile for their card, /rank for their rank card.",
+      "Or the shop panel's buttons: Shop, My Crates, Daily and Balance.",
+    ],
+    tips: [
+      "Keep only the newest level role on, so name colors always match levels.",
+      "A colored role placed above the level roles (like a staff role) overrides their colors.",
+      "The old Leaderboard, Level Roles, Prestige, Voice Activity, Achievements, Profile Cards and Economy pages are all tabs here now.",
+    ],
+  },
   "": {
     title: "Overview",
     purpose: "Your dashboard's home page. It shows which modules are on and what's happened recently.",

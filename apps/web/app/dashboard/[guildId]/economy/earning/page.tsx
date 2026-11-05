@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
@@ -24,6 +25,7 @@ function NumberField({ label, value, onChange }: { label: string; value: number;
 }
 
 export default function EconomyEarningPage({ params }: { params: { guildId: string } }) {
+  const embedded = useEmbedded();
   const [config, setConfig] = useState<EconomyConfig | null>(null);
   const [newChannelId, setNewChannelId] = useState<string | null>(null);
   const [newRoleId, setNewRoleId] = useState<string | null>(null);
@@ -78,8 +80,8 @@ export default function EconomyEarningPage({ params }: { params: { guildId: stri
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Economy Earning</h1>
-      <p className="text-slate-400 mb-6">How members earn and move currency: message rates, the daily claim, transfers, and per-channel / per-role multipliers.</p>
+      {!embedded && <h1 className="text-2xl font-bold mb-1">Economy Earning</h1>}
+      {!embedded && <p className="text-slate-400 mb-6">How members earn and move currency: message rates, the daily claim, transfers, and per-channel / per-role multipliers.</p>}
 
       <NeonCard className="max-w-2xl mb-4">
         <p className="font-medium mb-1">Message earning</p>

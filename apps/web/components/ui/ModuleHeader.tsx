@@ -5,6 +5,7 @@ import type { ModuleKey } from "@spartacus/shared";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { api } from "../../lib/api";
 import { EditableText } from "./EditableText";
+import { useEmbedded } from "./EmbeddedPage";
 
 interface ModuleHeaderProps {
   guildId: string;
@@ -17,6 +18,7 @@ interface ModuleHeaderProps {
 // without leaving the page to go find it in the Modules grid.
 export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleHeaderProps) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const embedded = useEmbedded();
 
   useEffect(() => {
     api.getModules(guildId).then((state) => setEnabled(state[moduleKey]?.enabled ?? false));
@@ -26,6 +28,8 @@ export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleH
     setEnabled(next);
     await api.setModule(guildId, moduleKey, next).catch(() => setEnabled(!next));
   }
+
+  if (embedded) return null;
 
   return (
     <div className="flex items-start justify-between gap-4 mb-6">

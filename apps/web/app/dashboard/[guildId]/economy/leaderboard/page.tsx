@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { api, type EconomyBalanceRow, type EconomyConfig } from "../../../../../lib/api";
@@ -7,6 +8,7 @@ import { useMemberNames } from "../../../../../lib/useMemberNames";
 import { downloadCsv } from "../../../../../lib/csv";
 
 export default function EconomyLeaderboardPage({ params }: { params: { guildId: string } }) {
+  const embedded = useEmbedded();
   const [config, setConfig] = useState<EconomyConfig | null>(null);
   const [rows, setRows] = useState<EconomyBalanceRow[]>([]);
   const { displayName } = useMemberNames(params.guildId, rows.map((r) => r.userId));
@@ -18,8 +20,8 @@ export default function EconomyLeaderboardPage({ params }: { params: { guildId: 
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Economy Leaderboard</h1>
-      <p className="text-slate-400 mb-6">Top wallets in this server, ranked by current balance.</p>
+      {!embedded && <h1 className="text-2xl font-bold mb-1">Economy Leaderboard</h1>}
+      {!embedded && <p className="text-slate-400 mb-6">Top wallets in this server, ranked by current balance.</p>}
 
       {rows.length > 0 && (
         <div className="flex justify-end mb-3 max-w-2xl">

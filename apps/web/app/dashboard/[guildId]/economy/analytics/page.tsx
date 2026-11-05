@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { api, type EconomyAnalytics, type EconomyConfig } from "../../../../../lib/api";
@@ -15,6 +16,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 }
 
 export default function EconomyAnalyticsPage({ params }: { params: { guildId: string } }) {
+  const embedded = useEmbedded();
   const [config, setConfig] = useState<EconomyConfig | null>(null);
   const [days, setDays] = useState(30);
   const [data, setData] = useState<EconomyAnalytics | null>(null);
@@ -33,7 +35,7 @@ export default function EconomyAnalyticsPage({ params }: { params: { guildId: st
   return (
     <div>
       <div className="flex items-start justify-between flex-wrap gap-2 mb-1">
-        <h1 className="text-2xl font-bold">Economy Analytics</h1>
+        {!embedded && <h1 className="text-2xl font-bold">Economy Analytics</h1>}
         <div className="flex gap-2">
           {[7, 30, 90].map((d) => (
             <button
@@ -48,7 +50,7 @@ export default function EconomyAnalyticsPage({ params }: { params: { guildId: st
           ))}
         </div>
       </div>
-      <p className="text-slate-400 mb-6">How much currency is out there, what came in vs. what went out, and who's holding most of it.</p>
+      {!embedded && <p className="text-slate-400 mb-6">How much currency is out there, what came in vs. what went out, and who's holding most of it.</p>}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <StatCard label="Total Held" value={`${(data?.totalHeld ?? 0).toLocaleString()} ${icon}`} />

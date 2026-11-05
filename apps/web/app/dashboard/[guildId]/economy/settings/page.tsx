@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
 import { DiscordEmbed, DiscordMessage } from "../../../../../components/ui/DiscordPreview";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
@@ -8,6 +9,7 @@ import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
 import { api, type EconomyConfig, type ModuleState } from "../../../../../lib/api";
 
 export default function EconomySettingsPage({ params }: { params: { guildId: string } }) {
+  const embedded = useEmbedded();
   const [config, setConfig] = useState<EconomyConfig | null>(null);
   const [enabled, setEnabled] = useState<boolean | null>(null);
 
@@ -30,8 +32,8 @@ export default function EconomySettingsPage({ params }: { params: { guildId: str
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">Economy Settings</h1>
-      <p className="text-slate-400 mb-6">Master switch and currency identity. Earning rules, leaderboard and analytics each live on their own sidebar page.</p>
+      {!embedded && <h1 className="text-2xl font-bold mb-1">Economy Settings</h1>}
+      {!embedded && <p className="text-slate-400 mb-6">Master switch and currency identity. Earning rules, leaderboard and analytics each live on their own sidebar page.</p>}
 
       <NeonCard className="max-w-2xl mb-4">
         <p className="font-medium mb-1">Master switch</p>

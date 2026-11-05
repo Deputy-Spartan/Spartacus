@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import { forgetLastUser, readLastUser, type LastUser } from "../lib/lastUser";
 
@@ -72,30 +72,49 @@ const FEATURES: Array<{ icon: string; title: string; short: string; details: str
 
 function useServerCount() {
   const [stats, setStats] = useState<{ servers: number; members: number; botAvatar: string | null } | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     fetch(`${API_URL}/public/stats`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => j && setStats(j))
-      .catch(() => null);
+      .then((j) => (j ? setStats(j) : setFailed(true)))
+      .catch(() => setFailed(true));
   }, []);
-  return stats;
+  return { stats, failed };
 }
 
 const compact = (n: number) => (n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n));
 
-function Helmet({ className = "" }: { className?: string }) {
+// Spartacus's logo is the bot's own Discord avatar, so changing the bot's
+// picture (in the Discord Developer Portal, or anywhere else) changes it here
+// too, the same way the sidebar and the browser tab icon follow it.
+// /public/stats gives the current picture (it refreshes every minute); if that
+// call fails, the public /bot-avatar image is used instead. Until one loads,
+// an empty circle holds the spot so nothing jumps.
+function BotLogo({ src, failed, className = "" }: { src: string | null | undefined; failed: boolean; className?: string }) {
+  const [broken, setBroken] = useState(false);
+  const url = src ?? (failed ? `${API_URL}/bot-avatar` : null);
+  if (!url || broken) return <span aria-hidden="true" className={`block rounded-full bg-white/[0.06] ${className}`} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="Spartacus" onError={() => setBroken(true)} className={`rounded-full object-cover ${className}`} />;
+}
+
+function FeatureDetails({ i }: { i: number }) {
+  const f = FEATURES[i];
   return (
-    <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
-      <defs>
-        <linearGradient id="spartacusHelm" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#9fb6d3" />
-          <stop offset="1" stopColor="#5e7fa6" />
-        </linearGradient>
-      </defs>
-      <path d="M32 4c-7 0-12 3-15 8l-4 9c-2 5-2 11 0 17l3 10c1 4 4 7 8 8l4 1V40h8v17l4-1c4-1 7-4 8-8l3-10c2-6 2-12 0-17l-4-9c-3-5-8-8-15-8z" fill="url(#spartacusHelm)" />
-      <path d="M24 30h16v8H24z" fill="#1c1d20" opacity=".85" />
-      <path d="M30 4h4v26h-4z" fill="#d9e3ef" opacity=".55" />
-    </svg>
+    <div className="rounded-xl border border-neon-blue/30 bg-black/20 px-4 py-3.5 animate-[fadeIn_.25s_ease-out]">
+      <p className="flex items-center gap-2 text-sm font-semibold">
+        <span className="text-lg">{f.icon}</span>
+        {f.title}
+      </p>
+      <ul className="mt-2.5 space-y-1.5">
+        {f.details.map((d) => (
+          <li key={d} className="flex gap-2 text-[13px] text-slate-300">
+            <span className="text-neon-blue">✓</span>
+            {d}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -115,7 +134,7 @@ function LandingContent() {
   const expired = params.get("expired") === "1";
   const idle = params.get("idle") === "1";
   const signinFailed = params.get("error") === "signin";
-  const stats = useServerCount();
+  const { stats, failed: statsFailed } = useServerCount();
   const [open, setOpen] = useState<number | null>(null);
   const [lastUser, setLastUser] = useState<LastUser | null>(null);
   const [going, setGoing] = useState(false);
@@ -136,24 +155,25 @@ function LandingContent() {
       <section className="relative overflow-hidden bg-gradient-to-br from-[#23262c] to-[#141518] px-6 py-10 sm:px-12 lg:py-14 flex flex-col">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(123,153,188,0.32),transparent_65%)]" />
         <div className="relative flex items-center gap-2.5">
-          <Helmet className="h-9 w-9" />
+          <BotLogo src={stats?.botAvatar} failed={statsFailed} className="h-9 w-9 ring-1 ring-white/10" />
           <span className="text-xl font-extrabold tracking-tight">Spartacus</span>
         </div>
         <h1 className="relative mt-10 text-3xl sm:text-4xl font-extrabold leading-tight max-w-xl">Run your gaming community from one dashboard.</h1>
         <p className="relative mt-3 text-slate-400 max-w-md">Everything your server needs, set up in minutes and managed in one place. Tap a box to see what it does.</p>
 
-        {/* The six boxes stay put; the open one's details slide out underneath,
-            so nothing jumps around when you click through them. */}
+        {/* Wider screens: the boxes stay put in two columns and the open one's
+            details show in one panel underneath. Phones (one column): the
+            details open right under the box that was tapped. */}
         <div className="relative mt-8 max-w-2xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {FEATURES.map((f, i) => {
               const isOpen = open === i;
               return (
+                <Fragment key={f.title}>
                 <button
-                  key={f.title}
                   type="button"
                   aria-expanded={isOpen}
-                  aria-controls="feature-details"
+                  aria-controls={isOpen ? "feature-details" : undefined}
                   onClick={() => setOpen(isOpen ? null : i)}
                   className={`group h-full text-left rounded-xl border px-4 py-3 transition-all duration-200 ${
                     isOpen
@@ -170,28 +190,15 @@ function LandingContent() {
                     <span className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180 text-neon-blue" : "text-slate-500"}`}>▼</span>
                   </span>
                 </button>
+                <div className={`sm:hidden grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 -mt-1" : "grid-rows-[0fr] opacity-0 -mt-2.5"}`}>
+                  <div className="overflow-hidden">{isOpen && <FeatureDetails i={i} />}</div>
+                </div>
+                </Fragment>
               );
             })}
           </div>
-          <div id="feature-details" className={`grid transition-all duration-300 ease-out ${open !== null ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
-            <div className="overflow-hidden">
-              {open !== null && (
-                <div key={open} className="rounded-xl border border-neon-blue/30 bg-black/20 px-4 py-3.5 animate-[fadeIn_.25s_ease-out]">
-                  <p className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="text-lg">{FEATURES[open].icon}</span>
-                    {FEATURES[open].title}
-                  </p>
-                  <ul className="mt-2.5 space-y-1.5">
-                    {FEATURES[open].details.map((d) => (
-                      <li key={d} className="flex gap-2 text-[13px] text-slate-300">
-                        <span className="text-neon-blue">✓</span>
-                        {d}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+          <div id="feature-details" className={`hidden sm:grid transition-all duration-300 ease-out ${open !== null ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
+            <div className="overflow-hidden">{open !== null && <FeatureDetails key={open} i={open} />}</div>
           </div>
         </div>
 
@@ -217,11 +224,8 @@ function LandingContent() {
           {lastUser?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={lastUser.avatarUrl} alt="" className="mx-auto h-16 w-16 rounded-full ring-2 ring-neon-blue/40" />
-          ) : stats?.botAvatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={stats.botAvatar} alt="" className="mx-auto h-16 w-16 rounded-full ring-2 ring-white/10" />
           ) : (
-            <Helmet className="mx-auto h-14 w-14" />
+            <BotLogo src={stats?.botAvatar} failed={statsFailed} className="mx-auto h-16 w-16 ring-2 ring-white/10" />
           )}
           <h2 className="mt-4 text-xl font-bold">{lastUser ? `Welcome back, ${lastUser.name}` : "Welcome"}</h2>
           <p className="mt-1 text-sm text-slate-400">Sign in with the Discord account that manages your server.</p>

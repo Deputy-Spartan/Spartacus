@@ -453,68 +453,11 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     steps: ["Tap + Create New.", "Enter the Partner Server Name.", "Add an Invite Link if you have one.", "Pick the Type.", "Tap Create Partnership."],
   },
 
-  "/leveling": {
-    title: "Leaderboard",
-    purpose: "Ranks members by the XP they earn from messages.",
-    steps: ["Turn the module on.", "Set up Level-Up Announcements, and write the Message. {user} and {level} fill in automatically.", "Check the leaderboard here, or tap Export CSV."],
-    members: ["Members use /leaderboard. /rank needs the Rank Cards module, which you can turn on from the Modules page."],
-  },
-  "/level-roles": {
-    title: "Level Roles",
-    purpose: "Gives members a role when they reach a level.",
-    before: ["Create the roles, and move Spartacus's role above them."],
-    steps: ["Tap + Create New.", "Enter the Level.", "Pick the Role to Grant.", "Tap Create Level Role.", "Repeat for each milestone."],
-  },
-  "/prestige": {
-    title: "Prestige",
-    purpose: "Members at the max level can reset to 0 for a permanent prestige rank.",
-    steps: ["Set the Max Level.", "Pick an optional Prestige Role.", "Turn the module on."],
-    members: ["Members run /prestige once they reach the max level."],
-    tips: ["Tell members their level resets, because they can't undo it."],
-  },
-  "/voice-activity": {
-    title: "Voice Activity",
-    purpose: "Tracks time spent in voice and ranks the most active members.",
-    steps: ["Turn the module on.", "Check Top 20 by Time in Voice after people have spent time in voice."],
-    tips: ["Time in your AFK channel doesn't count."],
-  },
-  "/achievements": {
-    title: "Achievements",
-    purpose: "Milestones members unlock automatically for messages, levels, daily streaks and voice time.",
-    steps: ["Turn the module on.", "Pick a channel under Achievement Announcements.", "Add Custom Achievements with a name, emoji, trigger and amount.", "Check Recently Awarded."],
-    tips: ["Without an announcement channel, it posts where the achievement was earned, when that's possible."],
-  },
   "/growth-analytics": {
     title: "Growth Analytics",
     purpose: "A daily snapshot of member count and messages, so you can see trends.",
     steps: ["Turn the module on.", "Come back after a few days, once snapshots have built up.", "Read the Member Count and Messages / Day charts."],
     tips: ["Snapshots are taken once a day at midnight UTC."],
-  },
-  "/economy/settings": {
-    title: "Economy Settings",
-    purpose: "Sets up your server's currency.",
-    steps: ["Turn on Enable Economy.", "Set the Currency name and symbol.", "Pick the Embed accent colour.", "Set the Maximum balance.", "Check the Embed preview, then go to Economy Earning."],
-    members: ["Members use /balance, /daily and /pay. /coinflip and /slots need the Casino module, and /trivia needs the Trivia module, both on the Modules page."],
-  },
-  "/economy/earning": {
-    title: "Economy Earning",
-    purpose: "Controls how members earn and send currency.",
-    steps: [
-      "Turn on Earn on messages and set the amounts and cooldown.",
-      "Turn on Enable /daily and set the reward and streak bonus.",
-      "Turn on Allow /pay, and set a Tax % if you want one.",
-      "Tap + Add channel or + Add role under Multipliers to reward certain channels or roles.",
-    ],
-  },
-  "/economy/leaderboard": {
-    title: "Economy Leaderboard",
-    purpose: "Ranks the top wallets on your server.",
-    steps: ["Read the Top wallets list.", "Tap Export CSV to download it."],
-  },
-  "/economy/analytics": {
-    title: "Economy Analytics",
-    purpose: "Shows how currency is moving through your server.",
-    steps: ["Check the Concentration card to see how much the top holders own.", "Check Top earners.", "If a few people hold nearly everything, lower earnings or add ways to spend."],
   },
   "/counting-game": {
     title: "Counting Game",

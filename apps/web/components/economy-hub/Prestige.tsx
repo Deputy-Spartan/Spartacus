@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { FormError } from "../../../../components/ui/FormError";
-import { RoleSelect } from "../../../../components/ui/RoleSelect";
-import { api, type PrestigeSettingsRow } from "../../../../lib/api";
-import { useAutoSave } from "../../../../lib/useAutoSave";
-import { SaveStatus } from "../../../../components/ui/SaveStatus";
+import { NeonCard } from "../ui/NeonCard";
+import { ModuleHeader } from "../ui/ModuleHeader";
+import { FormError } from "../ui/FormError";
+import { RoleSelect } from "../ui/RoleSelect";
+import { api, type PrestigeSettingsRow } from "../../lib/api";
+import { useAutoSave } from "../../lib/useAutoSave";
+import { SaveStatus } from "../ui/SaveStatus";
 
 const DEFAULTS: PrestigeSettingsRow = {
   maxLevel: 50,

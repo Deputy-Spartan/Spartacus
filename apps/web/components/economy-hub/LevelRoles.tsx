@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
-import { RoleSelect } from "../../../../components/ui/RoleSelect";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { Required } from "../../../../components/ui/Required";
-import { FormError } from "../../../../components/ui/FormError";
-import { api, type DiscordRoleOption, type LevelRoleRow } from "../../../../lib/api";
+import { NeonCard } from "../ui/NeonCard";
+import { RoleSelect } from "../ui/RoleSelect";
+import { ModuleHeader } from "../ui/ModuleHeader";
+import { useConfirm } from "../ui/ConfirmDialog";
+import { Required } from "../ui/Required";
+import { FormError } from "../ui/FormError";
+import { api, type DiscordRoleOption, type LevelRoleRow } from "../../lib/api";
 
 type Tab = "active" | "create";
 

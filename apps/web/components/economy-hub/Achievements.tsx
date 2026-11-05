@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
-import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
-import { ChannelOverrideField } from "../../../../components/ui/ChannelOverrideField";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { Required } from "../../../../components/ui/Required";
-import { FormError } from "../../../../components/ui/FormError";
-import { SaveStatus } from "../../../../components/ui/SaveStatus";
-import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { NeonCard } from "../ui/NeonCard";
+import { EmojiPicker } from "../ui/EmojiPicker";
+import { ChannelOverrideField } from "../ui/ChannelOverrideField";
+import { ModuleHeader } from "../ui/ModuleHeader";
+import { Required } from "../ui/Required";
+import { FormError } from "../ui/FormError";
+import { SaveStatus } from "../ui/SaveStatus";
+import { useConfirm } from "../ui/ConfirmDialog";
 import {
   api,
   type AchievementRow,
@@ -17,9 +17,9 @@ import {
   type CustomAchievementInput,
   type CustomAchievementTrigger,
   type DiscordChannelOption,
-} from "../../../../lib/api";
-import { useAutoSave } from "../../../../lib/useAutoSave";
-import { useMemberNames } from "../../../../lib/useMemberNames";
+} from "../../lib/api";
+import { useAutoSave } from "../../lib/useAutoSave";
+import { useMemberNames } from "../../lib/useMemberNames";
 
 const ACHIEVEMENT_LABELS: Record<string, string> = {
   FIRST_MESSAGE: "First Message",

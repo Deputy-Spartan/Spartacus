@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ChannelOverrideField } from "../../../../components/ui/ChannelOverrideField";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
-import { SaveStatus } from "../../../../components/ui/SaveStatus";
-import { api, type LeaderboardRow, type LevelingSettingsRow } from "../../../../lib/api";
-import { downloadCsv } from "../../../../lib/csv";
-import { useAutoSave } from "../../../../lib/useAutoSave";
+import { NeonCard } from "../ui/NeonCard";
+import { ChannelOverrideField } from "../ui/ChannelOverrideField";
+import { ModuleHeader } from "../ui/ModuleHeader";
+import { PlaceholderExamples } from "../ui/PlaceholderExamples";
+import { SaveStatus } from "../ui/SaveStatus";
+import { api, type LeaderboardRow, type LevelingSettingsRow } from "../../lib/api";
+import { downloadCsv } from "../../lib/csv";
+import { useAutoSave } from "../../lib/useAutoSave";
 
 const LEVEL_UP_TOKENS = [
   { token: "{user}", description: "Mentions the member who leveled up" },

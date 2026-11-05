@@ -1,14 +1,14 @@
 "use client";
 
-import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
+import { useEmbedded } from "../ui/EmbeddedPage";
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../../components/ui/NeonCard";
-import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
-import { ChannelSelect } from "../../../../../components/ui/ChannelSelect";
-import { RoleSelect } from "../../../../../components/ui/RoleSelect";
-import { Required } from "../../../../../components/ui/Required";
-import { FormError } from "../../../../../components/ui/FormError";
-import { api, type DiscordChannelOption, type DiscordRoleOption, type EconomyConfig, type EconomyMultiplier } from "../../../../../lib/api";
+import { NeonCard } from "../ui/NeonCard";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
+import { ChannelSelect } from "../ui/ChannelSelect";
+import { RoleSelect } from "../ui/RoleSelect";
+import { Required } from "../ui/Required";
+import { FormError } from "../ui/FormError";
+import { api, type DiscordChannelOption, type DiscordRoleOption, type EconomyConfig, type EconomyMultiplier } from "../../lib/api";
 
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (

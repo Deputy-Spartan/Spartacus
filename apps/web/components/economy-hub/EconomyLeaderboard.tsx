@@ -1,11 +1,11 @@
 "use client";
 
-import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
+import { useEmbedded } from "../ui/EmbeddedPage";
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../../components/ui/NeonCard";
-import { api, type EconomyBalanceRow, type EconomyConfig } from "../../../../../lib/api";
-import { useMemberNames } from "../../../../../lib/useMemberNames";
-import { downloadCsv } from "../../../../../lib/csv";
+import { NeonCard } from "../ui/NeonCard";
+import { api, type EconomyBalanceRow, type EconomyConfig } from "../../lib/api";
+import { useMemberNames } from "../../lib/useMemberNames";
+import { downloadCsv } from "../../lib/csv";
 
 export default function EconomyLeaderboardPage({ params }: { params: { guildId: string } }) {
   const embedded = useEmbedded();

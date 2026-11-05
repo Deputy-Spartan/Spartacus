@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { api, type VoiceActivityRow } from "../../../../lib/api";
-import { useMemberNames } from "../../../../lib/useMemberNames";
+import { NeonCard } from "../ui/NeonCard";
+import { ModuleHeader } from "../ui/ModuleHeader";
+import { api, type VoiceActivityRow } from "../../lib/api";
+import { useMemberNames } from "../../lib/useMemberNames";
 
 function formatMinutes(totalMinutes: number) {
   const hours = Math.floor(totalMinutes / 60);

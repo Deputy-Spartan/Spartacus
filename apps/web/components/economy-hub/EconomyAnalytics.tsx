@@ -1,10 +1,10 @@
 "use client";
 
-import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
+import { useEmbedded } from "../ui/EmbeddedPage";
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../../components/ui/NeonCard";
-import { api, type EconomyAnalytics, type EconomyConfig } from "../../../../../lib/api";
-import { useMemberNames } from "../../../../../lib/useMemberNames";
+import { NeonCard } from "../ui/NeonCard";
+import { api, type EconomyAnalytics, type EconomyConfig } from "../../lib/api";
+import { useMemberNames } from "../../lib/useMemberNames";
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (

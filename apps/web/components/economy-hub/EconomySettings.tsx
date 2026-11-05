@@ -1,12 +1,12 @@
 "use client";
 
-import { useEmbedded } from "../../../../../components/ui/EmbeddedPage";
-import { DiscordEmbed, DiscordMessage } from "../../../../../components/ui/DiscordPreview";
+import { useEmbedded } from "../ui/EmbeddedPage";
+import { DiscordEmbed, DiscordMessage } from "../ui/DiscordPreview";
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../../components/ui/NeonCard";
-import { EmojiPicker } from "../../../../../components/ui/EmojiPicker";
-import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
-import { api, type EconomyConfig, type ModuleState } from "../../../../../lib/api";
+import { NeonCard } from "../ui/NeonCard";
+import { EmojiPicker } from "../ui/EmojiPicker";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
+import { api, type EconomyConfig, type ModuleState } from "../../lib/api";
 
 export default function EconomySettingsPage({ params }: { params: { guildId: string } }) {
   const embedded = useEmbedded();

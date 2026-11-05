@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { MAX_PROFILE_STATS, PROFILE_PANEL_DEFAULTS, PROFILE_STATS, PROFILE_THEMES, type ProfileStatKey } from "@spartacus/shared";
-import { NeonCard } from "../../../../components/ui/NeonCard";
-import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
-import { api, type ProfileCardSettingsRow } from "../../../../lib/api";
+import { NeonCard } from "../ui/NeonCard";
+import { ModuleHeader } from "../ui/ModuleHeader";
+import { ChannelSelect } from "../ui/ChannelSelect";
+import { api, type ProfileCardSettingsRow } from "../../lib/api";
 
 export default function ProfileCardsPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;

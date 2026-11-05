@@ -42,21 +42,31 @@ export function forgetChannel(channelId: string) {
   memory.delete(channelId);
 }
 
-// ---- Cooldown: each person can ask a few questions a minute ----
-const PER_MINUTE = 5;
+// ---- Cooldown: each member can ask `limit` questions per `windowSec` ----
+// A rolling window: a question counts until windowSec after it was asked,
+// so a member never waits longer than that for their oldest one to expire.
 const asked = new Map<string, number[]>();
 const warned = new Map<string, number>();
 
-function tooFast(key: string): number {
+function tooFast(key: string, limit: number, windowSec: number): number {
+  if (limit <= 0) return 0; // no limit
   const now = Date.now();
-  const recent = (asked.get(key) ?? []).filter((t) => now - t < 60_000);
-  if (recent.length >= PER_MINUTE) {
+  const windowMs = windowSec * 1000;
+  const recent = (asked.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (recent.length >= limit) {
     asked.set(key, recent);
-    return Math.ceil((60_000 - (now - recent[0])) / 1000);
+    return Math.ceil((windowMs - (now - recent[0])) / 1000);
   }
   recent.push(now);
   asked.set(key, recent);
   return 0;
+}
+
+function waitText(s: number) {
+  return s < 90 ? `${s}s` : `${Math.ceil(s / 60)} min`;
+}
+function windowText(s: number) {
+  return s === 60 ? "this minute" : s < 60 ? `in ${s} seconds` : s < 3600 ? `in ${s / 60} minutes` : s === 3600 ? "this hour" : `in ${s / 3600} hours`;
 }
 
 const FAILURE_TEXT: Record<AiFailure, string> = {
@@ -85,9 +95,11 @@ export async function execute(message: Message) {
   // Belt and braces with the one-active-copy switch: one answer per message.
   if (!(await claimEvent(`aichat:${message.id}`))) return;
 
-  // Staff (Manage Server) aren't limited, so testing and moderating aren't blocked.
-  const isStaff = message.member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false;
-  const wait = isStaff ? 0 : tooFast(`${message.guildId}:${message.author.id}`);
+  // Staff (Manage Server) skip the limit unless the server turned that off.
+  const limit = config?.chatLimit ?? 5;
+  const windowSec = config?.chatLimitWindow ?? 60;
+  const isStaff = (config?.chatStaffExempt ?? true) && (message.member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false);
+  const wait = isStaff ? 0 : tooFast(`${message.guildId}:${message.author.id}`, limit, windowSec);
   if (wait) {
     // Every skipped question gets a ⏳ that stays, so it's clear it wasn't
     // just missed. The written note is shown at most every 30s.
@@ -96,7 +108,7 @@ export async function execute(message: Message) {
     if (Date.now() - (warned.get(key) ?? 0) > 30_000) {
       warned.set(key, Date.now());
       const note = await message
-        .reply({ content: `⏳ That's ${PER_MINUTE} questions this minute, so I skipped this one. Ask again in ${wait}s.`, allowedMentions: { repliedUser: false } })
+        .reply({ content: `⏳ That's ${limit} question${limit === 1 ? "" : "s"} ${windowText(windowSec)}, so I skipped this one. Ask again in ${waitText(wait)}.`, allowedMentions: { repliedUser: false } })
         .catch(() => null);
       if (note) setTimeout(() => void note.delete().catch(() => null), 20_000);
     }

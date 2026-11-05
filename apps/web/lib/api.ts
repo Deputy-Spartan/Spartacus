@@ -307,6 +307,11 @@ export interface AiConfigRow {
   chatChannelId: string | null;
   chatSystemPrompt: string | null;
   moderationEnabled: boolean;
+  chatLimit: number; // questions per member per window; 0 = no limit
+  chatLimitWindow: number; // seconds
+  chatStaffExempt: boolean;
+  chatSlowmode: number; // seconds of Discord slowmode on chatChannelId
+  slowmodeError?: string | null;
 }
 
 export interface ServerBackupRow {

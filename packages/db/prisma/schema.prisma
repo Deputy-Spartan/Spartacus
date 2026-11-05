@@ -1768,6 +1768,10 @@ model AiConfig {
   chatChannelId     String? // null = respond anywhere the bot is @-mentioned
   chatSystemPrompt  String?
   moderationEnabled Boolean @default(false)
+  chatLimit         Int     @default(5) // questions per member per window; 0 = no limit
+  chatLimitWindow   Int     @default(60) // seconds
+  chatStaffExempt   Boolean @default(true) // Manage Server skips the limit
+  chatSlowmode      Int     @default(0) // Discord slowmode (seconds) put on chatChannelId
 }
 
 // ---- Server Backup ----

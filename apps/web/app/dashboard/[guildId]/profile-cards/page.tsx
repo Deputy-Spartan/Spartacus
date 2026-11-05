@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MAX_PROFILE_STATS, PROFILE_STATS, PROFILE_THEMES, type ProfileStatKey } from "@spartacus/shared";
+import { MAX_PROFILE_STATS, PROFILE_PANEL_DEFAULTS, PROFILE_STATS, PROFILE_THEMES, type ProfileStatKey } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { api, type ProfileCardSettingsRow } from "../../../../lib/api";
 
 export default function ProfileCardsPage({ params }: { params: { guildId: string } }) {
@@ -18,11 +19,14 @@ export default function ProfileCardsPage({ params }: { params: { guildId: string
     api.getProfileCardSettings(guildId).then(setSettings);
   }, [guildId]);
 
-  async function persist(next: ProfileCardSettingsRow) {
+  const [panelError, setPanelError] = useState<string | null>(null);
+  async function persist(next: ProfileCardSettingsRow, repost = false) {
     setSettings(next);
     setSaving(true);
     try {
-      setSettings(await api.setProfileCardSettings(guildId, next));
+      const saved = await api.setProfileCardSettings(guildId, { ...next, repost });
+      setSettings(saved);
+      setPanelError(saved.panelError ?? null);
     } finally {
       setSaving(false);
     }
@@ -83,6 +87,73 @@ export default function ProfileCardsPage({ params }: { params: { guildId: string
                 );
               })}
             </div>
+          </NeonCard>
+
+          <NeonCard>
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-medium">Button Panel</p>
+              {settings.panelChannelId && (
+                <span className={`text-xs ${settings.panelPosted ? "text-emerald-400" : "text-amber-300"}`}>{settings.panelPosted ? "● Posted" : "● Posting…"}</span>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              An embed in a channel with two buttons, so members don't need /profile: <b>🪪 My card</b> and <b>🔍 Someone's card</b> (pick any member from a list).
+            </p>
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Channel</label>
+            <ChannelSelect guildId={guildId} value={settings.panelChannelId} onChange={(channelId) => persist({ ...settings, panelChannelId: channelId })} placeholder="No panel (commands only)" />
+            {settings.panelChannelId && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Title</label>
+                  <input
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
+                    value={settings.panelTitle}
+                    maxLength={256}
+                    onChange={(e) => setSettings({ ...settings, panelTitle: e.target.value })}
+                    onBlur={() => persist(settings)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
+                  <textarea
+                    className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-28"
+                    value={settings.panelText}
+                    maxLength={4000}
+                    onChange={(e) => setSettings({ ...settings, panelText: e.target.value })}
+                    onBlur={() => persist(settings)}
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="text-xs uppercase tracking-wide text-slate-500">Color</label>
+                  <input type="color" value={settings.panelColor} onChange={(e) => setSettings({ ...settings, panelColor: e.target.value })} onBlur={() => persist(settings)} className="h-8 w-12 bg-transparent" aria-label="Embed color" />
+                  <button
+                    type="button"
+                    className="text-xs text-slate-400 hover:text-white ml-auto"
+                    onClick={() => persist({ ...settings, panelTitle: PROFILE_PANEL_DEFAULTS.panelTitle, panelText: PROFILE_PANEL_DEFAULTS.panelText, panelColor: PROFILE_PANEL_DEFAULTS.panelColor })}
+                  >
+                    Reset wording
+                  </button>
+                  <button type="button" className="neon-button-sm" onClick={() => persist(settings, true)}>
+                    Repost panel
+                  </button>
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Cards from the panel</label>
+                  <div className="space-y-1.5 text-sm text-slate-300">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="panelPublic" checked={!settings.panelPublic} onChange={() => persist({ ...settings, panelPublic: false })} />
+                      Only the person who pressed the button sees it (keeps the channel clean)
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="panelPublic" checked={settings.panelPublic} onChange={() => persist({ ...settings, panelPublic: true })} />
+                      Post it in the channel for everyone
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">Changing the channel, title, message or color replaces the posted panel. Turn on the Profile Cards module for it to post.</p>
+                {panelError && <p className="text-xs text-rose-400">{panelError}</p>}
+              </div>
+            )}
           </NeonCard>
 
           <NeonCard>

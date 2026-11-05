@@ -43,6 +43,7 @@ import { startVerificationReminderJob } from "./jobs/verificationReminder";
 import { startRoleManagerJobs } from "./modules/utility/roleManager";
 import { onVerificationJoin } from "./modules/security/verification";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
+import { startProfilePanelPosterJob } from "./jobs/profilePanelPoster";
 import { startMatchTickerJob } from "./jobs/matchTicker";
 
 import * as logger from "./modules/logging/logger";
@@ -138,6 +139,7 @@ async function sendHeartbeat(client: Client) {
 export { commands } from "./commands";
 export { isLeader } from "./lib/leader";
 export { renderProfile } from "./modules/leveling/profile";
+export { postProfilePanel } from "./jobs/profilePanelPoster";
 // Re-exported so apps/api's "Resend Now" button can repost a sticky through
 // the exact same guarded delete+send logic the bot itself uses, instead of
 // a separate raw REST call that the bot's in-memory duplicate-post guards
@@ -272,6 +274,7 @@ export function startBot() {
     startRoleManagerJobs(c);
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
+    startProfilePanelPosterJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);

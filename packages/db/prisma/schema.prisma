@@ -2821,4 +2821,11 @@ model ProfileCardSettings {
   guildId   String   @unique
   stats     String[] @default(["rank", "voice", "matches", "coins", "invites", "achievements"])
   allowBios Boolean  @default(true)
+  // Button panel: an embed in panelChannelId with My card / Someone's card.
+  panelChannelId String?
+  panelMessageId String? // null with a channel set = (re)post it
+  panelTitle     String?
+  panelText      String?
+  panelColor     String?
+  panelPublic    Boolean  @default(false) // cards from the panel: in the channel for everyone, or only the clicker sees them
 }

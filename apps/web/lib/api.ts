@@ -1744,6 +1744,13 @@ export interface RoleChangeRow {
 export interface ProfileCardSettingsRow {
   stats: import("@spartacus/shared").ProfileStatKey[];
   allowBios: boolean;
+  panelChannelId: string | null;
+  panelPosted?: boolean;
+  panelTitle: string;
+  panelText: string;
+  panelColor: string;
+  panelPublic: boolean;
+  panelError?: string | null;
 }
 
 export interface QuickLinksStatus {
@@ -1775,7 +1782,7 @@ export interface StreamDeckLogRow {
 
 export const api = {
   getProfileCardSettings: (guildId: string) => request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`),
-  setProfileCardSettings: (guildId: string, s: ProfileCardSettingsRow) =>
+  setProfileCardSettings: (guildId: string, s: ProfileCardSettingsRow & { repost?: boolean }) =>
     request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`, { method: "PUT", body: JSON.stringify(s) }),
   // Returns an object URL for the drawn PNG (revoke it when done).
   getProfileCardPreview: async (guildId: string) => {

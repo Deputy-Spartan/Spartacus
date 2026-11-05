@@ -7,7 +7,9 @@ import {
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
+  UserSelectMenuBuilder,
   type ButtonInteraction,
+  type UserSelectMenuInteraction,
   type ChatInputCommandInteraction,
   type Guild,
   type ModalSubmitInteraction,
@@ -240,7 +242,33 @@ async function bioProblem(guildId: string, bio: string): Promise<string | null> 
   return null;
 }
 
-export async function handleProfileComponent(interaction: ButtonInteraction | StringSelectMenuInteraction | ModalSubmitInteraction) {
+// A card asked for from the panel: only the clicker sees it, unless the
+// server chose to show panel cards to everyone.
+async function sendPanelCard(interaction: ButtonInteraction | UserSelectMenuInteraction, shownId: string) {
+  const guild = interaction.guild as Guild;
+  const user = await guild.client.users.fetch(shownId).catch(() => null);
+  if (!user || user.bot) {
+    const msg = { content: "Bots don't have profile cards. Pick a member.", components: [] };
+    if (interaction.isUserSelectMenu()) await interaction.update(msg);
+    else await interaction.reply({ ...msg, ephemeral: true });
+    return;
+  }
+  const settings = await prisma.profileCardSettings.findUnique({ where: { guildId: guild.id } });
+  const pub = settings?.panelPublic ?? false;
+  const files = [new AttachmentBuilder(await renderProfile(guild, shownId), { name: "profile.png" })];
+  if (interaction.isUserSelectMenu()) {
+    if (pub) {
+      await interaction.update({ content: `Posted <@${shownId}>'s card below.`, components: [], allowedMentions: { parse: [] } });
+      await interaction.followUp({ content: `<@${interaction.user.id}> pulled up <@${shownId}>'s card`, files, components: [cardButtons(shownId)], allowedMentions: { parse: [] } });
+    } else {
+      await interaction.update({ content: "", files, components: [cardButtons(shownId)] });
+    }
+    return;
+  }
+  await interaction.editReply({ files, components: [cardButtons(shownId)] });
+}
+
+export async function handleProfileComponent(interaction: ButtonInteraction | StringSelectMenuInteraction | UserSelectMenuInteraction | ModalSubmitInteraction) {
   const guild = interaction.guild;
   if (!guild) return;
   if (!(await isModuleEnabled(guild.id, "PROFILE_CARDS"))) {
@@ -250,6 +278,28 @@ export async function handleProfileComponent(interaction: ButtonInteraction | St
   const userId = interaction.user.id;
   const id = interaction.customId;
 
+  if (interaction.isButton() && id === "pcard:mine") {
+    const settings = await prisma.profileCardSettings.findUnique({ where: { guildId: guild.id } });
+    await interaction.deferReply({ ephemeral: !(settings?.panelPublic ?? false) });
+    await sendPanelCard(interaction, userId);
+    return;
+  }
+  if (interaction.isButton() && id === "pcard:pick") {
+    await interaction.reply({
+      content: "**🔍 Whose card?** Pick a member.",
+      components: [
+        new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(
+          new UserSelectMenuBuilder().setCustomId("pcard:who").setPlaceholder("Search for a member").setMinValues(1).setMaxValues(1)
+        ),
+      ],
+      ephemeral: true,
+    });
+    return;
+  }
+  if (interaction.isUserSelectMenu() && id === "pcard:who") {
+    await sendPanelCard(interaction, interaction.values[0]);
+    return;
+  }
   if (interaction.isButton() && id === "pcard:edit") {
     await interaction.reply({ ...(await editorView(guild, userId)), ephemeral: true });
     return;

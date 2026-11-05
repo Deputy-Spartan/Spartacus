@@ -23,7 +23,7 @@ export async function execute(interaction: Interaction) {
   }
 
   // Profile Cards: Edit my card, Compare, and the edit menu.
-  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("pcard:")) {
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isUserSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("pcard:")) {
     const { handleProfileComponent } = await import("../modules/leveling/profile");
     await handleProfileComponent(interaction);
     return;

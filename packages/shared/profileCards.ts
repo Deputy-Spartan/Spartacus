@@ -85,6 +85,14 @@ export const BUILTIN_BADGES: Record<string, { emoji: string; label: string }> = 
   VOICE_50H: { emoji: "🎧", label: "50h in Voice" },
 };
 
+// The button panel (an embed with "My card" / "Someone's card" buttons).
+export const PROFILE_PANEL_DEFAULTS = {
+  panelTitle: "🪪 Profile Cards",
+  panelText: "See your profile card, or anyone else's. No commands needed.\n\n**🪪 My card** shows yours.\n**🔍 Someone's card** lets you pick a member.\n\nPress ✏️ Edit my card under your card to change your title, theme, badges, games and bio.",
+  panelColor: "#5865F2",
+  panelPublic: false,
+};
+
 export function cleanProfileStats(input: unknown): ProfileStatKey[] {
   if (!Array.isArray(input)) return DEFAULT_PROFILE_STATS;
   const keys = input.filter((k): k is ProfileStatKey => typeof k === "string" && k in PROFILE_STATS);

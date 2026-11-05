@@ -161,9 +161,10 @@ function LandingContent() {
         <h1 className="relative mt-10 text-3xl sm:text-4xl font-extrabold leading-tight max-w-xl">Run your gaming community from one dashboard.</h1>
         <p className="relative mt-3 text-slate-400 max-w-md">Everything your server needs, set up in minutes and managed in one place. Tap a box to see what it does.</p>
 
-        {/* Wider screens: the boxes stay put in two columns and the open one's
-            details show in one panel underneath. Phones (one column): the
-            details open right under the box that was tapped. */}
+        {/* Wider screens: the boxes stay put in two columns, and the open box's
+            details open in a full-width strip right under its row, with an
+            arrow pointing at the box. Phones (one column): the details open
+            right under the box that was tapped. */}
         <div className="relative mt-8 max-w-2xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {FEATURES.map((f, i) => {
@@ -173,7 +174,7 @@ function LandingContent() {
                 <button
                   type="button"
                   aria-expanded={isOpen}
-                  aria-controls={isOpen ? "feature-details" : undefined}
+                  aria-controls={isOpen ? `feature-details-${i}` : undefined}
                   onClick={() => setOpen(isOpen ? null : i)}
                   className={`group h-full text-left rounded-xl border px-4 py-3 transition-all duration-200 ${
                     isOpen
@@ -193,12 +194,18 @@ function LandingContent() {
                 <div className={`sm:hidden grid transition-all duration-300 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100 -mt-1" : "grid-rows-[0fr] opacity-0 -mt-2.5"}`}>
                   <div className="overflow-hidden">{isOpen && <FeatureDetails i={i} />}</div>
                 </div>
+                {i % 2 === 1 && open !== null && (open === i || open === i - 1) && (
+                  <div id={`feature-details-${open}`} key={`row-${open}`} className="relative hidden sm:block sm:col-span-2 pt-1.5 animate-[fadeIn_.25s_ease-out]">
+                    <span
+                      aria-hidden="true"
+                      className={`absolute top-0 z-10 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-neon-blue/30 bg-[#1b1d22] ${open === i ? "left-3/4" : "left-1/4"}`}
+                    />
+                    <FeatureDetails i={open} />
+                  </div>
+                )}
                 </Fragment>
               );
             })}
-          </div>
-          <div id="feature-details" className={`hidden sm:grid transition-all duration-300 ease-out ${open !== null ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
-            <div className="overflow-hidden">{open !== null && <FeatureDetails key={open} i={open} />}</div>
           </div>
         </div>
 

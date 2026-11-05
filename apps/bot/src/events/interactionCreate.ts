@@ -95,6 +95,12 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && /^cmdb(role)?:/.test(interaction.customId)) {
+    const { handleCommandButton } = await import("../modules/community/customSlashCommands");
+    await handleCommandButton(interaction);
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId === "bump:dm") {
     const { handleBumpButton } = await import("../modules/community/bumpReminder");
     await handleBumpButton(interaction);

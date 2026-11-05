@@ -1811,28 +1811,61 @@ model CommandToggle {
 // action. discordCommandId is what Discord assigns on registration, needed
 // to update/delete the live command later.
 
+// Command Builder: a /command made from steps (packages/shared/commandBuilder.ts).
 model CustomSlashCommand {
-  id               String  @id @default(cuid())
-  guild            Guild   @relation(fields: [guildId], references: [id])
+  id               String   @id @default(cuid())
+  guild            Guild    @relation(fields: [guildId], references: [id])
   guildId          String
   name             String
   description      String
   discordCommandId String?
-  actionType       String // SEND_MESSAGE | GIVE_ROLE | REMOVE_ROLE | ADD_CURRENCY | POST_EMBED
-  ephemeralReply   Boolean @default(true)
-  messageText      String? // SEND_MESSAGE
-  roleId           String? // GIVE_ROLE / REMOVE_ROLE
-  currencyAmount   Int? // ADD_CURRENCY
-  embedEnabled     Boolean @default(false) // POST_EMBED
-  embedTitle       String?
-  embedDescription String?
-  embedColor       String?
-  buttons          Json    @default("[]")
-  embedExtra       Json?
-  savedEmbedId     String?
+  enabled          Boolean  @default(true)
+  access           String   @default("EVERYONE") // EVERYONE | ROLES | MODS | ADMINS
+  roleIds          Json     @default("[]") // for ROLES
+  channelIds       Json     @default("[]") // only works in these (empty = anywhere)
+  cooldownSec      Int      @default(0)
+  checkPerms       Boolean  @default(true) // the person must have each step's Discord permission
+  skipConfirm      Boolean  @default(false) // risky steps run without "Yes, do it"
+  inputs           Json     @default("[]")
+  steps            Json     @default("[]")
+  reply            String   @default("")
+  replyPublic      Boolean  @default(false)
+  logChannelId     String?
   createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
 
   @@unique([guildId, name])
+}
+
+// Every time a Command Builder command runs: the Command Log.
+model CustomCommandRun {
+  id          String   @id @default(cuid())
+  guildId     String
+  commandId   String?
+  commandName String
+  userId      String
+  inputs      Json     @default("{}")
+  result      String // OK | PARTIAL | FAILED | DENIED | CANCELED
+  details     Json     @default("[]") // one line per step
+  createdAt   DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// Things a command does later: lift a temporary ban, take back a temporary
+// role, or send a message.
+model CommandTimer {
+  id        String   @id @default(cuid())
+  guildId   String
+  kind      String // UNBAN | REMOVE_ROLE | SEND
+  userId    String?
+  roleId    String?
+  channelId String?
+  text      String?
+  runAt     DateTime
+  createdAt DateTime @default(now())
+
+  @@index([runAt])
 }
 
 // ---- LFG (Looking For Group) ----

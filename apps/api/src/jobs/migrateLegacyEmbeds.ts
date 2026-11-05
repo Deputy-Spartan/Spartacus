@@ -113,14 +113,6 @@ export async function migrateLegacyEmbeds() {
     migrated++;
   }
 
-  const slashCommands = await prisma.customSlashCommand.findMany({ where: { savedEmbedId: null, actionType: "POST_EMBED" } });
-  for (const row of slashCommands) {
-    if (!hasRealEmbedContent(row)) continue;
-    const presetId = await makePreset(row.guildId, `Slash /${row.name}`, row, row.embedDescription);
-    await prisma.customSlashCommand.update({ where: { id: row.id }, data: { savedEmbedId: presetId } });
-    migrated++;
-  }
-
   const lfgCommands = await prisma.lfgCommand.findMany({ where: { savedEmbedId: null, mode: "embed" } });
   for (const row of lfgCommands) {
     if (!hasRealEmbedContent(row)) continue;

@@ -425,8 +425,21 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   },
   "/commands": {
     title: "Custom Commands",
-    purpose: "Text triggers the bot answers instantly, like !socials.",
-    steps: ["Tap + Create New.", "Enter the Trigger, like !socials.", "Write the Response, or use a saved embed.", "Check the preview and tap Create Command.", "Type the trigger in Discord to test it."],
+    purpose: "Make your own /commands that can do anything Spartacus can (messages, roles, channels, permissions, onboarding, moderation and more), plus !text triggers.",
+    steps: [
+      "Slash commands tab: tap + New command, or start from a template like /mute or /squad.",
+      "Name it and write what it does.",
+      "Pick who can use it, and optionally a channel and a cooldown.",
+      "Add inputs it asks for (a member, a role, text, a number…). Use them in steps as {name}; {me} is whoever ran it.",
+      "Add steps from the list of 95 actions, then write the reply. Tap Create command, and it's in Discord right away.",
+    ],
+    members: ["Type / in Discord and pick the command. Risky ones (⚠️) ask Yes, do it first."],
+    tips: [
+      "Every run is in the Command Log tab, with what each step did and why any step failed.",
+      "Spartacus can only act on members and roles below its own role, so keep its role near the top.",
+      "Turn off \"They need each step's Discord permission\" to let members use a command for something they normally can't, like making their own voice channel.",
+      "Text triggers (!socials) are on their own tab and work as before.",
+    ],
   },
   "/weekly-recap": {
     title: "Weekly Recap",

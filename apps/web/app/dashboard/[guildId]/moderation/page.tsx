@@ -7,7 +7,6 @@ import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -16,9 +15,6 @@ import {
   type AutomodConfig,
   type AutoPurgeConfigRow,
   type CommandToggleRow,
-  type CustomCommandActionType,
-  type CustomSlashCommandInput,
-  type CustomSlashCommandRow,
   type DiscordChannelOption,
   type DiscordRoleOption,
   type LoggingConfig,
@@ -777,44 +773,14 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
   );
 }
 
-const ACTION_OPTIONS: Array<{ value: CustomCommandActionType; label: string; hint: string }> = [
-  { value: "SEND_MESSAGE", label: "Send a message", hint: "Replies with a fixed message you write." },
-  { value: "POST_EMBED", label: "Post an embed", hint: "Replies with a fixed embed you design." },
-  { value: "GIVE_ROLE", label: "Give a role", hint: "Gives a role to the invoker, or a target member." },
-  { value: "REMOVE_ROLE", label: "Remove a role", hint: "Removes a role from the invoker, or a target member." },
-  { value: "ADD_CURRENCY", label: "Add currency", hint: "Gives a fixed amount of Economy currency to a target member." },
-];
-
-const EMPTY_CUSTOM_COMMAND: CustomSlashCommandInput = {
-  name: "",
-  description: "",
-  actionType: "SEND_MESSAGE",
-  ephemeralReply: true,
-  messageText: "",
-  embedColor: "#5865F2",
-  buttons: [],
-  embedExtra: {},
-  savedEmbedId: null,
-};
-
 function CommandsTab({ guildId }: { guildId: string }) {
-  const confirm = useConfirm();
   const [commands, setCommands] = useState<CommandToggleRow[] | null>(null);
   const [query, setQuery] = useState("");
-  const [customCommands, setCustomCommands] = useState<CustomSlashCommandRow[]>([]);
-  const [showBuilder, setShowBuilder] = useState(false);
-  const [form, setForm] = useState<CustomSlashCommandInput>(EMPTY_CUSTOM_COMMAND);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   function refreshToggles() {
     api.getCommandToggles(guildId).then(setCommands);
   }
-  function refreshCustom() {
-    api.getCustomSlashCommands(guildId).then(setCustomCommands);
-  }
   useEffect(refreshToggles, [guildId]);
-  useEffect(refreshCustom, [guildId]);
 
   async function toggle(name: string, next: boolean) {
     setCommands((prev) => (prev ? prev.map((c) => (c.name === name ? { ...c, enabled: next } : c)) : prev));
@@ -823,179 +789,20 @@ function CommandsTab({ guildId }: { guildId: string }) {
     });
   }
 
-  async function createCommand() {
-    if (!form.name || !form.description) {
-      setError("Enter a command name and description before creating.");
-      return;
-    }
-    setCreating(true);
-    setError(null);
-    try {
-      await api.createCustomSlashCommand(guildId, form);
-      setForm(EMPTY_CUSTOM_COMMAND);
-      setShowBuilder(false);
-      refreshCustom();
-      refreshToggles();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create command");
-    }
-    setCreating(false);
-  }
-
-  async function removeCustom(id: string) {
-    if (!(await confirm("Delete this custom slash command? It will be removed from Discord immediately.", { danger: true }))) return;
-    await api.deleteCustomSlashCommand(guildId, id);
-    refreshCustom();
-    refreshToggles();
-  }
-
   const filtered = commands?.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <div className="space-y-4">
       <NeonCard>
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-medium">Your Custom Commands</p>
-          <button
-            onClick={() => {
-              setError(null);
-              setShowBuilder(true);
-            }}
-            className="neon-button-sm"
-          >
-            + New Command
-          </button>
-        </div>
-        <p className="text-xs text-slate-500 mb-3">
-          Build a brand-new slash command that runs one preset action — registers instantly as a real Discord command
-          in this server.
+        <p className="font-medium">Your own slash commands</p>
+        <p className="text-xs text-slate-500 mt-1">
+          They live in{" "}
+          <a href={`/dashboard/${guildId}/commands`} className="text-neon-blue hover:underline">
+            Custom Commands
+          </a>{" "}
+          now, with the Command Builder: name a /command and stack any steps, from replies to roles, channels, onboarding and moderation.
         </p>
-        {customCommands.length === 0 && <p className="text-sm text-slate-500">None yet.</p>}
-        <div className="divide-y divide-white/5">
-          {customCommands.map((c) => (
-            <div key={c.id} className="flex items-center justify-between py-2.5 text-sm gap-3">
-              <div className="min-w-0">
-                <p className="text-neon-blue font-medium">/{c.name}</p>
-                <p className="text-xs text-slate-500 truncate">
-                  {ACTION_OPTIONS.find((a) => a.value === c.actionType)?.label} — {c.description}
-                </p>
-              </div>
-              <button onClick={() => removeCustom(c.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0">
-                Remove
-              </button>
-            </div>
-          ))}
-        </div>
       </NeonCard>
-
-      {showBuilder && (
-        <NeonCard>
-          <div className="flex items-center justify-between mb-3">
-            <p className="font-medium">New Custom Command</p>
-            <button onClick={() => setShowBuilder(false)} className="text-slate-500 hover:text-slate-300 text-xs">
-              Close
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-                Command Name
-                <Required />
-              </label>
-              <input
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-                placeholder="my-command"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value.toLowerCase() })}
-              />
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-                Description
-                <Required />
-              </label>
-              <input
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                placeholder="Shown in Discord's command picker"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Action</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-            {ACTION_OPTIONS.map((a) => (
-              <button
-                key={a.value}
-                onClick={() => setForm({ ...form, actionType: a.value })}
-                className={[
-                  "text-left rounded-lg p-3 border transition-colors",
-                  form.actionType === a.value ? "border-neon-blue bg-base-800 shadow-glow-blue" : "border-white/10 bg-base-950 hover:border-white/20",
-                ].join(" ")}
-              >
-                <p className="text-sm text-slate-200">{a.label}</p>
-                <p className="text-xs text-slate-500">{a.hint}</p>
-              </button>
-            ))}
-          </div>
-
-          {form.actionType === "SEND_MESSAGE" && (
-            <div className="mb-4">
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
-              <textarea
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-20"
-                value={form.messageText}
-                onChange={(e) => setForm({ ...form, messageText: e.target.value })}
-              />
-            </div>
-          )}
-
-          {form.actionType === "POST_EMBED" && (
-            <div className="mb-4">
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Fallback Text</label>
-              <textarea
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-16 mb-4"
-                value={form.messageText}
-                onChange={(e) => setForm({ ...form, messageText: e.target.value })}
-              />
-              <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => setForm({ ...form, savedEmbedId: id })} />
-            </div>
-          )}
-
-          {(form.actionType === "GIVE_ROLE" || form.actionType === "REMOVE_ROLE") && (
-            <div className="mb-4">
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Role</label>
-              <RoleSelect guildId={guildId} value={form.roleId ?? null} onChange={(roleId) => setForm({ ...form, roleId })} />
-              <p className="text-xs text-slate-600 -mt-3">Whoever runs the command can optionally target another member — otherwise it applies to themselves.</p>
-            </div>
-          )}
-
-          {form.actionType === "ADD_CURRENCY" && (
-            <div className="mb-4">
-              <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Amount</label>
-              <input
-                type="number"
-                className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                value={form.currencyAmount ?? 0}
-                onChange={(e) => setForm({ ...form, currencyAmount: Number(e.target.value) })}
-              />
-              <p className="text-xs text-slate-600 mt-1">Whoever runs the command must pick a member to give currency to.</p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-slate-300">Reply privately (only the user who ran it sees the response)</span>
-            <ToggleSwitch enabled={form.ephemeralReply} onChange={(v) => setForm({ ...form, ephemeralReply: v })} />
-          </div>
-
-          <button onClick={createCommand} disabled={creating} className="neon-button disabled:opacity-50">
-            {creating ? "Creating…" : "Create Command"}
-          </button>
-          <FormError message={error} />
-        </NeonCard>
-      )}
 
       <NeonCard>
         <p className="font-medium mb-3">All Commands</p>

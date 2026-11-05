@@ -471,40 +471,23 @@ export interface EmbedCreatorFetchResult {
   embeds: EmbedCreatorEmbed[];
 }
 
-export type CustomCommandActionType = "SEND_MESSAGE" | "GIVE_ROLE" | "REMOVE_ROLE" | "ADD_CURRENCY" | "POST_EMBED";
-
-export interface CustomSlashCommandRow {
+export interface CustomSlashCommandRow extends Omit<import("@spartacus/shared").CommandDraft, "logChannelId"> {
   id: string;
-  name: string;
-  description: string;
-  actionType: CustomCommandActionType;
-  ephemeralReply: boolean;
-  messageText: string | null;
-  roleId: string | null;
-  currencyAmount: number | null;
-  embedEnabled: boolean;
-  embedTitle: string | null;
-  embedDescription: string | null;
-  embedColor: string | null;
-  buttons: StickyButton[];
-  embedExtra?: EmbedExtra;
-  savedEmbedId?: string | null;
+  logChannelId: string | null;
+  discordCommandId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
-export interface CustomSlashCommandInput {
-  name: string;
-  description: string;
-  actionType: CustomCommandActionType;
-  ephemeralReply: boolean;
-  messageText?: string;
-  roleId?: string;
-  currencyAmount?: number;
-  embedEnabled?: boolean;
-  embedTitle?: string;
-  embedDescription?: string;
-  embedColor?: string;
-  buttons?: StickyButton[];
-  embedExtra?: EmbedExtra;
-  savedEmbedId?: string | null;
+export interface CustomCommandRunRow {
+  id: string;
+  commandId: string | null;
+  commandName: string;
+  userId: string;
+  userName: string;
+  inputs: Record<string, string>;
+  result: "OK" | "PARTIAL" | "FAILED" | "DENIED" | "CANCELED";
+  details: string[];
+  createdAt: string;
 }
 
 export interface SendMessageInput {
@@ -2014,10 +1997,12 @@ export const api = {
     request(`/guilds/${guildId}/command-toggles/${name}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
 
   getCustomSlashCommands: (guildId: string) => request<CustomSlashCommandRow[]>(`/guilds/${guildId}/custom-slash-commands`),
-  createCustomSlashCommand: (guildId: string, input: CustomSlashCommandInput) =>
-    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands`, { method: "POST", body: JSON.stringify(input) }),
-  deleteCustomSlashCommand: (guildId: string, id: string) =>
-    request(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "DELETE" }),
+  createCustomSlashCommand: (guildId: string, c: import("@spartacus/shared").CommandDraft) =>
+    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands`, { method: "POST", body: JSON.stringify(c) }),
+  updateCustomSlashCommand: (guildId: string, id: string, c: import("@spartacus/shared").CommandDraft) =>
+    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "PUT", body: JSON.stringify(c) }),
+  deleteCustomSlashCommand: (guildId: string, id: string) => request(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "DELETE" }),
+  getCustomCommandRuns: (guildId: string, commandId?: string) => request<CustomCommandRunRow[]>(`/guilds/${guildId}/custom-command-runs${commandId ? `?commandId=${commandId}` : ""}`),
 
   getLfgCommands: (guildId: string) => request<LfgCommandRow[]>(`/guilds/${guildId}/lfg-commands`),
   createLfgCommand: (guildId: string, input: LfgCommandInput) =>

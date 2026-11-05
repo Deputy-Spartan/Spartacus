@@ -15,3 +15,4 @@ export * from "./economyPlus";
 export * from "./tournaments";
 export * from "./playingNow";
 export * from "./frontPage";
+export * from "./commandBuilder";

@@ -1,4 +1,4 @@
-import { Events, Message } from "discord.js";
+import { Events, Message, PermissionFlagsBits } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
@@ -85,13 +85,20 @@ export async function execute(message: Message) {
   // Belt and braces with the one-active-copy switch: one answer per message.
   if (!(await claimEvent(`aichat:${message.id}`))) return;
 
-  const wait = tooFast(`${message.guildId}:${message.author.id}`);
+  // Staff (Manage Server) aren't limited, so testing and moderating aren't blocked.
+  const isStaff = message.member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false;
+  const wait = isStaff ? 0 : tooFast(`${message.guildId}:${message.author.id}`);
   if (wait) {
+    // Every skipped question gets a ⏳ that stays, so it's clear it wasn't
+    // just missed. The written note is shown at most every 30s.
+    await message.react("⏳").catch(() => null);
     const key = `${message.guildId}:${message.author.id}`;
     if (Date.now() - (warned.get(key) ?? 0) > 30_000) {
       warned.set(key, Date.now());
-      const note = await message.reply({ content: `Slow down a little, try again in ${wait}s.`, allowedMentions: { repliedUser: false } }).catch(() => null);
-      if (note) setTimeout(() => void note.delete().catch(() => null), 8_000);
+      const note = await message
+        .reply({ content: `⏳ That's ${PER_MINUTE} questions this minute, so I skipped this one. Ask again in ${wait}s.`, allowedMentions: { repliedUser: false } })
+        .catch(() => null);
+      if (note) setTimeout(() => void note.delete().catch(() => null), 20_000);
     }
     return;
   }

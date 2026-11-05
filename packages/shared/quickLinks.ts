@@ -129,7 +129,7 @@ export const DEFAULT_QUICK_LINKS: QuickLinkGroup[] = [
     pinned: false,
     links: [
       { label: "Twitch app", url: "https://dev.twitch.tv/console/apps/90qzo1tog7x49ey3eatuiwgo455dks" },
-      { label: "Kick developer", url: "https://kick.com/settings/developer" },
+      { label: "Kick app", url: "https://kick.com/settings/developer?action=view&id=01M6N741M9G2TYW8GANFJ6F1S8" },
     ],
   },
   {

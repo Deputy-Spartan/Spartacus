@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
+import { prisma, Prisma } from "@spartacus/db";
 import { ECONOMY_PLUS_DEFAULTS, MAX_SHOP_ITEMS, STARTER_SHOP, cleanEconomyPlus, cleanShopItem } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
@@ -58,6 +58,7 @@ router.put(P, requireAuth, requireGuildPermission, async (req, res) => {
   if (changed && before?.shopPanelChannelId && before.shopPanelMessageId) await deleteChannelMessage(before.shopPanelChannelId, before.shopPanelMessageId).catch(() => null);
   const data = {
     ...s,
+    ladder: s.ladder as unknown as Prisma.InputJsonValue,
     shopPanelChannelId: panelChannelId,
     shopPanelTitle: panelTitle,
     shopPanelText: panelText,

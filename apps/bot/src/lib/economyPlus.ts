@@ -1,4 +1,4 @@
-import { ECONOMY_PLUS_DEFAULTS, activeEvent, weekKey, type CrateRarity, type EconomyPlusSettings } from "@spartacus/shared";
+import { ECONOMY_PLUS_DEFAULTS, activeEvent, cleanLadder, weekKey, type CrateRarity, type EconomyPlusSettings } from "@spartacus/shared";
 import { prisma } from "./prisma";
 
 // Economy Hub settings for a server, cached briefly (read on every message).
@@ -37,6 +37,7 @@ export async function economyPlus(guildId: string): Promise<EconomyPlusSettings>
         champsChannelId: row.champsChannelId,
         champsRoleId: row.champsRoleId,
         champsCategories: row.champsCategories,
+        ladder: cleanLadder(row.ladder),
       }
     : { ...ECONOMY_PLUS_DEFAULTS };
   cache.set(guildId, { at: Date.now(), s });

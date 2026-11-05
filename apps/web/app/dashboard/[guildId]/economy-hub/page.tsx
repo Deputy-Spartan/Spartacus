@@ -14,6 +14,7 @@ import {
   xpForLevel,
   type CrateRarity,
   type EconomyPlusSettings,
+  type LadderRung,
   type ShopItemType,
 } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
@@ -75,6 +76,94 @@ const TABS = [
 type Tab = (typeof TABS)[number][0];
 type HubModule = "LEVELING" | "ECONOMY" | "PRESTIGE" | "VOICE_ACTIVITY" | "ACHIEVEMENTS" | "PROFILE_CARDS";
 const HUB_MODULES: HubModule[] = ["LEVELING", "ECONOMY", "PRESTIGE", "VOICE_ACTIVITY", "ACHIEVEMENTS", "PROFILE_CARDS"];
+
+// The level role ladder, with each rung's name and color editable. Saving
+// only changes the dashboard; /levelroles then renames and recolors the roles.
+function LadderEditor({ ladder, linked, saving, onSave }: { ladder: LadderRung[]; linked: number[]; saving: boolean; onSave: (l: LadderRung[]) => void }) {
+  const [draft, setDraft] = useState(ladder);
+  const key = JSON.stringify(ladder);
+  useEffect(() => setDraft(JSON.parse(key) as LadderRung[]), [key]);
+  const valid = (c: string) => /^#[0-9a-fA-F]{6}$/.test(c);
+  const dirty = JSON.stringify(draft) !== key;
+  const isDefault = JSON.stringify(ladder) === JSON.stringify(LEVEL_LADDER);
+  const set = (level: number, patch: Partial<LadderRung>) => setDraft((d) => d.map((r) => (r.level === level ? { ...r, ...patch } : r)));
+  const ok = draft.every((r) => r.name.trim() && valid(r.color));
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-slate-500">
+              <th className="py-1 pr-2">Level</th>
+              <th className="pr-2">Role name</th>
+              <th className="pr-2">Color</th>
+              <th className="pr-2">XP total</th>
+              <th>Linked</th>
+            </tr>
+          </thead>
+          <tbody>
+            {draft.map((r) => (
+              <tr key={r.level} className="border-t border-white/5">
+                <td className="py-1.5 pr-2">{r.level}</td>
+                <td className="pr-2">
+                  <input
+                    value={r.name}
+                    maxLength={100}
+                    onChange={(e) => set(r.level, { name: e.target.value })}
+                    aria-label={`Level ${r.level} role name`}
+                    className="w-full min-w-[8.5rem] rounded-md border border-white/10 bg-black/20 px-2 py-1 font-semibold"
+                    style={{ color: valid(r.color) ? r.color : undefined }}
+                  />
+                </td>
+                <td className="pr-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <input
+                      type="color"
+                      value={valid(r.color) ? r.color : "#000000"}
+                      onChange={(e) => set(r.level, { color: e.target.value.toUpperCase() })}
+                      aria-label={`Level ${r.level} color`}
+                      className="h-7 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+                    />
+                    <input
+                      value={r.color}
+                      maxLength={7}
+                      onChange={(e) => set(r.level, { color: (e.target.value.startsWith("#") ? e.target.value : "#" + e.target.value).toUpperCase() })}
+                      aria-label={`Level ${r.level} color code`}
+                      className={`w-[5.5rem] rounded-md border bg-black/20 px-1.5 py-1 font-mono text-xs ${valid(r.color) ? "border-white/10 text-slate-300" : "border-red-500/60 text-red-300"}`}
+                    />
+                  </span>
+                </td>
+                <td className="pr-2 text-slate-400">{xpForLevel(r.level).toLocaleString("en-US")}</td>
+                <td>{linked.includes(r.level) ? "✅" : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!dirty || !ok || saving} onClick={() => onSave(draft.map((r) => ({ ...r, name: r.name.trim() })))} className="neon-button-sm disabled:opacity-40">
+          Save names and colors
+        </button>
+        {dirty && (
+          <button type="button" onClick={() => setDraft(JSON.parse(key) as LadderRung[])} className="text-sm text-slate-300 hover:text-white">
+            Undo changes
+          </button>
+        )}
+        {!isDefault && !dirty && (
+          <button type="button" onClick={() => setDraft(LEVEL_LADDER.map((r) => ({ ...r })))} className="text-sm text-slate-300 hover:text-white">
+            Back to the original names and colors
+          </button>
+        )}
+        {!ok && <span className="text-xs text-red-300">Every role needs a name and a color like #3498DB.</span>}
+      </div>
+      <div className="rounded-lg border border-neon-blue/30 bg-neon-blue/5 p-3 text-sm">
+        Run <code className="text-neon-blue">/levelroles</code> in your server. The first time, Spartacus creates all 11 roles with these names and colors, stacks them in order under its own role, and links each to its level.
+        <br />
+        <b>Changed a name or color?</b> Save, then run <code className="text-neon-blue">/levelroles</code> again: it renames and recolors the roles that are already linked, so members keep them. Level-up messages and cards use your colors and names right away.
+      </div>
+    </>
+  );
+}
 
 // A full settings page shown as one step of a tab.
 function Embed({ children }: { children: ReactNode }) {
@@ -249,7 +338,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <Step n={2} title="Level-up moments" desc="Every level has its own color, from grey to gold, and level-ups come with rewards.">
           <div className="flex flex-wrap gap-1.5" aria-label="Level colors">
             {Array.from({ length: 50 }, (_, i) => i + 1).map((l) => (
-              <span key={l} title={`Level ${l}`} className="w-5 h-5 rounded" style={{ background: levelColor(l) }} />
+              <span key={l} title={`Level ${l}`} className="w-5 h-5 rounded" style={{ background: levelColor(l, s.ladder) }} />
             ))}
           </div>
           <label className="flex items-center justify-between gap-3 text-sm">
@@ -275,41 +364,8 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
 
         {tab === "roles" && (
           <>
-            <Step n={1} title="The level role ladder" desc={`11 colored roles from Recruit to Spartan Legend. ${ladderLinked}/${LEVEL_LADDER.length} linked in this server.`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs text-slate-500">
-                  <th className="py-1">Level</th>
-                  <th>Role</th>
-                  <th>Color</th>
-                  <th>XP total</th>
-                  <th>Linked</th>
-                </tr>
-              </thead>
-              <tbody>
-                {LEVEL_LADDER.map((r) => (
-                  <tr key={r.level} className="border-t border-white/5">
-                    <td className="py-1.5">{r.level}</td>
-                    <td className="font-semibold" style={{ color: r.color }}>
-                      {r.name}
-                    </td>
-                    <td>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="w-3.5 h-3.5 rounded" style={{ background: r.color }} />
-                        <code className="text-xs text-slate-400">{r.color}</code>
-                      </span>
-                    </td>
-                    <td className="text-slate-400">{xpForLevel(r.level).toLocaleString("en-US")}</td>
-                    <td>{hub.levelRoles.some((l) => l.level === r.level) ? "✅" : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="rounded-lg border border-neon-blue/30 bg-neon-blue/5 p-3 text-sm">
-            Run <code className="text-neon-blue">/levelroles</code> in your server. Spartacus creates all 11 roles with these names and colors, stacks them in order under its own role, and links each to its level. Run it again any time; it reuses roles that exist.
-          </div>
+            <Step n={1} title="The level role ladder" desc={`11 colored roles, ${s.ladder[0].name} to ${s.ladder[s.ladder.length - 1].name}. Tap a name or color to change it. ${ladderLinked}/${LEVEL_LADDER.length} linked in this server.`}>
+          <LadderEditor ladder={s.ladder} linked={hub.levelRoles.map((l) => l.level)} saving={saving} onSave={(ladder) => save({ ladder })} />
           <label className="flex items-center justify-between gap-3 text-sm">
             <span>Keep only the newest level role (so the name color always matches their level)</span>
             <ToggleSwitch enabled={s.keepTopLevelRole} onChange={(v) => save({ keepTopLevelRole: v })} />

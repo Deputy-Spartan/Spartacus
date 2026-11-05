@@ -1,5 +1,5 @@
 import { AttachmentBuilder, EmbedBuilder, type Client, type Guild, type GuildMember } from "discord.js";
-import { LEVEL_LADDER, CRATE_INFO, ladderRung, levelColor, levelCrateRarity, xpForLevel } from "@spartacus/shared";
+import { CRATE_INFO, ladderRung, levelColor, levelCrateRarity, xpForLevel } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { isModuleEnabled } from "../../lib/moduleGate";
@@ -77,9 +77,9 @@ export async function handleLevelUp(client: Client, guild: Guild, userId: string
     await channel.send({ content: text + (lines.length ? `\n${lines.map((l) => `• ${l}`).join("\n")}` : "") }).catch(() => null);
     return;
   }
-  const color = plus.levelColors ? levelColor(to) : "#5865F2";
-  const rung = ladderRung(to);
-  const next = LEVEL_LADDER.find((r) => r.level > to);
+  const color = plus.levelColors ? levelColor(to, plus.ladder) : "#5865F2";
+  const rung = ladderRung(to, plus.ladder);
+  const next = plus.ladder.find((r) => r.level > to);
   const nextLine = next ? `Next: ${next.name} at level ${next.level} (${(xpForLevel(next.level)).toLocaleString("en-US")} XP)` : "Top of the ladder. Time to /prestige?";
   const embed = new EmbedBuilder()
     .setColor(color as `#${string}`)

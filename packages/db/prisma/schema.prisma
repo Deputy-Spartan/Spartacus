@@ -2866,6 +2866,7 @@ model EconomyPlus {
   champsRoleId       String?
   champsCategories   String[] @default(["xp", "coins", "voice", "streak"])
   lastChampsWeek     String?
+  ladder             Json? // renamed / recolored level role ladder; null = defaults
 }
 
 model ShopItem {

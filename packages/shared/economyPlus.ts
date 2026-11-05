@@ -44,8 +44,8 @@ function rgbToHex([r, g, b]: [number, number, number]): string {
 
 // The color for any level: exactly the role color on a rung, blended
 // between rungs, gold from 50 up.
-export function levelColor(level: number): string {
-  const L = LEVEL_LADDER;
+export function levelColor(level: number, ladder: LadderRung[] = LEVEL_LADDER): string {
+  const L = ladder;
   if (level <= L[0].level) return L[0].color;
   if (level >= L[L.length - 1].level) return L[L.length - 1].color;
   for (let i = 0; i < L.length - 1; i++) {
@@ -60,10 +60,22 @@ export function levelColor(level: number): string {
 }
 
 // The rung a level belongs to (the last role earned).
-export function ladderRung(level: number): LadderRung | null {
+export function ladderRung(level: number, ladder: LadderRung[] = LEVEL_LADDER): LadderRung | null {
   let found: LadderRung | null = null;
-  for (const r of LEVEL_LADDER) if (level >= r.level) found = r;
+  for (const r of ladder) if (level >= r.level) found = r;
   return found;
+}
+
+// A server can rename and recolor the rungs (the levels stay 1, 5, 10 ... 50).
+// Anything missing or invalid falls back to the default for that rung.
+export function cleanLadder(v: unknown): LadderRung[] {
+  const list = Array.isArray(v) ? v : [];
+  return LEVEL_LADDER.map((d) => {
+    const e = list.find((x) => x && typeof x === "object" && (x as { level?: unknown }).level === d.level) as { name?: unknown; color?: unknown } | undefined;
+    const name = typeof e?.name === "string" ? e.name.replace(/\s+/g, " ").trim().slice(0, 100) : "";
+    const color = typeof e?.color === "string" && /^#[0-9a-fA-F]{6}$/.test(e.color.trim()) ? e.color.trim().toUpperCase() : "";
+    return { level: d.level, name: name || d.name, color: color || d.color };
+  });
 }
 
 // ---- Loot crates ----
@@ -197,6 +209,7 @@ export const ECONOMY_PLUS_DEFAULTS = {
   champsChannelId: null as string | null,
   champsRoleId: null as string | null,
   champsCategories: ["xp", "coins", "voice", "streak"] as string[],
+  ladder: LEVEL_LADDER as LadderRung[],
 };
 export type EconomyPlusSettings = typeof ECONOMY_PLUS_DEFAULTS;
 
@@ -232,6 +245,7 @@ export function cleanEconomyPlus(b: Record<string, unknown>): EconomyPlusSetting
     champsEnabled: bool(b.champsEnabled, D.champsEnabled),
     champsChannelId: id(b.champsChannelId),
     champsRoleId: id(b.champsRoleId),
+    ladder: cleanLadder(b.ladder),
     champsCategories: Array.isArray(b.champsCategories) ? [...new Set(b.champsCategories.filter((c): c is string => typeof c === "string" && c in CHAMP_CATEGORIES))] : D.champsCategories,
   };
 }

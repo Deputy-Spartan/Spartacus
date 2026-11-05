@@ -5,22 +5,53 @@
     <title>Spartacus</title>
     <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
     <style>
-      .sp-note { font-size: 11px; color: #9a9a9a; margin: 4px 0 8px; line-height: 1.4; }
-      .sp-ok { color: #4ade80; }
-      .sp-bad { color: #f87171; }
+      :root {
+        --sp-font: "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        --sp-muted: #9aa0aa;
+        --sp-line: #3a3d44;
+      }
+      body,
+      sdpi-item,
+      .sp-head,
+      .sp-note,
+      .sp-tip {
+        font-family: var(--sp-font);
+      }
+      .sp-head { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; padding: 0 0 10px; border-bottom: 1px solid var(--sp-line); }
+      .sp-head img { width: 30px; height: 30px; border-radius: 50%; }
+      .sp-head b { display: block; font-size: 13px; font-weight: 600; color: #f1f2f4; }
+      .sp-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sp-muted); }
+      .sp-chip i { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; display: inline-block; }
+      .sp-chip.ok { color: #4ade80; } .sp-chip.ok i { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+      .sp-chip.bad { color: #f87171; } .sp-chip.bad i { background: #f87171; }
+      .sp-link { margin-left: auto; font-size: 11px; color: #60a5fa; cursor: pointer; text-decoration: none; }
+      .sp-note { font-size: 11px; color: var(--sp-muted); margin: 2px 0 10px; line-height: 1.45; }
+      .sp-tip { font-size: 11px; color: var(--sp-muted); margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--sp-line); line-height: 1.45; }
+      #keyBox.hidden { display: none; }
       [data-field] { display: none; }
       [data-field].on { display: flex; }
     </style>
   </head>
   <body>
-    <!-- Shared by every Spartacus action: the connection key is stored once. -->
-    <sdpi-item label="Connection key">
-      <sdpi-password setting="apiKey" global placeholder="sd_live_…"></sdpi-password>
-    </sdpi-item>
-    <sdpi-item label="">
-      <sdpi-button id="test" value="Test connection"></sdpi-button>
-    </sdpi-item>
-    <p class="sp-note" id="status">Make a key on the dashboard: Owner Only → 🎛️ Stream Deck → Make a Key.</p>
+    <div class="sp-head">
+      <img src="../imgs/plugin/icon.png" alt="" />
+      <div>
+        <b>Spartacus</b>
+        <span class="sp-chip" id="chip"><i></i><span id="chipText">Checking connection…</span></span>
+      </div>
+      <a class="sp-link" id="change" hidden>Change key</a>
+    </div>
+
+    <!-- The connection key is stored once for every Spartacus key. Hidden once it works. -->
+    <div id="keyBox">
+      <sdpi-item label="Connection key">
+        <sdpi-password setting="apiKey" global placeholder="sd_live_…"></sdpi-password>
+      </sdpi-item>
+      <sdpi-item>
+        <sdpi-button id="test">Test connection</sdpi-button>
+      </sdpi-item>
+      <p class="sp-note">Get a key on the dashboard: Owner Only → 🎛️ Stream Deck → Make a Key. Paste it here once; every Spartacus key uses it.</p>
+    </div>
 
     <!-- Only the fields the current action uses are shown. -->
     <sdpi-item data-field="channel" label="Channel"><sdpi-select setting="channel" datasource="text" hot-reload placeholder="Pick a channel"></sdpi-select></sdpi-item>
@@ -41,31 +72,47 @@
     <sdpi-item data-field="streamer" label="Streamer"><sdpi-textfield setting="streamer" placeholder="Their name"></sdpi-textfield></sdpi-item>
     <sdpi-item data-field="link" label="Link"><sdpi-textfield setting="link" placeholder="https://twitch.tv/… (optional)"></sdpi-textfield></sdpi-item>
     <sdpi-item data-field="note" label="Note"><sdpi-textfield setting="note" placeholder="Optional"></sdpi-textfield></sdpi-item>
-    <p class="sp-note" id="tip"></p>
+    <p class="sp-tip" id="tip"></p>
 
     <script>
       // Which fields each action uses (kept in step with src/actions.ts).
       const FIELDS = __FIELDS__;
       const TIPS = __TIPS__;
       const client = SDPIComponents.streamDeckClient;
+      const chip = document.getElementById("chip");
+      const chipText = document.getElementById("chipText");
+      const keyBox = document.getElementById("keyBox");
+      const change = document.getElementById("change");
+
       client.getConnectionInfo().then((info) => {
         const id = info.actionInfo.action.split(".").pop();
         for (const f of FIELDS[id] ?? []) document.querySelectorAll(`[data-field="${f}"]`).forEach((el) => el.classList.add("on"));
         document.getElementById("tip").textContent = TIPS[id] ?? "";
       });
-      const status = document.getElementById("status");
-      document.getElementById("test").addEventListener("click", () => {
-        status.textContent = "Checking…";
-        status.className = "sp-note";
+
+      function setStatus(ok, text) {
+        chip.className = "sp-chip " + (ok === true ? "ok" : ok === false ? "bad" : "");
+        chipText.textContent = text;
+        // Once connected, the key field folds away; Change key brings it back.
+        keyBox.classList.toggle("hidden", ok === true);
+        change.hidden = ok !== true;
+      }
+      function test() {
+        setStatus(null, "Checking connection…");
         client.send("sendToPlugin", { event: "test" });
+      }
+      document.getElementById("test").addEventListener("click", test);
+      change.addEventListener("click", () => {
+        keyBox.classList.remove("hidden");
+        change.hidden = true;
       });
       client.sendToPropertyInspector.subscribe((ev) => {
         const p = ev.payload || {};
-        if (p.event === "test" || p.ok === false) {
-          status.textContent = p.message || (p.ok ? "Connected" : "Not connected");
-          status.className = "sp-note " + (p.ok === false ? "sp-bad" : "sp-ok");
-        }
+        if (p.event === "test") setStatus(!!p.ok, p.ok ? p.message : p.message || "Not connected");
       });
+      // Re-check after a new key is pasted.
+      client.didReceiveGlobalSettings.subscribe(() => setTimeout(test, 300));
+      test();
     </script>
   </body>
 </html>

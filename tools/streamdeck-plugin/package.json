@@ -11,5 +11,8 @@
   "dependencies": {
     "@elgato/streamdeck": "3.0.3",
     "esbuild": "0.24.0"
+  },
+  "devDependencies": {
+    "lucide-static": "^0.460.0"
   }
 }

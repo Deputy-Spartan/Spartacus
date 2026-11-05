@@ -18,6 +18,14 @@ const { KEYS, DIALS, PLUGIN_UUID } = await import("./dist-actions.mjs").catch(as
   return import("./dist-actions.mjs");
 });
 
+// 0. The line icons drawn on keys (Lucide, ISC licence), only the ones used.
+const glyphs = {};
+for (const a of [...KEYS, ...DIALS]) {
+  const svg = readFileSync(join(here, "node_modules/lucide-static/icons", `${a.glyph}.svg`), "utf8");
+  glyphs[a.glyph] = svg.replace(/<!--[\s\S]*?-->/g, "").replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>[\s\S]*$/, "").replace(/\s+/g, " ").trim();
+}
+writeFileSync(join(here, "src/glyphs.gen.ts"), `// Made by build.mjs from lucide-static. Don't edit.\nexport const GLYPHS: Record<string, string> = ${JSON.stringify(glyphs, null, 2)};\n`);
+
 // 1. The plugin code.
 await build({
   entryPoints: [join(here, "src/plugin.ts")],
@@ -55,7 +63,7 @@ const manifest = {
   $schema: "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   UUID: PLUGIN_UUID,
   Name: "Spartacus",
-  Version: "1.0.0.0",
+  Version: "1.1.0.0",
   Author: "Spartacus",
   Description: "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   Category: "Spartacus",

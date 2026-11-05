@@ -1,6 +1,7 @@
 import streamDeck, { type Action } from "@elgato/streamdeck";
 import type { JsonObject } from "@elgato/utils";
 import { ALL, idFromUuid } from "./actions";
+import { clip, iconImage, keyImage, plain, type Face } from "./draw";
 
 // The Spartacus Stream Deck plugin. Keys and dials show live info from
 // Spartacus and run their action on press. The connection key from the
@@ -11,12 +12,6 @@ type Globals = JsonObject & {
   apiUrl?: string;
 };
 type Settings = JsonObject & Record<string, string | number | boolean | undefined>;
-interface Face {
-  title: string;
-  line: string;
-  tone: "" | "red" | "green" | "warn" | "off";
-  pct?: number;
-}
 interface Visible {
   action: Action<Settings>;
   id: string; // which Spartacus action
@@ -44,30 +39,17 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   return json;
 }
 
-// ---- Drawing ----
-const TONE: Record<string, [string, string]> = {
-  "": ["#1b1d24", "#2b2f3b"],
-  red: ["#3b0d12", "#7a1622"],
-  green: ["#0c2a1a", "#16653a"],
-  warn: ["#33260a", "#7a5a12"],
-  off: ["#141518", "#1e2026"],
-};
-function keyImage(tone: string) {
-  const [a, b] = TONE[tone] ?? TONE[""];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${b}"/><stop offset="1" stop-color="${a}"/></linearGradient></defs><rect width="144" height="144" rx="18" fill="url(#g)"/><rect x="0" y="134" width="144" height="10" fill="${tone === "red" ? "#ef4444" : tone === "green" ? "#22c55e" : tone === "warn" ? "#f59e0b" : "#5e7fa6"}" opacity="0.9"/></svg>`;
-  return `data:image/svg+xml;charset=utf8,${encodeURIComponent(svg)}`;
-}
-const wrap = (t: string, n = 11) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+// ---- Drawing (src/draw.ts) ----
 
 async function draw(v: Visible, face: Face) {
   faces.set(v.action.id, face);
   const d = def(v.id);
   if (v.action.isKey()) {
     const pressAgain = armed.has(v.action.id) && Date.now() < (armed.get(v.action.id) ?? 0);
-    await v.action.setImage(keyImage(pressAgain ? "warn" : face.tone));
-    await v.action.setTitle(`${d?.icon ?? ""}\n${wrap(face.title)}\n${pressAgain ? "Press again" : wrap(face.line)}`);
+    await v.action.setImage(keyImage(face, d?.glyph, pressAgain));
+    await v.action.setTitle("");
   } else if (v.action.isDial()) {
-    await v.action.setFeedback({ title: `${d?.icon ?? ""} ${face.title}`, value: face.line, indicator: { value: Math.round(Math.max(0, Math.min(1, face.pct ?? 0)) * 100) } });
+    await v.action.setFeedback({ icon: iconImage(d?.glyph, face.tone), title: plain(face.title), value: plain(face.line), indicator: { value: Math.round(Math.max(0, Math.min(1, face.pct ?? 0)) * 100) } });
   }
 }
 
@@ -92,7 +74,7 @@ async function refreshAll() {
       if (f) await draw(v, f);
     }
   } catch (err) {
-    for (const v of visible.values()) await problem(v, err instanceof Error ? wrap(err.message, 14) : "Offline");
+    for (const v of visible.values()) await problem(v, err instanceof Error ? clip(err.message, 14) : "Offline");
   } finally {
     refreshing = false;
   }
@@ -245,6 +227,7 @@ let optionsCache: { at: number; data: Record<string, Array<{ value: string; labe
 streamDeck.ui.onSendToPlugin<{ event?: string }>(async (ev) => {
   const event = ev.payload?.event;
   if (!event) return;
+  if (!globals.apiKey) globals = await streamDeck.settings.getGlobalSettings<Globals>();
   try {
     if (event === "test") {
       const me = await api<{ guild: { name: string } }>("/sd/v1/me");

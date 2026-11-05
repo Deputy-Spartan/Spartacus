@@ -1736,6 +1736,17 @@ export interface RoleChangeRow {
   createdAt: string;
 }
 
+export interface QuickLinksStatus {
+  bot: "online" | "updating" | "offline";
+  botMessage: string | null;
+  lastHeartbeatAt: string | null;
+  dashboardDeploying: boolean;
+}
+export interface QuickLinksResponse {
+  groups: import("@spartacus/shared").QuickLinkGroup[];
+  status: QuickLinksStatus | null;
+}
+
 export interface StreamDeckKeyRow {
   id: string;
   name: string;
@@ -1753,6 +1764,10 @@ export interface StreamDeckLogRow {
 }
 
 export const api = {
+  getQuickLinks: () => request<QuickLinksResponse>("/owner/quick-links"),
+  saveQuickLinks: (groups: import("@spartacus/shared").QuickLinkGroup[]) =>
+    request<{ groups: import("@spartacus/shared").QuickLinkGroup[] }>("/owner/quick-links", { method: "PUT", body: JSON.stringify({ groups }) }),
+  resetQuickLinks: () => request<{ groups: import("@spartacus/shared").QuickLinkGroup[] }>("/owner/quick-links", { method: "DELETE" }),
   getStreamDeckKeys: (guildId: string) => request<StreamDeckKeyRow[]>(`/guilds/${guildId}/stream-deck/keys`),
   createStreamDeckKey: (guildId: string, name: string) => request<StreamDeckKeyRow>(`/guilds/${guildId}/stream-deck/keys`, { method: "POST", body: JSON.stringify({ name }) }),
   revokeStreamDeckKey: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-deck/keys/${id}`, { method: "DELETE" }),

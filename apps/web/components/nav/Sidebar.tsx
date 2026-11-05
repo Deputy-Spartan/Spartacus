@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api, type ModuleState } from "../../lib/api";
 import { usePinnedModules } from "../../lib/usePinnedModules";
@@ -32,6 +32,36 @@ export function Sidebar({
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
+
+  // Owner Only → Quick Links: the pinned sites, listed under that item when
+  // its arrow is open. Reloaded when the Quick Links page saves.
+  const [quickLinks, setQuickLinks] = useState<QuickLinkGroup[]>([]);
+  const [quickOpen, setQuickOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setQuickOpen(localStorage.getItem("spartacus:quick-links-open") === "1");
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  useEffect(() => {
+    if (!isOwner) return;
+    const load = () => api.getQuickLinks().then((r) => setQuickLinks(r.groups)).catch(() => null);
+    load();
+    window.addEventListener(QUICK_LINKS_EVENT, load);
+    return () => window.removeEventListener(QUICK_LINKS_EVENT, load);
+  }, [isOwner]);
+  function toggleQuick() {
+    setQuickOpen((v) => {
+      try {
+        localStorage.setItem("spartacus:quick-links-open", v ? "0" : "1");
+      } catch {
+        /* private mode */
+      }
+      return !v;
+    });
+  }
+  const pinnedQuick = quickLinks.filter((g) => g.pinned && quickLinkMain(g));
   const [modules, setModules] = useState<Record<string, ModuleState> | null>(null);
   const { isPinned, togglePin } = usePinnedModules(guildId);
 
@@ -232,9 +262,10 @@ export function Sidebar({
                     const moduleKey = NAV_MODULE_KEYS[item.href];
                     const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
                     const pinned = isPinned(item.href);
+                    const isQuick = item.href === "/quick-links" && section.section === "Owner Only";
                     return (
+                      <Fragment key={`${section.section ?? "top"}:${item.href}`}>
                       <div
-                        key={`${section.section ?? "top"}:${item.href}`}
                         className={[
                           "group relative flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
                           active
@@ -270,7 +301,36 @@ export function Sidebar({
                         >
                           📌
                         </button>
+                        {isQuick && pinnedQuick.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={toggleQuick}
+                            title={quickOpen ? "Hide links" : "Show links here"}
+                            aria-expanded={quickOpen}
+                            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-[10px] text-slate-500 hover:text-slate-200"
+                          >
+                            {quickOpen ? "▾" : "▸"}
+                          </button>
+                        )}
                       </div>
+                      {isQuick && quickOpen && pinnedQuick.length > 0 && (
+                        <div className="ml-7 pl-2 border-l border-white/10 space-y-0.5">
+                          {pinnedQuick.map((g) => (
+                            <a
+                              key={g.id}
+                              href={quickLinkMain(g) as string}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-400 hover:text-slate-100 hover:bg-base-800/60"
+                            >
+                              <span>{g.icon.startsWith("<") ? "🔗" : g.icon}</span>
+                              <span className="flex-1 min-w-0 truncate">{g.name}</span>
+                              <span className="text-slate-600">↗</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </div>

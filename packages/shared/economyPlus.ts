@@ -16,22 +16,23 @@ export function levelForXp(xp: number): number {
 // between gets its own color on the same path (levelColor), so level-ups
 // shift color a little each time and match the role you're working toward.
 export interface LadderRung {
+  key: string; // stays the same when the level, name or color changes, so /levelroles knows which role is which
   level: number;
   name: string;
   color: string;
 }
 export const LEVEL_LADDER: LadderRung[] = [
-  { level: 1, name: "Recruit", color: "#95A5A6" },
-  { level: 5, name: "Squire", color: "#2ECC71" },
-  { level: 10, name: "Warrior", color: "#1ABC9C" },
-  { level: 15, name: "Vanguard", color: "#3498DB" },
-  { level: 20, name: "Gladiator", color: "#5865F2" },
-  { level: 25, name: "Champion", color: "#9B59B6" },
-  { level: 30, name: "Centurion", color: "#E91E63" },
-  { level: 35, name: "Warlord", color: "#E74C3C" },
-  { level: 40, name: "Conqueror", color: "#E67E22" },
-  { level: 45, name: "Titan", color: "#F1C40F" },
-  { level: 50, name: "Spartan Legend", color: "#FFD700" },
+  { key: "l1", level: 1, name: "Recruit", color: "#95A5A6" },
+  { key: "l5", level: 5, name: "Squire", color: "#2ECC71" },
+  { key: "l10", level: 10, name: "Warrior", color: "#1ABC9C" },
+  { key: "l15", level: 15, name: "Vanguard", color: "#3498DB" },
+  { key: "l20", level: 20, name: "Gladiator", color: "#5865F2" },
+  { key: "l25", level: 25, name: "Champion", color: "#9B59B6" },
+  { key: "l30", level: 30, name: "Centurion", color: "#E91E63" },
+  { key: "l35", level: 35, name: "Warlord", color: "#E74C3C" },
+  { key: "l40", level: 40, name: "Conqueror", color: "#E67E22" },
+  { key: "l45", level: 45, name: "Titan", color: "#F1C40F" },
+  { key: "l50", level: 50, name: "Spartan Legend", color: "#FFD700" },
 ];
 
 function hexToRgb(h: string): [number, number, number] {
@@ -66,16 +67,32 @@ export function ladderRung(level: number, ladder: LadderRung[] = LEVEL_LADDER): 
   return found;
 }
 
-// A server can rename and recolor the rungs (the levels stay 1, 5, 10 ... 50).
-// Anything missing or invalid falls back to the default for that rung.
+// A server can rename, recolor, move, add and remove rungs. Levels are
+// unique and kept in order; nothing saved yet (or nothing valid) means the
+// default ladder.
+export const MAX_LADDER_RUNGS = 20;
+export const MAX_LADDER_LEVEL = 500;
 export function cleanLadder(v: unknown): LadderRung[] {
-  const list = Array.isArray(v) ? v : [];
-  return LEVEL_LADDER.map((d) => {
-    const e = list.find((x) => x && typeof x === "object" && (x as { level?: unknown }).level === d.level) as { name?: unknown; color?: unknown } | undefined;
-    const name = typeof e?.name === "string" ? e.name.replace(/\s+/g, " ").trim().slice(0, 100) : "";
-    const color = typeof e?.color === "string" && /^#[0-9a-fA-F]{6}$/.test(e.color.trim()) ? e.color.trim().toUpperCase() : "";
-    return { level: d.level, name: name || d.name, color: color || d.color };
-  });
+  if (!Array.isArray(v)) return LEVEL_LADDER.map((r) => ({ ...r }));
+  const out: LadderRung[] = [];
+  const keys = new Set<string>();
+  for (const x of v) {
+    if (!x || typeof x !== "object") continue;
+    const e = x as { key?: unknown; level?: unknown; name?: unknown; color?: unknown };
+    const level = typeof e.level === "number" && Number.isFinite(e.level) ? Math.round(e.level) : NaN;
+    if (!(level >= 1 && level <= MAX_LADDER_LEVEL) || out.some((r) => r.level === level)) continue;
+    const name = typeof e.name === "string" ? e.name.replace(/\s+/g, " ").trim().slice(0, 100) : "";
+    const color = typeof e.color === "string" && /^#[0-9a-fA-F]{6}$/.test(e.color.trim()) ? e.color.trim().toUpperCase() : "";
+    if (!name || !color) continue;
+    // Ladders saved before rungs had keys: the original rungs were keyed by level.
+    let key = typeof e.key === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(e.key) ? e.key : `l${level}`;
+    while (keys.has(key)) key = key + "x";
+    keys.add(key);
+    out.push({ key, level, name, color });
+    if (out.length >= MAX_LADDER_RUNGS) break;
+  }
+  if (!out.length) return LEVEL_LADDER.map((r) => ({ ...r }));
+  return out.sort((a, b) => a.level - b.level);
 }
 
 // ---- Loot crates ----

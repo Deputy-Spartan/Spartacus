@@ -9,6 +9,8 @@ import {
   CRATE_TABLE,
   EVENT_TIMEZONES,
   LEVEL_LADDER,
+  MAX_LADDER_LEVEL,
+  MAX_LADDER_RUNGS,
   SHOP_ITEM_TYPES,
   levelColor,
   xpForLevel,
@@ -77,8 +79,9 @@ type Tab = (typeof TABS)[number][0];
 type HubModule = "LEVELING" | "ECONOMY" | "PRESTIGE" | "VOICE_ACTIVITY" | "ACHIEVEMENTS" | "PROFILE_CARDS";
 const HUB_MODULES: HubModule[] = ["LEVELING", "ECONOMY", "PRESTIGE", "VOICE_ACTIVITY", "ACHIEVEMENTS", "PROFILE_CARDS"];
 
-// The level role ladder, with each rung's name and color editable. Saving
-// only changes the dashboard; /levelroles then renames and recolors the roles.
+// The level role ladder: every rung's level, name and color can be changed,
+// and rungs added or removed. Saving only changes the dashboard; /levelroles
+// then makes the roles match (renames, recolors, moves, creates, deletes).
 function LadderEditor({ ladder, linked, saving, onSave }: { ladder: LadderRung[]; linked: number[]; saving: boolean; onSave: (l: LadderRung[]) => void }) {
   const [draft, setDraft] = useState(ladder);
   const key = JSON.stringify(ladder);
@@ -86,8 +89,22 @@ function LadderEditor({ ladder, linked, saving, onSave }: { ladder: LadderRung[]
   const valid = (c: string) => /^#[0-9a-fA-F]{6}$/.test(c);
   const dirty = JSON.stringify(draft) !== key;
   const isDefault = JSON.stringify(ladder) === JSON.stringify(LEVEL_LADDER);
-  const set = (level: number, patch: Partial<LadderRung>) => setDraft((d) => d.map((r) => (r.level === level ? { ...r, ...patch } : r)));
-  const ok = draft.every((r) => r.name.trim() && valid(r.color));
+  const set = (k: string, patch: Partial<LadderRung>) => setDraft((d) => d.map((r) => (r.key === k ? { ...r, ...patch } : r)));
+  const levelOk = (r: LadderRung) => Number.isInteger(r.level) && r.level >= 1 && r.level <= MAX_LADDER_LEVEL && draft.filter((x) => x.level === r.level).length === 1;
+  const problem = !draft.length
+    ? "Keep at least one level."
+    : draft.some((r) => !levelOk(r))
+      ? `Each level needs its own number from 1 to ${MAX_LADDER_LEVEL}.`
+      : draft.some((r) => !r.name.trim() || !valid(r.color))
+        ? "Every role needs a name and a color like #3498DB."
+        : null;
+  const removed = ladder.filter((r) => !draft.some((d) => d.key === r.key));
+  function add() {
+    const last = [...draft].filter((r) => Number.isInteger(r.level)).sort((a, b) => a.level - b.level).pop();
+    let level = Math.min(MAX_LADDER_LEVEL, (last?.level ?? 0) + 5);
+    while (draft.some((r) => r.level === level) && level > 1) level--;
+    setDraft([...draft, { key: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), level, name: "New Rank", color: last?.color ?? "#5865F2" }]);
+  }
   return (
     <>
       <div className="overflow-x-auto">
@@ -98,18 +115,30 @@ function LadderEditor({ ladder, linked, saving, onSave }: { ladder: LadderRung[]
               <th className="pr-2">Role name</th>
               <th className="pr-2">Color</th>
               <th className="pr-2">XP total</th>
-              <th>Linked</th>
+              <th className="pr-2">Linked</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {draft.map((r) => (
-              <tr key={r.level} className="border-t border-white/5">
-                <td className="py-1.5 pr-2">{r.level}</td>
+              <tr key={r.key} className="border-t border-white/5">
+                <td className="py-1.5 pr-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={MAX_LADDER_LEVEL}
+                    value={Number.isNaN(r.level) ? "" : r.level}
+                    onChange={(e) => set(r.key, { level: e.target.value === "" ? NaN : Math.round(Number(e.target.value)) })}
+                    aria-label={`Level for ${r.name || "this role"}`}
+                    className={`w-14 rounded-md border bg-black/20 px-1.5 py-1 ${levelOk(r) ? "border-white/10" : "border-red-500/60 text-red-300"}`}
+                  />
+                </td>
                 <td className="pr-2">
                   <input
                     value={r.name}
                     maxLength={100}
-                    onChange={(e) => set(r.level, { name: e.target.value })}
+                    onChange={(e) => set(r.key, { name: e.target.value })}
                     aria-label={`Level ${r.level} role name`}
                     className="w-full min-w-[8.5rem] rounded-md border border-white/10 bg-black/20 px-2 py-1 font-semibold"
                     style={{ color: valid(r.color) ? r.color : undefined }}
@@ -120,29 +149,55 @@ function LadderEditor({ ladder, linked, saving, onSave }: { ladder: LadderRung[]
                     <input
                       type="color"
                       value={valid(r.color) ? r.color : "#000000"}
-                      onChange={(e) => set(r.level, { color: e.target.value.toUpperCase() })}
+                      onChange={(e) => set(r.key, { color: e.target.value.toUpperCase() })}
                       aria-label={`Level ${r.level} color`}
                       className="h-7 w-7 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
                     />
                     <input
                       value={r.color}
                       maxLength={7}
-                      onChange={(e) => set(r.level, { color: (e.target.value.startsWith("#") ? e.target.value : "#" + e.target.value).toUpperCase() })}
+                      onChange={(e) => set(r.key, { color: (e.target.value.startsWith("#") ? e.target.value : "#" + e.target.value).toUpperCase() })}
                       aria-label={`Level ${r.level} color code`}
                       className={`w-[5.5rem] rounded-md border bg-black/20 px-1.5 py-1 font-mono text-xs ${valid(r.color) ? "border-white/10 text-slate-300" : "border-red-500/60 text-red-300"}`}
                     />
                   </span>
                 </td>
-                <td className="pr-2 text-slate-400">{xpForLevel(r.level).toLocaleString("en-US")}</td>
-                <td>{linked.includes(r.level) ? "✅" : "—"}</td>
+                <td className="pr-2 text-slate-400">{Number.isInteger(r.level) ? xpForLevel(r.level).toLocaleString("en-US") : "—"}</td>
+                <td className="pr-2">{linked.includes(r.level) ? "✅" : "—"}</td>
+                <td>
+                  <button
+                    type="button"
+                    onClick={() => setDraft(draft.filter((x) => x.key !== r.key))}
+                    aria-label={`Remove level ${r.level} (${r.name})`}
+                    title="Remove this level"
+                    className="rounded px-1.5 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+                  >
+                    ✕
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {draft.length < MAX_LADDER_RUNGS && (
+        <button type="button" onClick={add} className="self-start text-sm text-neon-blue hover:underline">
+          + Add a level
+        </button>
+      )}
+      {removed.length > 0 && (
+        <p className="text-xs text-amber-300">
+          Removing {removed.map((r) => r.name).join(", ")}. When you run /levelroles, {removed.length === 1 ? "that role is" : "those roles are"} deleted from your server.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={!dirty || !ok || saving} onClick={() => onSave(draft.map((r) => ({ ...r, name: r.name.trim() })))} className="neon-button-sm disabled:opacity-40">
-          Save names and colors
+        <button
+          type="button"
+          disabled={!dirty || !!problem || saving}
+          onClick={() => onSave(draft.map((r) => ({ ...r, name: r.name.trim() })).sort((a, b) => a.level - b.level))}
+          className="neon-button-sm disabled:opacity-40"
+        >
+          Save ladder
         </button>
         {dirty && (
           <button type="button" onClick={() => setDraft(JSON.parse(key) as LadderRung[])} className="text-sm text-slate-300 hover:text-white">
@@ -151,15 +206,15 @@ function LadderEditor({ ladder, linked, saving, onSave }: { ladder: LadderRung[]
         )}
         {!isDefault && !dirty && (
           <button type="button" onClick={() => setDraft(LEVEL_LADDER.map((r) => ({ ...r })))} className="text-sm text-slate-300 hover:text-white">
-            Back to the original names and colors
+            Back to the original ladder
           </button>
         )}
-        {!ok && <span className="text-xs text-red-300">Every role needs a name and a color like #3498DB.</span>}
+        {dirty && problem && <span className="text-xs text-red-300">{problem}</span>}
       </div>
       <div className="rounded-lg border border-neon-blue/30 bg-neon-blue/5 p-3 text-sm">
-        Run <code className="text-neon-blue">/levelroles</code> in your server. The first time, Spartacus creates all 11 roles with these names and colors, stacks them in order under its own role, and links each to its level.
+        Run <code className="text-neon-blue">/levelroles</code> in your server. The first time, Spartacus creates a role for each level with these names and colors, stacks them in order under its own role, and links each to its level.
         <br />
-        <b>Changed a name or color?</b> Save, then run <code className="text-neon-blue">/levelroles</code> again: it renames and recolors the roles that are already linked, so members keep them. Level-up messages and cards use your colors and names right away.
+        <b>Changed something?</b> Save, then run <code className="text-neon-blue">/levelroles</code> again. It renames and recolors the same roles (members keep them), moves a role to its new level number, makes roles for levels you added, and deletes the roles of levels you removed. Level-up messages and cards use your ladder right away.
       </div>
     </>
   );
@@ -237,7 +292,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
     if (!(await confirm(`Remove “${it.name}” from the shop?`, { title: "Remove item", confirmLabel: "Remove", danger: true }))) return;
     setHub(await api.deleteShopItem(guildId, it.id));
   }
-  const ladderLinked = LEVEL_LADDER.filter((r) => hub.levelRoles.some((l) => l.level === r.level)).length;
+  const ladderLinked = s.ladder.filter((r) => hub.levelRoles.some((l) => l.level === r.level)).length;
   const sel = <T extends string | number>(value: T, options: Array<[T, string]>, onChange: (v: T) => void, aria: string) => (
     <select className={select} value={String(value)} aria-label={aria} onChange={(e) => onChange((typeof value === "number" ? Number(e.target.value) : e.target.value) as T)}>
       {options.map(([v, t]) => (
@@ -252,7 +307,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
   // The Start tab's checklist: what's on, and where to go next.
   const parts: Array<[string, string, boolean, Tab]> = [
     ["⚡", "XP & levels", modules.LEVELING, "levels"],
-    ["🎖️", `Level role ladder (${ladderLinked}/${LEVEL_LADDER.length} linked)`, ladderLinked > 0, "roles"],
+    ["🎖️", `Level role ladder (${ladderLinked}/${s.ladder.length} linked)`, ladderLinked > 0, "roles"],
     ["🪙", "Coins", modules.ECONOMY, "coins"],
     ["🛒", `Shop (${hub.items.filter((i) => i.enabled).length} items)`, s.shopEnabled, "shop"],
     ["🧾", "Shop panel", !!hub.panel.channelId, "shop"],
@@ -312,7 +367,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
                   <b>⚡ Levels:</b> turn on XP &amp; Levels. Members earn 15–25 XP a message (once a minute), 100 XP per level.
                 </li>
                 <li>
-                  <b>🎖️ Level Roles:</b> run <code className="text-neon-blue">/levelroles</code> in Discord to make the 11 colored roles.
+                  <b>🎖️ Level Roles:</b> run <code className="text-neon-blue">/levelroles</code> in Discord to make the colored level roles (change levels, names and colors there first if you like).
                 </li>
                 <li>
                   <b>🪙 Coins:</b> turn on Coins and name your currency.
@@ -337,7 +392,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <Step n={1} title="Turn on XP & levels" desc="Members earn 15–25 XP per message (once a minute). 100 XP per level: level 10 = 1,000 XP, 20 = 2,000, 30 = 3,000." {...mod("LEVELING")} />
             <Step n={2} title="Level-up moments" desc="Every level has its own color, from grey to gold, and level-ups come with rewards.">
           <div className="flex flex-wrap gap-1.5" aria-label="Level colors">
-            {Array.from({ length: 50 }, (_, i) => i + 1).map((l) => (
+            {Array.from({ length: Math.max(50, s.ladder[s.ladder.length - 1].level) }, (_, i) => i + 1).map((l) => (
               <span key={l} title={`Level ${l}`} className="w-5 h-5 rounded" style={{ background: levelColor(l, s.ladder) }} />
             ))}
           </div>
@@ -364,7 +419,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
 
         {tab === "roles" && (
           <>
-            <Step n={1} title="The level role ladder" desc={`11 colored roles, ${s.ladder[0].name} to ${s.ladder[s.ladder.length - 1].name}. Tap a name or color to change it. ${ladderLinked}/${LEVEL_LADDER.length} linked in this server.`}>
+            <Step n={1} title="The level role ladder" desc={`${s.ladder.length} colored roles, ${s.ladder[0].name} to ${s.ladder[s.ladder.length - 1].name}. Change any level, name or color, or add and remove levels. ${ladderLinked}/${s.ladder.length} linked in this server.`}>
           <LadderEditor ladder={s.ladder} linked={hub.levelRoles.map((l) => l.level)} saving={saving} onSave={(ladder) => save({ ladder })} />
           <label className="flex items-center justify-between gap-3 text-sm">
             <span>Keep only the newest level role (so the name color always matches their level)</span>

@@ -17,7 +17,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     steps: [
       "Start tab: see what's on at a glance and follow the quick start.",
       "Levels tab: turn on XP & Levels, choose level-up colors, the card image and coins per level, then the level-up message and channel.",
-      "Level Roles tab: run /levelroles in Discord to make the 11 colored roles (Recruit to Spartan Legend), then add or change any level roles and the XP blacklist.",
+      "Level Roles tab: change the ladder if you like (levels, names, colors, add or remove levels), save, then run /levelroles in Discord to make or update the roles. Step 2 has extra level roles and the XP blacklist.",
       "Coins tab: turn on Coins, name your currency, and set how coins are earned (messages, /daily, multipliers).",
       "Shop tab: add items (or the 4 starters), turn the shop on, pick a channel for the shop panel, and turn on loot crates.",
       "Boosts tab: Voice XP, voice time tracking, XP weekends and Happy Hour, and prestige with its permanent bonus.",

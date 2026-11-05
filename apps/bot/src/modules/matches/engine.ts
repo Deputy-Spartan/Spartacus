@@ -1,5 +1,5 @@
 // The match rules with no Discord or database in them: splitting teams,
-// building brackets, picking maps and counting votes. flow.ts runs these and
+// picking maps and counting votes. flow.ts runs these and
 // handles everything that actually touches Discord.
 
 export type Side = "a" | "b";
@@ -8,15 +8,6 @@ export interface MatchTeam {
   name: string;
   players: string[];
   captain: string;
-}
-
-export interface BracketTie {
-  a: number | null; // index into MatchState.teams
-  b: number | null;
-  winner: Side | null;
-  scoreA: number | null;
-  scoreB: number | null;
-  map: string | null;
 }
 
 export interface MatchReport {
@@ -32,8 +23,6 @@ export interface MatchState {
   teams: MatchTeam[];
   draftPool: string[];
   draftPick: number;
-  bracket: BracketTie[][];
-  tie: [number, number] | null;
   mapOptions: string[];
   votes: Record<string, string>;
   banned: string[];
@@ -43,7 +32,6 @@ export interface MatchState {
   report: MatchReport | null;
   winner: Side | null;
   score: string | null;
-  champion: number | null;
   voiceIds: string[]; // temporary team channels, deleted when the match ends
   roomId: string | null; // the match's temporary text channel
   roomMessageId: string | null;
@@ -69,8 +57,6 @@ export function emptyState(signups: string[] = []): MatchState {
     teams: [],
     draftPool: [],
     draftPick: 0,
-    bracket: [],
-    tie: null,
     mapOptions: [],
     votes: {},
     banned: [],
@@ -80,7 +66,6 @@ export function emptyState(signups: string[] = []): MatchState {
     report: null,
     winner: null,
     score: null,
-    champion: null,
     voiceIds: [],
     roomId: null,
     roomMessageId: null,
@@ -142,48 +127,6 @@ export function draftSide(pick: number): Side {
   return pick % 4 === 0 || pick % 4 === 3 ? "a" : "b";
 }
 
-// Brackets only run with 2, 4, 8 or 16 teams so nobody gets a free pass.
-export function bracketTeamCount(players: number, teamSize: number, maxTeams: number): number {
-  const possible = Math.min(maxTeams, Math.floor(players / teamSize));
-  let count = 0;
-  for (let n = 2; n <= possible; n *= 2) count = n;
-  return count;
-}
-
-export function buildBracket(teamCount: number): BracketTie[][] {
-  const blank = (a: number | null, b: number | null): BracketTie => ({ a, b, winner: null, scoreA: null, scoreB: null, map: null });
-  const seeds = shuffle(Array.from({ length: teamCount }, (_, i) => i));
-  const rounds: BracketTie[][] = [[]];
-  for (let i = 0; i < seeds.length; i += 2) rounds[0].push(blank(seeds[i], seeds[i + 1]));
-  for (let ties = teamCount / 4; ties >= 1; ties /= 2) rounds.push(Array.from({ length: ties }, () => blank(null, null)));
-  return rounds;
-}
-
-export function nextTie(bracket: BracketTie[][]): [number, number] | null {
-  for (let r = 0; r < bracket.length; r++) {
-    for (let i = 0; i < bracket[r].length; i++) {
-      const tie = bracket[r][i];
-      if (tie.a !== null && tie.b !== null && !tie.winner) return [r, i];
-    }
-  }
-  return null;
-}
-
-// Records a result and moves the winner up. Returns the champion's team index
-// once the final is decided, otherwise null.
-export function recordTie(bracket: BracketTie[][], [r, i]: [number, number], winner: Side, winnerScore: number, loserScore: number): number | null {
-  const tie = bracket[r][i];
-  tie.winner = winner;
-  tie.scoreA = winner === "a" ? winnerScore : loserScore;
-  tie.scoreB = winner === "b" ? winnerScore : loserScore;
-  const team = winner === "a" ? tie.a : tie.b;
-  const next = bracket[r + 1]?.[Math.floor(i / 2)];
-  if (!next) return team;
-  if (i % 2 === 0) next.a = team;
-  else next.b = team;
-  return null;
-}
-
 // Falls back to the full list when skipping recent maps wouldn't leave enough.
 export function mapPool(maps: string[], recent: string[], needed: number): string[] {
   const fresh = maps.filter((m) => !recent.includes(m));
@@ -226,27 +169,12 @@ export function ratingChange(won: boolean): number {
   return won ? 20 : -20;
 }
 
-// The two teams playing right now: the match itself, or the bracket's live tie.
-// A tournament counts its matches, skipping byes. Anything else uses its own number.
-export function matchNumber(state: MatchState, number: number): number {
-  return state.tie ? state.bracket.flat().filter((tie) => tie.scoreA !== null).length + 1 : number;
-}
-
+// The two teams playing, once teams are made.
 export function currentTeams(state: MatchState): [MatchTeam, MatchTeam] | null {
-  if (state.tie) {
-    const tie = state.bracket[state.tie[0]][state.tie[1]];
-    if (tie.a === null || tie.b === null) return null;
-    return [state.teams[tie.a], state.teams[tie.b]];
-  }
   return state.teams.length === 2 ? [state.teams[0], state.teams[1]] : null;
 }
 
 export const onTeam = (state: MatchState, slot: number) => state.signups.filter((id) => state.picks[id] === slot);
-
-export function teamSlotName(names: string[], tournament: boolean, slot: number, first: string, second: string): string {
-  if (!tournament) return slot === 0 ? first : second;
-  return names[slot]?.trim() || `Team ${slot + 1}`;
-}
 
 // Default names say nothing about who's on a team, so they stay off the leaderboard.
 export function countsAsNamedTeam(name: string, first: string, second: string): boolean {
@@ -290,21 +218,4 @@ export function tallyBoard(rows: BoardRow[]): { players: BoardEntry[]; teams: Bo
     if (row.loserTeam) add(teams, row.loserTeam, false);
   }
   return { players: topTen(players), teams: topTen(teams) };
-}
-
-const MOST_BRACKET_TEAMS = 64;
-
-// Picks the bracket that uses the most players, then the fullest teams. With
-// fixed teams, the size stays put and spare players sit out.
-export function fitBracket(players: number, teamSize: number, maxTeams: number, flexible: boolean): { teams: number; perTeam: number } {
-  const limit = maxTeams > 0 ? Math.min(maxTeams, MOST_BRACKET_TEAMS) : MOST_BRACKET_TEAMS;
-  let best = { teams: 0, perTeam: teamSize };
-  for (let teams = 2; teams <= limit; teams *= 2) {
-    const perTeam = flexible ? Math.min(teamSize, Math.floor(players / teams)) : teamSize;
-    if (perTeam < 1 || teams * perTeam > players) continue;
-    const used = teams * perTeam;
-    const bestUsed = best.teams * best.perTeam;
-    if (used > bestUsed || (used === bestUsed && perTeam > best.perTeam)) best = { teams, perTeam };
-  }
-  return best;
 }

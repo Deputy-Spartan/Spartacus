@@ -58,7 +58,7 @@ const gameTokens = { game: "Rainbow Six Siege", setup: "Friday Night 5v5", numbe
 const samplePlayers = "**1.** @Kuro: 12W 3L · 80%\n**2.** @FrostByte: 10W 4L · 71%\n**3.** @Deimos: 9W 5L · 64%";
 const sampleTeams = "**1.** Night Crew: 7W 1L · 88%\n**2.** Red Line: 5W 3L · 63%";
 const countTokens = { progress: "🟩🟩🟩⬛⬛", count: "6", needed: "10" };
-const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it.", startTime: "Friday, November 6 at 10:00 PM (in 6 days)", format: "Tournament · Single Elimination", teams: "Up to 4 teams · Up to 5 per team", maps: "Player vote on 3 maps", signedUp: "**6** signed up", eventLink: "[View event](https://discord.com)" };
+const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it.", startTime: "Friday, November 6 at 10:00 PM (in 6 days)", format: "Team Match", teams: "5 per team", maps: "Player vote on 3 maps", signedUp: "**6** signed up", eventLink: "[View event](https://discord.com)" };
 const signupPlayers = [{ name: "Players", value: "Nobody yet. Be the first!" }];
 const signupRows = [
   { name: "📅 Starts", value: "{startTime}\n{eventLink}", inline: false },
@@ -103,7 +103,6 @@ export const MATCH_TEXTS = {
   boardTeams: embed("Leaderboard", "Separate: top 10 teams", "The team embed in the Separate Embeds style.", { title: "👥 Top 10 Teams: {game}", description: "{list}", footer: "Saved and named teams · Updates after every match", color: STEEL }, { game: "Rainbow Six Siege", list: sampleTeams }),
 
   signup: { ...embed("Sign-Ups", "Match sign-ups", "The panel while a match or 1v1 is open.", { title: "⚔️ Match #{number}: {size} {game} Sign-Ups", description: "Sign up below to play **{game}**.", fields: signupRows, color: STEEL }, signupTokens), previewFields: signupPlayers },
-  registration: { ...embed("Sign-Ups", "Tournament registration", "The panel while a tournament is open.", { title: "🏆 {setup}", description: "Register below to play **{game}**.", fields: signupRows, color: GOLD }, signupTokens), previewFields: signupPlayers },
   noteManual: line("Sign-Ups", "Start note: staff", "Fills in {start} when staff start it.", "Starts when staff start it."),
   noteFull: line("Sign-Ups", "Start note: when full", "Fills in {start} when it starts on a full lobby.", "Starts when the lobby fills."),
   noteTime: line("Sign-Ups", "Start note: set time", "Fills in {start} for a scheduled start.", "Starts {time}.", { time: "Saturday at 8:00 PM" }),
@@ -113,16 +112,14 @@ export const MATCH_TEXTS = {
   checkin: embed("Match Steps", "Check-in", "Shown when players ready up.", { title: "✅ Lobby Full: Check In", description: "{deadline}\n{progress} **{count}/{needed}** ready", color: GOLD }, { ...countTokens, deadline: "Ready up to continue. Staff can skip this." }),
   draft: embed("Match Steps", "Captains draft", "Shown while captains pick players.", { title: "🎯 Match #{number}: Captains Draft", description: "{captain} is picking.", color: STEEL }, { ...gameTokens, captain: "@Kuro" }),
   teams: embed("Match Steps", "Teams", "Shown once teams are made.", { title: "🎯 Match #{number}: Teams", description: "Captains can start when both sides are ready.{auto}", footer: "Captains are marked with 👑", color: STEEL }, { ...gameTokens, auto: " Waiting for a captain or staff to start." }),
-  nameTeams: embed("Match Steps", "Name your teams", "Shown when tournament captains pick team names.", { title: "🏆 {setup}: Name Your Teams", description: "Captains can name their team.{auto}", footer: "Captains are marked with 👑", color: STEEL }, { ...gameTokens, auto: " Waiting for a captain or staff to start." }),
+  nameTeams: embed("Match Steps", "Name your teams", "Shown when captains pick team names.", { title: "🏆 {setup}: Name Your Teams", description: "Captains can name their team.{auto}", footer: "Captains are marked with 👑", color: STEEL }, { ...gameTokens, auto: " Waiting for a captain or staff to start." }),
   vote: embed("Match Steps", "Map vote", "Shown during a player vote.", { title: "🗺️ Vote for the {mapWord}", description: "{deadline}", color: STEEL }, { ...matchTokens, deadline: "Voting stays open until everyone votes or staff end it." }),
   bans: embed("Match Steps", "Captain bans", "Shown while captains ban maps.", { title: "🚫 Captains Ban {mapWord}s", description: "{captain} bans next.{banned}", footer: "The last one left gets played", color: STEEL }, { ...matchTokens, captain: "@Kuro", banned: "" }),
   live: embed("Match Steps", "Live match", "Shown while a match is being played.", { title: "🔴 LIVE: {match}{onMap}", description: "{mapNote}", footer: "{reportRule}", color: GREEN }, { ...matchTokens, match: "Match #12", mapNote: "Map pick: Bank 6 · Oregon 4", reportRule: "One captain reports, the other confirms" }),
   done: embed("Match Steps", "Match finished", "Shown after a match ends.", { title: "🏆 {winner} wins {score}{onMap}", description: "{rewards}", color: GOLD }, { ...matchTokens, winner: "Team Blue", score: "4-2", rewards: "Leaderboard updated." }),
-  champion: embed("Match Steps", "Tournament champion", "Shown when a tournament ends.", { title: "🏆 {winner} won {setup}!", description: "{players}", color: GOLD }, { ...gameTokens, winner: "Night Crew", players: "@Kuro @FrostByte" }),
 
   result: embed("Results", "Match result", "Posted in the results channel.", { title: "Match #{number}: {winner} won {score}", description: "{details}", color: GOLD }, { number: "12", winner: "Team Blue", score: "4-2", details: "Map: Bank · Rounds" }),
   rosters: embed("Results", "Rosters revealed", "Posted when hidden rosters are shown.", { title: "🔓 Rosters Revealed", description: "Registration closed.", color: STEEL }),
-  bracket: embed("Results", "Bracket", "The tournament bracket post.", { title: "🏆 {setup} Bracket", color: GOLD }, { setup: "Siege Cup" }),
   stats: embed("Results", "My Stats", "The private stats reply.", { title: "🎖️ Your {game} Stats", color: STEEL }, { game: "Rainbow Six Siege" }),
 
   pingCheckIn: line("Pings", "Check-in ping", "Sent when check-in starts.", "{players} Lobby is full. Check in on the panel.", { players: "@Kuro @FrostByte" }),
@@ -135,7 +132,6 @@ export const MATCH_TEXTS = {
   pingVoice: line("Pings", "Join voice ping", "Sent to players who weren't in voice.", "{players} Your match started. Join {channel}.", { players: "@Kuro", channel: "#Kuro vs FrostByte" }),
 
   btnSignUp: buttonLabel("Sign Up", "On match sign-ups."),
-  btnRegister: buttonLabel("Register", "On tournament registration."),
   btnLeave: buttonLabel("Leave", "On sign-ups."),
   btnMyTeam: buttonLabel("My Team", "On team sign-ups."),
   btnReady: buttonLabel("Ready Up", "During check-in."),
@@ -146,7 +142,6 @@ export const MATCH_TEXTS = {
   btnDispute: buttonLabel("Dispute", "When a result needs confirming."),
   btnRunBack: buttonLabel("Run It Back", "After a match."),
   btnNewSignups: buttonLabel("New Sign-Ups", "After a match."),
-  btnNewTournament: buttonLabel("Start New Tournament", "After a tournament."),
   btnSubs: buttonLabel("Subs", "On the panel."),
   btnStats: buttonLabel("My Stats", "On the panel."),
   btnLeaderboard: buttonLabel("Leaderboard", "On the panel."),
@@ -189,10 +184,6 @@ export const MATCH_TEXTS = {
   noteTeamsAuto: note("Teams with a timer", "Fills in {auto}.", " Starts by itself {time}.", { time: "in 2 minutes" }),
   noteDone: note("Finished, no rewards", "Fills in {rewards}.", "Leaderboard updated."),
   noteDoneRewards: note("Finished, with rewards", "Fills in {rewards}.", "+{win} coins to the winners, +{loss} to the other team. Leaderboard updated.", { win: "100", loss: "25" }),
-  roundFinal: note("Final", "Bracket round name.", "Final"),
-  roundSemi: note("Semifinals", "Bracket round name.", "Semifinals"),
-  roundQuarter: note("Quarterfinals", "Bracket round name.", "Quarterfinals"),
-  roundOf: note("Early rounds", "Bracket round name.", "Round of {teams}", { teams: "16" }),
 } satisfies Record<string, MatchTextEntry>;
 
 export type MatchTextKey = keyof typeof MATCH_TEXTS;

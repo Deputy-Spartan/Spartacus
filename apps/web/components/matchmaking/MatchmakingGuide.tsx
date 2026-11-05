@@ -6,13 +6,14 @@ import { MATCH_TEXTS, resolveText, type MatchTextEntry, type MatchTextKey } from
 import { NeonCard } from "../ui/NeonCard";
 import { api, type MatchPresetRow, type MatchSetupRow, type MatchmakingConfigRow } from "../../lib/api";
 
-export type GuideTab = "setups" | "board" | "queue" | "games" | "voice" | "messages";
+export type GuideTab = "tournaments" | "setups" | "board" | "queue" | "games" | "voice" | "messages";
 
 const SECTIONS = [
   { id: "start", label: "Start Here" },
   { id: "games", label: "Games" },
   { id: "voice", label: "Voice" },
-  { id: "setups", label: "Tournaments and Matches" },
+  { id: "tournaments", label: "Tournaments" },
+  { id: "setups", label: "Match Setups" },
   { id: "board", label: "Leaderboard" },
   { id: "queue", label: "Matchmaking" },
   { id: "messages", label: "Messages" },
@@ -238,15 +239,14 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
             <NeonCard>
               <div className="space-y-3">
                 <Heading>What this module does</Heading>
-                <Text>Matchmaking runs competitive play inside Discord for any game. It has two ways to play, and you can use either one or both.</Text>
+                <Text>Matchmaking runs competitive play inside Discord for any game. Players make teams on the always-open board, and those same teams enter your tournaments. Match Setups are there too, for one-off sign-up matches.</Text>
                 <Table
-                  heads={["", "Tournaments and Matches", "Matchmaking board"]}
+                  heads={["", "Tournaments", "Matchmaking board"]}
                   rows={[
-                    ["Best for", "Planned events, like a Saturday cup", "Quick games any time"],
-                    ["Who starts it", "Staff, a set time, or a full lobby", "Players, by queuing or challenging"],
-                    ["Discord event", "Yes, created automatically", "No"],
-                    ["Where players go", "A panel in your chosen channel", "An always-open board"],
-                    ["Results", "Results channel and Leaderboard", "Match thread and Leaderboard"],
+                    ["Best for", "Planned events, like a Saturday cup, for your Matchmaking teams", "Quick games any time"],
+                    ["Who starts it", "Staff, or a set time", "Players, by queuing or challenging"],
+                                        ["Where players go", "A tournament post with Register my team", "An always-open board"],
+                    ["Results", "A live bracket, match threads and the Leaderboard", "Match thread and Leaderboard"],
                   ]}
                 />
               </div>
@@ -258,7 +258,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                 <div className="space-y-2">
                   <Check done={games.length > 0}>Add at least one game ({games.length} saved)</Check>
                   <Check done={!!config?.lobbyVoiceId}>Pick your Lobby voice channel</Check>
-                  <Check done={setups.length > 0}>Build a tournament or match setup ({setups.length} saved)</Check>
+                  <Check done={setups.length > 0}>Optional: build a one-off match setup ({setups.length} saved)</Check>
                   <Check done={!!config?.boardChannelId}>Pick your leaderboard channel</Check>
                   <Check done={!!config?.enabled && !!config.channelId}>Turn on the Matchmaking board</Check>
                   <Check done={!!config?.activityChannelId}>Pick a channel for challenges and match threads (optional)</Check>
@@ -294,7 +294,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["Move Members", "Moving players into voice"],
                     ["Manage Events", "Creating Discord events"],
                     ["Create Private Threads, Manage Threads", "Match rooms on the Matchmaking board"],
-                    ["Manage Roles", "Private voice channels and champion roles"],
+                    ["Manage Roles", "Private voice channels and the tournament Champion role"],
                   ]}
                 />
                 <Tip>For champion roles, Spartacus's own role must sit above the role it gives. For role pings, turn on "Allow anyone to @mention this role".</Tip>
@@ -354,34 +354,59 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["Private channels", "Only that match's players can join"],
                   ["User limit", "Match players only, players plus extra spots, or no limit"],
                   ["1v1 and Team categories", "Where each type of channel goes. Left empty, channels appear under the Lobby"],
-                  ["Temporary match text channels", "Each tournament match or team match gets a text channel for votes, scores and pings, deleted after the result"],
+                  ["Temporary match text channels", "Each Match Setup match gets a text channel for votes, scores and pings, deleted after the result"],
                   ["Who can see it", "Players and staff only, or everyone can read while only players and staff type"],
-                  ["Close the room after", "How long the room stays up after the result. The next tournament match opens once it closes"],
+                  ["Close the room after", "How long the room stays up after the result"],
                 ]}
               />
               <Tip>A bot can only move someone already connected to voice. Anyone who isn't gets pinged a link instead.</Tip>
-              <Text>This Lobby is used everywhere, including tournaments and team matches. Each setup picks its own category in Step 6 of the builder. Names, limits and privacy apply to both.</Text>
+              <Text>This Lobby is used everywhere, including tournament matches and Match Setups. Each setup picks its own category in Step 6 of the builder. Names, limits and privacy apply to all of them.</Text>
               <GoTo tab="voice" label="Voice" onOpen={onOpen} />
             </div>
           </NeonCard>
+        )}
+
+        {section === "tournaments" && (
+          <>
+            <NeonCard>
+              <div className="space-y-3">
+                <Heading>Tournaments tab</Heading>
+                <Text>A tournament is a bracket for the teams people already made on the Matchmaking board. Captains register their team with one tap and the whole roster comes along.</Text>
+                <Table
+                  heads={["Step", "What happens"]}
+                  rows={[
+                    ["1. Create it", "Name, game, most teams (4 to 32), best of 1 or 3, seeding, check-in, solo sign-ups, start time, channel, rules and rewards"],
+                    ["2. Open registration", "The post goes up with Register my team, Solo sign-up and Withdraw my team. Captains with more than one team pick which one"],
+                    ["3. Check-in", "At the start time minus your check-in time (or when you tap Open check-in now). Captains tap Check in; teams that don't are taken out"],
+                    ["4. The bracket", "Seeded by Matchmaking record (or a random draw). Top seeds get a bye if it isn't a full bracket. Every match in a round starts at once, each with its own thread and voice channels"],
+                    ["5. Results", "Captains report in the thread and the other captain confirms. Winners move on by themselves and the post updates"],
+                    ["6. Champions", "Coins for every match win, champion and runner-up coins, the Champion role for a week, and a place in the Hall of Fame"],
+                  ]}
+                />
+                <Tip>Solo players are put into teams at the start and topped up from Looking for a Team. Anyone left over is told they're first in line next time.</Tip>
+                <Tip>A no-show or a dispute? On the bracket, use Set winner on that match. A tournament match is never canceled on its own; if nobody reports, staff are pinged in the thread.</Tip>
+                <GoTo tab="tournaments" label="Tournaments" onOpen={onOpen} />
+              </div>
+            </NeonCard>
+          </>
         )}
 
         {section === "setups" && (
           <>
             <NeonCard>
               <div className="space-y-3">
-                <Heading>Tournaments and Matches tab</Heading>
-                <Text>A setup holds all the rules for one game and format. Tap <strong>+ New Setup</strong> and work through the 8 steps. The side panel keeps a running summary.</Text>
+                <Heading>Match Setups tab</Heading>
+                <Text>A setup is a one-off sign-up match (a team match or a 1v1) with its own panel. For brackets, use the Tournaments tab. Tap <strong>+ New Setup</strong> and work through the 8 steps. The side panel keeps a running summary.</Text>
                 <Table
                   heads={["Step", "What you decide"]}
                   rows={[
                     ["1. Game", "Name the setup, pick a saved game from the Game list or add a new one, and set ranks and score type"],
-                    ["2. Format", "Tournament, 1v1 Tournament, Team Match or 1v1, plus the most teams (up to 64, or Unlimited) and whether teams adjust to fit sign-ups"],
+                    ["2. Format", "Team Match or 1v1"],
                     ["3. Teams", "Team size, how players join, how teams split, captains, roster visibility, and team names"],
                     ["4. Maps", "The map list, and whether players vote, the bot picks, or captains ban"],
                     ["5. Schedule", "Staff start it, a set time, or when the lobby fills, plus the panel and results channels"],
                     ["6. Match Flow", "Timers, check-in, the category for temporary voice channels, and who reports scores"],
-                    ["7. Rewards", "Coins and the champion role (off by default), plus ping and staff roles"],
+                    ["7. Rewards", "Coins for a win and a loss (off by default), plus ping and staff roles"],
                     ["8. Review", "Check everything, then save"],
                   ]}
                 />
@@ -391,7 +416,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   <Buttons texts={texts} items={[["btnSignUp", "green"], ["btnLeave", "red"]]} />
                   <Buttons texts={texts} items={[["btnStats", "gray"], ["btnLeaderboard", "gray"], ["btnResults", "gray"], ["btnStaff", "gray"]]} />
                 </Frame>
-                <GoTo tab="setups" label="Tournaments and Matches" onOpen={onOpen} />
+                <GoTo tab="setups" label="Match Setups" onOpen={onOpen} />
               </div>
             </NeonCard>
             <NeonCard>
@@ -402,16 +427,15 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   rows={[
                     ["How players join", "Bot Assigns Teams splits people after sign-ups. Players Choose a Team gives each team its own button, and turns off the bot's balancing"],
                     ["Who can see rosters", "Show Everyone, or Hidden Until Closed. Hidden shows only team counts until registration closes, then the bot posts the rosters. Staff can still see them on this page"],
-                    ["How teams split", "Balanced uses rank and results. Captains Draft lets captains pick (tournaments use Balanced instead). Random shuffles everyone"],
+                    ["How teams split", "Balanced uses rank and results. Captains Draft lets captains pick. Random shuffles everyone"],
                     ["How it starts", "Staff Start It waits for staff. Set a Time starts at your date and time with whoever joined. When Full starts as soon as the lobby fills"],
-                    ["Adjust teams to fit sign-ups", "Tournaments only. When it starts, the bot picks the team count and size that uses the most players. With 5-player teams and 8 sign-ups, that's 2 teams of 4. Anyone left over is told they're first in line as a sub"],
-                    ["Use timers", "Off means a person starts each step. On adds sign-up, auto-start, score and reopen timers"],
+                    ["Use timers", "Off means a person starts each step. On adds sign-up, auto-start and score timers"],
                   ]}
                 />
                 <Frame label="Preview: hidden rosters during registration">
-                  <Embed texts={texts} item="registration" fields={[{ name: "Team 1 (3/5)", value: "🔒 Hidden" }, { name: "Team 2 (1/5)", value: "🔒 Hidden" }]} />
+                  <Embed texts={texts} item="signup" fields={[{ name: "Team Blue (3/5)", value: "🔒 Hidden" }, { name: "Team Orange (1/5)", value: "🔒 Hidden" }]} />
                 </Frame>
-                <Tip>With timers off, a match can wait at a step until someone acts. Turn on Use timers for hands-off play. A tournament match with no score always alerts staff, since canceling it would end the bracket.</Tip>
+                <Tip>With timers off, a match can wait at a step until someone acts. Turn on Use timers for hands-off play.</Tip>
               </div>
             </NeonCard>
             <NeonCard>
@@ -538,8 +562,8 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["Matchmaking", "The board, match room, challenge ping, and closing lines"],
                   ["Leaderboard", "Top 10 players and teams"],
                   ["Sign-Ups", "Sign-up panels, start notes, the hidden rosters note, and the lobby full ping"],
-                  ["Match Steps", "Check-in, draft, teams, map vote, bans, live, finished, and champion"],
-                  ["Results", "Match results, revealed rosters, bracket, and My Stats"],
+                  ["Match Steps", "Check-in, draft, teams, map vote, bans, live and finished"],
+                  ["Results", "Match results, revealed rosters and My Stats"],
                   ["Pings", "Check-in, rosters revealed, and join voice"],
                   ["Buttons", "The label on every main button"],
                   ["Labels and Notes", "Headings, round names, deadline sentences and reward notes"],
@@ -567,10 +591,10 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
           <>
             <NeonCard>
               <div className="space-y-3">
-                <Heading>Tournaments and matches</Heading>
+                <Heading>Match Setups</Heading>
                 <Steps
                   items={[
-                    <>Go to the panel channel and tap <strong>{resolveText(texts, "btnSignUp").text}</strong>, <strong>{resolveText(texts, "btnRegister").text}</strong>, or a team's button.</>,
+                    <>Go to the panel channel and tap <strong>{resolveText(texts, "btnSignUp").text}</strong> or a team's button.</>,
                     <>Pick your rank the first time, if asked.</>,
                     <>If hidden rosters are on, tap <strong>{resolveText(texts, "btnMyTeam").text}</strong> to see your team. Teammates are revealed when registration closes.</>,
                     <>Join voice before the match so the bot can move you.</>,
@@ -640,7 +664,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                   ["A sub can't see the match room", "Spartacus needs Manage Roles to add a sub to a private room"],
                   ["Match threads are public", "Spartacus falls back to public threads if it can't create private ones"],
                   ["Role ping doesn't notify", "Turn on \"Allow anyone to @mention this role\" for that role"],
-                  ["Champion role isn't given", "Rewards must be on, and Spartacus's role must sit above the champion role"],
+                  ["Champion role isn't given", "Pick a Champion role on the tournament (or the Matchmaking one), and Spartacus's role must sit above it"],
                   ["Coins aren't paid", "Rewards must be on, and the Economy module must be on"],
                   ["A game isn't on the board", "Tap it under Games on the board in the Matchmaking tab"],
                   ["A team isn't on the leaderboard", "Default names like Team Blue are skipped. Use saved or captain-named teams"],

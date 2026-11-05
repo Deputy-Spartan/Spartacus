@@ -44,6 +44,7 @@ import { startRoleManagerJobs } from "./modules/utility/roleManager";
 import { onVerificationJoin } from "./modules/security/verification";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 import { startProfilePanelPosterJob } from "./jobs/profilePanelPoster";
+import { startPlayingNowJob } from "./jobs/playingNowJob";
 import { startEconomyJobs } from "./jobs/economyJobs";
 import { startMatchTickerJob } from "./jobs/matchTicker";
 
@@ -186,6 +187,10 @@ export { sendBirthdayTest } from "./jobs/birthdayAnnouncer";
 // start a season or void a result through the same queue players' clicks use.
 export { refreshMatchPanel, deleteMatch, matchRoster, voidMatchResult } from "./modules/matches/flow";
 export { cancelRoom, syncMatchmakingPanel } from "./modules/matches/matchmaking";
+// Re-exported so apps/api's Tournaments tab can run a tournament.
+export { openTournament, tournamentCheckIn, startTournamentNow, setTieWinner, removeTournamentEntry, cancelTournament, deleteTournament, refreshTournament } from "./modules/matches/tournaments";
+// Re-exported so apps/api's Playing Now page can post the panel and make roles.
+export { syncPlayingNowPanel, createPlayingNowRoles } from "./modules/engagement/playingNow";
 export { syncTempPanel } from "./modules/community/tempChannelPanel";
 export { startBoardSeason, syncBoard } from "./modules/matches/leaderboard";
 
@@ -278,6 +283,7 @@ export function startBot() {
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
     startProfilePanelPosterJob(c);
+    startPlayingNowJob(c);
     startEconomyJobs(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");

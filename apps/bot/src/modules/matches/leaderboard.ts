@@ -89,6 +89,6 @@ async function postBoards(client: Client, guildId: string, game?: string) {
 export async function startBoardSeason(client: Client, guildId: string) {
   await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId, boardSince: new Date() }, update: { boardSince: new Date() } });
   await prisma.matchSetup.updateMany({ where: { guildId }, data: { season: { increment: 1 } } });
-  await prisma.matchPlayer.updateMany({ where: { guildId }, data: { wins: 0, losses: 0, streak: 0, tournamentWins: 0 } });
+  await prisma.matchPlayer.updateMany({ where: { guildId }, data: { wins: 0, losses: 0, streak: 0 } });
   await syncBoard(client, guildId);
 }

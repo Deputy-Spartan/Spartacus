@@ -2,7 +2,6 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ChannelType,
   GuildScheduledEventEntityType,
   GuildScheduledEventPrivacyLevel,
   GuildScheduledEventStatus,
@@ -28,25 +27,18 @@ import { isModuleEnabled } from "../../lib/moduleGate";
 import { addBalance, getConfig } from "../../lib/economy";
 import { awardAchievement } from "../../lib/achievements";
 import {
-  bracketTeamCount,
-  fitBracket,
-  buildBracket,
   currentTeams,
   draftSide,
   emptyState,
   mapPool,
-  nextTie,
   countsAsNamedTeam,
-  matchNumber,
   onTeam,
-  teamSlotName,
   cleanTeamName,
   replacePlayer,
   pickCaptain,
   pickOne,
   ratingChange,
   ratingFromRank,
-  recordTie,
   shuffle,
   splitTeams,
   tallyVotes,
@@ -55,12 +47,12 @@ import {
   type MatchTeam,
   type Side,
 } from "./engine";
-import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildRoomNotice, buildRoomWelcome, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
+import { buildLeaderboard, buildPanel, buildResult, buildRoomNotice, buildRoomWelcome, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
 import { closeVoiceRooms, nameVoiceForMap, openTextRoom, openVoiceRooms, swapRoomAccess } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "./lock";
 import { startServerSetup } from "./serverSetup";
-import { syncMatchmakingPanel, tickMatchmaking } from "./matchmaking";
+import { tickMatchmaking } from "./matchmaking";
 
 const CONFIRM_MS = 5 * 60_000;
 const DONE_RESET_MS = 30 * 60_000;
@@ -90,7 +82,7 @@ async function openSession(setup: MatchSetup, signups: string[] = []): Promise<M
       setupId: setup.id,
       guildId: setup.guildId,
       number: updated.nextMatchNumber - 1,
-      kind: setup.format,
+      kind: "SINGLE",
       phase: "SIGNUP",
       state: emptyState(signups) as unknown as Prisma.InputJsonValue,
       phaseEndsAt: signups.length || setup.startMode === "SCHEDULED" ? signupDeadline(setup) : null,
@@ -101,13 +93,7 @@ async function openSession(setup: MatchSetup, signups: string[] = []): Promise<M
 async function loadCtx(client: Client, setupId: string): Promise<Ctx | null> {
   const setup = await prisma.matchSetup.findUnique({ where: { id: setupId } });
   if (!setup) return null;
-  let session = await prisma.matchSession.findFirst({ where: { setupId, closedAt: null }, orderBy: { createdAt: "desc" } });
-  // Switching a setup between formats only takes over once nothing is running.
-  if (session && session.kind !== setup.format && (session.phase === "SIGNUP" || session.phase === "DONE")) {
-    await prisma.matchSession.update({ where: { id: session.id }, data: { closedAt: new Date() } });
-    session = null;
-  }
-  session ??= await openSession(setup);
+  const session = (await prisma.matchSession.findFirst({ where: { setupId, closedAt: null }, orderBy: { createdAt: "desc" } })) ?? (await openSession(setup));
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
   return { client, setup, session, state: readState(session), texts: textsForGame(config?.texts, config?.gameTexts, setup.game) };
 }
@@ -119,8 +105,7 @@ function signupDeadline(setup: MatchSetup): Date | null {
   return setup.useTimers ? fromNow(setup.signupMinutes * 60_000) : null;
 }
 const usesPicks = (setup: MatchSetup) => setup.joinMode === "PICK" && setup.teamSize > 1;
-const slotCount = (setup: MatchSetup, kind: string) => (kind === "TOURNAMENT" ? setup.tournamentTeams : 2);
-const slotName = (setup: MatchSetup, kind: string, slot: number) => teamSlotName(stringList(setup.teamNames), kind === "TOURNAMENT", slot, setup.team1Name, setup.team2Name);
+const slotName = (setup: MatchSetup, slot: number) => (slot === 0 ? setup.team1Name : setup.team2Name);
 
 async function fetchPlayers(setup: MatchSetup, ids: string[]): Promise<PlayerMap> {
   const rows = await prisma.matchPlayer.findMany({ where: { setupId: setup.id, userId: { in: ids } } });
@@ -186,7 +171,7 @@ async function syncPanel(ctx: Ctx) {
   const ids = [...new Set([...state.signups, ...state.teams.flatMap((t) => t.players), ...state.draftPool])];
   const players = await fetchPlayers(setup, ids);
   const inRoom = !!state.roomId && ROOM_PHASES.includes(session.phase) && (await syncRoom(ctx, players));
-  const payload = inRoom ? buildRoomNotice(setup, session.phase, matchNumber(state, session.number), state, ctx.texts) : buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, players, await draftNames(client, setup, state), ctx.texts);
+  const payload = inRoom ? buildRoomNotice(setup, session.phase, session.number, state, ctx.texts) : buildPanel(setup, session.kind, session.number, session.phase, session.phaseEndsAt, state, players, await draftNames(client, setup, state), ctx.texts);
 
   if (setup.panelMessageId) {
     const message = await channel.messages.fetch(setup.panelMessageId).catch(() => null);
@@ -217,8 +202,8 @@ async function syncPanel(ctx: Ctx) {
 const EVENT_LEAD_MS = 60 * 60_000;
 const EVENT_LENGTH_MS = 2 * 60 * 60_000;
 
-function eventDetails({ setup, session }: Ctx): string {
-  const kind = session.kind === "TOURNAMENT" ? "tournament" : setup.teamSize === 1 ? "1v1" : "team match";
+function eventDetails({ setup }: Ctx): string {
+  const kind = setup.teamSize === 1 ? "1v1" : "team match";
   const link = setup.panelMessageId ? ` Sign-ups are here: https://discord.com/channels/${setup.guildId}/${setup.panelChannelId}/${setup.panelMessageId}` : "";
   return `${setup.game} ${kind}.${link}`;
 }
@@ -246,7 +231,7 @@ async function createEvent(ctx: Ctx) {
   const lobbyId = setup.lobbyVoiceId ?? (await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } }))?.lobbyVoiceId;
   const voice = lobbyId ? await guild.channels.fetch(lobbyId).catch(() => null) : null;
   const details = eventDetails(ctx);
-  const name = (session.kind === "TOURNAMENT" ? setup.name : `${setup.name} #${session.number}`).slice(0, 100);
+  const name = `${setup.name} #${session.number}`.slice(0, 100);
   const event = await guild.scheduledEvents
     .create(
       voice?.isVoiceBased()
@@ -310,7 +295,7 @@ async function clearPings(ctx: Ctx) {
 const here = (ctx: Ctx) => (ctx.state.roomId ? "here" : "on the panel");
 
 const roleMention = (setup: MatchSetup) => (setup.pingRoleId ? `<@&${setup.pingRoleId}> ` : "");
-const lobbySize = (setup: MatchSetup, kind: string) => (kind === "TOURNAMENT" && setup.tournamentTeams === 0 ? Infinity : setup.teamSize * (kind === "TOURNAMENT" ? setup.tournamentTeams : 2));
+const lobbySize = (setup: MatchSetup) => setup.teamSize * 2;
 
 async function teamLabel(ctx: Ctx, players: string[], fallback: string): Promise<string> {
   if (ctx.setup.teamSize !== 1 || !players[0]) return fallback;
@@ -343,7 +328,6 @@ async function revealRosters(ctx: Ctx) {
 
 async function closeSignups(ctx: Ctx) {
   ctx.state.reveal = ctx.setup.rosterView === "HIDDEN";
-  if (ctx.session.kind === "TOURNAMENT") return startTournament(ctx);
   if (!ctx.setup.checkIn) return enterTeams(ctx);
   ctx.state.ready = [];
   const endsAt = ctx.setup.useTimers ? fromNow(ctx.setup.checkInSeconds * 1000) : null;
@@ -365,7 +349,7 @@ async function enterTeams(ctx: Ctx) {
       return save(ctx, "SIGNUP", ctx.session.phaseEndsAt);
     }
     const all = await ratingsFor(setup, state.signups);
-    state.teams = groups.map((players, i) => ({ name: slotName(setup, "SINGLE", i), players, captain: pickCaptain(players, all, setup.captainRule) }));
+    state.teams = groups.map((players, i) => ({ name: slotName(setup, i), players, captain: pickCaptain(players, all, setup.captainRule) }));
     await revealRosters(ctx);
     return saveTeams(ctx);
   }
@@ -406,37 +390,6 @@ async function draftPick(ctx: Ctx, userId: string) {
   await saveTeams(ctx);
 }
 
-async function startTournament(ctx: Ctx): Promise<string | void> {
-  const { setup, state } = ctx;
-  await clearPings(ctx);
-  const ratings = await ratingsFor(setup, state.signups);
-  const groups = usesPicks(setup)
-    ? Array.from({ length: setup.tournamentTeams }, (_, i) => ({ name: slotName(setup, "TOURNAMENT", i), players: onTeam(state, i) })).filter((g) => g.players.length).sort((x, y) => y.players.length - x.players.length)
-    : null;
-  const fit = fitBracket(state.signups.length, setup.teamSize, setup.tournamentTeams, setup.flexTeams);
-  const teamCount = groups ? bracketTeamCount(groups.length, 1, setup.tournamentTeams || 16) : fit.teams;
-  if (teamCount < 2) return groups ? "A bracket needs at least 2 teams with players." : `A bracket needs at least ${setup.teamSize * 2} players.`;
-  if (groups) state.teams = groups.slice(0, teamCount).map((g) => ({ ...g, captain: pickCaptain(g.players, ratings, setup.captainRule) }));
-  else {
-    const ids = shuffle(state.signups).slice(0, teamCount * fit.perTeam);
-    const sittingOut = state.signups.filter((id) => !ids.includes(id));
-    if (sittingOut.length) await ping(ctx, `${sittingOut.map((id) => `<@${id}>`).join(" ")} The teams came out even without you this time, so you're first in line as a sub.`.slice(0, 2000));
-    const split = splitTeams(ids, ratings, teamCount, fit.perTeam, setup.balance === "RANDOM" ? "RANDOM" : "BALANCED");
-    state.teams = await Promise.all(
-      split.map(async (players, i): Promise<MatchTeam> => ({ name: await teamLabel(ctx, players, slotName(setup, "TOURNAMENT", i)), players, captain: pickCaptain(players, ratings, setup.captainRule) }))
-    );
-  }
-  state.bracket = buildBracket(teamCount);
-  state.tie = nextTie(state.bracket);
-  await revealRosters(ctx);
-  await syncBracket(ctx, true);
-  if (setup.teamNaming === "CAPTAIN" && setup.teamSize > 1) {
-    await ping(ctx, `${state.teams.map((t) => `<@${t.captain}>`).join(" ")} Name your team on the panel.`.slice(0, 2000));
-    return void (await saveTeams(ctx));
-  }
-  await beginMatch(ctx);
-}
-
 // Opens the room and voice channels when the match's teams are final. Returns
 // false when rooms are off or can't be made, so the match runs on the panel.
 async function openMatchRoom(ctx: Ctx): Promise<boolean> {
@@ -447,7 +400,7 @@ async function openMatchRoom(ctx: Ctx): Promise<boolean> {
   if (!config?.textRooms) return false;
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
   if (!guild) return false;
-  const number = matchNumber(state, session.number);
+  const number = session.number;
   const room = await openTextRoom({
     guild,
     config,
@@ -496,22 +449,6 @@ async function holdRoom(ctx: Ctx, winner: string, score: string): Promise<boolea
   return true;
 }
 
-async function syncBracket(ctx: Ctx, fresh = false) {
-  const { client, setup, state } = ctx;
-  const channel = await client.channels.fetch(setup.resultsChannelId).catch(() => null);
-  if (!isSendableChannel(channel)) return;
-  const embed = bracketEmbed(setup, state, ctx.texts);
-  if (setup.bracketMessageId && !fresh) {
-    const message = await channel.messages.fetch(setup.bracketMessageId).catch(() => null);
-    if (await message?.edit({ embeds: [embed] }).catch(() => null)) return;
-  }
-  const sent = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => null);
-  if (sent) {
-    setup.bracketMessageId = sent.id;
-    await prisma.matchSetup.update({ where: { id: setup.id }, data: { bracketMessageId: sent.id } });
-  }
-}
-
 async function startMapStep(ctx: Ctx) {
   const { setup, state } = ctx;
   state.map = null;
@@ -554,7 +491,6 @@ async function goLive(ctx: Ctx, map: string | null, note: string | null) {
   state.report = null;
   state.reminded = false;
   state.disputes = 0;
-  if (state.tie) state.bracket[state.tie[0]][state.tie[1]].map = map;
   const deadline = setup.useTimers ? fromNow(setup.reportMinutes * 60_000) : null;
   await startEvent(ctx);
   await save(ctx, "LIVE", deadline);
@@ -570,7 +506,7 @@ async function renameVoiceForMap(ctx: Ctx) {
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
   if (!teams || !guild) return;
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: setup.guildId } });
-  await nameVoiceForMap({ guild, config, game: setup.game, map: state.map, number: matchNumber(state, session.number), a: teams[0], b: teams[1], shared: setup.teamSize === 1 }, state.voiceIds);
+  await nameVoiceForMap({ guild, config, game: setup.game, map: state.map, number: session.number, a: teams[0], b: teams[1], shared: setup.teamSize === 1 }, state.voiceIds);
 }
 
 // Team matches get a channel per team, and a 1v1 shares one, using the voice
@@ -590,7 +526,7 @@ async function openTeamRooms(ctx: Ctx): Promise<string[]> {
     categoryId: setup.voiceCategoryId,
     game: setup.game,
     map: state.map,
-    number: matchNumber(state, session.number),
+    number: session.number,
     a: teams[0],
     b: teams[1],
     shared: setup.teamSize === 1,
@@ -668,40 +604,11 @@ async function finishMatch(ctx: Ctx, report: MatchReport) {
   if (!state.roomId) await closeTeamRooms(ctx);
   const score = `${report.winnerScore}-${report.loserScore}`;
 
-  if (state.tie) {
-    const champion = recordTie(state.bracket, state.tie, report.winner, report.winnerScore, report.loserScore);
-    state.tie = nextTie(state.bracket);
-    await syncBracket(ctx);
-    if (champion === null) {
-      if (await holdRoom(ctx, winner.name, score)) return;
-      return beginMatch(ctx);
-    }
-    state.champion = champion;
-    await crownChampion(ctx, state.teams[champion]);
-    await endEvent(ctx);
-  } else {
-    await endEvent(ctx);
-    state.winner = report.winner;
-    state.score = score;
-  }
+  await endEvent(ctx);
+  state.winner = report.winner;
+  state.score = score;
   if (await holdRoom(ctx, winner.name, score)) return;
   await save(ctx, "DONE");
-}
-
-async function crownChampion(ctx: Ctx, team: MatchTeam) {
-  const { client, setup } = ctx;
-  const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
-  const economyOn = await isModuleEnabled(setup.guildId, "ECONOMY");
-  const economy = economyOn ? await getConfig(setup.guildId) : null;
-  for (const userId of team.players) {
-    const bonus = setup.rewardsEnabled ? setup.championCoins : 0;
-    await prisma.matchPlayer.update({ where: { setupId_userId: { setupId: setup.id, userId } }, data: { tournamentWins: { increment: 1 }, coinsEarned: { increment: bonus } } });
-    if (economy && bonus > 0) await addBalance(setup.guildId, userId, bonus, "match_champion", economy.maxBalance);
-    if (setup.rewardsEnabled && setup.championRoleId) {
-      const member = await guild?.members.fetch(userId).catch(() => null);
-      await member?.roles.add(setup.championRoleId).catch((err) => logError("bot", err, setup.guildId));
-    }
-  }
 }
 
 async function replaceSession(ctx: Ctx, signups: string[] = []) {
@@ -715,11 +622,8 @@ async function replaceSession(ctx: Ctx, signups: string[] = []) {
 async function expirePhase(ctx: Ctx) {
   const { session, state, setup } = ctx;
   if (session.phase === "SIGNUP") {
-    const enough = session.kind === "TOURNAMENT" ? fitBracket(state.signups.length, setup.teamSize, setup.tournamentTeams, setup.flexTeams).teams >= 2 : state.signups.length >= 2 && setup.startMode === "SCHEDULED";
-    if (enough) {
-      const problem = await closeSignups(ctx);
-      if (!problem) return;
-    }
+    const enough = state.signups.length >= 2 && setup.startMode === "SCHEDULED";
+    if (enough) return closeSignups(ctx);
     state.signups = [];
     state.picks = {};
     await clearPings(ctx);
@@ -729,7 +633,7 @@ async function expirePhase(ctx: Ctx) {
   if (session.phase === "CHECKIN") {
     state.signups = state.signups.filter((id) => state.ready.includes(id));
     await clearPings(ctx);
-    if (state.signups.length >= lobbySize(setup, session.kind)) return enterTeams(ctx);
+    if (state.signups.length >= lobbySize(setup)) return enterTeams(ctx);
     await ping(ctx, `${roleMention(setup)}Not everyone checked in, so sign-ups are open again.`);
     state.picks = Object.fromEntries(Object.entries(state.picks).filter(([id]) => state.signups.includes(id)));
     return save(ctx, "SIGNUP", state.signups.length ? signupDeadline(setup) : null);
@@ -742,7 +646,6 @@ async function expirePhase(ctx: Ctx) {
   if (session.phase === "CLOSING") {
     await closeTeamRooms(ctx);
     state.closing = null;
-    if (state.tie) return beginMatch(ctx);
     return save(ctx, "DONE");
   }
   if (session.phase === "MAP") {
@@ -753,18 +656,17 @@ async function expirePhase(ctx: Ctx) {
   if (session.phase === "CONFIRM" && state.report) return finishMatch(ctx, state.report);
 }
 
-// A missing score gets one reminder. After that a single match follows the
-// setup's rule, while a tournament goes to staff since canceling a tie would
-// end everyone's bracket.
+// A missing score gets one reminder. After that the setup's rule decides:
+// cancel the match, or keep it open and alert staff.
 async function chaseScore(ctx: Ctx) {
-  const { setup, session, state } = ctx;
+  const { setup, state } = ctx;
   const teams = currentTeams(state);
   if (!state.reminded) {
     state.reminded = true;
     await ping(ctx, `${teams?.map((t) => `<@${t.captain}>`).join(" ")} Please report your score ${here(ctx)}.`);
     return save(ctx, "LIVE", fromNow(REMINDER_GRACE_MS));
   }
-  if (session.kind === "TOURNAMENT" || setup.noReportAction === "ALERT") {
+  if (setup.noReportAction === "ALERT") {
     await ping(ctx, `${setup.staffRoleId ? `<@&${setup.staffRoleId}> ` : ""}Nobody reported this match. Staff can report the score ${here(ctx)} or cancel it.`);
     return save(ctx, "LIVE");
   }
@@ -814,9 +716,9 @@ async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
   const { setup, session, state } = ctx;
   if (session.phase !== "SIGNUP") return "Sign-ups are closed for this match.";
   if (state.signups.includes(userId)) return "You're already in.";
-  if (state.signups.length >= lobbySize(setup, session.kind)) return "This lobby is full.";
+  if (state.signups.length >= lobbySize(setup)) return "This lobby is full.";
   const picking = usesPicks(setup);
-  if (picking && (slot === undefined || slot >= slotCount(setup, session.kind))) return "Pick a team on the panel.";
+  if (picking && (slot === undefined || slot >= 2)) return "Pick a team on the panel.";
   if (picking && onTeam(state, slot!).length >= setup.teamSize) return "That team is full. Pick another one.";
   if (setup.useRanks) {
     const player = await prisma.matchPlayer.findUnique({ where: { setupId_userId: { setupId: setup.id, userId } } });
@@ -824,7 +726,7 @@ async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
   }
   state.signups.push(userId);
   if (picking) state.picks[userId] = slot!;
-  const full = state.signups.length >= lobbySize(setup, session.kind);
+  const full = state.signups.length >= lobbySize(setup);
   if (full && setup.startMode === "FULL") await closeSignups(ctx);
   else {
     if (full && !state.fullPinged) {
@@ -834,10 +736,10 @@ async function join(ctx: Ctx, userId: string, slot?: number): Promise<Reply> {
     await save(ctx, "SIGNUP", session.phaseEndsAt ?? signupDeadline(setup));
   }
   if (picking) {
-    const name = slotName(setup, session.kind, slot!);
+    const name = slotName(setup, slot!);
     return setup.rosterView === "HIDDEN" ? `You're on ${name}. Your teammates stay hidden until registration closes.` : `You're on ${name}.`;
   }
-  return session.kind === "TOURNAMENT" ? "You're registered." : `You're in for Match #${session.number}.`;
+  return `You're in for Match #${session.number}.`;
 }
 
 async function runAction(client: Client, setupId: string, action: string, arg: string | undefined, userId: string, member: GuildMember | null): Promise<Reply> {
@@ -855,7 +757,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
     case "myteam": {
       const slot = state.picks[userId];
       if (slot === undefined) return "You aren't on a team.";
-      const name = slotName(setup, session.kind, slot);
+      const name = slotName(setup, slot);
       return setup.rosterView === "HIDDEN" ? `You're on ${name}. ${onTeam(state, slot).length}/${setup.teamSize} slots are filled, and names stay hidden until registration closes.` : `You're on ${name}.`;
     }
     case "leave":
@@ -918,7 +820,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       return "Result disputed.";
     }
     case "runback": {
-      if (session.phase !== "DONE" || session.kind !== "SINGLE") return "This match is still going.";
+      if (session.phase !== "DONE") return "This match is still going.";
       if (!staff && !state.signups.includes(userId)) return "Only players from this match or staff can run it back.";
       await replaceSession(ctx, state.signups);
       await closeSignups(ctx);
@@ -926,7 +828,6 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
     }
     case "new":
       if (session.phase !== "DONE") return "This match is still going.";
-      if (session.kind === "TOURNAMENT" && !staff) return staffOnly;
       await replaceSession(ctx);
       await save(ctx, "SIGNUP");
       return "Sign-ups are open.";
@@ -969,7 +870,7 @@ async function runAction(client: Client, setupId: string, action: string, arg: s
       if (!staff) return staffOnly;
       const buttons: ButtonBuilder[] = [];
       const add = (id: string, label: string, style = ButtonStyle.Primary) => buttons.push(new ButtonBuilder().setCustomId(`match:${setup.id}:${id}`).setLabel(label).setStyle(style));
-      if (session.phase === "SIGNUP") add("force", state.signups.length >= lobbySize(setup, session.kind) ? "Start Now" : "Start With Fewer");
+      if (session.phase === "SIGNUP") add("force", state.signups.length >= lobbySize(setup) ? "Start Now" : "Start With Fewer");
       if (session.phase === "CHECKIN") add("skipcheck", "Skip Check-In");
       if (session.phase === "TEAMS") add("reroll", "Reroll Teams");
       if (session.phase === "MAP" && setup.mapMethod === "VOTE") add("endvote", "End Vote Now");
@@ -1083,9 +984,7 @@ export async function handleMatchName(interaction: ModalSubmitInteraction) {
       if (state.teams.some((t, i) => i !== index && t.name.toLowerCase() === name.toLowerCase())) return "Another team already has that name.";
       state.teams[index].name = name;
       if (!state.named.includes(index)) state.named.push(index);
-      if (state.tie) await syncBracket(ctx);
-      if (session.kind === "TOURNAMENT" && state.named.length === state.teams.length) await beginMatch(ctx);
-      else await save(ctx, "TEAMS", session.phaseEndsAt);
+      await save(ctx, "TEAMS", session.phaseEndsAt);
       return `Your team is now ${name}.`;
     });
     await interaction.editReply(reply);
@@ -1308,7 +1207,7 @@ export async function tickMatches(client: Client) {
     }).catch((err) => logError("bot", err, row.guildId));
   }
 
-  const finished = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "SINGLE", setup: { useTimers: true }, doneAt: { lte: new Date(now.getTime() - DONE_RESET_MS) } }, take: 20 });
+  const finished = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", setup: { useTimers: true }, doneAt: { lte: new Date(now.getTime() - DONE_RESET_MS) } }, take: 20 });
   for (const row of finished) {
     await withLock(row.setupId, async () => {
       const ctx = await loadCtx(client, row.setupId);
@@ -1318,17 +1217,6 @@ export async function tickMatches(client: Client) {
     }).catch((err) => logError("bot", err, row.guildId));
   }
 
-  const tournaments = await prisma.matchSession.findMany({ where: { closedAt: null, phase: "DONE", kind: "TOURNAMENT" }, include: { setup: true }, take: 20 });
-  for (const row of tournaments) {
-    const hours = row.setup.useTimers ? row.setup.autoReopenHours : 0;
-    if (!hours || !row.doneAt || row.doneAt.getTime() + hours * 3_600_000 > now.getTime()) continue;
-    await withLock(row.setupId, async () => {
-      const ctx = await loadCtx(client, row.setupId);
-      if (!ctx || ctx.session.id !== row.id) return;
-      await replaceSession(ctx);
-      await save(ctx, "SIGNUP");
-    }).catch((err) => logError("bot", err, row.guildId));
-  }
 }
 
 // ---- Dashboard actions (called from apps/api) ----
@@ -1353,11 +1241,11 @@ export async function refreshMatchPanel(client: Client, setupId: string) {
 export async function matchRoster(client: Client, setupId: string): Promise<Array<{ team: string; players: string[] }>> {
   const ctx = await loadCtx(client, setupId);
   if (!ctx) return [];
-  const { setup, session, state } = ctx;
+  const { setup, state } = ctx;
   const guild = await client.guilds.fetch(setup.guildId).catch(() => null);
   const name = async (id: string) => (await guild?.members.fetch(id).catch(() => null))?.displayName ?? id;
   if (state.teams.length) return Promise.all(state.teams.map(async (t) => ({ team: t.name, players: await Promise.all(t.players.map(name)) })));
-  if (usesPicks(setup)) return Promise.all(Array.from({ length: slotCount(setup, session.kind) }, async (_, i) => ({ team: slotName(setup, session.kind, i), players: await Promise.all(onTeam(state, i).map(name)) })));
+  if (usesPicks(setup)) return Promise.all(Array.from({ length: 2 }, async (_, i) => ({ team: slotName(setup, i), players: await Promise.all(onTeam(state, i).map(name)) })));
   return [{ team: "Registered", players: await Promise.all(state.signups.map(name)) }];
 }
 
@@ -1370,18 +1258,17 @@ async function removeMessage(client: Client, channelId: string, messageId: strin
 }
 
 // Removes everything a setup has in Discord, then the setup itself. Finished
-// results stay for the leaderboard, and a finished bracket stays as a record.
+// results stay for the leaderboard.
 export async function deleteMatch(client: Client, setupId: string) {
   await withLock(setupId, async () => {
     const ctx = await loadCtx(client, setupId);
     if (!ctx) return;
-    const { setup, state } = ctx;
+    const { setup } = ctx;
     await closeTeamRooms(ctx);
     await clearPings(ctx);
     const event = await fetchEvent(ctx);
     await event?.delete().catch((err) => logError("bot", err, setup.guildId));
     await removeMessage(client, setup.panelChannelId, setup.panelMessageId);
-    if (state.bracket.length && state.champion === null) await removeMessage(client, setup.resultsChannelId, setup.bracketMessageId);
     await prisma.matchSetup.delete({ where: { id: setup.id } });
   });
 }

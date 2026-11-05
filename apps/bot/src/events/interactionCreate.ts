@@ -85,6 +85,16 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^(pn|pnset|pnnote)(:|$)/.test(interaction.customId)) {
+    if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "PLAYING_NOW"))) {
+      await interaction.reply({ content: "⚠️ Playing Now is turned off in this server.", ephemeral: true });
+      return;
+    }
+    const { handlePlayingNow } = await import("../modules/engagement/playingNow");
+    await handlePlayingNow(interaction);
+    return;
+  }
+
   // Team invites are answered in a DM, so they come before the server-only check below.
   if (interaction.isButton() && interaction.customId.startsWith("mminvite:")) {
     const { handleTeamInvite } = await import("../modules/matches/matchmaking");

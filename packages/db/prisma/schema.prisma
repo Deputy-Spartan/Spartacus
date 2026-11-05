@@ -179,6 +179,7 @@ enum ModuleKey {
   MATCHES
   ROLE_MANAGER
   PROFILE_CARDS
+  PLAYING_NOW
 }
 
 model GrowthSnapshot {
@@ -2445,16 +2446,12 @@ model MatchSetup {
   name                 String
   game                 String
   enabled              Boolean  @default(true)
-  format               String   @default("SINGLE") // SINGLE | TOURNAMENT
   teamSize             Int      @default(5)
   joinMode             String   @default("ASSIGN") // ASSIGN | PICK
   rosterView           String   @default("PUBLIC") // PUBLIC | HIDDEN until registration closes
-  teamNames            Json     @default("[]") // tournament slots when players pick a team
   startMode            String   @default("MANUAL") // MANUAL | SCHEDULED | FULL
   startAt              DateTime?
   useTimers            Boolean  @default(false)
-  tournamentTeams      Int      @default(4) // 2 to 64, or 0 for no limit
-  flexTeams            Boolean  @default(false) // fit team size to whoever signed up
   balance              String   @default("BALANCED") // BALANCED | CAPTAINS | RANDOM
   captainRule          String   @default("TOP") // TOP | RANDOM
   team1Name            String   @default("Team Blue")
@@ -2481,18 +2478,14 @@ model MatchSetup {
   reportMinutes        Int      @default(90) // 0 never chases a missing score
   noReportAction       String   @default("CANCEL") // CANCEL | ALERT
   signupMinutes        Int      @default(240) // from the first sign-up, 0 stays open
-  autoReopenHours      Int      @default(24) // tournaments, 0 waits for staff
   winCoins             Int      @default(100)
   lossCoins            Int      @default(25)
-  championCoins        Int      @default(500)
-  championRoleId       String?
   pingRoleId           String?
   staffRoleId          String?
   panelChannelId       String
   resultsChannelId     String
   panelMessageId       String?
   leaderboardMessageId String?
-  bracketMessageId     String?
   season               Int      @default(1)
   nextMatchNumber      Int      @default(1)
   createdAt            DateTime @default(now())
@@ -2512,7 +2505,7 @@ model MatchSession {
   setupId     String
   guildId     String
   number      Int
-  kind        String // SINGLE | TOURNAMENT
+  kind        String // SINGLE
   phase       String // SIGNUP | CHECKIN | DRAFT | TEAMS | MAP | LIVE | CONFIRM | DONE
   state       Json       @default("{}")
   phaseEndsAt DateTime?
@@ -2535,7 +2528,6 @@ model MatchPlayer {
   wins           Int        @default(0)
   losses         Int        @default(0)
   streak         Int        @default(0)
-  tournamentWins Int        @default(0)
   coinsEarned    Int        @default(0)
 
   @@unique([setupId, userId])
@@ -2609,6 +2601,7 @@ model MatchmakingConfig {
   queueMinutes     Int       @default(60)
   reportHours      Int       @default(3)
   staffRoleId      String?
+  championRoleId   String? // given to tournament champions for a week
   nextRoomNumber   Int       @default(1)
 }
 
@@ -2681,6 +2674,10 @@ model MatchRoom {
   disputes    Int       @default(0)
   expiresAt   DateTime?
   createdAt   DateTime  @default(now())
+  // Set when the match is part of a tournament bracket.
+  tournamentId String?
+  tieRound     Int?
+  tieIndex     Int?
 
   @@index([guildId, status])
   @@index([status, expiresAt])
@@ -2941,4 +2938,96 @@ model WeeklyStat {
 
   @@unique([guildId, userId, week])
   @@index([guildId, week])
+}
+
+// ---- Matchmaking tournaments ----
+// A bracket for the teams people already have in Matchmaking. Each match runs
+// as a normal match room; the bracket (rounds of ties) lives in `bracket`.
+model MatchTournament {
+  id              String    @id @default(cuid())
+  guildId         String
+  name            String
+  game            String
+  status          String    @default("DRAFT") // DRAFT | OPEN | CHECKIN | LIVE | DONE | CANCELED
+  maxTeams        Int       @default(8) // 4 | 8 | 16 | 32
+  bestOf          String    @default("BO1F3") // BO1 | BO1F3 (final is BO3) | BO3
+  seeding         String    @default("RECORD") // RECORD | RANDOM
+  checkIn         Boolean   @default(true)
+  checkInMinutes  Int       @default(15)
+  soloSignups     Boolean   @default(true)
+  startAt         DateTime?
+  checkInEndsAt   DateTime?
+  channelId       String?
+  messageId       String?
+  pingRoleId      String?
+  rules           String?
+  winCoins        Int       @default(100)
+  championCoins   Int       @default(500)
+  runnerUpCoins   Int       @default(150)
+  championRoleId  String?
+  solo            Json      @default("[]") // players signed up without a team
+  soloReady       Json      @default("[]") // solo players who checked in
+  bracket         Json      @default("[]")
+  championEntryId String?
+  runnerUpEntryId String?
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  endedAt         DateTime?
+
+  entries MatchTournamentEntry[]
+
+  @@index([guildId, status])
+  @@index([status, startAt])
+}
+
+model MatchTournamentEntry {
+  id           String          @id @default(cuid())
+  tournament   MatchTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentId String
+  teamId       String? // the Matchmaking team, or null for a team made from solo players
+  name         String
+  captainId    String
+  players      Json            @default("[]")
+  seed         Int?
+  checkedIn    Boolean         @default(false)
+  out          Boolean         @default(false) // withdrew, removed, or missed check-in
+  createdAt    DateTime        @default(now())
+
+  @@index([tournamentId])
+}
+
+// ---- Playing Now ----
+model PlayingNowConfig {
+  id                String    @id @default(cuid())
+  guildId           String    @unique
+  channelId         String?
+  panelMessageId    String?
+  roleId            String? // shown separately in the member list
+  notifyRoleId      String? // opt-in, pinged when someone's on
+  maxMinutes        Int       @default(120)
+  pingCooldown      Int       @default(20) // minutes between Notify pings
+  endOnVoiceLeave   Boolean   @default(true)
+  modes             Json      @default("[\"Ranked\",\"Quick Match\",\"Unranked\",\"Arcade\",\"Customs\"]")
+  matchmakingButton Boolean   @default(true)
+  lastPingAt        DateTime?
+}
+
+model PlayingNowPost {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  mode       String
+  need       Int
+  joined     Json      @default("[]")
+  note       String?
+  voiceId    String?
+  messageId  String?
+  endsAt     DateTime
+  endedAt    DateTime?
+  seenVoice  Boolean   @default(false)
+  awaySince  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([guildId, endedAt])
+  @@index([endedAt, endsAt])
 }

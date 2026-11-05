@@ -10,6 +10,7 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
 import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
+import { TournamentsTab } from "../../../../components/matchmaking/TournamentsTab";
 import { MatchmakingGuide } from "../../../../components/matchmaking/MatchmakingGuide";
 import { DateTimeZoneField } from "../../../../components/ui/DateTimeZoneField";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
@@ -24,9 +25,6 @@ const BLANK_GAME = { game: "", teamSize: 5, useRanks: false, ranks: [] as string
 const BLANK: MatchSetupInput = {
   name: "",
   enabled: true,
-  format: "SINGLE",
-  tournamentTeams: 4,
-  flexTeams: false,
   balance: "BALANCED",
   captainRule: "TOP",
   team1Name: "Team Blue",
@@ -44,7 +42,6 @@ const BLANK: MatchSetupInput = {
   rewardsEnabled: false,
   joinMode: "ASSIGN",
   rosterView: "PUBLIC",
-  teamNames: [],
   startMode: "MANUAL",
   startAt: null,
   useTimers: false,
@@ -53,11 +50,8 @@ const BLANK: MatchSetupInput = {
   reportMinutes: 90,
   noReportAction: "CANCEL",
   signupMinutes: 240,
-  autoReopenHours: 24,
   winCoins: 100,
   lossCoins: 25,
-  championCoins: 500,
-  championRoleId: null,
   pingRoleId: null,
   staffRoleId: null,
   panelChannelId: "",
@@ -68,10 +62,7 @@ const BLANK: MatchSetupInput = {
 const PHASES: Record<string, string> = { SIGNUP: "Sign-ups open", CHECKIN: "Check-in running", DRAFT: "Captains drafting", TEAMS: "Teams set", MAP: "Picking the map", LIVE: "Match live", CONFIRM: "Waiting for confirmation", CLOSING: "Match room closing", DONE: "Finished" };
 
 function formatSummary(s: MatchSetupInput): string {
-  const size = s.flexTeams && s.format === "TOURNAMENT" ? `Up to ${s.teamSize}v${s.teamSize}` : `${s.teamSize}v${s.teamSize}`;
-  if (s.format === "SINGLE") return `${size} · ${s.teamSize === 1 ? "1v1" : "Team Match"} · ${s.teamSize * 2} players`;
-  const unit = s.teamSize === 1 ? "players" : "teams";
-  return `${size} · ${s.teamSize === 1 ? "1v1 Tournament" : "Tournament"}, ${s.tournamentTeams ? `up to ${s.tournamentTeams} ${unit}` : `unlimited ${unit}`}`;
+  return `${s.teamSize}v${s.teamSize} · ${s.teamSize === 1 ? "1v1" : "Team Match"} · ${s.teamSize * 2} players`;
 }
 
 function mapSummary(s: MatchSetupInput): string {
@@ -89,7 +80,6 @@ function stepError(step: number, d: MatchSetupInput): string | null {
     if (d.useRanks && rankListProblem(d.ranks)) return rankListProblem(d.ranks);
   }
   if (step === 2 && (!Number.isInteger(d.teamSize) || d.teamSize < 1 || d.teamSize > 10)) return "Team size must be from 1 to 10.";
-  if (step === 2 && d.format === "TOURNAMENT" && d.joinMode === "PICK" && d.teamSize > 1 && (d.tournamentTeams === 0 || d.tournamentTeams > 16)) return "When players choose a team, use 16 teams or fewer.";
   if (step === 3 && d.useMaps) {
     if (d.maps.length < 1) return "Add at least 1 option to the list.";
     if (d.mapMethod !== "RANDOM") {
@@ -102,7 +92,6 @@ function stepError(step: number, d: MatchSetupInput): string | null {
   }
   if (step === 4) {
     if (d.startMode === "SCHEDULED" && !d.startAt) return "Pick a start date and time.";
-    if (d.format === "TOURNAMENT" && d.tournamentTeams === 0 && d.startMode === "FULL") return "With no team limit the lobby never fills. Pick Staff Start It or Set a Time.";
     if (!d.panelChannelId || !d.resultsChannelId) return "Pick a panel channel and a results channel.";
     if (d.panelChannelId === d.resultsChannelId) return "The panel and results need different channels.";
   }
@@ -110,14 +99,13 @@ function stepError(step: number, d: MatchSetupInput): string | null {
     if (d.autoMove && !d.lobbyVoiceId && !d.voiceCategoryId) return "Pick a category for team voice channels, or turn them off.";
     if (d.useTimers) {
       const offOr = (v: number, min: number, max: number) => v === 0 || (Number.isInteger(v) && v >= min && v <= max);
-      if (d.checkIn && d.format === "SINGLE" && (d.checkInSeconds < 15 || d.checkInSeconds > 600)) return "Check-in time must be from 15 to 600 seconds.";
+      if (d.checkIn && (d.checkInSeconds < 15 || d.checkInSeconds > 600)) return "Check-in time must be from 15 to 600 seconds.";
       if (!offOr(d.signupMinutes, 5, 10080)) return "Sign-up time must be 0 or from 5 to 10080 minutes.";
       if (!offOr(d.autoStartSeconds, 15, 600)) return "Auto-start must be 0 or from 15 to 600 seconds.";
       if (!offOr(d.reportMinutes, 5, 720)) return "Score deadline must be 0 or from 5 to 720 minutes.";
-      if (!Number.isInteger(d.autoReopenHours) || d.autoReopenHours < 0 || d.autoReopenHours > 720) return "Reopen time must be from 0 to 720 hours.";
     }
   }
-  if (step === 6 && d.rewardsEnabled && [d.winCoins, d.lossCoins, d.championCoins].some((c) => !Number.isInteger(c) || c < 0)) return "Coin rewards must be whole numbers of 0 or more.";
+  if (step === 6 && d.rewardsEnabled && [d.winCoins, d.lossCoins].some((c) => !Number.isInteger(c) || c < 0)) return "Coin rewards must be whole numbers of 0 or more.";
   return null;
 }
 
@@ -198,7 +186,6 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
   const [step, setStep] = useState(0);
   const [d, setD] = useState<MatchSetupInput>(editing ?? BLANK);
   const [ranksText, setRanksText] = useState((editing?.ranks ?? []).join(", "));
-  const [teamNamesText, setTeamNamesText] = useState((editing?.teamNames ?? []).join(", "));
   const [mapDraft, setMapDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -285,7 +272,6 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
   }
 
   const word = d.mapWord.trim() || "Map";
-  const tournament = d.format === "TOURNAMENT";
 
   return (
     <NeonCard>
@@ -368,29 +354,11 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
 
           {step === 1 && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-                <Choice on={tournament && d.teamSize > 1} title="Tournament" hint="A team bracket with one champion." onClick={() => set({ format: "TOURNAMENT", teamSize: d.teamSize > 1 ? d.teamSize : 5 })} />
-                <Choice on={tournament && d.teamSize === 1} title="1v1 Tournament" hint="A solo bracket with one champion." onClick={() => set({ format: "TOURNAMENT", teamSize: 1 })} />
-                <Choice on={!tournament && d.teamSize > 1} title="Team Match" hint="One match between two teams." onClick={() => set({ format: "SINGLE", teamSize: d.teamSize > 1 ? d.teamSize : 5 })} />
-                <Choice on={!tournament && d.teamSize === 1} title="1v1" hint="One player against another." onClick={() => set({ format: "SINGLE", teamSize: 1 })} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Choice on={d.teamSize > 1} title="Team Match" hint="One match between two teams." onClick={() => set({ teamSize: d.teamSize > 1 ? d.teamSize : 5 })} />
+                <Choice on={d.teamSize === 1} title="1v1" hint="One player against another." onClick={() => set({ teamSize: 1 })} />
               </div>
-              {tournament && (
-                <div>
-                  <Label>{d.teamSize === 1 ? "Most players in the bracket" : "Most teams in the bracket"}</Label>
-                  <select className={inputClass} value={d.tournamentTeams} onChange={(e) => set({ tournamentTeams: Number(e.target.value) })}>
-                    {[2, 4, 8, 16, 32, 64].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                    <option value={0}>Unlimited</option>
-                  </select>
-                  <Hint>Single elimination, with brackets of 2, 4, 8, 16, 32 or 64. Unlimited stays open until staff start it or your set time arrives.</Hint>
-                </div>
-              )}
-              {tournament && d.teamSize > 1 && (
-                <Toggle on={d.flexTeams} label="Adjust teams to fit sign-ups" hint="When it starts, the bot picks the best team count and size. With 5-player teams and 8 sign-ups, that's 2 teams of 4. Team size becomes the most per team." onChange={(flexTeams) => set({ flexTeams })} />
-              )}
+              <Hint>Want a bracket with a champion? Use the Tournaments tab: teams from Matchmaking register as they are.</Hint>
             </>
           )}
 
@@ -399,7 +367,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
               <div>
                 <Label>Players on each team</Label>
                 <input {...num("teamSize")} min={1} max={10} />
-                <Hint>{tournament && d.tournamentTeams === 0 ? "There's no limit on total players." : `The lobby fills at ${d.teamSize * (tournament ? d.tournamentTeams : 2) || 0} players.`}{tournament && d.flexTeams ? " With fewer, the bot adjusts the teams to fit." : ""}</Hint>
+                <Hint>{`The lobby fills at ${d.teamSize * 2 || 0} players.`}</Hint>
               </div>
               {d.teamSize > 1 && (
                 <div>
@@ -410,19 +378,12 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                   </div>
                 </div>
               )}
-              {d.joinMode === "PICK" && d.teamSize > 1 && tournament && (
-                <div>
-                  <Label>Team names (optional)</Label>
-                  <textarea className={`${inputClass} min-h-16`} value={teamNamesText} placeholder="Team 1, Team 2, Team 3" onChange={(e) => { setTeamNamesText(e.target.value); set({ teamNames: e.target.value.split(",").map((t) => t.trim()) }); }} />
-                  <Hint>Separate them with commas. Blank slots use Team 1, Team 2 and so on.</Hint>
-                </div>
-              )}
               {(d.joinMode === "ASSIGN" || d.teamSize === 1) && (
                 <div>
                   <Label>How teams are split</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <Choice on={d.balance === "BALANCED"} title="Balanced" hint={d.useRanks ? "Uses rank and match results." : "Uses match results."} onClick={() => set({ balance: "BALANCED" })} />
-                    <Choice on={d.balance === "CAPTAINS"} title="Captains Draft" hint={tournament ? "Tournaments use Balanced instead." : "Two captains take turns picking."} onClick={() => set({ balance: "CAPTAINS" })} />
+                    <Choice on={d.balance === "CAPTAINS"} title="Captains Draft" hint="Two captains take turns picking." onClick={() => set({ balance: "CAPTAINS" })} />
                     <Choice on={d.balance === "RANDOM"} title="Random" hint="The bot shuffles everyone." onClick={() => set({ balance: "RANDOM" })} />
                   </div>
                 </div>
@@ -446,12 +407,12 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                 <div>
                   <Label>Team names</Label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Choice on={d.teamNaming === "SET"} title={tournament ? "Numbered" : "Set Names"} hint={tournament ? "Team 1, Team 2 and so on." : "Uses the names below."} onClick={() => set({ teamNaming: "SET" })} />
+                    <Choice on={d.teamNaming === "SET"} title="Set Names" hint="Uses the names below." onClick={() => set({ teamNaming: "SET" })} />
                     <Choice on={d.teamNaming === "CAPTAIN"} title="Captains Name Them" hint="Captains pick a name on the panel before the match." onClick={() => set({ teamNaming: "CAPTAIN" })} />
                   </div>
                 </div>
               )}
-              {!tournament && (
+              {(
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label>First team name</Label>
@@ -565,7 +526,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
               <div>
                 <Label>Results channel</Label>
                 <ChannelSelect guildId={guildId} value={d.resultsChannelId || null} onChange={(resultsChannelId) => set({ resultsChannelId })} />
-                <Hint>Every result and the bracket post here.</Hint>
+                <Hint>Every result posts here.</Hint>
               </div>
               <Hint>Saving also creates a Discord event everyone can see. Spartacus needs Manage Events.</Hint>
             </>
@@ -577,7 +538,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
               {d.useTimers && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label>{tournament ? "Sign-up minutes" : "Clear sign-ups after (minutes)"}</Label>
+                    <Label>Clear sign-ups after (minutes)</Label>
                     <input {...num("signupMinutes")} min={0} />
                     <Hint>Counts from the first sign-up. 0 turns it off.</Hint>
                   </div>
@@ -591,25 +552,17 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                     <input {...num("reportMinutes")} min={0} />
                     <Hint>A reminder, then 15 more minutes. 0 turns it off.</Hint>
                   </div>
-                  {tournament ? (
-                    <div>
-                      <Label>Reopen sign-ups after (hours)</Label>
-                      <input {...num("autoReopenHours")} min={0} />
-                      <Hint>Counts from the final. 0 waits for staff.</Hint>
-                    </div>
-                  ) : (
-                    <div>
-                      <Label>If no score comes in</Label>
-                      <select className={inputClass} value={d.noReportAction} onChange={(e) => set({ noReportAction: e.target.value as MatchSetupInput["noReportAction"] })}>
-                        <option value="CANCEL">Cancel the match</option>
-                        <option value="ALERT">Alert staff</option>
-                      </select>
-                    </div>
-                  )}
+                  <div>
+                    <Label>If no score comes in</Label>
+                    <select className={inputClass} value={d.noReportAction} onChange={(e) => set({ noReportAction: e.target.value as MatchSetupInput["noReportAction"] })}>
+                      <option value="CANCEL">Cancel the match</option>
+                      <option value="ALERT">Alert staff</option>
+                    </select>
+                  </div>
                 </div>
               )}
-              {!tournament && <Toggle on={d.checkIn} label="Check-in" hint="Everyone readies up before teams are made." onChange={(checkIn) => set({ checkIn })} />}
-              {!tournament && d.checkIn && d.useTimers && (
+              {<Toggle on={d.checkIn} label="Check-in" hint="Everyone readies up before teams are made." onChange={(checkIn) => set({ checkIn })} />}
+              {d.checkIn && d.useTimers && (
                 <div>
                   <Label>Check-in seconds</Label>
                   <input {...num("checkInSeconds")} min={15} max={600} />
@@ -649,18 +602,6 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
                       <input {...num("lossCoins")} min={0} />
                     </div>
                   </div>
-                  {tournament && (
-                    <>
-                      <div>
-                        <Label>Champion bonus coins</Label>
-                        <input {...num("championCoins")} min={0} />
-                      </div>
-                      <div>
-                        <Label>Champion role (optional)</Label>
-                        <RoleSelect guildId={guildId} value={d.championRoleId} onChange={(id) => set({ championRoleId: id || null })} placeholder="No role" />
-                      </div>
-                    </>
-                  )}
                 </>
               )}
               <div>
@@ -705,7 +646,7 @@ function SetupBuilder({ guildId, editing, onDone, onCancel }: { guildId: string;
           {[
             ["Game", d.game || "Not set"],
             ["Format", formatSummary(d)],
-            ["Teams", { BALANCED: "Balanced", CAPTAINS: tournament ? "Balanced" : "Captains draft", RANDOM: "Random" }[d.balance]],
+            ["Teams", { BALANCED: "Balanced", CAPTAINS: "Captains draft", RANDOM: "Random" }[d.balance]],
             [`${word}s`, mapSummary(d)],
             ["Joining", d.joinMode === "PICK" && d.teamSize > 1 ? "Players choose a team" : "Bot assigns teams"],
             ["Rosters", d.rosterView === "HIDDEN" ? "Hidden until closed" : "Show everyone"],
@@ -1741,7 +1682,7 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
   const [setups, setSetups] = useState<MatchSetupRow[] | null>(null);
   const [builder, setBuilder] = useState<{ editing: MatchSetupRow | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"setups" | "board" | "queue" | "games" | "voice" | "messages" | "guide">("setups");
+  const [tab, setTab] = useState<"tournaments" | "setups" | "board" | "queue" | "games" | "voice" | "messages" | "guide">("tournaments");
   const [messageKey, setMessageKey] = useState<MatchTextKey | undefined>(undefined);
   const editText = (key: MatchTextKey) => {
     setMessageKey(key);
@@ -1799,11 +1740,11 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
         guildId={guildId}
         moduleKey="MATCHES"
         title="Matchmaking"
-        description="Tournaments, team matches, 1v1s, a live leaderboard and always-open matchmaking for any game."
+        description="Always-open matchmaking, teams and tournaments for any game, plus single matches and a live leaderboard."
       />
 
       <div className="flex gap-1 mb-5 border-b border-white/5 overflow-x-auto">
-        {([["setups", "Tournaments and Matches"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["games", "Games"], ["voice", "Voice"], ["messages", "Messages"], ["guide", "Guide"]] as const).map(([key, label]) => (
+        {([["tournaments", "🏆 Tournaments"], ["setups", "Match Setups"], ["board", "Leaderboard"], ["queue", "Matchmaking"], ["games", "Games"], ["voice", "Voice"], ["messages", "Messages"], ["guide", "Guide"]] as const).map(([key, label]) => (
           <button
             key={key}
             type="button"
@@ -1823,6 +1764,8 @@ export default function MatchesPage({ params }: { params: { guildId: string } })
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
         />
+      ) : tab === "tournaments" ? (
+        <TournamentsTab guildId={guildId} />
       ) : tab === "games" ? (
         <SettingsTab guildId={guildId} />
       ) : tab === "voice" ? (

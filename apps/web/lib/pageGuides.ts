@@ -379,8 +379,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   },
   "/matches": {
     title: "Matchmaking",
-    purpose: "Tournaments, team matches, 1v1s, leaderboards and an always-open matchmaking board for any game.",
-    steps: ["Open the Guide tab on this page for the full walkthrough, with previews and a setup checklist.", "Add your games on the Games tab.", "Set up your Lobby on the Voice tab.", "Build a setup, then set up the Leaderboard and Matchmaking tabs.", "Customize wording on the Messages tab."],
+    purpose: "An always-open matchmaking board with teams, tournaments for those teams, one-off match setups and leaderboards, for any game.",
+    steps: ["Open the Guide tab on this page for the full walkthrough, with previews and a setup checklist.", "Add your games on the Games tab.", "Set up your Lobby on the Voice tab.", "Set up the Matchmaking and Leaderboard tabs, then run a tournament from the Tournaments tab.", "Customize wording on the Messages tab."],
   },
   "/giveaways": {
     title: "Giveaways",
@@ -458,6 +458,23 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     purpose: "A daily snapshot of member count and messages, so you can see trends.",
     steps: ["Turn the module on.", "Come back after a few days, once snapshots have built up.", "Read the Member Count and Messages / Day charts."],
     tips: ["Snapshots are taken once a day at midnight UTC."],
+  },
+  "/playing-now": {
+    title: "Playing Now",
+    purpose: "A one-tap \"I'm on, who wants to play?\". Members get a role shown at the top of the member list and a post others can join. It clears itself when time's up, when they tap I'm done, or when they leave voice.",
+    before: ["A channel for it, like #playing-now.", "Spartacus needs Manage Roles, with its role above the two roles."],
+    steps: [
+      "Pick the channel. Spartacus posts the panel there.",
+      "Tap Make the roles for me (or pick your own Playing Now and Notify roles).",
+      "Set how long posts can last, how often Notify pings, and whether leaving voice ends a post.",
+      "Edit the game modes members pick from, then Save and turn the module on.",
+    ],
+    members: [
+      "Tap I'm on now, pick a mode, how many players they need and for how long, then Post it (or add a note).",
+      "Others tap Join (the poster gets a ping) or the voice button. Tap Join again to leave. Full squads close.",
+      "Tap Notify me to get pinged when someone's on, at most once every 20 minutes.",
+    ],
+    tips: ["Ended posts are deleted after 15 minutes, so the channel stays clean.", "When 5 or more people are on, a Queue in Matchmaking button shows on the panel."],
   },
   "/counting-game": {
     title: "Counting Game",

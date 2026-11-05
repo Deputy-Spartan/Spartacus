@@ -59,8 +59,8 @@ const mentionAll = (ids: string[]) => ids.map((id) => `<@${id}>`).join(" ");
 const lock = (guildId: string) => <T>(run: () => Promise<T>) => withLock(`mm:${guildId}`, run);
 const getConfig = (guildId: string) => prisma.matchmakingConfig.findUnique({ where: { guildId } });
 const textsFor = (config: MatchmakingConfig | null, game: string) => textsForGame(config?.texts, config?.gameTexts, game);
-const presetFor = (guildId: string, game: string): Promise<MatchPreset | null> => prisma.matchPreset.findFirst({ where: { guildId, game, deleted: false } });
-const teamSizeFor = (preset: MatchPreset | null) => Math.max(2, preset?.teamSize ?? 5);
+export const presetFor = (guildId: string, game: string): Promise<MatchPreset | null> => prisma.matchPreset.findFirst({ where: { guildId, game, deleted: false } });
+export const teamSizeFor = (preset: MatchPreset | null) => Math.max(2, preset?.teamSize ?? 5);
 
 function isStaff(member: GuildMember | null | undefined, config: MatchmakingConfig | null) {
   if (!member) return false;
@@ -288,7 +288,8 @@ function roomEmbed(room: MatchRoom, texts: unknown) {
 function roomButtons(room: MatchRoom, texts: unknown): Row[] {
   if (room.status === "CONFIRM") return [row(button(`mmroom:${room.id}:confirm`, resolveText(texts, "btnConfirm").text, ButtonStyle.Success), button(`mmroom:${room.id}:dispute`, resolveText(texts, "btnDispute").text, ButtonStyle.Danger))];
   if (room.status !== "LIVE") return [];
-  return [row(button(`mmroom:${room.id}:report:a`, `${room.aName} Won`, ButtonStyle.Primary), button(`mmroom:${room.id}:report:b`, `${room.bName} Won`, ButtonStyle.Secondary), button(`mmroom:${room.id}:cancel`, "Cancel Match", ButtonStyle.Danger))];
+  const report = [button(`mmroom:${room.id}:report:a`, `${room.aName} Won`, ButtonStyle.Primary), button(`mmroom:${room.id}:report:b`, `${room.bName} Won`, ButtonStyle.Secondary)];
+  return [row(...report, ...(room.tournamentId ? [] : [button(`mmroom:${room.id}:cancel`, "Cancel Match", ButtonStyle.Danger)]))];
 }
 
 async function roomThread(client: Client, room: MatchRoom) {
@@ -304,7 +305,15 @@ async function refreshRoom(client: Client, room: MatchRoom) {
   await message?.edit({ embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts) }).catch(() => null);
 }
 
-async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, game: string, a: Side, b: Side) {
+// A tournament match carries its place in the bracket, and a line for the thread.
+export interface TournamentTieRef {
+  tournamentId: string;
+  tieRound: number;
+  tieIndex: number;
+  note: string;
+}
+
+export async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, game: string, a: Side, b: Side, tie?: TournamentTieRef) {
   const { guildId } = config;
   const updated = await prisma.matchmakingConfig.update({ where: { guildId }, data: { nextRoomNumber: { increment: 1 } } });
   const preset = await presetFor(guildId, game);
@@ -326,6 +335,7 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
       bCaptain: b.captain,
       map: maps.length ? pickOne(maps) : null,
       expiresAt: new Date(Date.now() + config.reportHours * 3_600_000),
+      ...(tie ? { tournamentId: tie.tournamentId, tieRound: tie.tieRound, tieIndex: tie.tieIndex } : {}),
     },
   });
 
@@ -351,7 +361,7 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
   if (thread) {
     for (const id of everyone) await thread.members.add(id).catch(() => null);
     const card = await thread
-      .send({ content: [mentionAll(everyone), ...notes].join("\n").slice(0, 2000), embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts), allowedMentions: { parse: ["users"] } })
+      .send({ content: [mentionAll(everyone), ...(tie ? [tie.note] : []), ...notes].join("\n").slice(0, 2000), embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts), allowedMentions: { parse: ["users"] } })
       .catch((err) => {
         logError("bot", err, guildId);
         return null;
@@ -361,7 +371,7 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
   return room;
 }
 
-async function closeRoom(client: Client, room: MatchRoom, closing: string) {
+export async function closeRoom(client: Client, room: MatchRoom, closing: string) {
   const config = await getConfig(room.guildId);
   await closeVoiceRooms(client, config, stringList(room.voiceIds), config?.lobbyVoiceId ?? null, room.guildId);
   await refreshRoom(client, room);
@@ -399,13 +409,17 @@ async function finishRoom(client: Client, room: MatchRoom, side: string, high: n
     },
   });
   await closeRoom(client, { ...done, voiceIds: room.voiceIds }, resolveText(textsFor(config, room.game), "roomWon", { winner, score: `${high}-${low}` }).text);
+  if (done.tournamentId) {
+    const { tournamentMatchDone } = await import("./tournaments");
+    await tournamentMatchDone(client, done).catch((err) => logError("bot", err, room.guildId));
+  }
   await syncBoard(client, room.guildId, room.game);
   await syncMatchmakingPanel(client, room.guildId);
 }
 
 export async function cancelRoom(client: Client, roomId: string): Promise<boolean> {
   const room = await prisma.matchRoom.findUnique({ where: { id: roomId } });
-  if (!room || !OPEN_ROOMS.includes(room.status)) return false;
+  if (!room || !OPEN_ROOMS.includes(room.status) || room.tournamentId) return false;
   await lock(room.guildId)(async () => {
     const closed = await prisma.matchRoom.update({ where: { id: room.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
     await closeRoom(client, { ...closed, voiceIds: room.voiceIds }, resolveText(textsFor(await getConfig(room.guildId), room.game), "roomCanceled").text);
@@ -898,6 +912,11 @@ export async function handleMatchmaking(interaction: Interaction) {
     const games = stringList(config.games);
     const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
 
+    if ((prefix === "mmt" && interaction.isButton()) || (prefix === "mmtreg" && interaction.isStringSelectMenu())) {
+      const { handleTournament } = await import("./tournaments");
+      return void (await handleTournament(interaction));
+    }
+
     if (prefix === "mm" && interaction.isButton()) {
       const [, action, arg] = parts;
       if (action === "newteam" && games.length === 1) return void (await teamNameModal(interaction, 0));
@@ -1192,6 +1211,7 @@ export async function handleMatchmaking(interaction: Interaction) {
           const fresh = await prisma.matchRoom.findUnique({ where: { id: roomId } });
           if (!fresh || !OPEN_ROOMS.includes(fresh.status)) return "This match is already closed.";
           if (action === "cancel") {
+            if (fresh.tournamentId) return "Tournament matches can't be canceled. Staff can set the winner on the dashboard (Matchmaking → Tournaments).";
             if (!staff && ![fresh.aCaptain, fresh.bCaptain].includes(user.id)) return "Only the players or staff can cancel.";
             const closed = await prisma.matchRoom.update({ where: { id: fresh.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
             await closeRoom(client, { ...closed, voiceIds: fresh.voiceIds }, resolveText(textsFor(config, fresh.game), "roomCanceled").text);
@@ -1229,6 +1249,9 @@ export async function handleMatchmaking(interaction: Interaction) {
           if (!room || room.status !== "LIVE") return "This match isn't waiting for a result.";
           const blocked = await reportAllowed(room, user.id, staff);
           if (blocked) return blocked;
+          const { tournamentScoreProblem } = await import("./tournaments");
+          const wrongScore = await tournamentScoreProblem(room, high, low);
+          if (wrongScore) return wrongScore;
           if (staff && ![room.aCaptain, room.bCaptain].includes(user.id)) {
             await finishRoom(client, room, parts[2], high, low);
             return "Result saved.";
@@ -1257,6 +1280,8 @@ const refreshedBoards = new Set<string>();
 
 export async function tickMatchmaking(client: Client) {
   const now = new Date();
+  const { tickTournaments } = await import("./tournaments");
+  await tickTournaments(client).catch((err) => logError("bot", err));
   // After a restart, posts catch up to any change in how they look.
   const boards = await prisma.matchmakingConfig.findMany({ where: { boardChannelId: { not: null } }, select: { guildId: true } });
   for (const { guildId } of boards) {
@@ -1282,7 +1307,12 @@ export async function tickMatchmaking(client: Client) {
       const fresh = await prisma.matchRoom.findUnique({ where: { id: room.id } });
       if (!fresh?.expiresAt || fresh.expiresAt > new Date()) return;
       if (fresh.status === "CONFIRM") await finishRoom(client, fresh, fresh.reportSide!, fresh.reportHigh!, fresh.reportLow!);
-      else if (fresh.status === "LIVE") {
+      else if (fresh.status === "LIVE" && fresh.tournamentId) {
+        await prisma.matchRoom.update({ where: { id: fresh.id }, data: { expiresAt: null } });
+        const config = await getConfig(fresh.guildId);
+        const thread = await roomThread(client, fresh);
+        await thread?.send({ content: `${config?.staffRoleId ? `<@&${config.staffRoleId}> ` : ""}No score yet for this tournament match. Captains, report it above. Staff can report it here or set the winner on the dashboard (Matchmaking → Tournaments).`, allowedMentions: { roles: config?.staffRoleId ? [config.staffRoleId] : [] } }).catch(() => null);
+      } else if (fresh.status === "LIVE") {
         const closed = await prisma.matchRoom.update({ where: { id: fresh.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
         await closeRoom(client, { ...closed, voiceIds: fresh.voiceIds }, "Nobody reported a result in time, so this match was closed and nothing was recorded.");
         await syncMatchmakingPanel(client, fresh.guildId);

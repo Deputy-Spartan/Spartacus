@@ -12,3 +12,5 @@ export * from "./quickLinks";
 export * from "./aiChat";
 export * from "./profileCards";
 export * from "./economyPlus";
+export * from "./tournaments";
+export * from "./playingNow";

@@ -21,6 +21,7 @@ export const ROUTE_LOADS: Record<string, Loader[]> = {
   "/commands": ["getCommands"],
   "/confessions": ["getConfessionSettings"],
   "/counting-game": ["getCountingGame"],
+  "/playing-now": ["getPlayingNow", "getModules"],
   "/embed-creator": ["getEmbedCreatorPresets"],
   "/errors": ["getAlertSettings", "getErrors"],
   "/events": ["getEventSettings", "getEventTemplates", "getEvents", "getSavedEmbeds"],

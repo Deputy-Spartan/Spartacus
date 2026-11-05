@@ -60,6 +60,7 @@ export const MODULE_KEYS = [
   "MATCHES",
   "ROLE_MANAGER",
   "PROFILE_CARDS",
+  "PLAYING_NOW",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -116,6 +117,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   SUGGESTION_ANALYTICS: "Suggestion Analytics",
   RANK_CARDS: "Rank Cards",
   PROFILE_CARDS: "Profile Cards",
+  PLAYING_NOW: "Playing Now",
   CONFESSIONS: "Anonymous",
   MEMBER_MILESTONES: "Member Milestones",
   RULES_GATE: "Rules Gate",

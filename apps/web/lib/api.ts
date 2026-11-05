@@ -623,10 +623,7 @@ export interface MatchSetupInput {
   name: string;
   game: string;
   enabled: boolean;
-  format: "SINGLE" | "TOURNAMENT";
   teamSize: number;
-  tournamentTeams: number;
-  flexTeams: boolean;
   balance: "BALANCED" | "CAPTAINS" | "RANDOM";
   captainRule: "TOP" | "RANDOM";
   team1Name: string;
@@ -650,7 +647,6 @@ export interface MatchSetupInput {
   rewardsEnabled: boolean;
   joinMode: "ASSIGN" | "PICK";
   rosterView: "PUBLIC" | "HIDDEN";
-  teamNames: string[];
   startMode: "MANUAL" | "SCHEDULED" | "FULL";
   startAt: string | null;
   useTimers: boolean;
@@ -659,11 +655,8 @@ export interface MatchSetupInput {
   reportMinutes: number;
   noReportAction: "CANCEL" | "ALERT";
   signupMinutes: number;
-  autoReopenHours: number;
   winCoins: number;
   lossCoins: number;
-  championCoins: number;
-  championRoleId: string | null;
   pingRoleId: string | null;
   staffRoleId: string | null;
   panelChannelId: string;
@@ -1756,6 +1749,48 @@ export interface ShopItemRow {
   stock: number | null;
   enabled: boolean;
 }
+export interface TournamentEntryRow {
+  id: string;
+  teamId: string | null;
+  name: string;
+  captainId: string;
+  players: string[];
+  seed: number | null;
+  checkedIn: boolean;
+  out: boolean;
+}
+export interface TournamentRow extends Omit<import("@spartacus/shared").TournamentInput, "rules"> {
+  id: string;
+  status: import("@spartacus/shared").TournamentStatus;
+  rules: string | null;
+  messageId: string | null;
+  checkInEndsAt: string | null;
+  solo: string[];
+  soloReady: string[];
+  bracket: import("@spartacus/shared").TournamentBracket;
+  championEntryId: string | null;
+  runnerUpEntryId: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  entries: TournamentEntryRow[];
+}
+export interface TournamentsView {
+  games: Array<{ game: string; teamSize: number }>;
+  defaultChannelId: string | null;
+  championRoleId: string | null;
+  matchmakingReady: boolean;
+  rooms: Array<{ id: string; threadId: string | null; status: string }>;
+  names: Record<string, string>;
+  tournaments: TournamentRow[];
+}
+export interface PlayingNowView {
+  settings: import("@spartacus/shared").PlayingNowSettings;
+  posted: boolean;
+  panelError: string | null;
+  active: Array<{ userId: string; name: string; mode: string; need: number; joined: number; note: string | null; endsAt: string }>;
+}
+
 export interface EconomyHubView {
   settings: import("@spartacus/shared").EconomyPlusSettings;
   panel: { channelId: string | null; posted?: boolean; title: string; text: string; error?: string | null };
@@ -1804,6 +1839,17 @@ export interface StreamDeckLogRow {
 }
 
 export const api = {
+  getTournaments: (guildId: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments`),
+  createTournament: (guildId: string, t: import("@spartacus/shared").TournamentInput) => request<TournamentsView>(`/guilds/${guildId}/tournaments`, { method: "POST", body: JSON.stringify(t) }),
+  updateTournament: (guildId: string, id: string, t: import("@spartacus/shared").TournamentInput) => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}`, { method: "PUT", body: JSON.stringify(t) }),
+  tournamentAction: (guildId: string, id: string, action: "open" | "checkin" | "start" | "cancel" | "duplicate") => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}/${action}`, { method: "POST", body: "{}" }),
+  setTournamentTieWinner: (guildId: string, id: string, round: number, index: number, side: "a" | "b") =>
+    request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}/tie`, { method: "POST", body: JSON.stringify({ round, index, side }) }),
+  removeTournamentEntry: (guildId: string, id: string, entryId: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}/entries/${entryId}/remove`, { method: "POST", body: "{}" }),
+  deleteTournament: (guildId: string, id: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}`, { method: "DELETE" }),
+  getPlayingNow: (guildId: string) => request<PlayingNowView>(`/guilds/${guildId}/playing-now`),
+  savePlayingNow: (guildId: string, s: import("@spartacus/shared").PlayingNowSettings) => request<PlayingNowView>(`/guilds/${guildId}/playing-now`, { method: "PUT", body: JSON.stringify(s) }),
+  makePlayingNowRoles: (guildId: string) => request<PlayingNowView>(`/guilds/${guildId}/playing-now/roles`, { method: "POST", body: "{}" }),
   getEconomyHub: (guildId: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub`),
   saveEconomyHub: (guildId: string, body: { settings: import("@spartacus/shared").EconomyPlusSettings; panel: EconomyHubView["panel"]; repost?: boolean }) =>
     request<EconomyHubView>(`/guilds/${guildId}/economy-hub`, { method: "PUT", body: JSON.stringify(body) }),

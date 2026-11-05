@@ -65,7 +65,7 @@ async function fillDashboard(guildId: string, roles: Record<string, Role>) {
   if (staff && !config.staffRoleId) await prisma.matchmakingConfig.update({ where: { guildId }, data: { staffRoleId: staff } });
   if (staff) await prisma.matchSetup.updateMany({ where: { guildId, staffRoleId: null }, data: { staffRoleId: staff } });
   if (alerts) await prisma.matchSetup.updateMany({ where: { guildId, pingRoleId: null }, data: { pingRoleId: alerts } });
-  if (champion) await prisma.matchSetup.updateMany({ where: { guildId, championRoleId: null }, data: { championRoleId: champion } });
+  if (champion) await prisma.matchmakingConfig.updateMany({ where: { guildId, championRoleId: null }, data: { championRoleId: champion } });
 }
 
 export async function applyServerSetup(guild: Guild, category: CategoryChannel): Promise<string> {

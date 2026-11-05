@@ -72,6 +72,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/embed-creator", label: "Embed Creator", icon: "🧩", moduleKey: "EMBED_CREATOR" },
       { href: "/announcements", label: "Announcements", icon: "📢", moduleKey: "ANNOUNCEMENTS" },
       { href: "/matches", label: "Matchmaking", icon: "⚔️", moduleKey: "MATCHES" },
+      { href: "/playing-now", label: "Playing Now", icon: "🎮", moduleKey: "PLAYING_NOW" },
       { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
       { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
       { href: "/stream-alerts", label: "Going Live", icon: "🔴", moduleKey: "STREAM_ALERTS" },

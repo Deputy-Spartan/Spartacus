@@ -439,7 +439,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     title: "Bump Reminder",
     purpose: "Reminds your server to bump on Disboard once the 2-hour cooldown ends.",
     before: ["Disboard must be in your server."],
-    steps: ["Pick the Reminder Channel.", "Pick an optional Mention Role.", "Turn the module on.", "Run /bump in that channel to start the timer."],
+    steps: ["Pick the Bump Channel.", "Pick an optional Mention Role.", "Turn the module on. The reminder starts by itself (it says the bump is ready), and each /bump restarts the 2-hour timer.", "In Discord, tap DM me when it's ready under the bump message to get a DM (a phone notification) every time."],
+    tips: ["Missed alerts repeat every 2 hours for a day, then every 6 hours, until someone bumps.", "Spartacus can't bump for you: Discord doesn't let bots run another bot's commands, and Disboard bans auto-bumping."],
   },
   "/suggestion-analytics": {
     title: "Suggestion Analytics",

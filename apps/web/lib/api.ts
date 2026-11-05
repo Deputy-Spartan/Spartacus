@@ -1466,6 +1466,8 @@ export interface BumpReminderSettingsRow {
   missedAlerts?: number;
   bumpCount?: number;
   bumpMessages?: import("@spartacus/shared").BumpMessages;
+  dmUsers?: Array<{ id: string; name: string }>;
+  removeDmUserId?: string;
 }
 
 export interface RulesGateSettingsRow {

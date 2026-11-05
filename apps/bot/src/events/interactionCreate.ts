@@ -95,6 +95,12 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && interaction.customId === "bump:dm") {
+    const { handleBumpButton } = await import("../modules/community/bumpReminder");
+    await handleBumpButton(interaction);
+    return;
+  }
+
   // Team invites are answered in a DM, so they come before the server-only check below.
   if (interaction.isButton() && interaction.customId.startsWith("mminvite:")) {
     const { handleTeamInvite } = await import("../modules/matches/matchmaking");

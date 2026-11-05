@@ -346,6 +346,7 @@ export function startBot() {
   client.on(Events.VoiceStateUpdate, tempChannels.execute);
   client.on(Events.VoiceStateUpdate, voiceActivity.execute);
   client.on(bumpReminder.name, bumpReminder.execute);
+  client.on(Events.MessageUpdate, bumpReminder.onUpdate);
 
   client.on(Events.MessageReactionAdd, reactionRoles.onReactionAdd);
   client.on(Events.MessageReactionRemove, reactionRoles.onReactionRemove);

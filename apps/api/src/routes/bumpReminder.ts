@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { cleanBumpMessages } from "@spartacus/shared";
 import { getBotClient } from "../lib/botClient";
+import { memberNames } from "../lib/memberNames";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -28,7 +29,10 @@ function redrawSoon(guildId: string) {
 
 router.get("/guilds/:guildId/bump-reminder", requireAuth, requireGuildPermission, async (req, res) => {
   const row = await prisma.bumpReminderSettings.findUnique({ where: { guildId: req.params.guildId } });
+  const dmIds = Array.isArray(row?.dmUserIds) ? row.dmUserIds.filter((x): x is string => typeof x === "string") : [];
+  const names = await memberNames(req.params.guildId, dmIds);
   res.json({
+    dmUsers: dmIds.map((id) => ({ id, name: names[id] ?? id })),
     channelId: row?.channelId ?? null,
     mentionRoleId: row?.mentionRoleId ?? null,
     nextReminderAt: row?.nextReminderAt?.toISOString() ?? null,
@@ -43,7 +47,8 @@ router.get("/guilds/:guildId/bump-reminder", requireAuth, requireGuildPermission
 });
 
 router.put("/guilds/:guildId/bump-reminder", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, mentionRoleId, missedAlertEnabled, missedAfterMin, bumpMessages } = req.body as {
+  const { channelId, mentionRoleId, missedAlertEnabled, missedAfterMin, bumpMessages, removeDmUserId } = req.body as {
+    removeDmUserId?: string;
     bumpMessages?: unknown;
     channelId?: string | null;
     mentionRoleId?: string | null;
@@ -57,6 +62,12 @@ router.put("/guilds/:guildId/bump-reminder", requireAuth, requireGuildPermission
     ...(MISSED_AFTER_OPTIONS.includes(Number(missedAfterMin)) ? { missedAfterMin: Number(missedAfterMin) } : {}),
     ...(bumpMessages !== undefined ? { bumpMessages: cleanBumpMessages(bumpMessages) as unknown as Prisma.InputJsonValue } : {}),
   };
+
+  if (typeof removeDmUserId === "string") {
+    const cur = await prisma.bumpReminderSettings.findUnique({ where: { guildId: req.params.guildId }, select: { dmUserIds: true } });
+    const list = Array.isArray(cur?.dmUserIds) ? cur.dmUserIds.filter((x): x is string => typeof x === "string") : [];
+    Object.assign(patch, { dmUserIds: list.filter((id) => id !== removeDmUserId) });
+  }
 
   const row = await prisma.bumpReminderSettings.upsert({
     where: { guildId: req.params.guildId },

@@ -218,6 +218,7 @@ model BumpReminderSettings {
   statusMessageId    String?
   bumpMessages       Json?
   bumpCount          Int     @default(0)
+  dmUserIds          Json    @default("[]") // people who tapped "DM me when it's ready"
 }
 
 // ---- Suggestion Analytics ----

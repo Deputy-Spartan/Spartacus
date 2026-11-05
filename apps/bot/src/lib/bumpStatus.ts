@@ -1,4 +1,4 @@
-import { EmbedBuilder, type BaseMessageOptions, type Client } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type BaseMessageOptions, type Client } from "discord.js";
 import { cleanBumpMessages, fillBumpStage, BUMP_DEFAULTS, type BumpStage, type BumpStageMessage } from "@spartacus/shared";
 import { prisma } from "./prisma";
 import { isSendableChannel } from "./channels";
@@ -43,9 +43,11 @@ export function buildBumpPayload(row: Row, stage: BumpStage, serverName: string)
     applyEmbedExtra(embed, filled.extra);
     embeds.push(embed);
   }
+  const dmButton = new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("bump:dm").setLabel("DM me when it's ready").setEmoji("🔔").setStyle(ButtonStyle.Secondary));
   return {
     content: filled.content || (embeds.length ? "" : "​"),
     embeds,
+    components: [dmButton],
     allowedMentions: { roles: row.mentionRoleId ? [row.mentionRoleId] : [], users: row.lastBumpedById ? [row.lastBumpedById] : [] },
   };
 }
@@ -85,6 +87,21 @@ export async function showBumpStage(client: Client, guildId: string, stage: Bump
     return null;
   });
   await prisma.bumpReminderSettings.update({ where: { id: row.id }, data: { statusMessageId: posted?.id ?? null } });
+  if (opts.ping && (stage === "ready" || stage === "missed")) await dmBumpers(client, row, stage, guild?.name ?? "the server", posted?.url ?? null);
+}
+
+// A DM is a phone notification, so people at work still hear about it.
+async function dmBumpers(client: Client, row: Row, stage: BumpStage, serverName: string, url: string | null) {
+  const ids = Array.isArray(row.dmUserIds) ? row.dmUserIds.filter((x): x is string => typeof x === "string") : [];
+  const link = url ?? `https://discord.com/channels/${row.guildId}/${row.channelId}`;
+  const text =
+    stage === "ready"
+      ? `⏰ **${serverName}** can be bumped now! Run \`/bump\` here: ${link}`
+      : `⚠️ **${serverName}** still hasn't been bumped${row.missedAlerts > 1 ? ` (missed ${row.missedAlerts} in a row)` : ""}. Run \`/bump\` here: ${link}`;
+  for (const id of ids) {
+    const user = await client.users.fetch(id).catch(() => null);
+    await user?.send({ content: `${text}\n-# Tap 🔔 on the bump message to stop these.` }).catch(() => null);
+  }
 }
 
 // The dashboard's Send Now: optionally sets when the last bump was, then

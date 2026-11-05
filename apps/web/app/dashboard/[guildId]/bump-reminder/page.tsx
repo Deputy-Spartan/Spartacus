@@ -181,6 +181,33 @@ export default function BumpReminderPage({ params }: { params: { guildId: string
           <p className="text-xs text-slate-600 mt-1">Put {"{role}"} in a message's text to ping it.</p>
           {saved && <p className="text-xs text-emerald-400 mt-2">Saved ✓</p>}
         </NeonCard>
+
+        <NeonCard>
+          <p className="font-medium">🔔 DM reminders</p>
+          <p className="text-xs text-slate-500 mt-1">
+            A DM shows up as a phone notification, so you hear about it at work. Anyone can tap <b>DM me when it's ready</b> under the bump message in Discord to get one
+            every time the bump is ready (and when it's missed). Tap it again to stop.
+          </p>
+          <div className="mt-3 divide-y divide-white/5 text-sm">
+            {(settings?.dmUsers ?? []).length === 0 && <p className="py-2 text-slate-500">Nobody yet. Tap the button in Discord to add yourself.</p>}
+            {(settings?.dmUsers ?? []).map((u) => (
+              <div key={u.id} className="flex items-center justify-between py-1.5">
+                <span>{u.name}</span>
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:text-rose-400"
+                  onClick={async () => {
+                    setSettings((prev) => (prev ? { ...prev, dmUsers: (prev.dmUsers ?? []).filter((x) => x.id !== u.id) } : prev));
+                    await api.updateBumpReminderSettings(params.guildId, { removeDmUserId: u.id });
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-slate-600 mt-2">Missed alerts repeat every 2 hours for a day, then every 6 hours until someone bumps.</p>
+        </NeonCard>
       </div>
 
       <NeonCard>

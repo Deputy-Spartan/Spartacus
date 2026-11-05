@@ -23,6 +23,13 @@ export const QUICK_LINK_LIMITS = { groups: 30, links: 12, name: 40, note: 120, l
 
 const DISCORD_APP = "1547035749826691152";
 
+const RENDER = "https://dashboard.render.com/web/srv-dagb643l550s73bc2kcg";
+const VERCEL = "https://vercel.com/spartacus4/spartacus-web";
+const NEON = "https://console.neon.tech/app/projects/sparkling-cell-08559389";
+const CLOUDFLARE = "https://dash.cloudflare.com/1d9e86370276ee2d56061b9a11707114";
+const GITHUB = "https://github.com/Deputy-Spartan/Spartacus";
+
+// Every site Spartacus runs on or needs a key from, in one place.
 export const DEFAULT_QUICK_LINKS: QuickLinkGroup[] = [
   {
     id: "render",
@@ -31,9 +38,38 @@ export const DEFAULT_QUICK_LINKS: QuickLinkGroup[] = [
     note: "Runs the bot and the API (spartacus-api)",
     pinned: true,
     links: [
-      { label: "Service & deploys", url: "https://dashboard.render.com" },
-      { label: "Logs", url: "https://dashboard.render.com" },
-      { label: "Environment (API keys)", url: "https://dashboard.render.com" },
+      { label: "Service & deploys", url: RENDER },
+      { label: "Logs", url: `${RENDER}/logs` },
+      { label: "Environment (API keys)", url: `${RENDER}/env` },
+      { label: "Events", url: `${RENDER}/events` },
+      { label: "Settings", url: `${RENDER}/settings` },
+    ],
+  },
+  {
+    id: "vercel",
+    icon: "▲",
+    name: "Vercel",
+    note: "Hosts this dashboard (spartc.us)",
+    pinned: true,
+    links: [
+      { label: "Project", url: VERCEL },
+      { label: "Deployments", url: `${VERCEL}/deployments` },
+      { label: "Logs", url: `${VERCEL}/logs` },
+      { label: "Domains", url: `${VERCEL}/settings/domains` },
+      { label: "Environment variables", url: `${VERCEL}/settings/environment-variables` },
+    ],
+  },
+  {
+    id: "discord",
+    icon: "🎮",
+    name: "Discord Developer Portal",
+    note: "The bot's name, avatar, token, login redirect and invite link",
+    pinned: true,
+    links: [
+      { label: "General info", url: `https://discord.com/developers/applications/${DISCORD_APP}/information` },
+      { label: "Bot (token & avatar)", url: `https://discord.com/developers/applications/${DISCORD_APP}/bot` },
+      { label: "OAuth2 (login & invite)", url: `https://discord.com/developers/applications/${DISCORD_APP}/oauth2` },
+      { label: "Emojis", url: `https://discord.com/developers/applications/${DISCORD_APP}/emojis` },
     ],
   },
   {
@@ -50,37 +86,15 @@ export const DEFAULT_QUICK_LINKS: QuickLinkGroup[] = [
     ],
   },
   {
-    id: "vercel",
-    icon: "▲",
-    name: "Vercel",
-    note: "Hosts this dashboard (spartc.us)",
-    pinned: true,
-    links: [
-      { label: "Deployments", url: "https://vercel.com/dashboard" },
-      { label: "Domains", url: "https://vercel.com/dashboard" },
-    ],
-  },
-  {
     id: "github",
     icon: "🐙",
     name: "GitHub",
     note: "The code. Every push to main updates the bot and dashboard",
     pinned: true,
     links: [
-      { label: "Repository", url: "https://github.com/Deputy-Spartan/Spartacus" },
-      { label: "Recent commits", url: "https://github.com/Deputy-Spartan/Spartacus/commits/main" },
-    ],
-  },
-  {
-    id: "discord",
-    icon: "🎮",
-    name: "Discord Developer Portal",
-    note: "The bot's name, avatar, token and invite link",
-    pinned: true,
-    links: [
-      { label: "General info", url: `https://discord.com/developers/applications/${DISCORD_APP}/information` },
-      { label: "Bot (token & avatar)", url: `https://discord.com/developers/applications/${DISCORD_APP}/bot` },
-      { label: "Invite link (OAuth2)", url: `https://discord.com/developers/applications/${DISCORD_APP}/oauth2` },
+      { label: "Repository", url: GITHUB },
+      { label: "Recent commits", url: `${GITHUB}/commits/main` },
+      { label: "Webhooks", url: `${GITHUB}/settings/hooks` },
     ],
   },
   {
@@ -89,7 +103,23 @@ export const DEFAULT_QUICK_LINKS: QuickLinkGroup[] = [
     name: "Neon",
     note: "The database",
     pinned: false,
-    links: [{ label: "Project & backups", url: "https://console.neon.tech" }],
+    links: [
+      { label: "Project", url: NEON },
+      { label: "Branches", url: `${NEON}/branches` },
+      { label: "Main branch", url: `${NEON}/branches/br-quiet-leaf-aepja1jh` },
+    ],
+  },
+  {
+    id: "cloudflare",
+    icon: "🟠",
+    name: "Cloudflare",
+    note: "The spartc.us domain: renewal and DNS",
+    pinned: false,
+    links: [
+      { label: "spartc.us", url: `${CLOUDFLARE}/spartc.us` },
+      { label: "DNS records", url: `${CLOUDFLARE}/spartc.us/dns/records` },
+      { label: "Account home", url: CLOUDFLARE },
+    ],
   },
   {
     id: "streaming",
@@ -98,9 +128,25 @@ export const DEFAULT_QUICK_LINKS: QuickLinkGroup[] = [
     note: "Developer apps whose keys power Going Live alerts",
     pinned: false,
     links: [
-      { label: "Twitch apps", url: "https://dev.twitch.tv/console/apps" },
+      { label: "Twitch app", url: "https://dev.twitch.tv/console/apps/90qzo1tog7x49ey3eatuiwgo455dks" },
       { label: "Kick developer", url: "https://kick.com/settings/developer" },
     ],
+  },
+  {
+    id: "uptimerobot",
+    icon: "🟢",
+    name: "UptimeRobot",
+    note: "Watches that the bot and dashboard stay up",
+    pinned: false,
+    links: [{ label: "Monitors", url: "https://dashboard.uptimerobot.com/monitors" }],
+  },
+  {
+    id: "changelog",
+    icon: "📝",
+    name: "Spartacus Changelog",
+    note: "Before / Now of every change",
+    pinned: false,
+    links: [{ label: "Changelog", url: "https://claude.ai/artifact/3VPCUiSnRQYb9ctet6eecu" }],
   },
 ];
 

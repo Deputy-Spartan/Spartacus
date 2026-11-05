@@ -2637,6 +2637,10 @@ model MatchmakingConfig {
   reportHours      Int       @default(3)
   staffRoleId      String?
   championRoleId   String? // given to tournament champions for a week
+  playerRoleId     String? // only this role can use the board, tournaments and the Lobby (from /match setup)
+  alertsRoleId     String? // pinged when tournaments open
+  tournamentChannelId String? // where tournament posts go by default
+  setupCategoryId  String? // the category /match setup made
   nextRoomNumber   Int       @default(1)
 }
 

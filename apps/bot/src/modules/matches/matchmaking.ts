@@ -912,6 +912,21 @@ export async function handleMatchmaking(interaction: Interaction) {
     const games = stringList(config.games);
     const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
 
+    // "Let me play" / "Ping me" (from #how-to-play, or the locked message below).
+    if (prefix === "mm" && interaction.isButton() && parts[1] === "role") {
+      const roleId = parts[2] === "alerts" ? config.alertsRoleId : config.playerRoleId;
+      if (!roleId || !member) return void (await interaction.reply({ content: "That role isn't set up. Ask an admin to run /match setup.", ephemeral: true }));
+      const has = member.roles.cache.has(roleId);
+      const ok = await (has ? member.roles.remove(roleId) : member.roles.add(roleId)).then(() => true, () => false);
+      const what = parts[2] === "alerts" ? "You'll get a ping when games start and tournaments open." : "You can play now: use the buttons and hop in the Matchmaking Lobby.";
+      return void (await interaction.reply({ content: !ok ? "I couldn't change that role (my role needs to be above it)." : has ? `Took <@&${roleId}> off. Tap again to get it back.` : `You have <@&${roleId}> now. ${what}`, ephemeral: true, allowedMentions: { parse: [] } }));
+    }
+    // Only the Matchmaking role can play; everyone else gets a way to join in.
+    if (config.playerRoleId && member && !member.roles.cache.has(config.playerRoleId) && !isStaff(member, config)) {
+      const { roleButtons } = await import("./serverSetup");
+      return void (await interaction.reply({ content: `🔒 **Matchmaking is for players.** Get <@&${config.playerRoleId}> to play: tap **Let me play** below (or pick it in Channels & Roles).`, components: [roleButtons()], ephemeral: true, allowedMentions: { parse: [] } }));
+    }
+
     if ((prefix === "mmt" && interaction.isButton()) || (prefix === "mmtreg" && interaction.isStringSelectMenu())) {
       const { handleTournament } = await import("./tournaments");
       return void (await handleTournament(interaction));

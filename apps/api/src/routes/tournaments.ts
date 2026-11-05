@@ -24,7 +24,7 @@ async function view(guildId: string) {
   const live = await prisma.matchRoom.findMany({ where: { guildId, tournamentId: { not: null }, status: { in: ["LIVE", "CONFIRM"] } }, select: { id: true, threadId: true, status: true } });
   return {
     games: games.map((g) => ({ game: g, teamSize: Math.max(2, presets.find((p) => p.game === g)?.teamSize ?? 5) })),
-    defaultChannelId: config?.activityChannelId ?? config?.channelId ?? null,
+    defaultChannelId: config?.tournamentChannelId ?? config?.activityChannelId ?? config?.channelId ?? null,
     championRoleId: config?.championRoleId ?? null,
     matchmakingReady: !!config,
     rooms: live,

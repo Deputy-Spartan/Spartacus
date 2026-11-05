@@ -1,4 +1,4 @@
-import { ChannelType, SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import type { CommandModule } from "../types";
 import { handleMatchCommand } from "../../modules/matches/flow";
 
@@ -28,8 +28,8 @@ const command: CommandModule = {
     .addSubcommand((s) =>
       s
         .setName("setup")
-        .setDescription("Admins: create the Matchmaking roles and lock a category to them")
-        .addChannelOption((o) => o.setName("category").setDescription("Your main Matchmaking category").addChannelTypes(ChannelType.GuildCategory).setRequired(true))
+        .setDescription("Admins: build the Matchmaking category, channels, Lobby, roles and onboarding question")
+        .addRoleOption((o) => o.setName("member-role").setDescription("Your everyday member role: everyone with it can see Matchmaking").setRequired(true))
     ) as SlashCommandBuilder,
 
   execute: handleMatchCommand,

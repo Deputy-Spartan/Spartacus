@@ -217,6 +217,18 @@ export async function handlePlayingNow(interaction: ButtonInteraction | StringSe
   const key = `${guildId}:${user.id}`;
   const [prefix, action, postId] = interaction.customId.split(":");
 
+  const mm = await prisma.matchmakingConfig.findUnique({ where: { guildId }, select: { playerRoleId: true, setupCategoryId: true, staffRoleId: true } });
+  if (mm?.playerRoleId && mm.setupCategoryId && cfg.channelId) {
+    const ch = await client.channels.fetch(cfg.channelId).catch(() => null);
+    const member = await interaction.guild?.members.fetch(user.id).catch(() => null);
+    const staff = !!member && (member.permissions.has(PermissionFlagsBits.ManageGuild) || (!!mm.staffRoleId && member.roles.cache.has(mm.staffRoleId)));
+    if (ch && "parentId" in ch && ch.parentId === mm.setupCategoryId && member && !member.roles.cache.has(mm.playerRoleId) && !staff && interaction.isRepliable()) {
+      const { roleButtons } = await import("../matches/serverSetup");
+      await interaction.reply({ content: `🔒 **This is for players.** Get <@&${mm.playerRoleId}> to play: tap **Let me play** below.`, components: [roleButtons()], ephemeral: true, allowedMentions: { parse: [] } });
+      return;
+    }
+  }
+
   if (prefix === "pnset" && interaction.isStringSelectMenu()) {
     const choice = choiceFor(cfg, key);
     const value = interaction.values[0];

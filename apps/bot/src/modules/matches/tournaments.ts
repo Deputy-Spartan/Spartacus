@@ -62,7 +62,7 @@ async function save(t: Tournament, data: Prisma.MatchTournamentUpdateInput): Pro
 const saveBracket = (t: Tournament, bracket: TournamentBracket, extra: Prisma.MatchTournamentUpdateInput = {}) => save(t, { bracket: bracket as unknown as Prisma.InputJsonValue, ...extra });
 
 function channelFor(t: MatchTournament, config: MatchmakingConfig | null): string | null {
-  return t.channelId ?? config?.activityChannelId ?? config?.channelId ?? null;
+  return t.channelId ?? config?.tournamentChannelId ?? config?.activityChannelId ?? config?.channelId ?? null;
 }
 
 async function send(client: Client, t: MatchTournament, content: string, users: string[] = [], roles: string[] = []) {
@@ -185,7 +185,7 @@ async function buildPost(t: Tournament) {
   return { embeds: [embed], components: rows };
 }
 
-export async function syncTournamentPost(client: Client, t: Tournament, ping = "") {
+export async function syncTournamentPost(client: Client, t: Tournament, ping = "", pingRole: string | null = t.pingRoleId) {
   if (t.status === "DRAFT") return;
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: t.guildId } });
   const id = channelFor(t, config);
@@ -196,7 +196,7 @@ export async function syncTournamentPost(client: Client, t: Tournament, ping = "
     const message = await channel.messages.fetch(t.messageId).catch(() => null);
     if (message && (await message.edit(post).catch(() => null))) return;
   }
-  const sent = await channel.send({ ...post, content: ping || undefined, allowedMentions: { roles: t.pingRoleId ? [t.pingRoleId] : [] } }).catch((err) => {
+  const sent = await channel.send({ ...post, content: ping || undefined, allowedMentions: { roles: pingRole ? [pingRole] : [] } }).catch((err) => {
     logError("bot", err, t.guildId);
     return null;
   });
@@ -478,7 +478,8 @@ export async function openTournament(client: Client, id: string): Promise<string
     const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: t.guildId } });
     if (!channelFor(t, config)) return "Pick a channel for the tournament post first.";
     t = await save(t, { status: "OPEN" });
-    await syncTournamentPost(client, t, t.pingRoleId ? `<@&${t.pingRoleId}> Registration is open!` : "");
+    const ping = t.pingRoleId ?? config?.alertsRoleId ?? null;
+    await syncTournamentPost(client, t, ping ? `<@&${ping}> Registration is open!` : "", ping);
     t = (await load(id))!;
     return t.messageId ? null : "Registration is open, but I couldn't post in that channel. Check that I can send messages there.";
   });

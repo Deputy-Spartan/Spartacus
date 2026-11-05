@@ -255,6 +255,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
               <div className="space-y-3">
                 <Heading>Your setup checklist</Heading>
                 <Text>This updates from your saved settings, so you can see what's left.</Text>
+                <Tip>Fastest way: add your game below, then run <strong>/match setup member-role:@YourMemberRole</strong> in Discord. It makes the channels, Lobby, roles and onboarding question and ticks most of these for you.</Tip>
                 <div className="space-y-2">
                   <Check done={games.length > 0}>Add at least one game ({games.length} saved)</Check>
                   <Check done={!!config?.lobbyVoiceId}>Pick your Lobby voice channel</Check>
@@ -637,7 +638,7 @@ export function MatchmakingGuide({ guildId, onOpen, initial = "start" }: { guild
                     ["/match leaderboard", "Shows the leaderboard privately"],
                     ["/match sub", "Staff: replaces a player"],
                     ["/match setrank", "Staff: corrects a player's rank"],
-                    ["/match setup", "Admins: creates the Matchmaking roles and locks a category to them, after you confirm"],
+                    ["/match setup member-role:@Member", "Admins: builds the whole Matchmaking area after you confirm: a category everyone with your member role can see, #how-to-play (with a guide), #matchmaking, #tournaments, #playing-now, #leaderboard, #match-staff, a Matchmaking Lobby voice channel, a Match Rooms category, the Matchmaking, Match Alerts, Match Staff and Champion roles, and an onboarding question. Only the Matchmaking role can play, and players are only moved from the Lobby. Safe to run again."],
                   ]}
                 />
                 <Text>Use these in a match channel. If only one setup exists, they work anywhere. When players choose a team, they join from the panel's team buttons.</Text>

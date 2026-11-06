@@ -116,11 +116,11 @@ async function ensureCategory(guild: Guild, name: string, perms: OverwriteResolv
 }
 
 // Builds or updates everything. Returns the reply text.
-export async function applyServerSetup(guild: Guild, memberRoleId: string): Promise<string> {
+export async function applyServerSetup(guild: Guild, memberRoleId: string): Promise<EmbedBuilder> {
   await guild.roles.fetch();
   await guild.channels.fetch();
   const memberRole = guild.roles.cache.get(memberRoleId);
-  if (!memberRole) return "That member role doesn't exist anymore.";
+  if (!memberRole) return problem("That member role doesn't exist anymore. Run /match setup again and pick it.");
   const notes: string[] = [];
   const made: string[] = [];
   const roles = await ensureRoles(guild, notes, made);
@@ -198,7 +198,7 @@ export async function applyServerSetup(guild: Guild, memberRoleId: string): Prom
         options: [...p.options.values()].map((o) => ({ id: o.id, title: o.title, description: o.description, emoji: o.emoji?.id ?? o.emoji?.name ?? undefined, roles: [...o.roles.keys()], channels: [...o.channels.keys()] })),
       }));
       const has = prompts.find((p) => p.options.some((o) => o.roles.includes(roles.player.id)));
-      if (has) onboarding = `• Onboarding question already there: “${has.title}”`;
+      if (has) onboarding = `Already there: “${has.title}”`;
       else {
         prompts.push({
           title,
@@ -213,13 +213,13 @@ export async function applyServerSetup(guild: Guild, memberRoleId: string): Prom
           ],
         } as never);
         await guild.editOnboarding({ prompts: prompts as never, defaultChannels: [...ob.defaultChannels.keys()], enabled: ob.enabled, mode: ob.mode });
-        onboarding = `• Onboarding question added: “${title}”`;
+        onboarding = `Added: “${title}”`;
       }
     } catch (err) {
       logError("bot", err, guild.id);
-      onboarding = "• I couldn't add the onboarding question (I need Manage Server, and my role above the new roles). Members can use the buttons in #how-to-play instead.";
+      onboarding = `⚠️ I couldn't add it (I need Manage Server, and my role above the new roles). Members can use the buttons in <#${ch.guide.id}> instead.`;
     }
-  } else onboarding = "• Your server isn't a Community server, so there's no onboarding question. Members get the role from the buttons in #how-to-play.";
+  } else onboarding = `Skipped: your server isn't a Community server. Members get the role from the buttons in <#${ch.guide.id}>.`;
 
   const me = await guild.members.fetchMe();
   const above = Object.values(roles).filter((r) => r.position >= me.roles.highest.position);
@@ -227,16 +227,31 @@ export async function applyServerSetup(guild: Guild, memberRoleId: string): Prom
   const config = await prisma.matchmakingConfig.findUnique({ where: { guildId: guild.id }, select: { games: true } });
   if (!stringList(config?.games).length) notes.push("Add your game on the dashboard (Matchmaking → Games) so people can queue.");
 
-  return [
-    `✅ **Matchmaking is ready.** Everyone with <@&${memberRole.id}> can see ${CATEGORY}; only <@&${roles.player.id}> can play.`,
-    made.length ? `• Made: ${made.join(", ")}` : "• Everything already existed, so I updated it.",
-    `• Players are only moved from 🔊 <#${ch.lobby.id}>.`,
-    onboarding,
-    ...notes.map((n) => `⚠️ ${n}`),
-  ]
-    .join("\n")
-    .slice(0, 2000);
+  const isNew = (name: string) => made.includes(name);
+  const embed = new EmbedBuilder()
+    .setColor(notes.length ? 0xf1c40f : 0x3ba55d)
+    .setTitle("✅ Matchmaking is ready")
+    .setDescription(
+      [
+        `👀 Everyone with <@&${memberRole.id}> can **see** it.`,
+        `🎮 Only <@&${roles.player.id}> can **play**.`,
+        `🔊 Players are only moved from <#${ch.lobby.id}>.`,
+        made.length ? "" : "\n♻️ Everything already existed, so I updated it.",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
+    .addFields(
+      { name: "🎭 Roles", value: ROLES.map((r) => `<@&${roles[r.key].id}>${isNew(`role ${r.name}`) ? " · new" : ""}`).join("\n"), inline: true },
+      { name: `📁 ${CATEGORY}`, value: CHANNELS.map((c) => `<#${ch[c.key].id}>${c.key === "staffch" ? " · staff only" : ""}`).join("\n"), inline: true },
+      { name: `${ROOMS}`, value: "Voice channels for each match show up here." },
+      { name: "📝 Onboarding question", value: onboarding.slice(0, 1024) }
+    );
+  if (notes.length) embed.addFields({ name: "⚠️ Still to do", value: notes.map((n) => `• ${n}`).join("\n").slice(0, 1024) });
+  return embed;
 }
+
+const problem = (text: string) => new EmbedBuilder().setColor(0xda373c).setTitle("⚠️ Matchmaking setup didn't finish").setDescription(text);
 
 export async function startServerSetup(interaction: ChatInputCommandInteraction) {
   const { guild } = interaction;
@@ -261,27 +276,31 @@ export async function startServerSetup(interaction: ChatInputCommandInteraction)
       ),
     ],
     allowedMentions: { parse: [] },
-    content: [
-      "**This will set up Matchmaking:**",
-      `• **Roles**: ${[...create.map((n) => `${n} (new)`), ...reuse.map((n) => `${n} (reuse)`)].join(", ")}`,
-      `• **${CATEGORY}**: everyone with <@&${member.id}> can see it, only **Matchmaking** can play. Channels: #📖・how-to-play (with a guide), #⚔️・matchmaking, #🏆・tournaments, #🎮・playing-now, #📊・leaderboard, #🛡️・match-staff (staff only), 🔊 Matchmaking Lobby`,
-      `• **${ROOMS}** for match voice channels`,
-      "• **Onboarding question** “Want to play competitive …?” (Community servers)",
-      "• **Dashboard** filled in: board, leaderboard, tournaments, Playing Now, Lobby (pull from the Lobby only), roles",
-      "-# Running it again reuses what it finds and resets those channels' permissions.",
-    ].join("\n"),
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle("⚔️ Set up Matchmaking?")
+        .setDescription(`👀 Everyone with <@&${member.id}> can **see** it.\n🎮 Only the **Matchmaking** role can **play**.`)
+        .addFields(
+          { name: "🎭 Roles", value: [...create.map((n) => `${n} · new`), ...reuse.map((n) => `${n} · already have`)].join("\n"), inline: true },
+          { name: `📁 ${CATEGORY}`, value: CHANNELS.map((c) => `${c.type === ChannelType.GuildVoice ? "🔊 " : ""}${c.name.replace("・", " ")}${c.key === "staffch" ? " · staff only" : ""}`).join("\n"), inline: true },
+          { name: `${ROOMS}`, value: "Voice channels for each match" },
+          { name: "✅ Also", value: "• Onboarding question (Community servers)\n• Dashboard settings filled in" }
+        )
+        .setFooter({ text: "Safe to run again: it reuses what it finds and resets these channels' permissions." }),
+    ],
   });
 }
 
 export async function handleServerSetup(interaction: ButtonInteraction) {
   const [, action, roleId] = interaction.customId.split(":");
-  if (action === "cancel") return void (await interaction.update({ content: "Canceled. Nothing was changed.", components: [] }));
+  if (action === "cancel") return void (await interaction.update({ content: "Canceled. Nothing was changed.", embeds: [], components: [] }));
   const { guild } = interaction;
   if (!guild || !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) return void (await interaction.reply({ content: "Only server admins can run this.", ephemeral: true }));
-  await interaction.update({ content: "Setting up Matchmaking… (this takes a few seconds)", components: [] });
-  const content = await withLock(`setup:${guild.id}`, () => applyServerSetup(guild, roleId)).catch((err: Error) => {
+  await interaction.update({ content: "⏳ Setting up Matchmaking… (this takes a few seconds)", embeds: [], components: [] });
+  const embed = await withLock(`setup:${guild.id}`, () => applyServerSetup(guild, roleId)).catch((err: Error) => {
     logError("bot", err, guild.id);
-    return `Something went wrong: ${err.message ?? "unknown error"}. Check that I have Manage Roles, Manage Channels and Manage Server.`;
+    return problem(`${err.message ?? "Something went wrong."}\nCheck that I have Manage Roles, Manage Channels and Manage Server.`);
   });
-  await interaction.editReply({ content, allowedMentions: { parse: [] } });
+  await interaction.editReply({ content: "", embeds: [embed], allowedMentions: { parse: [] } });
 }

@@ -46,6 +46,7 @@ import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 import { startProfilePanelPosterJob } from "./jobs/profilePanelPoster";
 import { startPlayingNowJob } from "./jobs/playingNowJob";
 import { startCommandTimersJob } from "./jobs/commandTimers";
+import { startMessageActivityJob } from "./jobs/messageActivity";
 import { startEconomyJobs } from "./jobs/economyJobs";
 import { startMatchTickerJob } from "./jobs/matchTicker";
 
@@ -286,6 +287,7 @@ export function startBot() {
     startProfilePanelPosterJob(c);
     startPlayingNowJob(c);
     startCommandTimersJob(c);
+    startMessageActivityJob();
     startEconomyJobs(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");

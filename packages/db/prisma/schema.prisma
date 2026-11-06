@@ -233,6 +233,21 @@ model SuggestionAnalyticsSettings {
   channelId String?
 }
 
+// Messages per hour (UTC) and per channel: counts only, never message text.
+// Feeds the Overview's Busiest hours and Top channels charts. Rows older
+// than 35 days are deleted by the bot's flush job.
+model MessageActivity {
+  id        String   @id @default(cuid())
+  guildId   String
+  day       DateTime @db.Date
+  hour      Int
+  channelId String
+  count     Int      @default(0)
+
+  @@unique([guildId, day, hour, channelId])
+  @@index([guildId, day])
+}
+
 model DailyMessageCount {
   id      String   @id @default(cuid())
   guildId String

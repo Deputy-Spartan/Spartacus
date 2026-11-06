@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type GrowthSnapshotRow, type LeaderboardRow } from "../../lib/api";
+import { api, type ActivityInsights, type GrowthSnapshotRow, type LeaderboardRow, type ModuleState } from "../../lib/api";
 import { NeonCard } from "./NeonCard";
 
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -10,12 +10,14 @@ const avatarUrl = (r: LeaderboardRow) => (r.avatar ? `https://cdn.discordapp.com
 
 // Member growth (line), messages per day (bars) and the most active members,
 // from the daily growth snapshots and the XP leaderboard.
-export function OverviewCharts({ guildId }: { guildId: string }) {
+export function OverviewCharts({ guildId, modules }: { guildId: string; modules?: Record<string, ModuleState> | null }) {
   const [snaps, setSnaps] = useState<GrowthSnapshotRow[] | null>(null);
   const [top, setTop] = useState<LeaderboardRow[]>([]);
+  const [insights, setInsights] = useState<ActivityInsights | null>(null);
 
   useEffect(() => {
     api.getGrowthSnapshots(guildId).then(setSnaps).catch(() => setSnaps([]));
+    api.getActivityInsights(guildId).then(setInsights).catch(() => null);
     api
       .getLeaderboard(guildId)
       .then((rows) => setTop(rows.slice(0, 5)))
@@ -23,6 +25,7 @@ export function OverviewCharts({ guildId }: { guildId: string }) {
   }, [guildId]);
 
   if (!snaps) return null;
+  const growthOff = modules ? !modules.GROWTH_ANALYTICS?.enabled : false;
   const enough = snaps.length >= 2;
   const members = snaps.map((s) => s.memberCount);
   const week = snaps.slice(-7);
@@ -46,6 +49,36 @@ export function OverviewCharts({ guildId }: { guildId: string }) {
         {enough ? <Bars values={week.map((s) => s.messageCount)} labels={week.map((s) => weekday(s.createdAt))} /> : <Empty />}
       </NeonCard>
 
+      <NeonCard className="lg:col-span-2">
+        <div className="flex items-baseline justify-between mb-2">
+          <p className="font-medium">Busiest hours</p>
+          <p className="text-xs text-slate-500">Last 7 days · your time</p>
+        </div>
+        {insights && insights.total > 0 ? <Hours utc={insights.hours} /> : <Waiting off={growthOff} />}
+      </NeonCard>
+
+      <NeonCard className="lg:col-span-2">
+        <div className="flex items-baseline justify-between mb-3">
+          <p className="font-medium">Top channels</p>
+          <p className="text-xs text-slate-500">Messages, last 7 days</p>
+        </div>
+        {insights && insights.channels.length > 0 ? (
+          <div className="grid gap-2">
+            {insights.channels.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 text-sm">
+                <span className="w-40 sm:w-56 truncate text-slate-300">#{c.name ?? "deleted-channel"}</span>
+                <span className="dz-bar-track flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
+                  <span className="block h-full rounded-full bg-gradient-to-r from-[#5e7fa6] to-[#7b99bc]" style={{ width: `${Math.round((c.count / insights.channels[0].count) * 100)}%` }} />
+                </span>
+                <span className="w-12 text-right text-xs text-slate-500">{c.count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Waiting off={growthOff} />
+        )}
+      </NeonCard>
+
       {top.length > 0 && (
         <NeonCard className="lg:col-span-2">
           <p className="font-medium mb-3">Most active members</p>
@@ -64,6 +97,36 @@ export function OverviewCharts({ guildId }: { guildId: string }) {
           </div>
         </NeonCard>
       )}
+    </div>
+  );
+}
+
+function Waiting({ off }: { off: boolean }) {
+  return <p className="text-sm text-slate-500 py-6 text-center">{off ? "Turn on Growth Analytics (Modules) and this starts filling in." : "Counting started. This fills in as people chat (counts only, never message text)."}</p>;
+}
+
+// 24 cells, one per hour in the viewer's own time zone; darker = busier.
+function Hours({ utc }: { utc: number[] }) {
+  const shift = -Math.round(new Date().getTimezoneOffset() / 60);
+  const local = Array.from({ length: 24 }, (_, h) => utc[(((h - shift) % 24) + 24) % 24]);
+  const max = Math.max(1, ...local);
+  const peak = local.indexOf(Math.max(...local));
+  const label = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: "numeric" });
+  return (
+    <div>
+      <div className="grid gap-[3px]" style={{ gridTemplateColumns: "repeat(24, minmax(0, 1fr))" }}>
+        {local.map((v, h) => (
+          <span key={h} title={`${label(h)}: ${v} messages`} className="block h-7 rounded bg-[#7b99bc]" style={{ opacity: 0.1 + (v / max) * 0.9 }} />
+        ))}
+      </div>
+      <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+        <span>{label(0)}</span>
+        <span>{label(6)}</span>
+        <span>{label(12)}</span>
+        <span>{label(18)}</span>
+        <span>{label(23)}</span>
+      </div>
+      <p className="text-xs text-slate-500 mt-2">Busiest around {label(peak)}: a good time for events and announcements.</p>
     </div>
   );
 }

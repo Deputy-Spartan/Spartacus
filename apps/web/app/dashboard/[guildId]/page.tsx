@@ -58,7 +58,7 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
 
       <HealthCard guildId={params.guildId} modules={modules} />
 
-      <OverviewCharts guildId={params.guildId} />
+      <OverviewCharts guildId={params.guildId} modules={modules} />
 
       <ChangelogCard />
 

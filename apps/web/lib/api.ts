@@ -294,6 +294,13 @@ export interface StatusChannelRow {
   channelId: string;
 }
 
+export interface ActivityInsights {
+  hours: number[]; // 24 totals, by UTC hour
+  channels: Array<{ id: string; name: string | null; count: number }>;
+  days: number;
+  total: number;
+}
+
 export interface GrowthSnapshotRow {
   id: string;
   guildId: string;
@@ -1919,6 +1926,7 @@ export const api = {
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
   getSetupStatus: (guildId: string) => request<Record<string, string[]>>(`/guilds/${guildId}/setup-status`),
+  getActivityInsights: (guildId: string) => request<ActivityInsights>(`/guilds/${guildId}/activity-insights`),
   getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),
   setModule: (guildId: string, key: string, enabled: boolean) =>
     request(`/guilds/${guildId}/modules/${key}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),

@@ -1,3 +1,4 @@
+import { countMessageActivity } from "../jobs/messageActivity";
 import { Events, Message } from "discord.js";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { checkAutomod, handleViolation, type AutomodConfig } from "../modules/moderation/automod";
@@ -104,6 +105,7 @@ export async function execute(message: Message) {
       create: { guildId: message.guildId, date: today, count: 1 },
       update: { count: { increment: 1 } },
     });
+    countMessageActivity(message.guildId, message.channelId);
   }
 
   // --- Counting game ---

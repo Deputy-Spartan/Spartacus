@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { SettingRow, SettingsSection } from "../../../../components/ui/Settings";
 import { api } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 export default function PermWatchPage({ params }: { params: { guildId: string } }) {
   const [alertChannelId, setAlertChannelId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,15 +23,13 @@ export default function PermWatchPage({ params }: { params: { guildId: string } 
       return;
     }
     setError(null);
-    setSaving(true);
     await api.setPermWatch(params.guildId, alertChannelId);
-    setSaving(false);
   }
 
   const autoSave = useAutoSave(alertChannelId, save);
 
   return (
-    <div>
+    <div className="max-w-4xl">
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="PERM_WATCH"
@@ -41,18 +37,13 @@ export default function PermWatchPage({ params }: { params: { guildId: string } 
         description="Get alerted the moment a role's permissions change — especially a new Administrator grant."
       />
 
-      <NeonCard className="max-w-lg">
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-          Alert Channel
-          <Required />
-        </label>
-        <ChannelSelect guildId={params.guildId} value={alertChannelId} onChange={setAlertChannelId} />
-      </NeonCard>
+      <SettingsSection title="Alerts">
+        <SettingRow label="Alert channel" required help="Where the alert posts when a role's permissions change." tip="Use a staff-only channel. A surprise Administrator grant is the most common sign of a compromised account.">
+          <ChannelSelect guildId={params.guildId} value={alertChannelId} onChange={setAlertChannelId} />
+        </SettingRow>
+      </SettingsSection>
 
-      <button onClick={save} disabled={saving} className="neon-button mt-4">
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-      <SaveStatus status={autoSave} />
+      <SaveStatus status={autoSave} onSave={save} />
       <FormError message={error} />
     </div>
   );

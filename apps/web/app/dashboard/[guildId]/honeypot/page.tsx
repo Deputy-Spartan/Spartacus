@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { SettingRow, SettingsSection } from "../../../../components/ui/Settings";
 import { api, type HoneypotConfig } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 export default function HoneypotPage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<HoneypotConfig | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.getHoneypot(params.guildId).then(setConfig);
@@ -18,9 +17,7 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
 
   async function save() {
     if (!config) return;
-    setSaving(true);
     setConfig(await api.setHoneypot(params.guildId, config));
-    setSaving(false);
   }
 
   const autoSave = useAutoSave(config, save);
@@ -28,7 +25,7 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
   return (
-    <div>
+    <div className="max-w-4xl">
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="HONEYPOT"
@@ -41,19 +38,18 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
         }
       />
 
-      <NeonCard className="max-w-lg">
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Honeypot Channel</label>
-        <ChannelSelect
-          guildId={params.guildId}
-          value={config.channelId}
-          onChange={(channelId) => setConfig({ ...config, channelId })}
-        />
-      </NeonCard>
+      <SettingsSection title="Trap">
+        <SettingRow
+          label="Honeypot channel"
+          required
+          help="Anyone who posts here is banned straight away."
+          tip="Hide this channel from @everyone in Discord's permissions, so only bots and raiders that post everywhere find it."
+        >
+          <ChannelSelect guildId={params.guildId} value={config.channelId} onChange={(channelId) => setConfig({ ...config, channelId })} />
+        </SettingRow>
+      </SettingsSection>
 
-      <button onClick={save} disabled={saving} className="neon-button mt-4">
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-      <SaveStatus status={autoSave} />
+      <SaveStatus status={autoSave} onSave={save} />
     </div>
   );
 }

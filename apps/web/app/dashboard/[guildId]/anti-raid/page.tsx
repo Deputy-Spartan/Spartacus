@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { NumberInput, SettingRow, SettingsSection } from "../../../../components/ui/Settings";
 import { api, type AntiRaidConfig } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 export default function AntiRaidPage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<AntiRaidConfig | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.getAntiRaid(params.guildId).then(setConfig);
@@ -19,9 +18,7 @@ export default function AntiRaidPage({ params }: { params: { guildId: string } }
 
   async function save() {
     if (!config) return;
-    setSaving(true);
     setConfig(await api.setAntiRaid(params.guildId, config));
-    setSaving(false);
   }
 
   const autoSave = useAutoSave(config, save);
@@ -29,7 +26,7 @@ export default function AntiRaidPage({ params }: { params: { guildId: string } }
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
   return (
-    <div>
+    <div className="max-w-4xl">
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="ANTI_RAID"
@@ -37,60 +34,31 @@ export default function AntiRaidPage({ params }: { params: { guildId: string } }
         description="The bot kicks new-account joiners and alerts a channel when the join rate spikes."
       />
 
-      <NeonCard className="max-w-lg">
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Alert Channel</label>
-        <ChannelSelect
-          guildId={params.guildId}
-          value={config.alertChannelId}
-          onChange={(channelId) => setConfig({ ...config, alertChannelId: channelId })}
-        />
+      <SettingsSection title="Alerts">
+        <SettingRow label="Alert channel" help="Where Spartacus posts when it spots a raid.">
+          <ChannelSelect guildId={params.guildId} value={config.alertChannelId} onChange={(channelId) => setConfig({ ...config, alertChannelId: channelId })} />
+        </SettingRow>
+      </SettingsSection>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Join Rate Limit</label>
-            <input
-              type="number"
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              value={config.joinRateLimit}
-              onChange={(e) => setConfig({ ...config, joinRateLimit: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Window (seconds)</label>
-            <input
-              type="number"
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              value={config.joinRateWindowSec}
-              onChange={(e) => setConfig({ ...config, joinRateWindowSec: Number(e.target.value) })}
-            />
-          </div>
-        </div>
+      <SettingsSection title="What counts as a raid">
+        <SettingRow label="Join rate limit" help="This many joins…" tip="Together with the window below: for example 10 joins within 30 seconds counts as a raid.">
+          <NumberInput label="Join rate limit" value={config.joinRateLimit} onChange={(n) => setConfig({ ...config, joinRateLimit: n })} min={1} />
+        </SettingRow>
+        <SettingRow label="Window (seconds)" help="…within this many seconds.">
+          <NumberInput label="Window in seconds" value={config.joinRateWindowSec} onChange={(n) => setConfig({ ...config, joinRateWindowSec: n })} min={1} />
+        </SettingRow>
+        <SettingRow label="Minimum account age (days)" help="During a raid, accounts younger than this are kicked." tip="Raid accounts are usually brand new. Older, real accounts are left alone.">
+          <NumberInput label="Minimum account age in days" value={config.minAccountAgeDays} onChange={(n) => setConfig({ ...config, minAccountAgeDays: n })} min={0} />
+        </SettingRow>
+      </SettingsSection>
 
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Min Account Age (days) to Skip Kick</label>
-        <input
-          type="number"
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-          value={config.minAccountAgeDays}
-          onChange={(e) => setConfig({ ...config, minAccountAgeDays: Number(e.target.value) })}
-        />
+      <SettingsSection title="Response">
+        <SettingRow label="Auto-lockdown" help="Lock every text channel automatically when a raid is detected." tip="Members can't post until staff unlock the channels again, which stops a raid from flooding chat.">
+          <ToggleSwitch enabled={config.autoLockdown} onChange={(next) => setConfig({ ...config, autoLockdown: next })} label="Auto-lockdown" />
+        </SettingRow>
+      </SettingsSection>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Auto-Lockdown</p>
-            <p className="text-xs text-slate-500">Lock every text channel automatically when a raid is detected.</p>
-          </div>
-          <ToggleSwitch
-            enabled={config.autoLockdown}
-            onChange={(next) => setConfig({ ...config, autoLockdown: next })}
-            label="Auto-lockdown"
-          />
-        </div>
-      </NeonCard>
-
-      <button onClick={save} disabled={saving} className="neon-button mt-4">
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-      <SaveStatus status={autoSave} />
+      <SaveStatus status={autoSave} onSave={save} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { api, type ModuleState } from "../../lib/api";
 import { usePinnedModules } from "../../lib/usePinnedModules";
 import { hoverPrefetch } from "../../lib/prefetch";
 import { AppIcon } from "../ui/AppIcon";
+import { useSetupStatus } from "../ui/SetupStatus";
 
 // NAV_SECTIONS/NAV_MODULE_KEYS/MODULE_KEY_TO_HREF/OWNER_NAV_SECTION now live
 // in packages/shared/navItems.ts — the bot's !setup-test-server scaffold
@@ -64,6 +65,7 @@ export function Sidebar({
   }
   const pinnedQuick = quickLinks.filter((g) => g.pinned && quickLinkMain(g));
   const [modules, setModules] = useState<Record<string, ModuleState> | null>(null);
+  const setup = useSetupStatus(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
 
   useEffect(() => {
@@ -287,8 +289,8 @@ export function Sidebar({
                           <span className="flex-1 min-w-0 truncate">{item.label}</span>
                           {enabled !== null && (
                             <span
-                              className={`h-2 w-2 rounded-full shrink-0 ${enabled ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]" : "bg-rose-500"}`}
-                              title={enabled ? "Enabled" : "Disabled"}
+                              className={`h-2 w-2 rounded-full shrink-0 ${!enabled ? "bg-rose-500" : setup?.[moduleKey!]?.length ? "bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" : "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]"}`}
+                              title={!enabled ? "Disabled" : setup?.[moduleKey!]?.length ? "Needs setup" : "Enabled"}
                             />
                           )}
                         </Link>

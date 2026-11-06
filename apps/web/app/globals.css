@@ -313,6 +313,12 @@ html[data-theme="daylight"] .neon-toggle-on { background: #5e7fa6; }
 html[data-theme="daylight"] .spartacus-wave { background-image: linear-gradient(90deg, #3f5f86 0%, #3f5f86 35%, #7b99bc 50%, #3f5f86 65%, #3f5f86 100%); }
 html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgba(123, 153, 188, 0.22), transparent 65%), #e9edf2; color: #1c1d20; }
 html[data-theme="daylight"] .sp-login-card { background: #ffffff; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
+html[data-theme="daylight"] .setup-ready { background: rgba(31, 138, 76, 0.12); color: #1f7a45; }
+html[data-theme="daylight"] .setup-needs { background: rgba(201, 138, 46, 0.16); color: #8a5a10; }
+html[data-theme="daylight"] :is(.text-amber-300, .text-amber-400):not([class*="bg-[#"] *) { color: #8a5a10; }
+html[data-theme="daylight"] :is(.text-emerald-300, .text-emerald-400):not([class*="bg-[#"] *) { color: #1f7a45; }
+html[data-theme="daylight"] :is(.text-rose-300, .text-rose-400):not([class*="bg-[#"] *) { color: #b42318; }
+html[data-theme="daylight"] .stroke-white\/10 { stroke: rgba(28, 29, 32, 0.1); }
 html[data-theme="daylight"] * { scrollbar-color: rgba(28, 29, 32, 0.2) transparent; }
 
 /* Account settings → Reduce motion: no sweeps, sheens or fades. */

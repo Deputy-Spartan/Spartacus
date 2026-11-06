@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NAV_SECTIONS, type ModuleKey } from "@spartacus/shared";
 import { AppIcon } from "./AppIcon";
+import { SetupBadge, SetupNotice, setupState, useSetupStatus } from "./SetupStatus";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { api } from "../../lib/api";
 import { EditableText } from "./EditableText";
@@ -22,6 +23,8 @@ const iconFor = (key: ModuleKey) => NAV_SECTIONS.flatMap((s) => s.items).find((i
 export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleHeaderProps) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const embedded = useEmbedded();
+  const setup = useSetupStatus(guildId);
+  const missing = setup?.[moduleKey] ?? [];
 
   useEffect(() => {
     api.getModules(guildId).then((state) => setEnabled(state[moduleKey]?.enabled ?? false));
@@ -35,7 +38,8 @@ export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleH
   if (embedded) return null;
 
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
+    <>
+    <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
       <div className="flex items-start gap-3.5 min-w-0">
         {iconFor(moduleKey) && <AppIcon emoji={iconFor(moduleKey)!} size={44} className="mt-0.5" />}
         <div className="min-w-0">
@@ -51,11 +55,13 @@ export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleH
           </>
         ) : (
           <>
-            <span className="text-xs text-slate-400">{enabled ? "Enabled" : "Disabled"}</span>
+            {setup ? <SetupBadge state={setupState(enabled, missing)} count={missing.length} /> : <span className="text-xs text-slate-400">{enabled ? "Enabled" : "Disabled"}</span>}
             <ToggleSwitch enabled={enabled} onChange={toggle} label={`Toggle ${title}`} />
           </>
         )}
       </div>
     </div>
+    {enabled && <SetupNotice title={title} missing={missing} />}
+    </>
   );
 }

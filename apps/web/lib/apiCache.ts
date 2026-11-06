@@ -13,7 +13,7 @@
 const MAX_AGE = 10 * 60 * 1000; // never serve anything older than 10 minutes
 const BURST = 2000; // how long after opening a page its loads count as "opening"
 const RECHECK_AFTER = 1500; // answers newer than this aren't rechecked
-const NO_CACHE = [/^\/access-status/, /^\/auth/, /^\/logout/, /^\/me\/prefs/];
+const NO_CACHE = [/^\/access-status/, /^\/auth/, /^\/logout/, /^\/me\/prefs/, /\/setup-status$/];
 
 interface Entry {
   json: string;

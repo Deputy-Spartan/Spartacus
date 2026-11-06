@@ -1917,6 +1917,7 @@ export const api = {
   getAccessAuditLog: () => request<AccessAuditEntryRow[]>("/access-audit-log"),
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
+  getSetupStatus: (guildId: string) => request<Record<string, string[]>>(`/guilds/${guildId}/setup-status`),
   getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),
   setModule: (guildId: string, key: string, enabled: boolean) =>
     request(`/guilds/${guildId}/modules/${key}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),

@@ -9,6 +9,7 @@ import { api, type ModuleState } from "../../../../lib/api";
 import { usePinnedModules } from "../../../../lib/usePinnedModules";
 import Link from "next/link";
 import { AppIcon } from "../../../../components/ui/AppIcon";
+import { SetupBadge, setupState, useSetupStatus } from "../../../../components/ui/SetupStatus";
 
 // Every card here mirrors a real sidebar link — same grouping, same order —
 // so this page reads as "the sidebar, laid out as a grid" rather than a
@@ -18,6 +19,7 @@ const ALL_GRID_SECTIONS = NAV_SECTIONS.filter((s) => s.section && s.section !== 
 function ModulesContent({ guildId }: { guildId: string }) {
   const [state, setState] = useState<Record<string, ModuleState> | null>(null);
   const { isPinned, togglePin } = usePinnedModules(guildId);
+  const setup = useSetupStatus(guildId);
   // A sidebar category link (e.g. "Moderation") opens straight to its own
   // grid via ?section=; the plain "Modules" link shows every category.
   const sectionFilter = useSearchParams().get("section");
@@ -74,9 +76,8 @@ function ModulesContent({ guildId }: { guildId: string }) {
                       <div className="min-w-0">
                         <p className="font-medium truncate">{item.label}</p>
                         {enabled !== null ? (
-                          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                            <span className={`h-2 w-2 rounded-full shrink-0 ${enabled ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]" : "bg-rose-500"}`} />
-                            {enabled ? "Enabled" : "Disabled"}
+                          <p className="mt-1.5">
+                            <SetupBadge state={setupState(enabled, setup?.[moduleKey!])} count={setup?.[moduleKey!]?.length ?? 0} />
                           </p>
                         ) : (
                           <p className="text-xs text-slate-600 mt-1">Always on</p>

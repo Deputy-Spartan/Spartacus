@@ -13,6 +13,7 @@ import { api, clearToken, type CurrentUser } from "../../../lib/api";
 import { useIdleLogout } from "../../../lib/useIdleLogout";
 import { PageGate } from "../../../components/nav/PageGate";
 import { preloadGuild } from "../../../lib/prefetch";
+import { UserPrefsProvider } from "../../../lib/userPrefs";
 
 export default function DashboardLayout({
   children,
@@ -89,6 +90,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <UserPrefsProvider>
     <DashboardTextProvider isOwner={isOwner}>
     <ConfirmProvider>
       <div className="min-h-screen bg-base-950">
@@ -119,5 +121,6 @@ export default function DashboardLayout({
       </div>
     </ConfirmProvider>
     </DashboardTextProvider>
+    </UserPrefsProvider>
   );
 }

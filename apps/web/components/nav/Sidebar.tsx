@@ -167,7 +167,7 @@ export function Sidebar({
       {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={onClose} aria-hidden="true" />}
       <aside
         className={[
-          "fixed left-0 top-0 h-screen w-64 sm:w-60 bg-base-900 border-r border-white/5 flex flex-col overflow-y-auto z-40",
+          "sp-sidebar fixed left-0 top-0 h-screen w-64 sm:w-60 bg-base-900 border-r border-white/5 flex flex-col overflow-y-auto z-40",
           "transition-transform duration-200",
           open ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}

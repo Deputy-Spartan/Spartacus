@@ -2189,6 +2189,16 @@ model SupportSettings {
 // A dashboard user's pinned sidebar links for one server — synced to
 // their account (keyed by Discord user id) rather than the browser, so it
 // follows them between devices the way the rest of the dashboard does.
+// One row per dashboard user (Discord user id): how the dashboard looks for
+// them, saved to their account so it follows them to every device.
+model DashboardUserPrefs {
+  userId       String   @id
+  theme        String   @default("studio") // studio | glass | neon
+  reduceMotion Boolean  @default(false)
+  displayName  String?
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
 model PinnedModule {
   id        String   @id @default(cuid())
   guild     Guild    @relation(fields: [guildId], references: [id])

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { EARLY_THEME_SCRIPT } from "../lib/themeScript";
 
 export const metadata: Metadata = {
   title: "Spartacus",
@@ -17,7 +18,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="studio" suppressHydrationWarning>
+      <head>
+        {/* Paints the saved theme before anything shows, so it never flashes. */}
+        <script dangerouslySetInnerHTML={{ __html: EARLY_THEME_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

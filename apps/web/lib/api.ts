@@ -1626,6 +1626,14 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
+export type DashboardTheme = "studio" | "glass" | "neon";
+
+export interface UserPrefs {
+  theme: DashboardTheme;
+  reduceMotion: boolean;
+  displayName: string | null;
+}
+
 export interface AccessStatus {
   status: "owner" | "approved" | "pending" | "none";
   plan: "FREE" | "PAID" | null;
@@ -1885,6 +1893,8 @@ export const api = {
   uploadImage: (guildId: string, file: File) => uploadFile(`/guilds/${guildId}/upload-image`, file),
 
   getMe: () => request<CurrentUser>("/me"),
+  getMyPrefs: () => request<UserPrefs>("/me/prefs"),
+  saveMyPrefs: (body: Partial<UserPrefs>) => request<UserPrefs>("/me/prefs", { method: "PUT", body: JSON.stringify(body) }),
   getGuilds: () =>
     request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean; owner: boolean }>>("/guilds"),
 

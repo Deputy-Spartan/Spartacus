@@ -189,3 +189,101 @@
 @media (prefers-reduced-motion: reduce) {
   #feature-details * { animation: none !important; }
 }
+
+/* ---------------------------------------------------------------------------
+   Dashboard themes (Account settings → Theme), saved per person.
+   Same colors in all three: #1C1D20 #242529 #2C2E33 #37393F and the steel
+   blues #7B99BC #5E7FA6 #94A3B8.
+   Cards never get transform, filter or backdrop-filter: those would make the
+   fixed-position pop-ups inside some cards (cropper, embed editors) jump.
+   Hover effects use only borders, shadows and backgrounds.
+   ------------------------------------------------------------------------- */
+
+/* Studio: solid and crisp; an accent line sweeps across the top on hover. */
+html[data-theme="studio"] .neon-card {
+  border-color: #37393f;
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, #5e7fa6, #7b99bc, #94a3b8) top left / 0% 2px no-repeat,
+    #242529;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: background-size 0.35s ease, border-color 0.2s, box-shadow 0.2s;
+}
+html[data-theme="studio"] .neon-card:hover {
+  background-size: 100% 2px, auto;
+  border-color: #4a4d55;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+html[data-theme="studio"] .sp-sidebar { background: #202124; }
+html[data-theme="studio"] .neon-button,
+html[data-theme="studio"] .neon-button-sm { background: #7b99bc; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); transition: background-color 0.15s; }
+html[data-theme="studio"] .neon-button:hover,
+html[data-theme="studio"] .neon-button-sm:hover { background: #89a6c7; }
+
+/* Glass: frosted panels over a soft steel-blue glow; a sheen on hover. */
+html[data-theme="glass"] body {
+  background:
+    radial-gradient(900px 600px at 10% 0%, rgba(123, 153, 188, 0.22), transparent 60%),
+    radial-gradient(800px 650px at 100% 100%, rgba(94, 127, 166, 0.26), transparent 60%),
+    radial-gradient(600px 420px at 55% 35%, rgba(148, 163, 184, 0.12), transparent 60%),
+    #1c1d20;
+  background-attachment: fixed;
+}
+html[data-theme="glass"] .neon-card {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 16px;
+  background:
+    linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.07) 50%, transparent 60%) 120% 0 / 250% 100% no-repeat,
+    linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02)),
+    rgba(36, 37, 41, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 30px rgba(0, 0, 0, 0.25);
+  transition: background-position 0.8s ease, border-color 0.25s, box-shadow 0.25s;
+}
+html[data-theme="glass"] .neon-card:hover {
+  background-position: -120% 0, 0 0, 0 0;
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+html[data-theme="glass"] .sp-sidebar {
+  background: rgba(36, 37, 41, 0.55);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html[data-theme="glass"] .sp-header { background: rgba(28, 29, 32, 0.45); border-color: rgba(255, 255, 255, 0.08); }
+html[data-theme="glass"] .neon-button,
+html[data-theme="glass"] .neon-button-sm { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 18px rgba(94, 127, 166, 0.3); }
+
+/* Neon: a faint grid, steel-blue glowing edges, buttons that light up. */
+html[data-theme="neon"] body {
+  background:
+    linear-gradient(rgba(123, 153, 188, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, rgba(123, 153, 188, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+    #17181b;
+  background-attachment: fixed;
+}
+html[data-theme="neon"] .neon-card {
+  background: #1d1e22;
+  border-color: rgba(123, 153, 188, 0.28);
+  transition: border-color 0.2s, box-shadow 0.25s;
+}
+html[data-theme="neon"] .neon-card:hover {
+  border-color: #7b99bc;
+  box-shadow: 0 0 0 1px rgba(123, 153, 188, 0.4), 0 0 22px rgba(123, 153, 188, 0.3), inset 0 0 22px rgba(123, 153, 188, 0.06);
+}
+html[data-theme="neon"] .sp-sidebar { background: rgba(23, 24, 27, 0.96); border-color: rgba(123, 153, 188, 0.3); }
+html[data-theme="neon"] .sp-header { border-color: rgba(123, 153, 188, 0.25); }
+html[data-theme="neon"] .neon-toggle-on { box-shadow: 0 0 12px rgba(123, 153, 188, 0.8); }
+html[data-theme="neon"] .neon-button,
+html[data-theme="neon"] .neon-button-sm { box-shadow: 0 0 14px rgba(123, 153, 188, 0.5); transition: box-shadow 0.2s; }
+html[data-theme="neon"] .neon-button:hover,
+html[data-theme="neon"] .neon-button-sm:hover { box-shadow: 0 0 22px rgba(123, 153, 188, 0.8), 0 0 44px rgba(123, 153, 188, 0.35); }
+html[data-theme="neon"] .spartacus-wave { filter: drop-shadow(0 0 8px rgba(123, 153, 188, 0.6)); }
+
+/* Account settings → Reduce motion: no sweeps, sheens or fades. */
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  transition: none !important;
+  animation: none !important;
+}

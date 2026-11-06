@@ -30,7 +30,10 @@ export default async function OpenGraphImage() {
           alignItems: "center",
           gap: 56,
           padding: "0 96px",
-          background: "radial-gradient(circle at 8% 0%, rgba(123,153,188,0.55), transparent 55%), radial-gradient(circle at 100% 100%, rgba(94,127,166,0.6), transparent 55%), #1c1d20",
+          // The color has to be its own property: the image renderer rejects a
+          // plain color mixed into a list of gradients.
+          backgroundColor: "#1c1d20",
+          backgroundImage: "radial-gradient(circle at 8% 0%, rgba(123,153,188,0.55), rgba(28,29,32,0) 55%), radial-gradient(circle at 100% 100%, rgba(94,127,166,0.6), rgba(28,29,32,0) 55%)",
           color: "#ffffff",
           fontFamily: "sans-serif",
         }}

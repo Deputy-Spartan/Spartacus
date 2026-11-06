@@ -21,6 +21,8 @@ import { stringList } from "./render";
 import { withLock } from "./lock";
 import { syncMatchmakingPanel } from "./matchmaking";
 import { syncBoard } from "./leaderboard";
+import { invalidateModuleCache } from "../../lib/moduleGate";
+import { syncPlayingNowPanel } from "../engagement/playingNow";
 
 // /match setup member-role:@Member builds the whole Matchmaking area:
 // a ⚔️ MATCHMAKING category everyone with the member role can see, its
@@ -163,8 +165,29 @@ export async function applyServerSetup(guild: Guild, memberRoleId: string): Prom
       panelParts: ["PICKUP", "TEAM", "TOOLS"],
     },
   });
+  // Matchmaking and Playing Now both have to be on, or their panels never post.
+  for (const key of ["MATCHES", "PLAYING_NOW"] as const) {
+    await prisma.moduleToggle.upsert({ where: { guildId_key: { guildId: guild.id, key } }, create: { guildId: guild.id, key, enabled: true }, update: { enabled: true } });
+    invalidateModuleCache(guild.id, key);
+  }
+  // Playing Now always moves into the new #playing-now. Its old panel (in
+  // whatever channel it used before) is deleted so there's only one.
   const pn = await prisma.playingNowConfig.findUnique({ where: { guildId: guild.id } });
-  if (!pn?.channelId) await prisma.playingNowConfig.upsert({ where: { guildId: guild.id }, create: { guildId: guild.id, channelId: ch.now.id, notifyRoleId: roles.alerts.id }, update: { channelId: ch.now.id, panelMessageId: null, notifyRoleId: pn?.notifyRoleId ?? roles.alerts.id } });
+  if (pn?.channelId && pn.channelId !== ch.now.id && pn.panelMessageId) {
+    const oldCh = await guild.channels.fetch(pn.channelId).catch(() => null);
+    if (oldCh && isSendableChannel(oldCh)) await oldCh.messages.delete(pn.panelMessageId).catch(() => null);
+  }
+  const movePn = pn?.channelId !== ch.now.id;
+  await prisma.playingNowConfig.upsert({
+    where: { guildId: guild.id },
+    create: { guildId: guild.id, channelId: ch.now.id, notifyRoleId: roles.alerts.id },
+    update: { channelId: ch.now.id, notifyRoleId: pn?.notifyRoleId ?? roles.alerts.id, ...(movePn ? { panelMessageId: null } : {}) },
+  });
+  const pnProblem = await syncPlayingNowPanel(guild.client, guild.id).catch((err) => {
+    logError("bot", err, guild.id);
+    return "I couldn't post the Playing Now panel.";
+  });
+  if (pnProblem) notes.push(`Playing Now: ${pnProblem}`);
   await syncMatchmakingPanel(guild.client, guild.id).catch((err) => logError("bot", err, guild.id));
   await syncBoard(guild.client, guild.id).catch(() => null);
 

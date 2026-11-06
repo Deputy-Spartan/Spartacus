@@ -14,6 +14,7 @@ import { useIdleLogout } from "../../../lib/useIdleLogout";
 import { PageGate } from "../../../components/nav/PageGate";
 import { preloadGuild } from "../../../lib/prefetch";
 import { UserPrefsProvider } from "../../../lib/userPrefs";
+import { PhoneTabBar } from "../../../components/nav/PhoneTabBar";
 
 export default function DashboardLayout({
   children,
@@ -113,11 +114,12 @@ export default function DashboardLayout({
               position:sticky on descendants (e.g. the Embed Creator's live
               preview column). "clip" prevents the horizontal overflow
               without that side effect. */}
-          <main className="p-3 sm:p-6 overflow-x-clip">
+          <main className="p-3 sm:p-6 pb-24 md:pb-6 overflow-x-clip">
             <PageGuideButton guildId={params.guildId} />
             <PageGate>{children}</PageGate>
           </main>
         </div>
+        <PhoneTabBar guildId={params.guildId} />
       </div>
     </ConfirmProvider>
     </DashboardTextProvider>

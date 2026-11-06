@@ -507,6 +507,7 @@ export interface LeaderboardRow {
   level: number;
   username: string | null;
   nickname: string | null;
+  avatar?: string | null;
 }
 
 export interface DiscordChannelOption {

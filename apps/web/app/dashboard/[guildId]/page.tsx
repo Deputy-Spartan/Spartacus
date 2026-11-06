@@ -9,6 +9,7 @@ import { MODULE_KEYS, MODULE_LABELS, type ModuleKey } from "@spartacus/shared";
 import { api, type DashboardActivityEntry, type ModuleState } from "../../../lib/api";
 import { useBotStatus } from "../../../lib/useBotStatus";
 import { HealthCard } from "../../../components/ui/HealthCard";
+import { OverviewCharts } from "../../../components/ui/OverviewCharts";
 
 const METHOD_VERB: Record<string, string> = {
   POST: "Created",
@@ -56,6 +57,8 @@ export default function OverviewPage({ params }: { params: { guildId: string } }
       <h1 className="text-2xl font-bold mb-6">Overview</h1>
 
       <HealthCard guildId={params.guildId} modules={modules} />
+
+      <OverviewCharts guildId={params.guildId} />
 
       <ChangelogCard />
 

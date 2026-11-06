@@ -209,6 +209,15 @@
 }
 .app-tile svg { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
 
+/* Leaderboard rank badges. */
+.rank-badge { background: #5f6673; color: #fff; }
+.rank-1 { background: linear-gradient(135deg, #f7d774, #c9a03a); color: #1c1d20; }
+.rank-2 { background: linear-gradient(135deg, #e3e7ed, #9aa3af); color: #1c1d20; }
+.rank-3 { background: linear-gradient(135deg, #e0a26a, #a9652e); color: #1c1d20; }
+html[data-theme="daylight"] .chart-grid { stroke: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .sp-tabbar { background: rgba(255, 255, 255, 0.95); border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="glass"] .sp-tabbar { background: rgba(36, 37, 41, 0.7); }
+
 /* ---------- Studio: solid and bold, an accent bar on every card ---------- */
 html[data-theme="studio"] .neon-card {
   border-color: #37393f;

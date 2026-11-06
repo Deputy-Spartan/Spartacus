@@ -14,6 +14,12 @@ function ownerOnly(req: AuthedRequest, res: Response, next: NextFunction) {
 
 let cached: { at: number; cards: FrontPageCard[]; statusUrl: string | null } | null = null;
 
+// The bot's public UptimeRobot status page, used until the owner sets a
+// different link (or removes it) in Owner Only → Front Page.
+// Saved value: null = never set (use this default), "" = removed (hide it).
+const DEFAULT_STATUS_URL = "https://stats.uptimerobot.com/G3pz6TRiib";
+const statusLink = (saved: string | null | undefined) => (saved === null || saved === undefined ? DEFAULT_STATUS_URL : saved || null);
+
 async function readCards(): Promise<FrontPageCard[]> {
   const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { frontPage: true } });
   return cleanFrontPage(cfg?.frontPage) ?? FRONT_PAGE_DEFAULTS;
@@ -23,7 +29,7 @@ async function readCards(): Promise<FrontPageCard[]> {
 router.get("/public/front-page", async (_req, res) => {
   if (!cached || Date.now() - cached.at > 60_000) {
     const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { statusPageUrl: true } });
-    cached = { at: Date.now(), cards: await readCards(), statusUrl: cfg?.statusPageUrl ?? null };
+    cached = { at: Date.now(), cards: await readCards(), statusUrl: statusLink(cfg?.statusPageUrl) };
   }
   res.set("Cache-Control", "public, max-age=30").json({ cards: cached.cards, statusUrl: cached.statusUrl });
 });
@@ -31,7 +37,7 @@ router.get("/public/front-page", async (_req, res) => {
 router.get("/owner/front-page", requireAuth, ownerOnly, async (_req: AuthedRequest, res) => {
   const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { frontPage: true, statusPageUrl: true } });
   const saved = cleanFrontPage(cfg?.frontPage);
-  res.json({ cards: saved ?? FRONT_PAGE_DEFAULTS, custom: !!saved, statusUrl: cfg?.statusPageUrl ?? null });
+  res.json({ cards: saved ?? FRONT_PAGE_DEFAULTS, custom: !!saved, statusUrl: statusLink(cfg?.statusPageUrl) });
 });
 
 router.put("/owner/front-page", requireAuth, ownerOnly, async (req: AuthedRequest, res) => {
@@ -56,7 +62,8 @@ router.put("/owner/status-page", requireAuth, ownerOnly, async (req: AuthedReque
       return res.status(400).json({ error: "Paste the full link, starting with https://" });
     }
   }
-  await prisma.botConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton", statusPageUrl: url }, update: { statusPageUrl: url } });
+  // Saved as "" when removed, so the default link doesn't come back.
+  await prisma.botConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton", statusPageUrl: url ?? "" }, update: { statusPageUrl: url ?? "" } });
   cached = null;
   res.json({ statusUrl: url });
 });

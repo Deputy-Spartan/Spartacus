@@ -13,8 +13,17 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
   const router = useRouter();
   const { prefs, save } = useUserPrefs();
   const [open, setOpen] = useState(false);
+  const [statusUrl, setStatusUrl] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const name = prefs.displayName || user.username;
+
+  // The public status page link, if the owner has set one (Owner Only → Front Page).
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/public/front-page`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j && typeof j.statusUrl === "string" && setStatusUrl(j.statusUrl))
+      .catch(() => null);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +99,11 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
           <Link role="menuitem" href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className={item}>
             <Icon name="settings" /> Account settings
           </Link>
+          {statusUrl && (
+            <a role="menuitem" href={statusUrl} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={item}>
+              <Icon name="heart-pulse" /> Status page
+            </a>
+          )}
           <div className="border-t border-white/5 my-1" />
           <button role="menuitem" type="button" onClick={logout} className={`${item} text-rose-300 hover:bg-rose-500/10`}>
             <Icon name="log-out" /> Log out

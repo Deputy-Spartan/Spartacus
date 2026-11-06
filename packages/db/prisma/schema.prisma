@@ -1697,6 +1697,7 @@ model Reminder {
 
 model BotConfig {
   id              String    @id @default("singleton")
+  statusPageUrl   String? // public status page link, shown on the sign-in page and in the account menu
   username        String?
   description     String?
   statusType      String    @default("online") // online | idle | dnd | invisible

@@ -12,7 +12,7 @@ function ownerOnly(req: AuthedRequest, res: Response, next: NextFunction) {
   next();
 }
 
-let cached: { at: number; cards: FrontPageCard[] } | null = null;
+let cached: { at: number; cards: FrontPageCard[]; statusUrl: string | null } | null = null;
 
 async function readCards(): Promise<FrontPageCard[]> {
   const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { frontPage: true } });
@@ -21,14 +21,17 @@ async function readCards(): Promise<FrontPageCard[]> {
 
 // Public: the sign-in page reads this. Cached briefly; a save clears it.
 router.get("/public/front-page", async (_req, res) => {
-  if (!cached || Date.now() - cached.at > 60_000) cached = { at: Date.now(), cards: await readCards() };
-  res.set("Cache-Control", "public, max-age=30").json({ cards: cached.cards });
+  if (!cached || Date.now() - cached.at > 60_000) {
+    const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { statusPageUrl: true } });
+    cached = { at: Date.now(), cards: await readCards(), statusUrl: cfg?.statusPageUrl ?? null };
+  }
+  res.set("Cache-Control", "public, max-age=30").json({ cards: cached.cards, statusUrl: cached.statusUrl });
 });
 
 router.get("/owner/front-page", requireAuth, ownerOnly, async (_req: AuthedRequest, res) => {
-  const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { frontPage: true } });
+  const cfg = await prisma.botConfig.findUnique({ where: { id: "singleton" }, select: { frontPage: true, statusPageUrl: true } });
   const saved = cleanFrontPage(cfg?.frontPage);
-  res.json({ cards: saved ?? FRONT_PAGE_DEFAULTS, custom: !!saved });
+  res.json({ cards: saved ?? FRONT_PAGE_DEFAULTS, custom: !!saved, statusUrl: cfg?.statusPageUrl ?? null });
 });
 
 router.put("/owner/front-page", requireAuth, ownerOnly, async (req: AuthedRequest, res) => {
@@ -38,6 +41,24 @@ router.put("/owner/front-page", requireAuth, ownerOnly, async (req: AuthedReques
   await prisma.botConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton", frontPage }, update: { frontPage } });
   cached = null;
   res.json({ cards, custom: true });
+});
+
+// The public status page link. Empty clears it.
+router.put("/owner/status-page", requireAuth, ownerOnly, async (req: AuthedRequest, res) => {
+  const raw = typeof req.body?.url === "string" ? req.body.url.trim() : "";
+  let url: string | null = null;
+  if (raw) {
+    try {
+      const u = new URL(raw);
+      if (u.protocol !== "https:" || raw.length > 300) throw new Error();
+      url = u.toString();
+    } catch {
+      return res.status(400).json({ error: "Paste the full link, starting with https://" });
+    }
+  }
+  await prisma.botConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton", statusPageUrl: url }, update: { statusPageUrl: url } });
+  cached = null;
+  res.json({ statusUrl: url });
 });
 
 // Back to the original boxes.

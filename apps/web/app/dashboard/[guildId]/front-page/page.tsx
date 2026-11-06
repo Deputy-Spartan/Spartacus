@@ -63,6 +63,9 @@ export default function FrontPageEditor({ params }: { params: { guildId: string 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statusUrl, setStatusUrl] = useState("");
+  const [statusSaved, setStatusSaved] = useState("");
+  const [statusNote, setStatusNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     api
@@ -71,6 +74,8 @@ export default function FrontPageEditor({ params }: { params: { guildId: string 
         setSaved(r.cards);
         setCards(r.cards);
         setCustom(r.custom);
+        setStatusUrl(r.statusUrl ?? "");
+        setStatusSaved(r.statusUrl ?? "");
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Couldn't load."));
   }, []);
@@ -85,6 +90,17 @@ export default function FrontPageEditor({ params }: { params: { guildId: string 
     setCards(next);
   };
   const problem = cards.length < L.minCards ? `Keep at least ${L.minCards} boxes.` : cards.some((c) => !c.title.trim()) ? "Every box needs a title." : null;
+
+  async function saveStatus() {
+    try {
+      const r = await api.saveStatusPage(statusUrl);
+      setStatusUrl(r.statusUrl ?? "");
+      setStatusSaved(r.statusUrl ?? "");
+      setStatusNote({ ok: true, text: r.statusUrl ? "Saved. It shows on the sign-in page and in the account menu within a minute." : "Removed." });
+    } catch (e) {
+      setStatusNote({ ok: false, text: e instanceof Error ? e.message : "Couldn't save." });
+    }
+  }
 
   async function save() {
     setBusy(true);
@@ -108,6 +124,18 @@ export default function FrontPageEditor({ params }: { params: { guildId: string 
         <h1 className="text-2xl font-bold">🏠 Front Page</h1>
         <p className="text-sm text-slate-400">The info boxes on the sign-in page at the dashboard's address. Change them as Spartacus grows. Two per row; tap one there to see its ticked lines.</p>
       </div>
+
+      <NeonCard>
+        <p className="text-sm font-medium">Status page link</p>
+        <p className="text-xs text-slate-500 mb-2">Your public status page, e.g. from UptimeRobot (Status Pages → Add status page). It shows as “● Status” on the sign-in page and as “Status page” in the account menu. Leave empty to hide it.</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input value={statusUrl} onChange={(e) => setStatusUrl(e.target.value)} placeholder="https://stats.uptimerobot.com/…" className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm" />
+          <button type="button" onClick={saveStatus} disabled={statusUrl.trim() === statusSaved} className="neon-button-sm disabled:opacity-40">
+            Save link
+          </button>
+        </div>
+        {statusNote && <p className={`text-xs mt-2 ${statusNote.ok ? "text-emerald-400" : "text-rose-400"}`}>{statusNote.text}</p>}
+      </NeonCard>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-3">

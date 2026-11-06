@@ -12,13 +12,17 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 // Owner Only → Front Page; the built-in set shows until that loads (or if it fails).
 function useFrontPage() {
   const [cards, setCards] = useState<FrontPageCard[]>(FRONT_PAGE_DEFAULTS);
+  const [statusUrl, setStatusUrl] = useState<string | null>(null);
   useEffect(() => {
     fetch(`${API_URL}/public/front-page`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => j && Array.isArray(j.cards) && j.cards.length && setCards(j.cards))
+      .then((j) => {
+        if (j && Array.isArray(j.cards) && j.cards.length) setCards(j.cards);
+        if (j && typeof j.statusUrl === "string") setStatusUrl(j.statusUrl);
+      })
       .catch(() => null);
   }, []);
-  return cards;
+  return { cards, statusUrl };
 }
 
 function useServerCount() {
@@ -85,7 +89,7 @@ function LandingContent() {
   const idle = params.get("idle") === "1";
   const signinFailed = params.get("error") === "signin";
   const { stats, failed: statsFailed } = useServerCount();
-  const cards = useFrontPage();
+  const { cards, statusUrl } = useFrontPage();
   const [open, setOpen] = useState<number | null>(null);
   const [lastUser, setLastUser] = useState<LastUser | null>(null);
   const [going, setGoing] = useState(false);
@@ -216,7 +220,17 @@ function LandingContent() {
             </button>
           )}
         </div>
-        <p className="absolute bottom-5 text-[11px] text-slate-600">Spartacus · Discord sign-in only, no password stored</p>
+        <p className="absolute bottom-5 text-[11px] text-slate-600">
+          Spartacus · Discord sign-in only, no password stored
+          {statusUrl && (
+            <>
+              {" · "}
+              <a href={statusUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline">
+                ● Status
+              </a>
+            </>
+          )}
+        </p>
       </section>
     </main>
   );

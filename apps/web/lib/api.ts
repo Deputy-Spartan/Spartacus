@@ -1870,7 +1870,8 @@ export const api = {
     }
     return URL.createObjectURL(await res.blob());
   },
-  getFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page"),
+  getFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean; statusUrl: string | null }>("/owner/front-page"),
+  saveStatusPage: (url: string) => request<{ statusUrl: string | null }>("/owner/status-page", { method: "PUT", body: JSON.stringify({ url }) }),
   saveFrontPage: (cards: import("@spartacus/shared").FrontPageCard[]) => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page", { method: "PUT", body: JSON.stringify({ cards }) }),
   resetFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page", { method: "DELETE" }),
   getQuickLinks: () => request<QuickLinksResponse>("/owner/quick-links"),

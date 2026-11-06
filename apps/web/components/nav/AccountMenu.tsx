@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clearToken } from "../../lib/api";
 import { THEMES, useUserPrefs } from "../../lib/userPrefs";
+import { Icon } from "../ui/AppIcon";
 
 // The avatar in the top bar opens this: who you're signed in as, a quick
 // theme switch, Profile, Account settings and Log out.
@@ -84,14 +85,14 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
           </div>
 
           <Link role="menuitem" href={`/dashboard/${guildId}/account?tab=profile`} onClick={() => setOpen(false)} className={item}>
-            <span>👤</span> Profile
+            <Icon name="user" /> Profile
           </Link>
           <Link role="menuitem" href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className={item}>
-            <span>⚙️</span> Account settings
+            <Icon name="settings" /> Account settings
           </Link>
           <div className="border-t border-white/5 my-1" />
           <button role="menuitem" type="button" onClick={logout} className={`${item} text-rose-300 hover:bg-rose-500/10`}>
-            <span>🚪</span> Log out
+            <Icon name="log-out" /> Log out
           </button>
         </div>
       )}

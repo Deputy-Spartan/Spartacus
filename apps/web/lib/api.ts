@@ -1626,7 +1626,7 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
-export type DashboardTheme = "studio" | "glass" | "neon";
+export type DashboardTheme = "studio" | "glass" | "daylight";
 
 export interface UserPrefs {
   theme: DashboardTheme;

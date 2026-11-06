@@ -8,6 +8,7 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { api, type ModuleState } from "../../../../lib/api";
 import { usePinnedModules } from "../../../../lib/usePinnedModules";
 import Link from "next/link";
+import { AppIcon } from "../../../../components/ui/AppIcon";
 
 // Every card here mirrors a real sidebar link — same grouping, same order —
 // so this page reads as "the sidebar, laid out as a grid" rather than a
@@ -69,7 +70,7 @@ function ModulesContent({ guildId }: { guildId: string }) {
                       📌
                     </button>
                     <Link href={`/dashboard/${guildId}${item.href}`} className="flex items-start gap-3 pr-7">
-                      <span className="text-lg leading-none mt-0.5">{item.icon}</span>
+                      <AppIcon emoji={item.icon} size={34} />
                       <div className="min-w-0">
                         <p className="font-medium truncate">{item.label}</p>
                         {enabled !== null ? (

@@ -8,6 +8,7 @@ import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api, type ModuleState } from "../../lib/api";
 import { usePinnedModules } from "../../lib/usePinnedModules";
 import { hoverPrefetch } from "../../lib/prefetch";
+import { AppIcon } from "../ui/AppIcon";
 
 // NAV_SECTIONS/NAV_MODULE_KEYS/MODULE_KEY_TO_HREF/OWNER_NAV_SECTION now live
 // in packages/shared/navItems.ts — the bot's !setup-test-server scaffold
@@ -247,7 +248,7 @@ export function Sidebar({
                                 active ? "h-5 opacity-100" : "h-0 opacity-0"
                               }`}
                             />
-                            <span>{cat.icon}</span>
+                            <AppIcon emoji={cat.icon} size={22} />
                             <span className="flex-1 min-w-0 truncate">{cat.label}</span>
                           </Link>
                         );
@@ -282,7 +283,7 @@ export function Sidebar({
                           }`}
                         />
                         <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
-                          <span>{item.icon}</span>
+                          <AppIcon emoji={item.icon} size={22} />
                           <span className="flex-1 min-w-0 truncate">{item.label}</span>
                           {enabled !== null && (
                             <span

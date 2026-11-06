@@ -93,7 +93,7 @@ export default function DashboardLayout({
     <UserPrefsProvider>
     <DashboardTextProvider isOwner={isOwner}>
     <ConfirmProvider>
-      <div className="min-h-screen bg-base-950">
+      <div className="sp-shell min-h-screen bg-base-950">
         <CommandPalette guildId={params.guildId} />
         <Sidebar guildId={params.guildId} open={sidebarOpen} onClose={() => setSidebarOpen(false)} isOwner={isOwner} />
         <div className={`transition-[margin] duration-200 ${sidebarOpen ? "md:ml-60" : "md:ml-0"}`}>

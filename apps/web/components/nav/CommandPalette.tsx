@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NAV_SECTIONS } from "./Sidebar";
+import { AppIcon } from "../ui/AppIcon";
 
 interface FlatItem {
   href: string;
@@ -110,7 +111,7 @@ export function CommandPalette({ guildId }: { guildId: string }) {
                 i === activeIndex ? "bg-base-800 text-neon-blue" : "text-slate-300"
               }`}
             >
-              <span>{item.icon}</span>
+              <AppIcon emoji={item.icon} size={24} />
               <span className="flex-1">{item.label}</span>
               <span className="text-[10px] text-slate-600 uppercase tracking-wide">{item.section}</span>
             </button>

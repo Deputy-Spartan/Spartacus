@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import { FRONT_PAGE_DEFAULTS, type FrontPageCard } from "@spartacus/shared";
 import { forgetLastUser, readLastUser, type LastUser } from "../lib/lastUser";
+import { AppIcon } from "../components/ui/AppIcon";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -52,7 +53,7 @@ function FeatureDetails({ f }: { f: FrontPageCard }) {
   return (
     <div className="rounded-xl border border-neon-blue/30 bg-black/20 px-4 py-3.5 animate-[fadeIn_.25s_ease-out]">
       <p className="flex items-center gap-2 text-sm font-semibold">
-        <span className="text-lg">{f.icon}</span>
+        <AppIcon emoji={f.icon} size={24} />
         {f.title}
       </p>
       <ul className="mt-2.5 space-y-1.5">
@@ -100,9 +101,9 @@ function LandingContent() {
         : null;
 
   return (
-    <main className="min-h-screen bg-base-950 text-slate-100 grid lg:grid-cols-[1.15fr_1fr]">
+    <main className="sp-login min-h-screen bg-base-950 text-slate-100 grid lg:grid-cols-[1.15fr_1fr]">
       {/* Left: what Spartacus does */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#23262c] to-[#141518] px-6 py-10 sm:px-12 lg:py-14 flex flex-col">
+      <section className="sp-hero relative overflow-hidden bg-gradient-to-br from-[#23262c] to-[#141518] px-6 py-10 sm:px-12 lg:py-14 flex flex-col">
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(123,153,188,0.32),transparent_65%)]" />
         <div className="relative flex items-center gap-2.5">
           <BotLogo src={stats?.botAvatar} failed={statsFailed} className="h-9 w-9 ring-1 ring-white/10" />
@@ -133,7 +134,7 @@ function LandingContent() {
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
-                    <span className={`text-xl transition-transform duration-200 ${isOpen ? "scale-110" : "group-hover:scale-110"}`}>{f.icon}</span>
+                    <span className={`inline-flex transition-transform duration-200 ${isOpen ? "scale-110" : "group-hover:scale-110"}`}><AppIcon emoji={f.icon} size={30} /></span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-semibold">{f.title}</span>
                       <span className="block text-xs text-slate-400">{f.short}</span>
@@ -177,7 +178,7 @@ function LandingContent() {
 
       {/* Right: sign in */}
       <section className="relative flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-base-900 p-7 shadow-[0_20px_60px_rgba(0,0,0,0.4)] text-center">
+        <div className="sp-login-card w-full max-w-sm rounded-2xl border border-white/10 bg-base-900 p-7 shadow-[0_20px_60px_rgba(0,0,0,0.4)] text-center">
           {lastUser?.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={lastUser.avatarUrl} alt="" className="mx-auto h-16 w-16 rounded-full ring-2 ring-neon-blue/40" />

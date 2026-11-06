@@ -2193,7 +2193,7 @@ model SupportSettings {
 // them, saved to their account so it follows them to every device.
 model DashboardUserPrefs {
   userId       String   @id
-  theme        String   @default("studio") // studio | glass | neon
+  theme        String   @default("studio") // studio | glass | daylight
   reduceMotion Boolean  @default(false)
   displayName  String?
   updatedAt    DateTime @default(now()) @updatedAt

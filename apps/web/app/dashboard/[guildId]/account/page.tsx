@@ -14,18 +14,18 @@ function ThemePreview({ id }: { id: DashboardTheme }) {
   const bg =
     id === "glass"
       ? "radial-gradient(120px 80px at 15% 10%, rgba(123,153,188,.45), transparent 70%), radial-gradient(120px 90px at 100% 100%, rgba(94,127,166,.5), transparent 70%), #1c1d20"
-      : id === "neon"
-        ? "linear-gradient(rgba(123,153,188,.07) 1px, transparent 1px) 0 0/12px 12px, linear-gradient(90deg, rgba(123,153,188,.07) 1px, transparent 1px) 0 0/12px 12px, #17181b"
+      : id === "daylight"
+        ? "#eef1f5"
         : "#1c1d20";
   const card =
     id === "glass"
       ? { background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 8 }
-      : id === "neon"
-        ? { background: "#1d1e22", border: "1px solid #7b99bc", borderRadius: 6, boxShadow: "0 0 10px rgba(123,153,188,.55)" }
-        : { background: "linear-gradient(90deg,#5e7fa6,#7b99bc,#94a3b8) top/100% 2px no-repeat, #242529", border: "1px solid #37393f", borderRadius: 8 };
+      : id === "daylight"
+        ? { background: "#ffffff", border: "1px solid rgba(28,29,32,.1)", borderRadius: 8, boxShadow: "0 2px 6px rgba(28,29,32,.08)" }
+        : { background: "linear-gradient(90deg,#5e7fa6,#7b99bc,#94a3b8) top/100% 3px no-repeat, #2a2c31", border: "1px solid #37393f", borderRadius: 8 };
   return (
     <div className="h-20 rounded-lg overflow-hidden p-2 flex gap-1.5" style={{ background: bg }} aria-hidden="true">
-      <div className="w-6 rounded" style={{ background: id === "glass" ? "rgba(255,255,255,.06)" : "#242529" }} />
+      <div className="w-6 rounded" style={{ background: id === "glass" ? "rgba(255,255,255,.08)" : id === "daylight" ? "#ffffff" : "#242529" }} />
       <div className="flex-1 grid grid-cols-2 gap-1.5">
         <div style={card} />
         <div style={card} />

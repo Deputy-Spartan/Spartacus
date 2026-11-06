@@ -8,9 +8,9 @@ import { PREFS_CACHE_KEY as CACHE_KEY } from "./themeScript";
 // device) and also remembered in this browser, so the page can paint in the
 // right theme before the account answers.
 export const THEMES: Array<{ id: DashboardTheme; name: string; blurb: string }> = [
-  { id: "studio", name: "Studio", blurb: "Solid and crisp. An accent line sweeps across cards on hover." },
-  { id: "glass", name: "Glass", blurb: "Frosted see-through panels over a soft glow, with a sheen on hover." },
-  { id: "neon", name: "Neon", blurb: "Glowing steel-blue edges, and buttons that light up." },
+  { id: "studio", name: "Studio", blurb: "Solid and bold: an accent bar on every card, filled buttons." },
+  { id: "glass", name: "Glass", blurb: "Frosted see-through panels over a colorful glow, with a sheen on hover." },
+  { id: "daylight", name: "Daylight", blurb: "A light theme: light gray page, white cards, dark text." },
 ];
 
 export const DEFAULT_PREFS: UserPrefs = { theme: "studio", reduceMotion: false, displayName: null };

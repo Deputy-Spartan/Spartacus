@@ -25,7 +25,8 @@ router.get("/guilds/:guildId/setup-status", requireAuth, requireGuildPermission,
     prisma.bumpReminderSettings.findUnique(where),
     prisma.birthdayConfig.findUnique(where),
     prisma.rulesGateSettings.findUnique(where),
-    prisma.reactionRolePanel.count(where),
+    // Panels come in two kinds: the older reaction panels and the button/dropdown ones.
+    Promise.all([prisma.reactionRolePanel.count(where), prisma.rolePanel.count(where)]).then(([a, b]) => a + b),
   ]);
   const need = (...items: Array<[boolean, string]>) => items.filter(([missing]) => missing).map(([, text]) => text);
   const games = Array.isArray(mm?.games) ? mm.games : [];

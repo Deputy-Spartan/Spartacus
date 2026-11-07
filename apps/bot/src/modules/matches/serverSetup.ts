@@ -83,6 +83,27 @@ function guide(ch: Record<ChannelKey, GuildBasedChannel>, r: Record<RoleKey, Rol
   ];
 }
 
+// Posts the same guide into a how-to-play channel that another setup built
+// (/server-setup's streaming layout), using that setup's channel and role ids.
+// Skipped if the channel already has messages.
+export async function postMatchGuide(
+  channel: GuildBasedChannel,
+  channelIds: Record<"lobby" | "now" | "board" | "lead" | "cups", string>,
+  roleIds: Record<"player" | "champion" | "alerts", string>
+) {
+  if (!isSendableChannel(channel)) return;
+  const existing = await (channel as TextChannel).messages.fetch({ limit: 1 }).catch(() => null);
+  if (existing?.size) return;
+  const ch = Object.fromEntries(Object.entries(channelIds).map(([k, id]) => [k, { id }])) as unknown as Record<ChannelKey, GuildBasedChannel>;
+  const roles = Object.fromEntries(Object.entries(roleIds).map(([k, id]) => [k, { id }])) as unknown as Record<RoleKey, Role>;
+  const parts = guide(ch, roles);
+  for (const [i, text] of parts.entries()) {
+    await (channel as TextChannel)
+      .send({ embeds: [new EmbedBuilder().setColor(0x5865f2).setDescription(text)], components: i === 0 || i === parts.length - 1 ? [roleButtons()] : [], allowedMentions: { parse: [] } })
+      .catch((err) => logError("bot", err, channel.guild.id));
+  }
+}
+
 export const roleButtons = () =>
   new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId("mm:role:play").setLabel("Let me play").setEmoji("🎮").setStyle(ButtonStyle.Success),

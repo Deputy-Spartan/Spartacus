@@ -88,6 +88,7 @@ export type Access =
   | { see: "everyone"; talk: boolean }
   | { see: "member"; talk: boolean }
   | { see: "role"; role: RoleKey; talk: boolean }
+  | { see: "roles"; roles: RoleKey[]; talk: boolean } // any of these (missing ones are skipped)
   | { see: "staff"; talk: boolean };
 
 export type ChannelKind = "text" | "voice" | "announcement";
@@ -117,7 +118,8 @@ const memberRead: Access = { see: "member", talk: false };
 const mmRead: Access = { see: "role", role: "mm", talk: false };
 const staffTalk: Access = { see: "staff", talk: true };
 
-export function blueprintCategories(games: BlueprintGameId[]): BlueprintCategory[] {
+export function blueprintCategories(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintCategory[] {
+  if (layout === "streaming") return streamingCategories(games);
   const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
   return [
     { key: "stats", name: "📊 Server Stats", aliases: ["server-stats", "stats"], access: readOnlyEveryone, channels: [
@@ -178,10 +180,11 @@ export const ARCHIVE_CATEGORY = "📦 Archive";
 export interface BlueprintPicker {
   name: string;
   description: string;
-  options: Array<{ role: RoleKey; label: string; emoji?: string }>;
+  options: Array<{ role?: RoleKey; channel?: string; label: string; emoji?: string }>;
 }
 
-export function blueprintPickers(games: BlueprintGameId[]): BlueprintPicker[] {
+export function blueprintPickers(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintPicker[] {
+  if (layout === "streaming") return streamingPickers(games);
   const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
   return [
     { name: "🎮 Pick your games", description: "Each game opens its channel.", options: picked.map((g) => ({ role: `game:${g.id}`, label: g.name, emoji: g.emoji })) },
@@ -192,7 +195,15 @@ export function blueprintPickers(games: BlueprintGameId[]): BlueprintPicker[] {
 }
 
 // Discord onboarding: the same choices as the pickers.
-export function blueprintOnboarding(games: BlueprintGameId[]) {
+export function blueprintOnboarding(games: BlueprintGameId[], layout: BlueprintLayout = "gaming") {
+  if (layout === "streaming") {
+    const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
+    return [
+      { title: "What brings you here?", singleSelect: false, options: [{ channel: "live", label: "I watch the streams", emoji: "👀" }, { role: "mm", label: "I want to play with the community", emoji: "🎮" }, { role: "creator", label: "I stream too", emoji: "🎥" }] },
+      { title: "What should we ping you for?", singleSelect: false, options: streamingPickers(games)[0].options },
+      { title: "What do you play?", singleSelect: false, options: picked.map((g) => ({ role: `game:${g.id}`, label: g.name, emoji: g.emoji })) },
+    ];
+  }
   const pickers = blueprintPickers(games);
   const titles = ["Which games do you play?", "What do you play on?", "How do you like to play?", "What should we ping you for?"];
   return pickers.map((p, i) => ({ title: titles[i], singleSelect: false, options: p.options }));
@@ -235,4 +246,152 @@ export function blueprintSlug(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+// ---- The streaming-community layout (/server-setup layout: Streaming community) ----
+// An open server: anyone who joins can see and chat right away. Discord's
+// onboarding hands out roles and shows the rules; there's no verify button.
+
+export type BlueprintLayout = "gaming" | "streaming";
+export const BLUEPRINT_LAYOUTS: Array<{ id: BlueprintLayout; label: string; emoji: string; description: string }> = [
+  { id: "gaming", label: "Gaming community", emoji: "🎮", description: "Rules gate, game channels, squads and Matchmaking" },
+  { id: "streaming", label: "Streaming community", emoji: "🔴", description: "Open door: stream alerts, clips, hangout, supporters, Matchmaking" },
+];
+export const DEFAULT_STREAMING_GAMES: BlueprintGameId[] = ["r6", "cod", "other"];
+
+const STREAMING_ROLES: BlueprintRole[] = [
+  { key: "admin", name: "⚙️ Admin", color: 0xed4245, hoist: true, aliases: ["admins", "admin", "administrator"], perms: "admin-lite" },
+  { key: "mod", name: "🛡️ Moderator", color: 0x5865f2, hoist: true, aliases: ["mods", "mod", "moderator", "moderators", "staff"], perms: "moderator" },
+  { key: "live", name: "🔴 Live", color: 0xe74c3c, hoist: true, aliases: ["live", "live-now", "streaming", "now-live"] },
+  { key: "vip", name: "⭐ VIP", color: 0xf1c40f, hoist: true, aliases: ["vip", "vips", "regular", "regulars", "og"] },
+  { key: "creator", name: "🎥 Content Creator", color: 0x9b59b6, hoist: true, aliases: ["content-creator", "creator", "creators", "streamer", "streamers"] },
+  { key: "champion", name: "🏆 Champion", color: 0xffd700, hoist: true, aliases: ["champion", "tournament-champion"] },
+  { key: "lvl50", name: "👑 Legend", color: 0xe67e22, aliases: ["legend"] },
+  { key: "lvl30", name: "🛡️ Spartan", color: 0xe74c3c, aliases: ["spartan", "elite"] },
+  { key: "lvl15", name: "⚔️ Soldier", color: 0x3498db, aliases: ["soldier", "veteran"] },
+  { key: "lvl5", name: "🪖 Recruit", color: 0x95a5a6, aliases: ["recruit"] },
+  { key: "mm", name: "⚔️ Matchmaking", color: 0, aliases: ["matchmaking"] },
+  ...BLUEPRINT_GAMES.map((g): BlueprintRole => ({ key: `game:${g.id}`, name: `${g.emoji} ${g.name}`, color: 0, aliases: [g.slug, ...g.aliases, g.name], game: g.id })),
+  { key: "ping:streams", name: "🔴 Stream Alerts", color: 0, aliases: ["stream-alerts", "stream-pings", "streams", "live-pings", "go-live"] },
+  { key: "ping:events", name: "📅 Events", color: 0, aliases: ["events", "event-pings"] },
+  { key: "ping:giveaways", name: "🎁 Giveaways", color: 0, aliases: ["giveaways", "giveaway-pings"] },
+  { key: "ping:gamenight", name: "🎮 Game Nights", color: 0, aliases: ["game-nights", "game-night", "gamenight"] },
+  { key: "ping:match", name: "🔔 Match Alerts", color: 0, aliases: ["match-alerts"] },
+];
+
+export function blueprintRoles(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintRole[] {
+  const list = layout === "streaming" ? STREAMING_ROLES : BLUEPRINT_ROLES;
+  return list.filter((r) => !r.game || games.includes(r.game));
+}
+
+const everyoneTalk: Access = { see: "everyone", talk: true };
+const supporters: Access = { see: "roles", roles: ["vip", "booster", "twitchsub"], talk: true };
+
+function streamingCategories(games: BlueprintGameId[]): BlueprintCategory[] {
+  const ro = readOnlyEveryone;
+  return [
+    { key: "stats", name: "📊 Server Stats", aliases: ["server-stats", "stats"], access: ro, channels: [
+      { key: "stat-members", name: "👥 Members: 0", kind: "voice", aliases: ["members", "member-count"] },
+    ]},
+    { key: "start", name: "📌 Start Here", aliases: ["start-here", "information", "info", "welcome", "information-center"], access: ro, channels: [
+      { key: "rules", name: "📜・rules", kind: "text", topic: "The rules. Please read them.", aliases: ["rules", "server-rules"] },
+      { key: "welcome", name: "👋・welcome", kind: "text", topic: "Welcome to the community!", aliases: ["welcome", "welcomes"] },
+      { key: "announcements", name: "📢・announcements", kind: "announcement", topic: "News from the stream.", aliases: ["announcements", "news", "updates"] },
+      { key: "events", name: "📅・stream-schedule", kind: "text", topic: "Upcoming streams and game nights. Tap Interested for a reminder.", aliases: ["stream-schedule", "schedule", "events"] },
+      { key: "roles", name: "🎭・pick-roles", kind: "text", topic: "Pick your pings and games.", aliases: ["pick-roles", "roles", "self-roles", "get-roles", "role-select"] },
+    ]},
+    { key: "stream", name: "🔴 Stream", aliases: ["stream", "streams", "streaming", "twitch"], access: everyoneTalk, channels: [
+      { key: "live", name: "🔴・live-now", kind: "text", topic: "Go-live alerts.", aliases: ["live-now", "going-live", "go-live", "stream-alerts", "live"], access: ro },
+      { key: "clips", name: "🎬・clips", kind: "text", topic: "Stream clips and highlights. 5 ⭐ sends a post to hall-of-fame.", aliases: ["clips", "highlights", "clips-and-highlights", "stream-clips"] },
+      { key: "hof", name: "⭐・hall-of-fame", kind: "text", topic: "The community's favorite moments.", aliases: ["hall-of-fame", "starboard", "best-of"], access: ro },
+      { key: "polls", name: "💡・stream-ideas", kind: "text", topic: "Ideas and polls for the stream. Use /suggest.", aliases: ["stream-ideas", "suggestions", "ideas", "polls"] },
+      { key: "giveaways", name: "🎁・giveaways", kind: "text", topic: "Giveaways. Tap the button to enter.", aliases: ["giveaways", "giveaway"], access: ro },
+    ]},
+    { key: "hangout", name: "💬 Hangout", aliases: ["hangout", "community", "general", "chat"], access: everyoneTalk, channels: [
+      { key: "general", name: "💬・general", kind: "text", topic: "Main chat.", aliases: ["general", "general-chat", "chat", "lounge"] },
+      { key: "memes", name: "😂・memes", kind: "text", topic: "Memes.", aliases: ["memes", "meme"] },
+      { key: "media", name: "📸・media", kind: "text", topic: "Pets, setups, food, life.", aliases: ["media", "pics", "photos", "setups", "pets"] },
+      { key: "lfg", name: "🎮・gaming", kind: "text", topic: "Game talk. Use !lfg to find a group.", aliases: ["gaming", "gaming-chat", "looking-for-group", "lfg"] },
+      { key: "confess", name: "🤫・confessions", kind: "text", topic: "Anonymous confessions with /confess.", aliases: ["confessions", "confess", "anonymous"], access: ro },
+      { key: "counting", name: "🔢・counting", kind: "text", topic: "Count up together, one number each.", aliases: ["counting", "count"] },
+      { key: "botcmds", name: "🤖・bot-commands", kind: "text", topic: "/rank, /daily, /trivia, the shop. Mention Spartacus to chat.", aliases: ["bot-commands", "commands", "bots", "bot-spam"] },
+    ]},
+    { key: "mm", name: "⚔️ Matchmaking", aliases: ["matchmaking"], access: ro, channels: [
+      { key: "mm-how", name: "📖・how-to-play", kind: "text", topic: "How Matchmaking works. Start here.", aliases: ["how-to-play", "matchmaking-guide"] },
+      { key: "mm-board", name: "⚔️・matchmaking", kind: "text", topic: "Find matches, make a team, challenge others.", aliases: ["matchmaking", "start-matchmaking", "matchmaking-board"] },
+      { key: "mm-threads", name: "📋・match-feed", kind: "text", topic: "Challenges and match threads.", aliases: ["match-feed", "matches", "match-threads", "match-results"] },
+      { key: "mm-now", name: "🎮・playing-now", kind: "text", topic: "On right now? Tap I'm on now.", aliases: ["playing-now"] },
+      { key: "mm-tournaments", name: "🏆・tournaments", kind: "text", topic: "Tournament sign-ups and brackets.", aliases: ["tournaments", "tournament"] },
+      { key: "mm-leaderboard", name: "📊・leaderboard", kind: "text", topic: "Top players and teams.", aliases: ["leaderboard", "leaderboards"] },
+      { key: "mm-lobby", name: "Matchmaking Lobby", kind: "voice", aliases: ["matchmaking-lobby", "lobby"], access: { see: "role", role: "mm", talk: true } },
+    ]},
+    { key: "rooms", name: "🎮 Match Rooms", aliases: ["match-rooms"], access: { see: "role", role: "mm", talk: true }, channels: [] },
+    { key: "voice", name: "🔊 Voice", aliases: ["voice", "voice-channels", "vc"], access: everyoneTalk, channels: [
+      { key: "vc-hang", name: "🔊 Hangout", kind: "voice", aliases: ["hangout", "general-vc", "general-voice", "chill", "lounge-vc"] },
+      { key: "vc-watch", name: "📺 Watch Party", kind: "voice", aliases: ["watch-party", "watch-along", "stream-watch"] },
+      { key: "vc-game", name: "🎮 Game Night", kind: "voice", aliases: ["game-night", "gaming-vc", "gaming-voice"] },
+      { key: "squad", name: "➕ Create a VC", kind: "voice", aliases: ["create-a-vc", "create-vc", "join-to-create", "create-a-squad"] },
+      { key: "afk", name: "💤 AFK", kind: "voice", aliases: ["afk"] },
+    ]},
+    { key: "supporters", name: "💎 Supporters", aliases: ["supporters", "subscribers", "subs", "vip"], access: supporters, channels: [
+      { key: "sub-chat", name: "💎・supporter-chat", kind: "text", topic: "Thanks for supporting the stream!", aliases: ["supporter-chat", "sub-chat", "subscriber-chat", "vip-chat"] },
+      { key: "sub-vc", name: "💎 Supporter Lounge", kind: "voice", aliases: ["supporter-lounge", "sub-lounge", "vip-lounge"] },
+    ]},
+    { key: "creators", name: "🎥 Creators", aliases: ["creators", "content-creators"], access: { see: "role", role: "creator", talk: true }, channels: [
+      { key: "promo", name: "📣・self-promo", kind: "text", topic: "Share your streams and videos.", aliases: ["self-promo", "promo", "promotion", "self-promotion"] },
+      { key: "collabs", name: "🤝・collabs", kind: "text", topic: "Find people to stream with.", aliases: ["collabs", "collab", "collaborations"] },
+    ]},
+    { key: "support", name: "🎫 Help", aliases: ["help", "support", "tickets"], access: ro, channels: [
+      { key: "support", name: "🎫・support", kind: "text", topic: "Open a private ticket. You can also DM Spartacus.", aliases: ["support", "open-a-ticket", "tickets", "help"] },
+      { key: "apply", name: "📝・apply", kind: "text", topic: "Apply for Moderator, VIP or Content Creator.", aliases: ["apply", "applications", "apply-here"] },
+    ]},
+    { key: "staff", name: "🛡️ Staff", aliases: ["mods", "staff", "moderators", "mod-only", "staff-only"], access: staffTalk, channels: [
+      { key: "staff-chat", name: "🛡️・mod-chat", kind: "text", aliases: ["mod-chat", "staff-chat", "moderator-only", "staff"] },
+      { key: "mod-log", name: "📜・mod-logs", kind: "text", topic: "Moderation actions, edits and deletes.", aliases: ["mod-logs", "mod-log", "logs", "audit-log"] },
+      { key: "server-log", name: "👋・join-leave", kind: "text", topic: "Joins, leaves and security alerts.", aliases: ["join-leave", "hi-bye", "member-log", "server-log"] },
+      { key: "reports", name: "🚩・reports", kind: "text", topic: "Member reports.", aliases: ["reports", "player-reports"] },
+      { key: "staff-desk", name: "📨・applications", kind: "text", topic: "Applications and the weekly staff report.", aliases: ["applications-review", "staff-desk", "tickets-and-applications"] },
+      { key: "transcripts", name: "🧾・transcripts", kind: "text", topic: "Saved copies of closed tickets.", aliases: ["transcripts", "ticket-logs"] },
+      { key: "bot-status", name: "🟢・bot-status", kind: "text", aliases: ["bot-status", "spartacus", "status"] },
+      { key: "staff-voice", name: "🔊 Staff Voice", kind: "voice", aliases: ["staff-voice", "staff-vc", "mod-vc"] },
+    ]},
+  ];
+}
+
+function streamingPickers(games: BlueprintGameId[]): BlueprintPicker[] {
+  const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
+  return [
+    { name: "🔔 Pick your pings", description: "Choose what you get pinged for.", options: [{ role: "ping:streams", label: "When the stream goes live", emoji: "🔴" }, { role: "ping:events", label: "Events", emoji: "📅" }, { role: "ping:giveaways", label: "Giveaways", emoji: "🎁" }, { role: "ping:gamenight", label: "Game nights", emoji: "🎮" }, { role: "ping:match", label: "Match Alerts", emoji: "🔔" }] },
+    { name: "🎮 Pick your games", description: "Let people know what you play.", options: picked.map((g) => ({ role: `game:${g.id}`, label: g.name, emoji: g.emoji })) },
+    { name: "✨ Extras", description: "Matchmaking lets you play in matches and tournaments; Content Creator opens 🎥 Creators.", options: [{ role: "mm", label: "Matchmaking", emoji: "⚔️" }, { role: "creator", label: "I stream too", emoji: "🎥" }] },
+  ];
+}
+
+export const STREAMING_RULES = [
+  "**1. Be kind.** No hate, harassment, slurs or drama from other places.",
+  "**2. Keep it clean.** No NSFW, gore or shock content.",
+  "**3. No spam.** Self-promo only in 📣・self-promo.",
+  "**4. Respect the stream.** No spoilers, backseating when asked not to, or stream sniping.",
+  "**5. Listen to the mods.** If you have a problem, open a ticket in 🎫・support.",
+  "**6. Follow Discord's Terms of Service.**",
+].join("\n");
+
+export function blueprintTicketTypes(layout: BlueprintLayout = "gaming") {
+  return layout === "streaming"
+    ? [
+        { name: "Get Help", emoji: "🙋", description: "Questions or problems with the server." },
+        { name: "Report a Member", emoji: "🚩", description: "Report someone breaking the rules." },
+        { name: "Partnership", emoji: "🤝", description: "Collabs, partnerships and business." },
+      ]
+    : BLUEPRINT_TICKET_TYPES;
+}
+
+export function blueprintApplications(layout: BlueprintLayout = "gaming") {
+  return layout === "streaming"
+    ? [
+        { name: "Moderator", emoji: "🛡️", description: "Help keep chat and the server running.", questions: ["How old are you?", "What timezone are you in?", "Why do you want to be a mod?", "Any moderation experience?"] },
+        { name: "VIP", emoji: "⭐", description: "For regulars who are always around.", questions: ["How long have you been watching?", "What's your Twitch name?", "Why should you be a VIP?"] },
+        { name: "Content Creator", emoji: "🎥", description: "Get the creator role, self-promo and go-live alerts.", questions: ["Link to your channel", "What do you stream or post?", "How often do you go live?"] },
+      ]
+    : BLUEPRINT_APPLICATIONS;
 }

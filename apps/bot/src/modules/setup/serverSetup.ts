@@ -11,16 +11,19 @@ import {
   type GuildBasedChannel,
   type OverwriteResolvable,
   type Role,
+  type TextChannel,
+  type VoiceChannel,
 } from "discord.js";
 import {
   ARCHIVE_CATEGORY,
-  BLUEPRINT_APPLICATIONS,
   BLUEPRINT_GAMES,
   BLUEPRINT_LEVEL_ROLES,
-  BLUEPRINT_ROLES,
   BLUEPRINT_RULES,
-  BLUEPRINT_TICKET_TYPES,
+  STREAMING_RULES,
+  blueprintApplications,
   blueprintCategories,
+  blueprintRoles,
+  blueprintTicketTypes,
   blueprintGameChoices,
   blueprintOnboarding,
   blueprintPickers,
@@ -29,12 +32,14 @@ import {
   type BlueprintCategory,
   type BlueprintChannel,
   type BlueprintGameId,
+  type BlueprintLayout,
   type BlueprintRole,
   type ModuleKey,
 } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
+import { postMatchGuide } from "../matches/serverSetup";
 
 export type SetupPart = "roles" | "channels" | "settings" | "modules" | "onboarding";
 
@@ -50,6 +55,9 @@ export const SETUP_PARTS: Array<{ id: SetupPart; emoji: string; label: string; d
 export interface SetupOptions {
   games: BlueprintGameId[];
   archiveOthers: boolean;
+  layout?: BlueprintLayout; // leaving it out builds the gaming layout
+  // With archiving on: unused old channels and roles are deleted instead of archived.
+  deleteUnused?: boolean;
   // Leaving these out builds everything.
   parts?: SetupPart[];
   categories?: string[];
@@ -60,7 +68,8 @@ export const categoryOn = (opts: SetupOptions, key: string) => !opts.categories 
 // Old channels only move to the archive when every category is being built,
 // so channels from a category that was skipped never get swept up.
 export const archiveOn = (opts: SetupOptions) =>
-  opts.archiveOthers && partOn(opts, "channels") && blueprintCategories(opts.games).every((c) => categoryOn(opts, c.key));
+  opts.archiveOthers && partOn(opts, "channels") && blueprintCategories(opts.games, opts.layout).every((c) => categoryOn(opts, c.key));
+export const deleteOn = (opts: SetupOptions) => archiveOn(opts) && !!opts.deleteUnused;
 
 type ChannelMatch = { spec: BlueprintChannel; category: BlueprintCategory; existing: GuildBasedChannel | null };
 type CategoryMatch = { spec: BlueprintCategory; existing: CategoryChannel | null };
@@ -69,8 +78,37 @@ export interface SetupPlan {
   roles: Array<{ spec: BlueprintRole; existing: Role | null }>;
   categories: CategoryMatch[];
   channels: ChannelMatch[];
-  archive: GuildBasedChannel[];
+  archive: GuildBasedChannel[]; // old channels that move into the archive
   hideCategories: CategoryChannel[];
+  // Only filled when deleting unused things is on.
+  deleteChannels: GuildBasedChannel[];
+  deleteCategories: CategoryChannel[];
+  deleteRoles: Role[];
+}
+
+// "Unused" means nobody has posted in it for this long (or ever).
+const UNUSED_DAYS = 30;
+const lastActive = (c: GuildBasedChannel) => {
+  const id = (c as { lastMessageId?: string | null }).lastMessageId;
+  return id ? SnowflakeUtil.timestampFrom(id) : null;
+};
+function channelUnused(c: GuildBasedChannel, keep: Set<string>) {
+  if (keep.has(c.id)) return false;
+  if (isVoiceChannel(c) && (c as VoiceChannel).members?.size) return false;
+  const last = lastActive(c);
+  return last === null || Date.now() - last > UNUSED_DAYS * 86_400_000;
+}
+
+// Every role id any Spartacus setting points at, so those roles are never deleted.
+async function rolesInUse(guildId: string): Promise<string> {
+  const where = { where: { guildId } };
+  const rows = await Promise.all([
+    prisma.levelRole.findMany(where), prisma.reactionRole.findMany(where), prisma.joinRole.findMany(where), prisma.rolePanel.findMany(where),
+    prisma.matchmakingConfig.findUnique(where), prisma.streamAlertSettings.findUnique(where), prisma.playingNowConfig.findUnique(where),
+    prisma.rulesGateSettings.findUnique(where), prisma.verificationConfig.findUnique(where), prisma.ticketSettings.findUnique(where),
+    prisma.ticketType.findMany(where), prisma.applicationType.findMany(where), prisma.eventSettings.findUnique(where), prisma.birthdayConfig.findUnique(where),
+  ].map((q) => (q as Promise<unknown>).catch(() => null)));
+  return JSON.stringify(rows);
 }
 
 const { ViewChannel, SendMessages, Connect, Speak, SendMessagesInThreads, AddReactions, ReadMessageHistory, EmbedLinks, ManageChannels, MoveMembers, ManageRoles } = PermissionFlagsBits;
@@ -91,7 +129,7 @@ const slugsOf = (name: string, aliases: string[] = []) => new Set([blueprintSlug
 export async function planSetup(guild: Guild, opts: SetupOptions): Promise<SetupPlan> {
   await guild.roles.fetch().catch(() => null);
   await guild.channels.fetch().catch(() => null);
-  const roleSpecs = BLUEPRINT_ROLES.filter((r) => !r.game || opts.games.includes(r.game));
+  const roleSpecs = blueprintRoles(opts.games, opts.layout);
   const usedRoles = new Set<string>();
   const roles = roleSpecs.map((spec) => {
     const wanted = slugsOf(spec.name, spec.aliases);
@@ -103,7 +141,7 @@ export async function planSetup(guild: Guild, opts: SetupOptions): Promise<Setup
     return { spec, existing };
   });
 
-  const specs = blueprintCategories(opts.games);
+  const specs = blueprintCategories(opts.games, opts.layout);
   const all = [...guild.channels.cache.values()].filter((c) => !c.isThread());
   const tempIds = new Set((await prisma.tempChannelInstance.findMany({ where: { guildId: guild.id } })).flatMap((t) => [t.channelId, t.textChannelId].filter(Boolean) as string[]));
   // Channels Spartacus already uses for a job keep that job, before any name matching.
@@ -116,6 +154,7 @@ export async function planSetup(guild: Guild, opts: SetupOptions): Promise<Setup
   const inUse: Record<string, string | null | undefined> = {
     "mm-board": mm?.channelId, "mm-threads": mm?.activityChannelId, "mm-leaderboard": mm?.boardChannelId, "mm-lobby": mm?.lobbyVoiceId,
     welcome: welcome?.channelId, rules: rules?.channelId, squad: lobby?.lobbyChannelId, duels: mm?.duelCategoryId, teammatches: mm?.teamCategoryId,
+    rooms: mm?.teamCategoryId ?? mm?.duelCategoryId, "mm-tournaments": mm?.tournamentChannelId,
   };
 
   const usedCats = new Set<string>();
@@ -123,7 +162,7 @@ export async function planSetup(guild: Guild, opts: SetupOptions): Promise<Setup
     const configured = all.find((c) => c.id === inUse[key] && c.type === ChannelType.GuildCategory);
     return (configured ?? all.find((c) => c.type === ChannelType.GuildCategory && !usedCats.has(c.id) && wanted.has(blueprintSlug(c.name)))) as CategoryChannel | undefined;
   };
-  for (const id of [inUse.duels, inUse.teammatches]) if (id) usedCats.add(id);
+  for (const id of opts.layout === "streaming" ? [] : [inUse.duels, inUse.teammatches]) if (id) usedCats.add(id);
   const categories: CategoryMatch[] = specs.map((spec) => {
     const existing = categoryOf(spec.key, slugsOf(spec.name, spec.aliases)) ?? null;
     if (existing) usedCats.add(existing.id);
@@ -160,13 +199,38 @@ export async function planSetup(guild: Guild, opts: SetupOptions): Promise<Setup
   }
 
   // Match rooms live in the 1v1 and Team Matches categories while a game runs.
-  const liveRoomParents = new Set(categories.filter((c) => c.spec.key === "duels" || c.spec.key === "teammatches").map((c) => c.existing?.id).filter(Boolean));
+  const liveRoomParents = new Set(categories.filter((c) => c.spec.key === "duels" || c.spec.key === "teammatches" || c.spec.key === "rooms").map((c) => c.existing?.id).filter(Boolean));
   const archiveCat = all.find((c) => c.type === ChannelType.GuildCategory && c.name === ARCHIVE_CATEGORY);
   const archive = opts.archiveOthers
     ? all.filter((c) => c.type !== ChannelType.GuildCategory && !usedChannels.has(c.id) && !tempIds.has(c.id) && !liveRoomParents.has(c.parentId ?? "") && c.parentId !== archiveCat?.id)
     : [];
-  const hideCategories = opts.archiveOthers ? (all.filter((c) => c.type === ChannelType.GuildCategory && !usedCats.has(c.id) && c.id !== archiveCat?.id) as CategoryChannel[]) : [];
-  return { roles, categories, channels, archive, hideCategories };
+  let hideCategories = opts.archiveOthers ? (all.filter((c) => c.type === ChannelType.GuildCategory && !usedCats.has(c.id) && c.id !== archiveCat?.id) as CategoryChannel[]) : [];
+
+  // Deleting unused: old channels nobody posted in for 30+ days, old categories
+  // that end up empty, and roles nobody has that Spartacus doesn't use.
+  // Everything else still moves to the archive. Discord's own special
+  // channels (rules, updates, AFK, system) are never deleted.
+  let deleteChannels: GuildBasedChannel[] = [];
+  let deleteCategories: CategoryChannel[] = [];
+  let deleteRoles: Role[] = [];
+  if (opts.archiveOthers && opts.deleteUnused) {
+    const keep = new Set([guild.rulesChannelId, guild.publicUpdatesChannelId, guild.systemChannelId, guild.afkChannelId, guild.safetyAlertsChannelId, guild.widgetChannelId].filter(Boolean) as string[]);
+    deleteChannels = archive.filter((c) => channelUnused(c, keep));
+    const gone = new Set(archive.map((c) => c.id));
+    // A category goes only if everything in it is leaving (moved or deleted).
+    deleteCategories = hideCategories.filter((cat) => all.every((c) => c.parentId !== cat.id || gone.has(c.id)));
+    const doomed = new Set(deleteCategories.map((c) => c.id));
+    hideCategories = hideCategories.filter((c) => !doomed.has(c.id));
+
+    await guild.members.fetch().catch(() => null);
+    const used = await rolesInUse(guild.id);
+    const top = guild.members.me?.roles.highest;
+    deleteRoles = [...guild.roles.cache.values()].filter(
+      (r) => r.id !== guild.id && !r.managed && !usedRoles.has(r.id) && r.members.size === 0 && !!top && top.comparePositionTo(r) > 0 && !used.includes(r.id)
+    );
+  }
+  const deleting = new Set(deleteChannels.map((c) => c.id));
+  return { roles, categories, channels, archive: archive.filter((c) => !deleting.has(c.id)), hideCategories, deleteChannels, deleteCategories, deleteRoles };
 }
 
 // Counts what a run would change. With `opts`, only the parts and categories picked.
@@ -179,6 +243,9 @@ export function summarizePlan(plan: SetupPlan, opts?: SetupOptions) {
     channels: count(channels ? plan.channels.filter((c) => !opts || categoryOn(opts, c.category.key)) : [], (c) => c.existing),
     archive: !opts || archiveOn(opts) ? plan.archive.length : 0,
     hideCategories: !opts || archiveOn(opts) ? plan.hideCategories.length : 0,
+    deleteChannels: !opts || deleteOn(opts) ? plan.deleteChannels.length : 0,
+    deleteCategories: !opts || deleteOn(opts) ? plan.deleteCategories.length : 0,
+    deleteRoles: !opts || deleteOn(opts) ? plan.deleteRoles.length : 0,
   };
 }
 
@@ -200,6 +267,7 @@ function overwritesFor(guild: Guild, access: Access, voice: boolean, ids: Ids): 
   else add(guild.id, [], [ViewChannel]);
   if (access.see === "member") add(role("member"), access.talk ? talk : read, access.talk ? [] : noTalk);
   if (access.see === "role") add(role(access.role), access.talk ? talk : read, access.talk ? [] : noTalk);
+  if (access.see === "roles") for (const key of access.roles) add(role(key), access.talk ? talk : read, access.talk ? [] : noTalk);
   // Staff can always see and post, including in read-only and staff channels.
   for (const key of ["staff", "admin", "mod", "support"]) add(role(key), voice ? [ViewChannel, Connect, Speak, MoveMembers] : [...talk]);
   if (guild.members.me) out.push({ id: guild.members.me.id, type: OverwriteType.Member, allow: [ViewChannel, SendMessages, EmbedLinks, Connect, MoveMembers, ManageChannels, ReadMessageHistory] });
@@ -231,6 +299,20 @@ async function fillSettings(model: string, guildId: string, values: Record<strin
   const missing = Object.fromEntries(Object.entries(values).filter(([k]) => blank((current as Record<string, unknown>)[k])));
   return Object.keys(missing).length ? delegate.update({ where: { guildId }, data: missing }) : current;
 }
+
+// The streaming layout turns on nearly everything. Off: Verification and
+// Rules Gate (it's an open door), Honeypot (needs a trap channel you place),
+// Bump Reminder (only for Disboard), and AI Chat / AI Moderation (they make a
+// paid AI call per message; switch them on in Modules if you want them).
+const STREAMING_MODULES_ON: ModuleKey[] = [
+  "WELCOME", "REACTION_ROLES", "ANNOUNCEMENTS", "EVENTS", "GIVEAWAYS", "STREAM_ALERTS", "LEVELING", "POLLS", "SUGGESTIONS", "LFG",
+  "MATCHES", "PLAYING_NOW", "TEMP_CHANNELS", "TICKETS", "APPLICATIONS", "PLAYER_REPORTS", "MODERATION", "WARN_ESCALATION", "ANTI_RAID", "ANTI_NUKE",
+  "PERM_WATCH", "STAT_CHANNELS", "STATUS_CHANNEL", "SERVER_BACKUP", "MOD_DIGEST", "STARBOARD", "COUNTING_GAME", "CONFESSIONS", "BIRTHDAYS", "ECONOMY",
+  "TRIVIA", "CASINO", "WEEKLY_RECAP", "MEMBER_MILESTONES", "INVITE_TRACKING", "MODMAIL", "SUPPORT_INTAKE", "ROLE_PERSISTENCE", "QUARANTINE", "REMINDERS",
+  "VOICE_ACTIVITY", "ACHIEVEMENTS", "RANK_CARDS", "PROFILE_CARDS", "PRESTIGE", "GROWTH_ANALYTICS", "SUGGESTION_ANALYTICS", "CUSTOM_COMMANDS", "SCHEDULED_MESSAGES", "EMBED_CREATOR",
+  "STICKY_MESSAGES", "CHANNEL_LOCKS", "SLOW_MODE", "ROLE_MANAGER", "SERVER_TEMPLATES", "BAN_APPEALS",
+];
+const modulesOn = (opts: SetupOptions) => (opts.layout === "streaming" ? STREAMING_MODULES_ON : MODULES_ON);
 
 const MODULES_ON: ModuleKey[] = [
   "WELCOME", "RULES_GATE", "REACTION_ROLES", "ANNOUNCEMENTS", "EVENTS", "GIVEAWAYS", "STREAM_ALERTS", "LEVELING", "POLLS", "SUGGESTIONS",
@@ -307,6 +389,13 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
     for (const { spec, existing } of plan.roles) if (existing) ids.roles.set(spec.key, existing.id);
   }
 
+  // Roles Discord manages itself, used for the supporters area: Server
+  // Booster, and the Twitch subscriber role from Server Settings → Integrations.
+  const booster = guild.roles.premiumSubscriberRole;
+  if (booster) ids.roles.set("booster", booster.id);
+  const twitch = guild.roles.cache.find((r) => r.managed && !!r.tags?.integrationId && /sub/i.test(r.name));
+  if (twitch) ids.roles.set("twitchsub", twitch.id);
+
   // Categories in order, then their channels.
   const buildChannels = partOn(opts, "channels");
   let position = 0;
@@ -375,8 +464,16 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   }
   if (buildChannels) await step(`💬 Channels: ${createdChannels} new, ${movedChannels} renamed and moved`);
 
-  // Everything else goes into a hidden archive. Nothing is deleted.
-  if (archiveOn(opts) && (plan.archive.length || plan.hideCategories.length)) {
+  // Unused old channels are deleted (when that's on); everything else goes
+  // into a hidden archive.
+  if (deleteOn(opts) && (plan.deleteChannels.length || plan.deleteRoles.length)) {
+    let gone = 0;
+    for (const c of plan.deleteChannels) await c.delete("Server Setup: unused").then(() => gone++, () => notes.push(`Couldn't delete #${c.name}, so it was left where it is.`));
+    let rolesGone = 0;
+    for (const r of plan.deleteRoles) await r.delete("Server Setup: nobody has it").then(() => rolesGone++, () => notes.push(`Couldn't delete the ${r.name} role.`));
+    await step(`🧹 Deleted ${gone} unused channel${gone === 1 ? "" : "s"} and ${rolesGone} unused role${rolesGone === 1 ? "" : "s"}`);
+  }
+  if (archiveOn(opts) && (plan.archive.length || plan.hideCategories.length || plan.deleteCategories.length)) {
     const staffOnly = overwritesFor(guild, { see: "staff", talk: true }, false, ids);
     const archiveCat =
       (guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === ARCHIVE_CATEGORY) as CategoryChannel | undefined) ??
@@ -389,16 +486,23 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
       }
     }
     for (const cat of plan.hideCategories) await cat.edit({ permissionOverwrites: staffOnly, reason: "Server Setup archive" }).catch(() => null);
-    await step(`📦 Archived ${archived} old channel${archived === 1 ? "" : "s"} into ${ARCHIVE_CATEGORY} (hidden, nothing deleted)`);
+    // Old categories that are now empty are removed.
+    let catsGone = 0;
+    for (const cat of plan.deleteCategories) {
+      const fresh = (await guild.channels.fetch(cat.id).catch(() => null)) as CategoryChannel | null;
+      if (fresh && fresh.children.cache.size === 0) await fresh.delete("Server Setup: empty").then(() => catsGone++, () => null);
+      else if (fresh) await fresh.edit({ permissionOverwrites: staffOnly, reason: "Server Setup archive" }).catch(() => null);
+    }
+    await step(`📦 Archived ${archived} old channel${archived === 1 ? "" : "s"} into ${ARCHIVE_CATEGORY} (hidden)${catsGone ? `, removed ${catsGone} empty old categor${catsGone === 1 ? "y" : "ies"}` : ""}`);
   }
 
   if (partOn(opts, "settings")) {
-    await setupServerSettings(guild, ids, notes);
+    await setupServerSettings(guild, opts, ids, notes);
     await step("⚙️ Server settings: AFK channel, join messages and Community");
   }
   if (partOn(opts, "modules")) {
     await setupModules(guild, opts, ids, notes);
-    await step(`🧩 Modules set up and switched on: ${MODULES_ON.length}`);
+    await step(`🧩 Modules set up and switched on: ${modulesOn(opts).length}`);
   }
   if (partOn(opts, "onboarding")) await setupOnboarding(guild, opts, ids, notes).then((line) => step(line));
 
@@ -407,12 +511,15 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   return { done, notes };
 }
 
-async function setupServerSettings(guild: Guild, ids: Ids, notes: string[]) {
+async function setupServerSettings(guild: Guild, opts: SetupOptions, ids: Ids, notes: string[]) {
   const afk = ids.channels.get("afk");
   await guild.edit({ afkChannel: afk ?? null, afkTimeout: 900, reason: "Server Setup" }).catch(() => notes.push("Couldn't set the AFK channel."));
   // Spartacus posts the welcome, so Discord's own join message is turned off.
   await guild.setSystemChannelFlags(guild.systemChannelFlags.add(GuildSystemChannelFlags.SuppressJoinNotifications)).catch(() => null);
 
+  if (opts.layout === "streaming" && guild.verificationLevel < GuildVerificationLevel.Medium) {
+    await guild.setVerificationLevel(GuildVerificationLevel.Medium, "Server Setup").catch(() => notes.push("Couldn't raise the verification level to Medium."));
+  }
   const rules = ids.channels.get("rules");
   const updates = ids.channels.get("staff-chat");
   if (!guild.features.includes("COMMUNITY") && rules && updates) {
@@ -421,7 +528,8 @@ async function setupServerSettings(guild: Guild, ids: Ids, notes: string[]) {
         features: [...guild.features, "COMMUNITY"],
         rulesChannel: rules,
         publicUpdatesChannel: updates,
-        verificationLevel: Math.max(guild.verificationLevel, GuildVerificationLevel.Low),
+        // An open streaming server gets Medium (account 5+ minutes old, verified email).
+        verificationLevel: Math.max(guild.verificationLevel, opts.layout === "streaming" ? GuildVerificationLevel.Medium : GuildVerificationLevel.Low),
         explicitContentFilter: GuildExplicitContentFilter.AllMembers,
         reason: "Server Setup",
       } as never)
@@ -434,13 +542,28 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
   const ch = (key: string) => ids.channels.get(key) ?? null;
   const role = (key: string) => ids.roles.get(key) ?? null;
   const cat = (key: string) => ids.categories.get(key) ?? null;
-  const staffRoles = ["staff", "support"].map(role).filter(Boolean) as string[];
+  const streaming = opts.layout === "streaming";
+  const staffRoles = (streaming ? ["mod", "admin"] : ["staff", "support"]).map(role).filter(Boolean) as string[];
 
   const tasks: Array<[string, () => Promise<unknown>]> = [
-    ["Welcome", () => fillSettings("welcomeConfig", g, { channelId: ch("welcome"), leaveChannelId: ch("server-log"), pingAboveEmbed: false, embedEnabled: true, welcomeText: `Welcome to **{server}**, {user}! Read and accept <#${ch("rules")}>, then pick your games in <#${ch("roles")}>.`, goodbyeText: "{user} left {server}." })],
+    ["Welcome", () =>
+      fillSettings("welcomeConfig", g, {
+        channelId: ch("welcome"),
+        leaveChannelId: ch("server-log"),
+        pingAboveEmbed: false,
+        embedEnabled: true,
+        welcomeText: streaming
+          ? `Welcome to **{server}**, {user}! Say hi in <#${ch("general")}>, check <#${ch("events")}> for the next stream, and pick your pings in <#${ch("roles")}>.`
+          : `Welcome to **{server}**, {user}! Read and accept <#${ch("rules")}>, then pick your games in <#${ch("roles")}>.`,
+        goodbyeText: "{user} left {server}.",
+      })],
     ["Rules", async () => {
-      const settings = await fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: BLUEPRINT_RULES });
-      return settings;
+      if (!streaming) return fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: BLUEPRINT_RULES });
+      // Open door: just post the rules in the rules channel if it's empty.
+      const rulesCh = ch("rules") ? await guild.channels.fetch(ch("rules")!).catch(() => null) : null;
+      if (!rulesCh || !rulesCh.isTextBased()) return;
+      const last = await (rulesCh as TextChannel).messages.fetch({ limit: 1 }).catch(() => null);
+      if (!last?.size) await (rulesCh as TextChannel).send({ embeds: [{ color: 0xe67e22, title: "📜 Rules", description: STREAMING_RULES }] });
     }],
     ["Logging", () => fillSettings("loggingConfig", g, { logChannelId: ch("mod-log") })],
     ["Anti-Raid", () => fillSettings("antiRaidConfig", g, { alertChannelId: ch("server-log") })],
@@ -455,12 +578,12 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       }
     }],
     ["Warn Escalation", () => fillSettings("warnEscalationSettings", g, {})],
-    ["Weekly Staff Report", () => fillSettings("modDigestSettings", g, { channelId: ch("staff-desk") })],
-    ["Player Reports", () => fillSettings("playerReportSettings", g, { staffRoleId: role("staff") })],
+    ["Weekly Staff Report", () => fillSettings("modDigestSettings", g, { channelId: ch(streaming ? "staff-chat" : "staff-desk") })],
+    ["Player Reports", () => fillSettings("playerReportSettings", g, { staffRoleId: role(streaming ? "mod" : "staff") })],
     ["Tickets", async () => {
-      await fillSettings("ticketSettings", g, { logChannelId: ch("staff-desk"), transcriptChannelId: ch("staff-desk"), supportRoleIds: staffRoles });
+      await fillSettings("ticketSettings", g, { logChannelId: ch(streaming ? "transcripts" : "staff-desk"), transcriptChannelId: ch(streaming ? "transcripts" : "staff-desk"), supportRoleIds: staffRoles });
       const typeIds: string[] = [];
-      for (const t of BLUEPRINT_TICKET_TYPES) {
+      for (const t of blueprintTicketTypes(opts.layout)) {
         const found = await prisma.ticketType.findFirst({ where: { guildId: g, name: t.name } });
         const type = found ?? (await prisma.ticketType.create({ data: { guildId: g, name: t.name, emoji: t.emoji, description: t.description, categoryId: cat("support"), staffRoleIds: staffRoles } }));
         typeIds.push(type.id);
@@ -473,7 +596,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
     ["Applications", async () => {
       await fillSettings("applicationSettings", g, { logChannelId: ch("staff-desk"), supportRoleIds: staffRoles });
       const typeIds: string[] = [];
-      for (const a of BLUEPRINT_APPLICATIONS) {
+      for (const a of blueprintApplications(opts.layout)) {
         const found = await prisma.applicationType.findFirst({ where: { guildId: g, name: a.name } });
         const type =
           found ??
@@ -482,17 +605,17 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
           }));
         typeIds.push(type.id);
       }
-      const support = ch("support");
-      if (support && !(await prisma.applicationPanel.findFirst({ where: { guildId: g, channelId: support } }))) {
-        await prisma.applicationPanel.create({ data: { guildId: g, name: "Join the Team", channelId: support, typeIds, description: "Apply below. You'll get a DM when staff decide." } });
+      const applyCh = ch(streaming ? "apply" : "support");
+      if (applyCh && !(await prisma.applicationPanel.findFirst({ where: { guildId: g, channelId: applyCh } }))) {
+        await prisma.applicationPanel.create({ data: { guildId: g, name: streaming ? "Apply" : "Join the Team", channelId: applyCh, typeIds, description: "Apply below. You'll get a DM when staff decide." } });
       }
     }],
     ["Role pickers", async () => {
       const rolesChannel = ch("roles");
       if (!rolesChannel) return;
-      for (const picker of blueprintPickers(opts.games)) {
+      for (const picker of blueprintPickers(opts.games, opts.layout)) {
         if (await prisma.rolePanel.findFirst({ where: { guildId: g, name: picker.name } })) continue;
-        const options = picker.options.map((o) => ({ roleIds: [role(o.role)].filter(Boolean), channelIds: [], label: o.label, emoji: o.emoji })).filter((o) => o.roleIds.length);
+        const options = picker.options.map((o) => ({ roleIds: [o.role ? role(o.role) : null].filter(Boolean), channelIds: [], label: o.label, emoji: o.emoji })).filter((o) => o.roleIds.length);
         if (options.length) await prisma.rolePanel.create({ data: { guildId: g, name: picker.name, channelId: rolesChannel, description: picker.description, layout: "DROPDOWN", options } });
       }
     }],
@@ -501,6 +624,10 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       if (!lobby) return;
       const gameChoices = blueprintGameChoices(opts.games);
       const existing = await prisma.tempChannelLobby.findFirst({ where: { guildId: g, lobbyChannelId: lobby } });
+      if (streaming) {
+        if (!existing) await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a VC", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s VC", userLimit: 0, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000) } });
+        return;
+      }
       if (!existing) {
         await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a Squad", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s Squad", userLimit: 5, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000), gamePicker: true, gameCategories: true, gameChoices } });
       } else if (!Array.isArray(existing.gameChoices) || existing.gameChoices.length === 0) {
@@ -522,15 +649,40 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
         activityChannelId: ch("mm-threads"),
         boardChannelId: ch("mm-leaderboard"),
         lobbyVoiceId: ch("mm-lobby"),
-        duelCategoryId: cat("duels"),
-        teamCategoryId: cat("teammatches"),
-        staffRoleId: role("staff"),
+        duelCategoryId: cat(streaming ? "rooms" : "duels"),
+        teamCategoryId: cat(streaming ? "rooms" : "teammatches"),
+        staffRoleId: role(streaming ? "mod" : "staff"),
         games,
+        ...(streaming
+          ? { tournamentChannelId: ch("mm-tournaments"), playerRoleId: role("mm"), alertsRoleId: role("ping:match"), championRoleId: role("champion"), setupCategoryId: cat("mm"), voiceSource: "LOBBY", panelParts: ["PICKUP", "TEAM", "TOOLS"] }
+          : {}),
       });
       await prisma.matchmakingConfig.update({ where: { guildId: g }, data: { enabled: true } });
+      if (streaming) {
+        // The how-to-play guide, the same one /match setup posts.
+        const how = ch("mm-how") ? await guild.channels.fetch(ch("mm-how")!).catch(() => null) : null;
+        const need = [ch("mm-lobby"), ch("mm-now"), ch("mm-board"), ch("mm-leaderboard"), ch("mm-tournaments"), role("mm"), role("champion"), role("ping:match")];
+        if (how && need.every(Boolean)) {
+          await postMatchGuide(how, { lobby: ch("mm-lobby")!, now: ch("mm-now")!, board: ch("mm-board")!, lead: ch("mm-leaderboard")!, cups: ch("mm-tournaments")! }, { player: role("mm")!, champion: role("champion")!, alerts: role("ping:match")! });
+        }
+      }
     }],
+    ...(streaming
+      ? ([
+          ["Going Live", () => fillSettings("streamAlertSettings", g, { defaultChannelId: ch("live"), pingRoleId: role("ping:streams"), liveRoleId: role("live"), selfServeRoleId: role("creator") })],
+          ["Starboard", () => fillSettings("starboardConfig", g, { channelId: ch("hof"), threshold: 5 })],
+          ["Counting", () => fillSettings("countingGameConfig", g, { channelId: ch("counting") })],
+          ["Anonymous", () => fillSettings("confessionSettings", g, { channelId: ch("confess") })],
+          ["Birthdays", () => fillSettings("birthdayConfig", g, { channelId: ch("general") })],
+          ["Playing Now", () => fillSettings("playingNowConfig", g, { channelId: ch("mm-now"), notifyRoleId: role("ping:match") })],
+          ["Weekly Recap", () => fillSettings("weeklyRecapSettings", g, { channelId: ch("announcements") })],
+          ["Member Milestones", () => fillSettings("milestoneSettings", g, { channelId: ch("announcements") })],
+          ["Appeals", () => fillSettings("appealSettings", g, { appealChannelId: ch("staff-chat") })],
+          ["AI Chat channel", () => fillSettings("aiConfig", g, { chatChannelId: ch("botcmds") })],
+        ] as Array<[string, () => Promise<unknown>]>)
+      : []),
     ["Module switches", async () => {
-      for (const key of MODULES_ON) await prisma.moduleToggle.upsert({ where: { guildId_key: { guildId: g, key } }, create: { guildId: g, key, enabled: true }, update: { enabled: true } });
+      for (const key of modulesOn(opts)) await prisma.moduleToggle.upsert({ where: { guildId_key: { guildId: g, key } }, create: { guildId: g, key, enabled: true }, update: { enabled: true } });
     }],
   ];
   await prisma.guild.upsert({ where: { id: g }, create: { id: g, name: guild.name }, update: {} }).catch(() => null);
@@ -540,7 +692,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       notes.push(`${label} couldn't be fully set up. Check it on the dashboard.`);
     });
   }
-  for (const key of MODULES_ON) invalidateModuleCache(g, key);
+  for (const key of modulesOn(opts)) invalidateModuleCache(g, key);
   notes.push("LFG needs its command made on the dashboard (LFG page), since it picks a trigger word for your server.");
 }
 
@@ -560,7 +712,7 @@ async function setupOnboarding(guild: Guild, opts: SetupOptions, ids: Ids, notes
     }
     return true;
   };
-  const prompts = blueprintOnboarding(opts.games).map((q) => ({
+  const prompts = blueprintOnboarding(opts.games, opts.layout).map((q) => ({
     id: newId(),
     type: 0,
     title: q.title,
@@ -568,8 +720,8 @@ async function setupOnboarding(guild: Guild, opts: SetupOptions, ids: Ids, notes
     required: false,
     in_onboarding: true,
     options: q.options
-      .map((o) => ({ id: newId(), title: o.label, emoji_name: o.emoji, role_ids: [ids.roles.get(o.role)].filter(usable), channel_ids: [] }))
-      .filter((o) => o.role_ids.length),
+      .map((o) => ({ id: newId(), title: o.label, emoji_name: o.emoji, role_ids: [o.role ? ids.roles.get(o.role) : undefined].filter(usable), channel_ids: [o.channel ? ids.channels.get(o.channel) : undefined].filter(Boolean) }))
+      .filter((o) => o.role_ids.length || o.channel_ids.length),
   })).filter((p) => p.options.length);
   const moveNote = `Spartacus's role has to be above these roles for onboarding to give them out: ${[...blocked].slice(0, 15).join(", ")}. Drag Spartacus to the top in Server Settings → Roles, then run /server-setup again with Onboarding.`;
   if (!prompts.length) {
@@ -577,7 +729,9 @@ async function setupOnboarding(guild: Guild, opts: SetupOptions, ids: Ids, notes
     return blocked.size ? "🧭 Onboarding skipped (Spartacus's role is too low)" : "🧭 Onboarding skipped (no roles yet)";
   }
   if (blocked.size) notes.push(moveNote);
-  const defaults = ["welcome", "rules", "roles"].map((k) => ids.channels.get(k)).filter(Boolean);
+  // The streaming layout is open, so new people start with the main channels.
+  const defaultKeys = opts.layout === "streaming" ? ["rules", "welcome", "announcements", "events", "live", "general", "memes", "media", "clips", "lfg"] : ["welcome", "rules", "roles"];
+  const defaults = defaultKeys.map((k) => ids.channels.get(k)).filter(Boolean);
   const body = { prompts, default_channel_ids: defaults, enabled: true, mode: 0 };
   const path = `/guilds/${guild.id}/onboarding` as `/${string}`;
   let reason = "";

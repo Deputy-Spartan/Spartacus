@@ -58,6 +58,10 @@ export interface SetupOptions {
   layout?: BlueprintLayout; // leaving it out builds the gaming layout
   // With archiving on: unused old channels and roles are deleted instead of archived.
   deleteUnused?: boolean;
+  // Fresh roles: delete every role that isn't in the new layout, even ones
+  // people have. Layout roles that already exist are reused, so whoever has
+  // them keeps them. Admin-power, bot, booster and Twitch roles always stay.
+  freshRoles?: boolean;
   // Leaving these out builds everything.
   parts?: SetupPart[];
   categories?: string[];
@@ -229,6 +233,14 @@ export async function planSetup(guild: Guild, opts: SetupOptions): Promise<Setup
       (r) => r.id !== guild.id && !r.managed && !usedRoles.has(r.id) && r.members.size === 0 && !!top && top.comparePositionTo(r) > 0 && !used.includes(r.id)
     );
   }
+  if (opts.freshRoles && partOn(opts, "roles")) {
+    await guild.members.fetch().catch(() => null);
+    const top = guild.members.me?.roles.highest;
+    const powers = PermissionFlagsBits.Administrator | PermissionFlagsBits.ManageGuild;
+    deleteRoles = [...guild.roles.cache.values()].filter(
+      (r) => r.id !== guild.id && !r.managed && !usedRoles.has(r.id) && !!top && top.comparePositionTo(r) > 0 && (r.permissions.bitfield & powers) === 0n
+    );
+  }
   const deleting = new Set(deleteChannels.map((c) => c.id));
   return { roles, categories, channels, archive: archive.filter((c) => !deleting.has(c.id)), hideCategories, deleteChannels, deleteCategories, deleteRoles };
 }
@@ -245,7 +257,7 @@ export function summarizePlan(plan: SetupPlan, opts?: SetupOptions) {
     hideCategories: !opts || archiveOn(opts) ? plan.hideCategories.length : 0,
     deleteChannels: !opts || deleteOn(opts) ? plan.deleteChannels.length : 0,
     deleteCategories: !opts || deleteOn(opts) ? plan.deleteCategories.length : 0,
-    deleteRoles: !opts || deleteOn(opts) ? plan.deleteRoles.length : 0,
+    deleteRoles: !opts || deleteOn(opts) || opts.freshRoles ? plan.deleteRoles.length : 0,
   };
 }
 
@@ -466,12 +478,23 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
 
   // Unused old channels are deleted (when that's on); everything else goes
   // into a hidden archive.
-  if (deleteOn(opts) && (plan.deleteChannels.length || plan.deleteRoles.length)) {
+  if (deleteOn(opts) && plan.deleteChannels.length) {
     let gone = 0;
     for (const c of plan.deleteChannels) await c.delete("Server Setup: unused").then(() => gone++, () => notes.push(`Couldn't delete #${c.name}, so it was left where it is.`));
-    let rolesGone = 0;
-    for (const r of plan.deleteRoles) await r.delete("Server Setup: nobody has it").then(() => rolesGone++, () => notes.push(`Couldn't delete the ${r.name} role.`));
-    await step(`🧹 Deleted ${gone} unused channel${gone === 1 ? "" : "s"} and ${rolesGone} unused role${rolesGone === 1 ? "" : "s"}`);
+    await step(`🧹 Deleted ${gone} unused channel${gone === 1 ? "" : "s"}`);
+  }
+  if ((deleteOn(opts) || opts.freshRoles) && plan.deleteRoles.length) {
+    const deleted: string[] = [];
+    for (const r of plan.deleteRoles) {
+      await r.delete(opts.freshRoles ? "Server Setup: fresh roles" : "Server Setup: nobody has it").then(() => deleted.push(r.id), () => notes.push(`Couldn't delete the ${r.name} role.`));
+    }
+    // Spartacus settings that pointed at a deleted role are cleared, so nothing
+    // keeps trying to give out a role that's gone.
+    if (deleted.length) {
+      const where = { guildId: guild.id, roleId: { in: deleted } };
+      await Promise.all([prisma.levelRole.deleteMany({ where }), prisma.joinRole.deleteMany({ where }), prisma.reactionRole.deleteMany({ where })].map((q) => q.catch(() => null)));
+    }
+    await step(opts.freshRoles ? `🎭 Fresh roles: deleted ${deleted.length} old role${deleted.length === 1 ? "" : "s"} that aren't in the new layout` : `🧹 Deleted ${deleted.length} unused role${deleted.length === 1 ? "" : "s"}`);
   }
   if (archiveOn(opts) && (plan.archive.length || plan.hideCategories.length || plan.deleteCategories.length)) {
     const staffOnly = overwritesFor(guild, { see: "staff", talk: true }, false, ids);

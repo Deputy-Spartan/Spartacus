@@ -41,6 +41,8 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
   const plan = await planSetup(guild, opts);
   const layout = BLUEPRINT_LAYOUTS.find((l) => l.id === (opts.layout ?? "gaming"))!;
   const del = deleteOn(opts);
+  const fresh = !!opts.freshRoles && partOn(opts, "roles");
+  const roleLabel = (r: { name: string; members: { size: number } }) => (r.members.size ? `${r.name} (${r.members.size})` : r.name);
   const s = summarizePlan(plan, opts);
   const line = (label: string, x: { reuse: number; create: number }) => `**${label}:** ${x.create} new${x.reuse ? `, ${x.reuse} of yours reused and renamed` : ""}`;
   const games = BLUEPRINT_GAMES.filter((g) => opts.games.includes(g.id));
@@ -67,7 +69,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
         partOn(opts, "channels") && !allCategories ? `**Only these categories:** ${chosen.map((cat) => cat.name).join(", ")}` : null,
         del
           ? [
-              `**🧹 Deleted (unused):** ${s.deleteChannels} channel${s.deleteChannels === 1 ? "" : "s"} nobody has posted in for 30+ days${plan.deleteChannels.length ? ` (${names(plan.deleteChannels.map((c) => c.name))})` : ""}, ${s.deleteRoles} role${s.deleteRoles === 1 ? "" : "s"} nobody has${plan.deleteRoles.length ? ` (${names(plan.deleteRoles.map((r) => r.name))})` : ""}`,
+              `**🧹 Deleted (unused):** ${s.deleteChannels} channel${s.deleteChannels === 1 ? "" : "s"} nobody has posted in for 30+ days${plan.deleteChannels.length ? ` (${names(plan.deleteChannels.map((c) => c.name))})` : ""}${fresh ? "" : `, ${s.deleteRoles} role${s.deleteRoles === 1 ? "" : "s"} nobody has${plan.deleteRoles.length ? ` (${names(plan.deleteRoles.map((r) => r.name))})` : ""}`}`,
               `**📦 Archived:** ${s.archive} channel${s.archive === 1 ? "" : "s"} with recent messages move into a hidden ${ARCHIVE_CATEGORY}${plan.archive.length ? ` (${names(plan.archive.map((c) => c.name))})` : ""}`,
             ].join("\n")
           : archiveOn(opts)
@@ -75,6 +77,9 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
           : opts.archiveOthers && partOn(opts, "channels") && !allCategories
             ? "**Old channels:** stay where they are (archiving only runs when every category is picked)"
             : "**Old channels:** stay where they are",
+        fresh
+          ? `**🎭 Fresh roles:** ${plan.deleteRoles.length} old role${plan.deleteRoles.length === 1 ? "" : "s"} not in the new layout get deleted, even if people have them (number of people in brackets)${plan.deleteRoles.length ? `: ${names(plan.deleteRoles.map(roleLabel), 12)}` : ""}. Roles that match the layout are reused, so people keep them. Roles with admin powers, bot roles and Discord's booster and Twitch roles stay.`
+          : null,
         `**Games:** ${games.map((g) => `${g.emoji} ${g.name}`).join(", ")}`,
         "",
         del
@@ -103,6 +108,12 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
         value: "archive",
         emoji: "📦",
         description: `${opts.archiveOthers ? "Tap to skip" : "Tap to build"} · Move channels not in the layout into a hidden ${ARCHIVE_CATEGORY}`.slice(0, 100),
+      },
+      {
+        label: `${opts.freshRoles ? "✅" : "⬜"} Fresh roles: delete every old role`,
+        value: "fresh",
+        emoji: "🎭",
+        description: `${opts.freshRoles ? "Tap to keep old roles" : "Tap to turn on"} · Keeps only the layout's roles (and admin, bot, booster, Twitch)`.slice(0, 100),
       },
       {
         label: `${opts.deleteUnused ? "✅" : "⬜"} Delete unused channels and roles`,
@@ -142,7 +153,8 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
 }
 
 // Deleting needs a second tap.
-function confirmScreen(plan: Awaited<ReturnType<typeof planSetup>>): InteractionEditReplyOptions {
+function confirmScreen(plan: Awaited<ReturnType<typeof planSetup>>, opts: SetupOptions): InteractionEditReplyOptions {
+  const people = plan.deleteRoles.reduce((n, r) => n + r.members.size, 0);
   return {
     embeds: [
       new EmbedBuilder()
@@ -152,7 +164,8 @@ function confirmScreen(plan: Awaited<ReturnType<typeof planSetup>>): Interaction
           [
             `This **permanently deletes** ${plan.deleteChannels.length} channel${plan.deleteChannels.length === 1 ? "" : "s"} and ${plan.deleteRoles.length} role${plan.deleteRoles.length === 1 ? "" : "s"}:`,
             plan.deleteChannels.length ? `**Channels:** ${names(plan.deleteChannels.map((c) => `#${c.name}`), 25)}` : null,
-            plan.deleteRoles.length ? `**Roles:** ${names(plan.deleteRoles.map((r) => r.name), 25)}` : null,
+            plan.deleteRoles.length ? `**Roles:** ${names(plan.deleteRoles.map((r) => (r.members.size ? `${r.name} (${r.members.size})` : r.name)), 25)}` : null,
+            opts.freshRoles && people ? `⚠️ **Fresh roles is on:** people lose these roles (${people} role${people === 1 ? "" : "s"} taken off in total). They can pick their new ones in onboarding and 🎭・pick-roles.` : null,
             "",
             "A backup is saved first. It brings back the channels and roles, **not their messages or who had a role**. Everything else that isn't in the new layout moves into the hidden archive.",
           ]
@@ -178,6 +191,7 @@ export async function runServerSetupCommand(interaction: ChatInputCommandInterac
   const missing = missingBotPerms(guild);
   if (missing.length) return void (await interaction.editReply(`Spartacus needs these permissions first: ${missing.join(", ")}. Give its role Administrator, or those, in Server Settings → Roles.`));
   const layout = (interaction.options.getString("layout") ?? "gaming") as BlueprintLayout;
+  const freshRoles = interaction.options.getBoolean("fresh-roles") ?? false;
   const games = layout === "streaming" ? DEFAULT_STREAMING_GAMES : DEFAULT_BLUEPRINT_GAMES;
   const opts: SetupOptions & { expires: number } = {
     games: [...games],
@@ -185,6 +199,7 @@ export async function runServerSetupCommand(interaction: ChatInputCommandInterac
     archiveOthers: true,
     // The streaming rebuild clears out what's unused by default; the gaming one only archives.
     deleteUnused: layout === "streaming",
+    freshRoles,
     parts: SETUP_PARTS.map((p) => p.id),
     categories: blueprintCategories(games, layout).map((cat) => cat.key),
     expires: Date.now() + PENDING_MS,
@@ -222,6 +237,7 @@ export async function handleServerSetupInteraction(interaction: Interaction) {
         opts.categories = blueprintCategories(opts.games, opts.layout).map((cat) => cat.key);
         opts.archiveOthers = true;
       } else if (pick === "archive") opts.archiveOthers = !opts.archiveOthers;
+      else if (pick === "fresh") opts.freshRoles = !opts.freshRoles;
       else if (pick === "delete") {
         opts.deleteUnused = !opts.deleteUnused;
         if (opts.deleteUnused) opts.archiveOthers = true;
@@ -248,10 +264,10 @@ export async function handleServerSetupInteraction(interaction: Interaction) {
     }
     if (interaction.isButton() && action === "build") {
       // Anything to delete? Ask once more first.
-      if (deleteOn(opts)) {
+      if (deleteOn(opts) || opts.freshRoles) {
         await interaction.deferUpdate();
         const plan = await planSetup(guild, opts);
-        if (plan.deleteChannels.length || plan.deleteRoles.length) return void (await interaction.editReply(confirmScreen(plan)));
+        if (plan.deleteChannels.length || plan.deleteRoles.length) return void (await interaction.editReply(confirmScreen(plan, opts)));
         return void (await build(interaction, opts, key, true));
       }
       return void (await build(interaction, opts, key));

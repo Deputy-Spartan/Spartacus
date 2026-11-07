@@ -12,6 +12,7 @@ const command: CommandModule = {
         .setDescription("Which kind of server to build (default: Gaming community)")
         .addChoices({ name: "🎮 Gaming community", value: "gaming" }, { name: "🔴 Streaming community", value: "streaming" })
     )
+    .addBooleanOption((o) => o.setName("fresh-roles").setDescription("Delete every old role and keep only the ones the new layout needs (asks first)"))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false) as SlashCommandBuilder,
   execute: runServerSetupCommand,

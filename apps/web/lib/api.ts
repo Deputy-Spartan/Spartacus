@@ -27,7 +27,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? "GET").toUpperCase();
   if (method === "GET" && cacheable(path)) return cachedGet<T>(path, () => send(path, init).then((res) => res.text()));
   const res = await send(path, init);
-  if (method !== "GET") forgetArea(path);
+  if (method !== "GET") {
+    forgetArea(path);
+    // Tells anything showing derived state (setup badges, the health score)
+    // that a setting just changed, so it reloads instead of going stale.
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("spartacus:saved", { detail: { path } }));
+  }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -165,6 +170,7 @@ export interface StreamSubscription {
   peakViewers?: number;
   lastError?: string | null;
   lastNotifiedAt?: string | null;
+  alertOverrides?: Record<string, string> | null;
 }
 export interface StreamAlertSettingsRow {
   guildId?: string;
@@ -180,6 +186,11 @@ export interface StreamAlertSettingsRow {
   buttonEmoji?: string | null;
   embedExtra?: import("./embedExtra").EmbedExtra | null;
   showThumbnail?: boolean;
+  showGame?: boolean;
+  showViewers?: boolean;
+  endedTitle?: string | null;
+  endedDescription?: string | null;
+  endedColor?: string | null;
   updateWhileLive?: boolean;
   endAction?: "EDIT" | "DELETE" | "KEEP";
   cooldownMinutes?: number;

@@ -347,6 +347,7 @@ model StreamSubscription {
   peakViewers    Int       @default(0)
   offlineStrikes Int       @default(0) // offline checks in a row, so a blip doesn't end the stream
   lastError      String?
+  alertOverrides Json? // this streamer's own alert look (message, title, text, color, button, images); empty parts use the server's
 
   @@index([guildId])
 }
@@ -369,6 +370,11 @@ model StreamAlertSettings {
   updateWhileLive  Boolean @default(true) // keep viewers, title and game fresh on the post
   endAction        String  @default("EDIT") // EDIT (stream ended summary) | DELETE | KEEP
   cooldownMinutes  Int     @default(30) // no second post if they come back within this
+  showGame         Boolean @default(true) // the "Playing" field
+  showViewers      Boolean @default(true) // the "Viewers" field
+  endedTitle       String? // the summary when the stream ends ({duration}, {peak} work here)
+  endedDescription String?
+  endedColor       String?
 }
 
 model MemberXp {

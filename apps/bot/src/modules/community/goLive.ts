@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, type BaseMessageOptions, type Guild } from "discord.js";
 import type { StreamAlertSettings, StreamSubscription } from "@prisma/client";
-import { buildGoLiveMessage, fillGoLiveExtra, platformInfo, type LiveInfo, type LivePlatform } from "@spartacus/shared";
+import { buildGoLiveMessage, fillGoLiveExtra, platformInfo, withStreamerOverrides, type LiveInfo, type LivePlatform } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
@@ -13,8 +13,10 @@ import { claimEvent } from "../../lib/eventClaims";
 
 type Sub = StreamSubscription;
 
-async function settingsFor(guildId: string): Promise<Partial<StreamAlertSettings>> {
-  return (await prisma.streamAlertSettings.findUnique({ where: { guildId } })) ?? {};
+// The server's alert settings, with this streamer's own look laid on top.
+async function settingsFor(guildId: string, sub?: Sub): Promise<Partial<StreamAlertSettings>> {
+  const s = (await prisma.streamAlertSettings.findUnique({ where: { guildId } })) ?? {};
+  return sub ? withStreamerOverrides(s, sub.alertOverrides) : s;
 }
 
 function infoOf(sub: Sub, check?: LiveCheck | null, settings?: Partial<StreamAlertSettings>): LiveInfo {
@@ -76,7 +78,7 @@ async function setLiveRole(guild: Guild, sub: Sub, settings: Partial<StreamAlert
 }
 
 export async function announce(client: Client, sub: Sub, check: LiveCheck | null): Promise<{ ok: boolean; error?: string }> {
-  const settings = await settingsFor(sub.guildId);
+  const settings = await settingsFor(sub.guildId, sub);
   const guild = client.guilds.cache.get(sub.guildId);
   const channel = await client.channels.fetch(sub.announceChannelId || settings.defaultChannelId || "").catch(() => null);
   if (!guild || !isSendableChannel(channel)) return { ok: false, error: "Spartacus can't post in the alert channel." };
@@ -122,7 +124,7 @@ async function refresh(client: Client, sub: Sub, check: LiveCheck) {
     where: { id: sub.id },
     data: { offlineStrikes: 0, lastError: null, peakViewers: peak, lastTitle: check.title ?? sub.lastTitle, lastGame: check.game ?? sub.lastGame, lastThumbnail: check.thumbnail ?? sub.lastThumbnail },
   });
-  const settings = await settingsFor(sub.guildId);
+  const settings = await settingsFor(sub.guildId, sub);
   if (settings.updateWhileLive === false || !sub.liveMessageId) return;
   const channel = await client.channels.fetch(sub.announceChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
@@ -131,7 +133,7 @@ async function refresh(client: Client, sub: Sub, check: LiveCheck) {
 }
 
 export async function endStream(client: Client, sub: Sub) {
-  const settings = await settingsFor(sub.guildId);
+  const settings = await settingsFor(sub.guildId, sub);
   const guild = client.guilds.cache.get(sub.guildId);
   await prisma.streamSubscription.update({ where: { id: sub.id }, data: { isLive: false, offlineStrikes: 0 } });
   if (guild) await setLiveRole(guild, sub, settings, false);
@@ -235,7 +237,7 @@ export async function checkStreamerNow(client: Client, id: string) {
 export async function sendTestAlert(client: Client, id: string) {
   const sub = await prisma.streamSubscription.findUnique({ where: { id } });
   if (!sub) return { ok: false, error: "Not found." };
-  const settings = await settingsFor(sub.guildId);
+  const settings = await settingsFor(sub.guildId, sub);
   const channel = await client.channels.fetch(sub.announceChannelId || settings.defaultChannelId || "").catch(() => null);
   if (!isSendableChannel(channel)) return { ok: false, error: "Spartacus can't post in the alert channel." };
   const info = infoOf(sub, { live: true, title: sub.lastTitle || "Test stream: ranked grind", game: sub.lastGame || "Rainbow Six Siege", viewers: 42 }, settings);

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
-import { LIVE_PLATFORMS, cleanHandle, type LivePlatform } from "@spartacus/shared";
+import { LIVE_PLATFORMS, STREAMER_OVERRIDE_KEYS, cleanHandle, type LivePlatform } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
@@ -35,10 +35,11 @@ router.put("/guilds/:guildId/stream-alert-settings", requireAuth, requireGuildPe
   const b = req.body ?? {};
   const data: Record<string, unknown> = {};
   for (const k of ["defaultChannelId", "pingRoleId", "liveRoleId", "selfServeRoleId"]) if (k in b) data[k] = id(b[k]);
-  for (const k of ["contentTemplate", "embedTitle", "embedDescription", "buttonLabel", "buttonEmoji"]) if (k in b) data[k] = text(b[k], k === "buttonEmoji" ? 100 : 2000);
+  for (const k of ["contentTemplate", "embedTitle", "embedDescription", "buttonLabel", "buttonEmoji", "endedTitle", "endedDescription"]) if (k in b) data[k] = text(b[k], k === "buttonEmoji" ? 100 : 2000);
+  if ("endedColor" in b) data.endedColor = typeof b.endedColor === "string" && /^#[0-9a-f]{6}$/i.test(b.endedColor) ? b.endedColor : null;
   if ("embedExtra" in b) data.embedExtra = b.embedExtra && typeof b.embedExtra === "object" ? (b.embedExtra as object) : Prisma.JsonNull;
   if ("embedColor" in b) data.embedColor = typeof b.embedColor === "string" && /^#[0-9a-f]{6}$/i.test(b.embedColor) ? b.embedColor : null;
-  for (const k of ["showThumbnail", "updateWhileLive"]) if (typeof b[k] === "boolean") data[k] = b[k];
+  for (const k of ["showThumbnail", "updateWhileLive", "showGame", "showViewers"]) if (typeof b[k] === "boolean") data[k] = b[k];
   if (["EDIT", "DELETE", "KEEP"].includes(b.endAction)) data.endAction = b.endAction;
   if (Number.isFinite(Number(b.cooldownMinutes))) data.cooldownMinutes = Math.max(0, Math.min(1440, Math.round(Number(b.cooldownMinutes))));
   const s = await prisma.streamAlertSettings.upsert({ where: { guildId: req.params.guildId }, create: { guildId: req.params.guildId, ...data }, update: data });
@@ -52,6 +53,19 @@ function streamerData(b: Record<string, unknown>, platform: LivePlatform) {
   if ("discordUserId" in b) out.discordUserId = id(b.discordUserId);
   if ("pingRoleId" in b) out.pingRoleId = id(b.pingRoleId);
   if ("announceChannelId" in b && id(b.announceChannelId)) out.announceChannelId = id(b.announceChannelId);
+  if ("alertOverrides" in b) {
+    // Only the known parts, trimmed; nothing set means "use the server's look".
+    const raw = b.alertOverrides && typeof b.alertOverrides === "object" ? (b.alertOverrides as Record<string, unknown>) : {};
+    const o: Record<string, string> = {};
+    for (const k of STREAMER_OVERRIDE_KEYS) {
+      const v = text(raw[k], k === "buttonEmoji" ? 100 : k === "embedTitle" ? 256 : k === "buttonLabel" ? 80 : 2000);
+      if (!v) continue;
+      if (k === "embedColor" && !/^#[0-9a-f]{6}$/i.test(v)) continue;
+      if ((k === "thumbnailUrl" || k === "imageUrl") && !/^https?:\/\/|^\{/i.test(v)) continue;
+      o[k] = v;
+    }
+    out.alertOverrides = Object.keys(o).length ? o : Prisma.JsonNull;
+  }
   return out;
 }
 

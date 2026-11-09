@@ -5,19 +5,37 @@ import { usePathname } from "next/navigation";
 import { api } from "../../lib/api";
 import { Icon } from "./AppIcon";
 
-// What each module still needs (from /guilds/:id/setup-status). Loaded fresh
-// on every page change, so fixing a setting clears its badge on the next page.
+// What each module still needs (from /guilds/:id/setup-status). Loaded on
+// every page change, after any save anywhere on the dashboard (adding a
+// streamer, a panel, a channel...), and when you come back to the tab, so a
+// badge never says "Needs setup" for something that's already done.
 export function useSetupStatus(guildId: string) {
   const pathname = usePathname();
   const [status, setStatus] = useState<Record<string, string[]> | null>(null);
   useEffect(() => {
     let alive = true;
-    api
-      .getSetupStatus(guildId)
-      .then((s) => alive && setStatus(s))
-      .catch(() => null);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () =>
+      api
+        .getSetupStatus(guildId)
+        .then((s) => alive && setStatus(s))
+        .catch(() => null);
+    // A save can fire several requests in a row; wait for them to settle.
+    const soon = () => {
+      clearTimeout(timer);
+      timer = setTimeout(load, 400);
+    };
+    const onFocus = () => document.visibilityState === "visible" && soon();
+    load();
+    window.addEventListener("spartacus:saved", soon);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     return () => {
       alive = false;
+      clearTimeout(timer);
+      window.removeEventListener("spartacus:saved", soon);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
     };
   }, [guildId, pathname]);
   return status;

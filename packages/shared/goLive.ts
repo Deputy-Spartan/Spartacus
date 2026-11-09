@@ -49,7 +49,41 @@ export interface GoLiveSettingsLike {
   buttonLabel?: string | null;
   buttonEmoji?: string | null;
   showThumbnail?: boolean;
+  showGame?: boolean;
+  showViewers?: boolean;
+  endedTitle?: string | null;
+  endedDescription?: string | null;
+  endedColor?: string | null;
   embedExtra?: unknown;
+}
+
+// One streamer's own alert look. Anything left empty uses the server's.
+export interface StreamerOverrides {
+  contentTemplate?: string;
+  embedTitle?: string;
+  embedDescription?: string;
+  embedColor?: string;
+  buttonLabel?: string;
+  buttonEmoji?: string;
+  thumbnailUrl?: string;
+  imageUrl?: string;
+  footerText?: string;
+}
+export const STREAMER_OVERRIDE_KEYS = ["contentTemplate", "embedTitle", "embedDescription", "embedColor", "buttonLabel", "buttonEmoji", "thumbnailUrl", "imageUrl", "footerText"] as const;
+
+// The server's settings with one streamer's overrides laid on top.
+export function withStreamerOverrides<T extends GoLiveSettingsLike>(s: T, raw: unknown): T {
+  if (!raw || typeof raw !== "object") return s;
+  const o = raw as Record<string, unknown>;
+  const has = (k: string) => typeof o[k] === "string" && (o[k] as string).trim() !== "";
+  const out: T = { ...s };
+  for (const k of ["contentTemplate", "embedTitle", "embedDescription", "embedColor", "buttonLabel", "buttonEmoji"] as const) if (has(k)) (out as Record<string, unknown>)[k] = o[k];
+  const extra = ["thumbnailUrl", "imageUrl", "footerText"].filter(has);
+  if (extra.length) {
+    const base = s.embedExtra && typeof s.embedExtra === "object" ? (s.embedExtra as Record<string, unknown>) : {};
+    out.embedExtra = { ...base, ...Object.fromEntries(extra.map((k) => [k, o[k]])) };
+  }
+  return out;
 }
 
 export const GO_LIVE_DEFAULTS = {
@@ -58,6 +92,8 @@ export const GO_LIVE_DEFAULTS = {
   description: "**{name}** just went live. Come hang out!",
   button: "Watch on {platform}",
   endedTitle: "⚫ {name} was live on {platform}",
+  endedDescription: "**{title}**\nStreamed for **{duration}** · Peak **{peak}** viewers",
+  endedColor: "#4E5058",
 };
 
 export const GO_LIVE_PLACEHOLDERS = [
@@ -69,6 +105,12 @@ export const GO_LIVE_PLACEHOLDERS = [
   { token: "{viewers}", description: "How many are watching" },
   { token: "{url}", description: "The stream link" },
   { token: "{role}", description: "The ping role (pings it in the message text)" },
+];
+
+// Extra placeholders for the "stream ended" summary.
+export const GO_LIVE_ENDED_PLACEHOLDERS = [
+  { token: "{duration}", description: "How long they streamed, e.g. 2h 15m" },
+  { token: "{peak}", description: "The most viewers at once" },
 ];
 
 export interface LiveInfo {
@@ -125,12 +167,16 @@ export function buildGoLiveMessage(s: GoLiveSettingsLike, i: LiveInfo, ended?: {
   const color = s.embedColor && /^#[0-9a-f]{6}$/i.test(s.embedColor) ? s.embedColor : plat.color;
   const platName = i.platform === "other" ? i.platformName || "Stream" : plat.name;
   if (ended) {
+    const fillEnded = (t: string) => fillGoLive(t.replace(/\{duration\}/g, durationText(ended.durationMs)).replace(/\{peak\}/g, ended.peak ? ended.peak.toLocaleString("en-US") : "—"), i);
+    const customText = s.endedDescription?.trim();
     return {
       content: "",
-      title: fillGoLive(GO_LIVE_DEFAULTS.endedTitle, i),
-      description: [i.title ? `**${i.title}**` : "", `Streamed for **${durationText(ended.durationMs)}**${ended.peak ? ` · Peak **${ended.peak.toLocaleString("en-US")}** viewers` : ""}`].filter(Boolean).join("\n"),
-      color: "#4E5058",
-      fields: i.game ? [{ name: "Played", value: i.game, inline: true }] : [],
+      title: fillEnded(s.endedTitle?.trim() || GO_LIVE_DEFAULTS.endedTitle).slice(0, 256),
+      description: customText
+        ? fillEnded(customText).slice(0, 4096)
+        : [i.title ? `**${i.title}**` : "", `Streamed for **${durationText(ended.durationMs)}**${ended.peak ? ` · Peak **${ended.peak.toLocaleString("en-US")}** viewers` : ""}`].filter(Boolean).join("\n"),
+      color: s.endedColor && /^#[0-9a-f]{6}$/i.test(s.endedColor) ? s.endedColor : GO_LIVE_DEFAULTS.endedColor,
+      fields: i.game && s.showGame !== false ? [{ name: "Played", value: i.game, inline: true }] : [],
       image: null,
       thumbnail: i.avatar ?? null,
       author: { name: i.name, icon: i.avatar ?? null },
@@ -140,8 +186,8 @@ export function buildGoLiveMessage(s: GoLiveSettingsLike, i: LiveInfo, ended?: {
     };
   }
   const fields = [
-    ...(i.game ? [{ name: "Playing", value: i.game, inline: true }] : []),
-    ...(i.viewers != null ? [{ name: "Viewers", value: i.viewers.toLocaleString("en-US"), inline: true }] : []),
+    ...(i.game && s.showGame !== false ? [{ name: "Playing", value: i.game, inline: true }] : []),
+    ...(i.viewers != null && s.showViewers !== false ? [{ name: "Viewers", value: i.viewers.toLocaleString("en-US"), inline: true }] : []),
   ];
   return {
     content: fillGoLive(s.contentTemplate?.trim() || GO_LIVE_DEFAULTS.content, i).trim(),

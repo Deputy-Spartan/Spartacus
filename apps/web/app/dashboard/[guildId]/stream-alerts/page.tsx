@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { GO_LIVE_DEFAULTS, GO_LIVE_PLACEHOLDERS, LIVE_PLATFORMS, buildGoLiveMessage, fillGoLiveExtra, platformInfo, type LivePlatform } from "@spartacus/shared";
+import { GO_LIVE_DEFAULTS, GO_LIVE_ENDED_PLACEHOLDERS, GO_LIVE_PLACEHOLDERS, LIVE_PLATFORMS, buildGoLiveMessage, fillGoLiveExtra, platformInfo, withStreamerOverrides, type LiveInfo, type LivePlatform } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
@@ -105,7 +105,7 @@ export default function GoingLivePage({ params }: { params: { guildId: string } 
         </div>
       )}
 
-      {tab === "active" && <ActiveTab guildId={guildId} subs={subs} keys={keys} refresh={refresh} hasChannel={!!settings.defaultChannelId} />}
+      {tab === "active" && <ActiveTab guildId={guildId} subs={subs} keys={keys} refresh={refresh} hasChannel={!!settings.defaultChannelId} settings={settings} />}
       {tab === "settings" && <SettingsTab guildId={guildId} settings={settings} update={update} />}
       {tab === "guide" && <GuideTab onSettings={() => setTab("settings")} />}
     </div>
@@ -114,8 +114,23 @@ export default function GoingLivePage({ params }: { params: { guildId: string } 
 
 // ---- Active ----
 
-function ActiveTab({ guildId, subs, keys, refresh, hasChannel }: { guildId: string; subs: StreamSubscription[]; keys: { TWITCH: boolean; KICK: boolean }; refresh: () => void; hasChannel: boolean }) {
+function ActiveTab({
+  guildId,
+  subs,
+  keys,
+  refresh,
+  hasChannel,
+  settings,
+}: {
+  guildId: string;
+  subs: StreamSubscription[];
+  keys: { TWITCH: boolean; KICK: boolean };
+  refresh: () => void;
+  hasChannel: boolean;
+  settings: StreamAlertSettingsRow;
+}) {
   const confirm = useConfirm();
+  const [editing, setEditing] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, { ok: boolean; text: string }>>({});
   const live = subs.filter((s) => s.isLive);
 
@@ -212,10 +227,14 @@ function ActiveTab({ guildId, subs, keys, refresh, hasChannel }: { guildId: stri
                         <p className="text-xs text-slate-500 truncate">
                           {s.isLive ? <span className="text-rose-400">🔴 Live for {ago(s.liveStartedAt)}</span> : p.auto ? "⚫ Offline" : "Announced with /golive"}
                           {s.discordUserId ? " · 🔗 linked to their Discord" : ""}
+                          {s.alertOverrides && Object.keys(s.alertOverrides).length ? " · 🎨 own alert look" : ""}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0 text-xs">
+                      <button onClick={() => setEditing(editing === s.id ? null : s.id)} className={editing === s.id ? "text-neon-blue" : "text-slate-400 hover:text-neon-blue"}>
+                        {editing === s.id ? "Close" : "Edit"}
+                      </button>
                       {p.auto && (
                         <button onClick={() => check(s)} className="text-slate-400 hover:text-neon-blue">
                           Check now
@@ -231,6 +250,19 @@ function ActiveTab({ guildId, subs, keys, refresh, hasChannel }: { guildId: stri
                   </div>
                   {s.lastError && !notes[s.id] && <p className="text-xs text-amber-300 mt-2">⚠️ Last check: {s.lastError}</p>}
                   {notes[s.id] && <p className={`text-xs mt-2 ${notes[s.id].ok ? "text-slate-300" : "text-rose-400"}`}>{notes[s.id].text}</p>}
+                  {editing === s.id && (
+                    <EditStreamer
+                      guildId={guildId}
+                      sub={s}
+                      settings={settings}
+                      onClose={() => setEditing(null)}
+                      onSaved={() => {
+                        setNotes((n) => ({ ...n, [s.id]: { ok: true, text: "✓ Saved. The next alert uses these." } }));
+                        setEditing(null);
+                        refresh();
+                      }}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -352,7 +384,10 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
   const titleRef = useRef<HTMLInputElement>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
   const buttonRef = useRef<HTMLInputElement>(null);
+  const endedTitleRef = useRef<HTMLInputElement>(null);
+  const endedDescRef = useRef<HTMLTextAreaElement>(null);
   const last = STEPS.length - 1;
+  const showEnded = step === 5 && (settings.endAction ?? "EDIT") === "EDIT";
 
   const info = {
     name: "BustyBunz",
@@ -365,8 +400,6 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
     roleId: settings.pingRoleId,
     userId: null,
   };
-  const sample = buildGoLiveMessage(settings, info);
-  const extra = fillGoLiveExtra(settings.embedExtra, info);
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -447,6 +480,20 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
                   </div>
                   <ToggleSwitch enabled={settings.showThumbnail !== false} onChange={(v) => update({ showThumbnail: v })} label="Show stream preview" />
                 </div>
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-sm">Show “Playing”</p>
+                    <p className={hint}>The game or category they're streaming.</p>
+                  </div>
+                  <ToggleSwitch enabled={settings.showGame !== false} onChange={(v) => update({ showGame: v })} label="Show playing" />
+                </div>
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <p className="text-sm">Show “Viewers”</p>
+                    <p className={hint}>How many are watching, kept up to date while they're live.</p>
+                  </div>
+                  <ToggleSwitch enabled={settings.showViewers !== false} onChange={(v) => update({ showViewers: v })} label="Show viewers" />
+                </div>
                 <EmbedExtraFields guildId={guildId} value={(settings.embedExtra ?? {}) as EmbedExtra} onChange={(v) => update({ embedExtra: v })} />
                 <p className={`${hint} mt-2`}>Extras replace the matching default part (author, images, footer) and add fields. Placeholders work in them too.</p>
               </>
@@ -483,6 +530,26 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
                   <option value="DELETE">Delete the alert</option>
                   <option value="KEEP">Leave it as it is</option>
                 </select>
+                {(settings.endAction ?? "EDIT") === "EDIT" && (
+                  <div className="mt-4 rounded-lg border border-white/10 p-3">
+                    <p className="text-sm font-medium mb-1">The Summary</p>
+                    <p className={`${hint} mb-3`}>Leave any part empty to use the default. The preview shows it.</p>
+                    <label className={label}>Summary Title</label>
+                    <input ref={endedTitleRef} className={field} value={settings.endedTitle ?? ""} placeholder={GO_LIVE_DEFAULTS.endedTitle} onChange={(e) => update({ endedTitle: e.target.value })} maxLength={256} />
+                    <PlaceholderExamples items={[...GO_LIVE_ENDED_PLACEHOLDERS, ...GO_LIVE_PLACEHOLDERS.filter((p) => p.token !== "{role}" && p.token !== "{viewers}")]} inputRef={endedTitleRef} value={settings.endedTitle ?? ""} onChange={(v) => update({ endedTitle: v })} />
+                    <label className={label}>Summary Text</label>
+                    <MarkdownToolbar guildId={guildId} textareaRef={endedDescRef} value={settings.endedDescription ?? ""} onChange={(v) => update({ endedDescription: v })} />
+                    <textarea ref={endedDescRef} className={`${field} min-h-20`} value={settings.endedDescription ?? ""} placeholder={GO_LIVE_DEFAULTS.endedDescription} onChange={(e) => update({ endedDescription: e.target.value })} />
+                    <PlaceholderExamples items={[...GO_LIVE_ENDED_PLACEHOLDERS, ...GO_LIVE_PLACEHOLDERS.filter((p) => p.token !== "{role}" && p.token !== "{viewers}")]} inputRef={endedDescRef} value={settings.endedDescription ?? ""} onChange={(v) => update({ endedDescription: v })} />
+                    <label className={label}>Summary Color</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" className="h-9 w-11 rounded-lg border border-white/10 bg-base-950 cursor-pointer" value={settings.endedColor || GO_LIVE_DEFAULTS.endedColor} onChange={(e) => update({ endedColor: e.target.value })} />
+                      <button type="button" onClick={() => update({ endedColor: null })} className={`text-xs px-2.5 py-1.5 rounded-lg border ${settings.endedColor ? "border-white/10 text-slate-400 hover:text-white" : "border-neon-blue/40 bg-neon-blue/10 text-white"}`}>
+                        Default grey
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className={`${label} mt-4`}>Don't Post Again Within</label>
                 <select className={field} value={settings.cooldownMinutes ?? 30} onChange={(e) => update({ cooldownMinutes: Number(e.target.value) })}>
                   {[0, 10, 30, 60, 120, 360].map((m) => (
@@ -538,26 +605,207 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
               ))}
             </div>
           </div>
-          <DiscordMessage content={sample.content || null}>
-            <DiscordEmbed
-              color={sample.color}
-              author={extra.authorName || sample.author.name}
-              authorIconUrl={extra.authorIconUrl}
-              title={sample.title}
-              description={sample.description}
-              fields={[...sample.fields, ...(extra.fields ?? [])]}
-              thumbnailUrl={extra.thumbnailUrl}
-              imageUrl={extra.imageUrl || (sample.image ? SAMPLE_IMAGE : null)}
-              footer={extra.footerText || sample.footer}
-              footerIconUrl={extra.footerIconUrl}
-              timestamp
-            />
-            <DiscordButtonRow>
-              <DiscordButton label={sample.button.label} emoji={sample.button.emoji} style="link" />
-            </DiscordButtonRow>
-          </DiscordMessage>
-          <p className={`${hint} mt-3`}>Sample streamer. In Discord the image is their live stream and their avatar shows in the corner.</p>
+          {showEnded && <p className="text-xs text-slate-400 mb-2">⚫ After the stream ends</p>}
+          <AlertPreview settings={settings} info={info} ended={showEnded ? { peak: 312, durationMs: 8_100_000 } : undefined} />
+          <p className={`${hint} mt-3`}>Sample streamer. In Discord the image is their live stream and their avatar shows in the corner. Streamers with their own look (Active → Edit) use that instead.</p>
         </NeonCard>
+      </div>
+    </div>
+  );
+}
+
+// The alert as Discord shows it, built the same way the bot builds it.
+function AlertPreview({ settings, info, ended, avatar }: { settings: StreamAlertSettingsRow; info: LiveInfo; ended?: { peak: number; durationMs: number }; avatar?: string | null }) {
+  const m = buildGoLiveMessage(settings, info, ended);
+  const x = ended ? {} : fillGoLiveExtra(settings.embedExtra, info);
+  return (
+    <DiscordMessage content={m.content || null}>
+      <DiscordEmbed
+        color={m.color}
+        author={x.authorName || m.author.name}
+        authorIconUrl={x.authorIconUrl || avatar || undefined}
+        title={m.title}
+        description={m.description}
+        fields={[...m.fields, ...(x.fields ?? [])]}
+        thumbnailUrl={x.thumbnailUrl || avatar || undefined}
+        imageUrl={x.imageUrl || (m.image ? SAMPLE_IMAGE : null)}
+        footer={x.footerText || m.footer}
+        footerIconUrl={x.footerIconUrl}
+        timestamp
+      />
+      <DiscordButtonRow>
+        <DiscordButton label={m.button.label} emoji={m.button.emoji} style="link" />
+      </DiscordButtonRow>
+    </DiscordMessage>
+  );
+}
+
+// ---- Edit one streamer ----
+
+type Overrides = Record<string, string>;
+
+function EditStreamer({ guildId, sub, settings, onClose, onSaved }: { guildId: string; sub: StreamSubscription; settings: StreamAlertSettingsRow; onClose: () => void; onSaved: () => void }) {
+  const p = platformInfo(sub.platform);
+  const [displayName, setDisplayName] = useState(sub.displayName ?? "");
+  const [site, setSite] = useState(sub.platformName ?? "");
+  const [channelId, setChannelId] = useState(sub.announceChannelId);
+  const [pingRoleId, setPingRoleId] = useState<string | null>(sub.pingRoleId ?? null);
+  const [userId, setUserId] = useState<string | null>(sub.discordUserId ?? null);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [memberQ, setMemberQ] = useState("");
+  const [results, setResults] = useState<RoleManagerMember[]>([]);
+  const [o, setO] = useState<Overrides>({ ...(sub.alertOverrides ?? {}) });
+  const [custom, setCustom] = useState(!!sub.alertOverrides && Object.keys(sub.alertOverrides).length > 0);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const q = memberQ.trim();
+    if (q.length < 2) return setResults([]);
+    const t = setTimeout(() => api.searchRoleMembers(guildId, q).then(setResults).catch(() => setResults([])), 300);
+    return () => clearTimeout(t);
+  }, [memberQ, guildId]);
+
+  const set = (k: string, v: string) => setO((cur) => ({ ...cur, [k]: v }));
+  const name = displayName.trim() || sub.channelName.replace(/^@/, "");
+  const info: LiveInfo = {
+    name,
+    platform: sub.platform,
+    platformName: site || undefined,
+    title: sub.lastTitle || "Ranked grind to Champion 🏆",
+    game: sub.lastGame || "Rainbow Six Siege",
+    viewers: 127,
+    url: p.url(sub.channelName),
+    userId,
+    roleId: pingRoleId || settings.pingRoleId || null,
+  };
+  const merged = custom ? withStreamerOverrides(settings, o) : settings;
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateStreamSubscription(guildId, sub.id, {
+        displayName: displayName.trim() || null,
+        platformName: sub.platform === "other" ? site.trim() || null : null,
+        announceChannelId: channelId,
+        pingRoleId,
+        discordUserId: userId,
+        alertOverrides: custom ? o : null,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const sub2 = "text-[11px] uppercase tracking-wide text-slate-500 block mb-1.5 mt-3";
+  return (
+    <div className="mt-3 pt-3 border-t border-white/10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Streamer</p>
+          <label className={sub2}>Name to Show</label>
+          <input className={field} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={sub.channelName.replace(/^@/, "")} maxLength={80} />
+          {sub.platform === "other" && (
+            <>
+              <label className={sub2}>Site</label>
+              <input className={field} value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. Facebook" maxLength={40} />
+            </>
+          )}
+          <label className={sub2}>Their Discord Account</label>
+          {userId ? (
+            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-base-950 px-2.5 py-2 text-sm">
+              <span>🔗 {userName ?? "Linked"}</span>
+              <button type="button" onClick={() => { setUserId(null); setUserName(null); }} className="text-xs text-slate-500 hover:text-rose-400">
+                Unlink
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input className={field} value={memberQ} onChange={(e) => setMemberQ(e.target.value)} placeholder="Search members" />
+              {results.length > 0 && (
+                <div className="absolute z-20 mt-1 w-full rounded-lg border border-white/10 bg-base-900 shadow-xl max-h-48 overflow-y-auto">
+                  {results.map((m) => (
+                    <button key={m.id} type="button" onClick={() => { setUserId(m.id); setUserName(m.displayName); setResults([]); setMemberQ(""); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-white/5">
+                      {m.displayName} <span className="text-xs text-slate-500">@{m.username}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <label className={sub2}>Alert Channel</label>
+          <ChannelSelect guildId={guildId} value={channelId} onChange={(id) => id && setChannelId(id)} kind="text" />
+          <label className={sub2}>Ping Role</label>
+          <RoleSelect guildId={guildId} value={pingRoleId} onChange={(id) => setPingRoleId(id || null)} placeholder="The server's ping role" />
+
+          <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-white/5">
+            <div>
+              <p className="text-sm font-medium">Their Own Alert Look</p>
+              <p className={hint}>Off: they use the server's alert from Settings. On: change any part just for them.</p>
+            </div>
+            <ToggleSwitch enabled={custom} onChange={setCustom} label="Own alert look" />
+          </div>
+          {custom && (
+            <>
+              <label className={sub2}>Message Text</label>
+              <textarea ref={contentRef} className={`${field} min-h-16`} value={o.contentTemplate ?? ""} placeholder={settings.contentTemplate || GO_LIVE_DEFAULTS.content} onChange={(e) => set("contentTemplate", e.target.value)} />
+              <PlaceholderExamples items={GO_LIVE_PLACEHOLDERS} inputRef={contentRef} value={o.contentTemplate ?? ""} onChange={(v) => set("contentTemplate", v)} />
+              <label className={sub2}>Embed Title</label>
+              <input ref={titleRef} className={field} value={o.embedTitle ?? ""} placeholder={settings.embedTitle || GO_LIVE_DEFAULTS.title} onChange={(e) => set("embedTitle", e.target.value)} maxLength={256} />
+              <PlaceholderExamples items={GO_LIVE_PLACEHOLDERS} inputRef={titleRef} value={o.embedTitle ?? ""} onChange={(v) => set("embedTitle", v)} />
+              <label className={sub2}>Embed Text</label>
+              <textarea ref={descRef} className={`${field} min-h-20`} value={o.embedDescription ?? ""} placeholder={settings.embedDescription ?? GO_LIVE_DEFAULTS.description} onChange={(e) => set("embedDescription", e.target.value)} />
+              <PlaceholderExamples items={GO_LIVE_PLACEHOLDERS} inputRef={descRef} value={o.embedDescription ?? ""} onChange={(v) => set("embedDescription", v)} />
+              <label className={sub2}>Embed Color</label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input type="color" className="h-9 w-11 rounded-lg border border-white/10 bg-base-950 cursor-pointer" value={o.embedColor || settings.embedColor || p.color} onChange={(e) => set("embedColor", e.target.value)} />
+                {COLOR_PRESETS.map((c) => (
+                  <button key={c} type="button" title={c} onClick={() => set("embedColor", c)} className="w-[18px] h-[18px] rounded border border-white/10 hover:scale-110 transition-transform" style={{ background: c }} />
+                ))}
+                <button type="button" onClick={() => set("embedColor", "")} className="text-xs text-slate-500 hover:text-white">
+                  Use the server's
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+                <div>
+                  <label className={sub2}>Button Text</label>
+                  <input className={field} value={o.buttonLabel ?? ""} placeholder={settings.buttonLabel || GO_LIVE_DEFAULTS.button} onChange={(e) => set("buttonLabel", e.target.value)} maxLength={80} />
+                </div>
+                <div>
+                  <label className={sub2}>Button Emoji</label>
+                  <EmojiPicker guildId={guildId} value={o.buttonEmoji ?? ""} onChange={(v) => set("buttonEmoji", v || "")} placeholder="The server's" />
+                </div>
+              </div>
+              <label className={sub2}>Big Image Link (replaces the stream preview)</label>
+              <input className={field} value={o.imageUrl ?? ""} placeholder="https://… (a banner or GIF)" onChange={(e) => set("imageUrl", e.target.value)} />
+              <label className={sub2}>Small Corner Image Link</label>
+              <input className={field} value={o.thumbnailUrl ?? ""} placeholder="https://… (their logo; empty = their avatar)" onChange={(e) => set("thumbnailUrl", e.target.value)} />
+              <label className={sub2}>Footer</label>
+              <input className={field} value={o.footerText ?? ""} placeholder={p.id === "other" ? site || "Stream" : p.name} onChange={(e) => set("footerText", e.target.value)} maxLength={2000} />
+              <p className={`${hint} mt-2`}>Empty boxes use the server's alert. Placeholders like {"{name}"} and {"{game}"} work in every box.</p>
+            </>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs text-slate-400 mb-2">Their alert</p>
+          <AlertPreview settings={merged} info={info} avatar={sub.lastAvatar} />
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mt-4">
+        <button onClick={save} disabled={saving || !channelId} className="neon-button-sm disabled:opacity-50">
+          {saving ? "Saving…" : "Save Streamer"}
+        </button>
+        <button type="button" onClick={onClose} className="text-xs text-slate-400 hover:text-white">
+          Cancel
+        </button>
+        {error && <p className="text-xs text-rose-400">{error}</p>}
       </div>
     </div>
   );

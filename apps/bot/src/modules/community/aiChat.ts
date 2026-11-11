@@ -80,13 +80,25 @@ const FAILURE_TEXT: Record<AiFailure, string> = {
 
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId || !message.client.user) return;
-  if (!message.mentions.has(message.client.user, { ignoreEveryone: true, ignoreRoles: true })) return;
+  const mentioned = message.mentions.has(message.client.user, { ignoreEveryone: true, ignoreRoles: true });
 
   const enabled = await isModuleEnabled(message.guildId, "AI_CHAT");
   if (!enabled) return;
 
   const config = await prisma.aiConfig.findUnique({ where: { guildId: message.guildId } });
-  if (config?.chatChannelId && config.chatChannelId !== message.channelId) return;
+  if (config?.chatChannelId) {
+    if (config.chatChannelId !== message.channelId) return;
+    if (!mentioned) {
+      // In its own channel it answers everything, unless set to mentions only.
+      if (config.chatRequireMention) return;
+      // A reply to another member is the two of them talking, not a question for the bot.
+      const repliedTo = message.mentions.repliedUser;
+      if (repliedTo && repliedTo.id !== message.client.user.id) return;
+    }
+  } else if (!mentioned) {
+    // With no channel picked it would otherwise answer every message in the server.
+    return;
+  }
   if (!isSendableChannel(message.channel)) return;
 
   const content = message.content.replace(/<@!?\d+>/g, "").trim();

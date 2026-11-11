@@ -9,7 +9,10 @@ import {
   Guild,
   GuildBasedChannel,
   Message,
+  PermissionFlagsBits,
   Role,
+  type CategoryChannel,
+  type OverwriteResolvable,
 } from "discord.js";
 import {
   EXTRA_GUIDES,
@@ -17,11 +20,15 @@ import {
   MODULE_LABELS,
   NAV_SECTIONS,
   PAGE_GUIDES,
+  STARTER_SHOP,
   TEST_AUTOMOD_WORD,
   TEST_GUIDES,
   TEST_ROLES,
   TEST_TICKETS_CATEGORY,
+  TESTER_START_CATEGORY,
+  TESTER_START_CHANNEL,
   UNLISTED_MODULES,
+  cleanShopItem,
   slugifyModuleLabel,
   zonedClock,
   type ModuleKey,
@@ -35,7 +42,7 @@ import { isSendableChannel } from "../../lib/channels";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { customCommandCache } from "../../lib/cache";
 import { buildSavedEmbedPayload, type SavedEmbedData } from "../../lib/savedEmbedRender";
-import { EXTRA_PAGE_CHANNELS, EXTRA_VOICE_CATEGORY, normalizeCategoryName } from "./setupTestServer";
+import { EXTRA_PAGE_CHANNELS, EXTRA_VOICE_CATEGORY, buildLayout, normalizeCategoryName } from "./setupTestServer";
 
 // Second half of the test-server scaffold. !setup-test-server makes a
 // category per dashboard section and a channel per page; this turns every
@@ -154,7 +161,8 @@ const SEEDERS: Record<string, (ctx: Ctx) => Promise<void>> = {
     const moved = !!existing && existing.channelId !== channel.id;
     await prisma.honeypotConfig.upsert({
       where: { guildId: guild.id },
-      create: { guildId: guild.id, channelId: channel.id, messageEnabled: true },
+      // A one-minute timeout, so testing it never removes anyone for good.
+      create: { guildId: guild.id, channelId: channel.id, messageEnabled: true, action: "TIMEOUT", timeoutMinutes: 1 },
       update: { channelId: channel.id, messageEnabled: true, ...(moved ? { messageId: null } : {}) },
     });
     const { syncHoneypotMessage } = await import("../security/honeypot");
@@ -489,12 +497,264 @@ const SEEDERS: Record<string, (ctx: Ctx) => Promise<void>> = {
   },
 };
 
+// ---- seeders that need more than a channel ----
+
+const voiceChannel = (guild: Guild, categoryId: string | null, name: string) =>
+  guild.channels.cache.find((c) => c.type === ChannelType.GuildVoice && c.name === name && (!categoryId || c.parentId === categoryId)) ?? null;
+
+// Two games, the board posted here, and General VC as the lobby. Anyone can
+// play, so a Tester doesn't need a separate Matchmaking role.
+SEEDERS["/matches"] = async ({ client, guild, channel, roles, voiceCategoryId }) => {
+  const games = [
+    { game: "Valorant", teamSize: 5 },
+    { game: "Rocket League", teamSize: 2 },
+  ];
+  await prisma.matchPreset.createMany({ data: games.map((g) => ({ guildId: guild.id, ...g })), skipDuplicates: true });
+  const existing = await prisma.matchmakingConfig.findUnique({ where: { guildId: guild.id } });
+  const listed = existing && Array.isArray(existing.games) ? existing.games : [];
+  const lobby = voiceChannel(guild, voiceCategoryId, "General VC");
+  const moved = !!existing && existing.channelId !== channel.id;
+  const data = {
+    enabled: true,
+    channelId: channel.id,
+    activityChannelId: channel.id,
+    lobbyVoiceId: existing?.lobbyVoiceId ?? lobby?.id ?? null,
+    staffRoleId: existing?.staffRoleId ?? roles.staff.id,
+    ...(moved ? { messageId: null, panelMessages: [] } : {}),
+  };
+  await prisma.matchmakingConfig.upsert({
+    where: { guildId: guild.id },
+    create: { guildId: guild.id, ...data, games: games.map((g) => g.game) },
+    update: { ...data, ...(listed.length ? {} : { games: games.map((g) => g.game) }) },
+  });
+  const { syncMatchmakingPanel } = await import("../matches/matchmaking");
+  await syncMatchmakingPanel(client, guild.id);
+};
+
+SEEDERS["/playing-now"] = async ({ client, guild, channel }) => {
+  const { createPlayingNowRoles, syncPlayingNowPanel } = await import("../engagement/playingNow");
+  const made = await createPlayingNowRoles(client, guild.id);
+  if (made.error) throw new Error(made.error);
+  const existing = await prisma.playingNowConfig.findUnique({ where: { guildId: guild.id } });
+  const data = {
+    channelId: channel.id,
+    roleId: existing?.roleId ?? made.roleId,
+    notifyRoleId: existing?.notifyRoleId ?? made.notifyRoleId,
+    ...(existing && existing.channelId !== channel.id ? { panelMessageId: null } : {}),
+  };
+  await prisma.playingNowConfig.upsert({ where: { guildId: guild.id }, create: { guildId: guild.id, ...data }, update: data });
+  const problem = await syncPlayingNowPanel(client, guild.id);
+  if (problem) throw new Error(problem);
+};
+
+// A made-up streamer with a test alert, so the post can be seen without a
+// live stream. Testers can use /golive for themselves.
+SEEDERS["/stream-alerts"] = async ({ client, guild, channel, roles }) => {
+  const settings = { defaultChannelId: channel.id, selfServeRoleId: roles.tester.id };
+  await prisma.streamAlertSettings.upsert({
+    where: { guildId: guild.id },
+    create: { guildId: guild.id, ...settings, pingRoleId: roles.ping.id },
+    update: settings,
+  });
+  if (await prisma.streamSubscription.findFirst({ where: { guildId: guild.id, displayName: "Test Streamer" } })) return;
+  const sub = await prisma.streamSubscription.create({
+    data: {
+      guildId: guild.id,
+      platform: "other",
+      platformName: "Test Platform",
+      channelName: "https://example.com/test-streamer",
+      announceChannelId: channel.id,
+      displayName: "Test Streamer",
+      lastTitle: "Test stream: ranked grind",
+      lastGame: "Rainbow Six Siege",
+    },
+  });
+  const { sendTestAlert } = await import("../community/goLive");
+  const result = await sendTestAlert(client, sub.id);
+  if (!result.ok) throw new Error(result.error ?? "The test alert didn't post.");
+};
+
+SEEDERS["/role-manager"] = async ({ guild, channel, roles }) => {
+  await prisma.roleManagerConfig.upsert({
+    where: { guildId: guild.id },
+    create: { guildId: guild.id, staffRoleIds: [roles.staff.id], logChannelId: channel.id },
+    update: { logChannelId: channel.id },
+  });
+};
+
+SEEDERS["/partnerships"] = async ({ guild }) => {
+  if (await prisma.serverPartnership.findFirst({ where: { guildId: guild.id, partnerName: "Test Partner Server" } })) return;
+  await prisma.serverPartnership.create({ data: { guildId: guild.id, partnerName: "Test Partner Server", type: "Ad Exchange" } });
+};
+
+// The shop, crates and profile panel all post in the hub's channel. Panels
+// are put up by their own jobs within a minute.
+async function seedEconomyHubExtras({ guild, channel, roles }: Ctx) {
+  const existing = await prisma.economyPlus.findUnique({ where: { guildId: guild.id } });
+  const data = {
+    shopEnabled: true,
+    shopPanelChannelId: channel.id,
+    cratesEnabled: true,
+    crateChannelId: channel.id,
+    voiceXpEnabled: true,
+    ...(!existing || existing.shopPanelChannelId !== channel.id ? { shopPanelMessageId: null } : {}),
+  };
+  await prisma.economyPlus.upsert({ where: { guildId: guild.id }, create: { guildId: guild.id, ...data }, update: data });
+
+  if ((await prisma.shopItem.count({ where: { guildId: guild.id } })) === 0) {
+    const items: Array<Record<string, unknown>> = [
+      ...STARTER_SHOP,
+      { emoji: "🔴", name: "Test Red Role", description: "A cosmetic role for one day", price: 100, type: "ROLE", roleId: roles.red.id, durationDays: 1 },
+    ];
+    let sort = 0;
+    for (const raw of items) {
+      const item = cleanShopItem({ ...raw, stock: null, enabled: true, roleId: raw.roleId ?? null });
+      if (typeof item !== "string") await prisma.shopItem.create({ data: { guildId: guild.id, sort: sort++, ...item } });
+    }
+  }
+
+  const profile = await prisma.profileCardSettings.findUnique({ where: { guildId: guild.id } });
+  const profileData = { panelChannelId: channel.id, ...(!profile || profile.panelChannelId !== channel.id ? { panelMessageId: null } : {}) };
+  await prisma.profileCardSettings.upsert({ where: { guildId: guild.id }, create: { guildId: guild.id, ...profileData }, update: profileData });
+}
+
+// ---- Tester role: who can see the test channels ----
+
+const TESTER_PERMS = [
+  PermissionFlagsBits.ViewChannel,
+  PermissionFlagsBits.ReadMessageHistory,
+  PermissionFlagsBits.SendMessages,
+  PermissionFlagsBits.SendMessagesInThreads,
+  PermissionFlagsBits.AddReactions,
+  PermissionFlagsBits.EmbedLinks,
+  PermissionFlagsBits.AttachFiles,
+  PermissionFlagsBits.UseApplicationCommands,
+  PermissionFlagsBits.Connect,
+  PermissionFlagsBits.Speak,
+  PermissionFlagsBits.UseVAD,
+];
+const BOT_PERMS = [
+  ...TESTER_PERMS,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.ManageThreads,
+  PermissionFlagsBits.CreatePublicThreads,
+  PermissionFlagsBits.MoveMembers,
+];
+
+interface Rule {
+  id: string;
+  allow?: bigint[];
+  deny?: bigint[];
+}
+
+// Keeps whatever else is already set on the category, and replaces only the
+// entries for the people and roles named in `rules`.
+function withRules(category: CategoryChannel, rules: Rule[]): OverwriteResolvable[] {
+  const ids = new Set(rules.map((r) => r.id));
+  const kept = category.permissionOverwrites.cache.filter((o) => !ids.has(o.id)).map((o) => ({ id: o.id, type: o.type, allow: o.allow, deny: o.deny }));
+  return [...kept, ...rules] as OverwriteResolvable[];
+}
+
+// Everyone can see #become-a-tester and nothing else here. Tapping its button
+// gives the Tester role, which opens every test channel.
+async function ensureStartHere(client: Client, guild: Guild, roles: Record<RoleKey, Role>): Promise<GuildBasedChannel> {
+  const me = guild.members.me ?? (await guild.members.fetchMe());
+  let category = findCategory(guild, TESTER_START_CATEGORY);
+  if (!category || category.type !== ChannelType.GuildCategory) {
+    category = await guild.channels.create({
+      name: TESTER_START_CATEGORY,
+      type: ChannelType.GuildCategory,
+      position: 0,
+      permissionOverwrites: [
+        {
+          id: guild.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory],
+          deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads, PermissionFlagsBits.SendMessagesInThreads],
+        },
+        { id: me.id, allow: BOT_PERMS },
+      ],
+    });
+  }
+  let channel = guild.channels.cache.find((c) => c.parentId === category.id && c.name === TESTER_START_CHANNEL);
+  if (!channel) {
+    channel = await guild.channels.create({ name: TESTER_START_CHANNEL, type: ChannelType.GuildText, parent: category.id, topic: "Tap the button to become a Tester and open every test channel." });
+  }
+
+  if (!(await prisma.rolePanel.findFirst({ where: { guildId: guild.id, channelId: channel.id, name: "Become a Tester" } }))) {
+    await prisma.rolePanel.create({
+      data: {
+        guildId: guild.id,
+        name: "Become a Tester",
+        channelId: channel.id,
+        description: `Tap the button to get the **${TEST_ROLES.tester}** role and open every test channel. Tap it again to leave.`,
+        layout: "BUTTONS",
+        embedEnabled: true,
+        embedColor: "#1ABC9C",
+        options: [{ roleIds: [roles.tester.id], channelIds: [], label: "Become a Tester", emoji: "🧪" }],
+      },
+    });
+  }
+
+  const info = new EmbedBuilder()
+    .setColor(0x1abc9c)
+    .setTitle("🧪 How testing works here")
+    .setDescription(`Tap **Become a Tester** below to get the **${TEST_ROLES.tester}** role. It opens every test channel, each with a card explaining what's set up and how to try it.`)
+    .addFields(
+      { name: "What you can do", value: "See and use every test channel, press the buttons and panels, run the bot's member commands (/rank, /daily, /trivia and so on) and join the voice channels." },
+      { name: "What you can't do", value: "Nothing staff-level. The role has no permissions of its own, only access to the test channels, so you can't ban, kick, mute, manage roles or channels, or change server settings." },
+      { name: "Heads up", value: "Posting in #honeypot times you out for a minute. Only post there to test it." }
+    )
+    .setFooter({ text: `${CARD_FOOTER} · tester access` });
+  await postCard(client, channel, info);
+  return channel;
+}
+
+// Hides every test category from @everyone and opens them to Testers, the
+// bot and the owner. Returns how many categories were locked.
+async function lockTestChannels(guild: Guild, roles: Record<RoleKey, Role>, ownerId: string, ticketsCategoryId: string) {
+  const problems: string[] = [];
+  let locked = 0;
+  const me = guild.members.me ?? (await guild.members.fetchMe());
+  const owner = await guild.members.fetch(ownerId).catch(() => null);
+  const base: Rule[] = [
+    { id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+    { id: me.id, allow: BOT_PERMS },
+    ...(owner ? [{ id: owner.id, allow: [...TESTER_PERMS, PermissionFlagsBits.ManageMessages] }] : []),
+  ];
+
+  for (const { name } of buildLayout()) {
+    const category = findCategory(guild, name);
+    if (!category || category.type !== ChannelType.GuildCategory) continue;
+    try {
+      await category.permissionOverwrites.set(withRules(category, [...base, { id: roles.tester.id, allow: TESTER_PERMS }]), "Spartacus test setup: testers only");
+      for (const child of guild.channels.cache.filter((c) => c.parentId === category.id && !c.isThread()).values()) {
+        if ("lockPermissions" in child && "permissionsLocked" in child && child.permissionsLocked === false) await child.lockPermissions();
+      }
+      locked++;
+    } catch (err) {
+      problems.push(`Couldn't lock **${name}** to Testers: ${err instanceof Error ? err.message : err}. Check that I have Manage Roles and Manage Channels.`);
+    }
+  }
+
+  // Private tickets and reports stay private: Testers don't get in here.
+  const tickets = guild.channels.cache.get(ticketsCategoryId);
+  if (tickets?.type === ChannelType.GuildCategory) {
+    const staff: Rule = { id: roles.staff.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.SendMessages] };
+    await tickets.permissionOverwrites.set(withRules(tickets, [...base, staff]), "Spartacus test setup: private tickets").catch((err) => {
+      problems.push(`Couldn't lock **${TEST_TICKETS_CATEGORY}**: ${err instanceof Error ? err.message : err}.`);
+    });
+  }
+  return { locked, problems };
+}
+
 // ---- roles, categories and channel lookup ----
 
 // The Economy Hub page holds what used to be separate pages, so its channel
 // gets all of their set-up.
 SEEDERS["/economy-hub"] = async (ctx) => {
   for (const key of ["/leveling", "/level-roles", "/prestige", "/achievements", "/economy/settings"]) await SEEDERS[key](ctx);
+  await seedEconomyHubExtras(ctx);
 };
 
 // Switched on with everything else: these are tabs of the Economy Hub, so no
@@ -505,10 +765,10 @@ async function ensureRoles(guild: Guild): Promise<Record<RoleKey, Role>> {
   await guild.roles.fetch();
   const roles = {} as Record<RoleKey, Role>;
   for (const [key, name] of Object.entries(TEST_ROLES) as Array<[RoleKey, string]>) {
-    const colors: Partial<Record<RoleKey, number>> = { red: 0xed4245, blue: 0x5865f2 };
+    const colors: Partial<Record<RoleKey, number>> = { red: 0xed4245, blue: 0x5865f2, tester: 0x1abc9c };
     roles[key] =
       guild.roles.cache.find((r) => !r.managed && r.name === name) ??
-      (await guild.roles.create({ name, permissions: [], mentionable: key === "ping", color: colors[key], reason: "Spartacus test setup" }));
+      (await guild.roles.create({ name, permissions: [], mentionable: key === "ping", hoist: key === "tester", color: colors[key], reason: "Spartacus test setup" }));
   }
   return roles;
 }
@@ -610,10 +870,12 @@ interface Report {
   cards: number;
   missing: string[];
   problems: string[];
+  locked: number;
+  signup: string | null;
 }
 
 async function run(client: Client, guild: Guild, ownerId: string, progress: (text: string) => Promise<unknown>): Promise<Report> {
-  const report: Report = { enabled: 0, cards: 0, missing: [], problems: [] };
+  const report: Report = { enabled: 0, cards: 0, missing: [], problems: [], locked: 0, signup: null };
   await guild.channels.fetch();
   await prisma.guild.upsert({ where: { id: guild.id }, create: { id: guild.id, name: guild.name }, update: {} });
 
@@ -621,6 +883,14 @@ async function run(client: Client, guild: Guild, ownerId: string, progress: (tex
   const ticketsCategoryId = await ensureTicketsCategory(guild);
   const voiceCategoryId = findCategory(guild, EXTRA_VOICE_CATEGORY.name)?.id ?? null;
   const targets = buildTargets();
+
+  // The one channel everyone can see, where a button gives the Tester role.
+  const signup = await ensureStartHere(client, guild, roles).catch((err) => {
+    report.problems.push(`**Tester sign-up**: ${err instanceof Error ? err.message : err}`);
+    logError("bot", err, guild.id);
+    return null;
+  });
+  report.signup = signup?.id ?? null;
 
   // Everything is switched on before anything posts, since most posters
   // check their module's switch first.
@@ -670,6 +940,11 @@ async function run(client: Client, guild: Guild, ownerId: string, progress: (tex
       else report.missing.push(`#${name}`);
     }
   }
+
+  // Last, so the bot is never locked out while it is still posting.
+  const lock = await lockTestChannels(guild, roles, ownerId, ticketsCategoryId).catch((err) => ({ locked: 0, problems: [`Couldn't lock the test channels: ${err instanceof Error ? err.message : err}`] }));
+  report.locked = lock.locked;
+  report.problems.push(...lock.problems);
   return report;
 }
 
@@ -697,6 +972,7 @@ export async function runSetupTestModules(message: Message) {
     `• Create ${Object.keys(TEST_ROLES).length} test roles with no permissions (${Object.values(TEST_ROLES).join(", ")}) and a "${TEST_TICKETS_CATEGORY}" category.`,
     "• Post each module's panel or sample (tickets, rules, a poll, a giveaway, today's quote and question, and so on).",
     "• Leave a card in every channel saying what was set up and how to try it.",
+    `• Make a "${TESTER_START_CATEGORY}" channel (#${TESTER_START_CHANNEL}) where anyone can tap a button to get the **${TEST_ROLES.tester}** role. Every test category is then hidden from everyone except Testers, you and me. **Members without the role lose sight of the test channels.** Testers get no staff permissions.`,
     "",
     `⚠️ Only run this in a test server. It changes where modules post, makes #honeypot a live trap, sets the starboard to 1 star, and adds the banned word \`${TEST_AUTOMOD_WORD}\`.`,
   ];
@@ -745,12 +1021,13 @@ export async function handleSetupTestModules(interaction: ButtonInteraction, act
     const report = await run(interaction.client, guild, interaction.user.id, edit);
     const parts = [
       `✅ Turned on ${report.enabled} modules and posted ${report.cards} test cards.`,
+      report.signup ? `🧪 People can join by tapping the button in <#${report.signup}>. ${report.locked} categories are now Testers only.` : "",
       "Panels made by background jobs (tickets, applications, reaction roles, giveaway, status, birthday button) show up within a minute.",
       "Open any channel and follow its card.",
     ];
     if (report.missing.length > 0) parts.push(`⚠️ Skipped ${report.missing.length} missing channel(s): ${report.missing.slice(0, 15).join(", ")}. Run \`!setup-test-server\`, then run this again.`);
     if (report.problems.length > 0) parts.push(`⚠️ ${report.problems.length} thing(s) need a look:\n${report.problems.slice(0, 10).join("\n")}`);
-    await edit(parts.join("\n").slice(0, 2000));
+    await edit(parts.filter(Boolean).join("\n").slice(0, 2000));
   } catch (err) {
     logError("bot", err, guild.id);
     await edit(`⚠️ Setup stopped early: ${err instanceof Error ? err.message : err}. Check that I have Manage Roles and Manage Channels, then run it again.`).catch(() => null);

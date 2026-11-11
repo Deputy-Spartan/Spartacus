@@ -1817,16 +1817,17 @@ model UptimeIncident {
 // isn't, both features log an error and no-op rather than crash anything.
 
 model AiConfig {
-  id                String  @id @default(cuid())
-  guild             Guild   @relation(fields: [guildId], references: [id])
-  guildId           String  @unique
-  chatChannelId     String? // null = respond anywhere the bot is @-mentioned
-  chatSystemPrompt  String?
-  moderationEnabled Boolean @default(false)
-  chatLimit         Int     @default(5) // questions per member per window; 0 = no limit
-  chatLimitWindow   Int     @default(60) // seconds
-  chatStaffExempt   Boolean @default(true) // Manage Server skips the limit
-  chatSlowmode      Int     @default(0) // Discord slowmode (seconds) put on chatChannelId
+  id                 String  @id @default(cuid())
+  guild              Guild   @relation(fields: [guildId], references: [id])
+  guildId            String  @unique
+  chatChannelId      String? // null = respond anywhere the bot is @-mentioned
+  chatRequireMention Boolean @default(false) // in chatChannelId: false = answer every message, true = only @-mentions
+  chatSystemPrompt   String?
+  moderationEnabled  Boolean @default(false)
+  chatLimit          Int     @default(5) // questions per member per window; 0 = no limit
+  chatLimitWindow    Int     @default(60) // seconds
+  chatStaffExempt    Boolean @default(true) // Manage Server skips the limit
+  chatSlowmode       Int     @default(0) // Discord slowmode (seconds) put on chatChannelId
 }
 
 // ---- Server Backup ----

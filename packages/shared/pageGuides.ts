@@ -308,9 +308,9 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   },
   "/ai-chat": {
     title: "AI Chat",
-    purpose: "Members mention the bot and it replies using AI.",
+    purpose: "Members chat with the bot in its own channel, or mention it, and it replies using AI.",
     before: ["An Anthropic API key must be set up on the bot."],
-    steps: ["Optionally pick a channel to restrict it to.", "Write its Personality / System Prompt.", "Turn the module on.", "Mention the bot in a channel to test it."],
+    steps: ["Pick the AI Channel. The bot answers every message there and stays quiet everywhere else.", "Tick Only answer when @mentioned if it should wait to be mentioned in that channel.", "Or leave the channel empty to have it answer anywhere it's mentioned.", "Write its Personality / System Prompt.", "Turn the module on.", "Type in the AI channel to test it."],
     tips: ["Each reply is an API call, so restricting it to one channel helps control cost."],
   },
   "/birthdays": {

@@ -7,7 +7,7 @@ export const AI_CHAT_WINDOW_CHOICES = [30, 60, 300, 600, 1800, 3600] as const;
 // Discord's own slowmode steps, in seconds (0 = off).
 export const SLOWMODE_CHOICES = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600] as const;
 
-export const AI_CHAT_DEFAULTS = { chatLimit: 5, chatLimitWindow: 60, chatStaffExempt: true, chatSlowmode: 0 };
+export const AI_CHAT_DEFAULTS = { chatLimit: 5, chatLimitWindow: 60, chatStaffExempt: true, chatSlowmode: 0, chatRequireMention: false };
 
 export function formatSeconds(s: number): string {
   if (s <= 0) return "Off";

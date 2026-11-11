@@ -323,6 +323,7 @@ export interface GrowthSnapshotRow {
 export interface AiConfigRow {
   guildId: string;
   chatChannelId: string | null;
+  chatRequireMention: boolean; // in the AI channel: only answer @mentions
   chatSystemPrompt: string | null;
   moderationEnabled: boolean;
   chatLimit: number; // questions per member per window; 0 = no limit

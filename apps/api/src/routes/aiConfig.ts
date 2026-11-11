@@ -35,6 +35,7 @@ router.put("/guilds/:guildId/ai-config", requireAuth, requireGuildPermission, as
     chatLimit: pick(body.chatLimit, AI_CHAT_LIMIT_CHOICES, before?.chatLimit ?? AI_CHAT_DEFAULTS.chatLimit),
     chatLimitWindow: pick(body.chatLimitWindow, AI_CHAT_WINDOW_CHOICES, before?.chatLimitWindow ?? AI_CHAT_DEFAULTS.chatLimitWindow),
     chatStaffExempt: typeof body.chatStaffExempt === "boolean" ? body.chatStaffExempt : (before?.chatStaffExempt ?? true),
+    chatRequireMention: typeof body.chatRequireMention === "boolean" ? body.chatRequireMention : (before?.chatRequireMention ?? false),
     chatSlowmode: pick(body.chatSlowmode, SLOWMODE_CHOICES, before?.chatSlowmode ?? 0),
   };
   // Slowmode only means something on a picked channel.

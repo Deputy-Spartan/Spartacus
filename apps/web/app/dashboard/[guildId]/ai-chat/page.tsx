@@ -49,7 +49,7 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
         guildId={params.guildId}
         moduleKey="AI_CHAT"
         title="AI Chat"
-        description="Mention the bot and it answers with Claude Haiku 5.5. It remembers the last few messages in the channel for 15 minutes, so follow-up questions work. Set how often members can ask, and a slowmode for the AI channel, below. Needs ANTHROPIC_API_KEY set in Render."
+        description="Pick a channel and the bot answers every message there with Claude Haiku 5.5, or mention it anywhere if no channel is picked. It remembers the last few messages in the channel for 15 minutes, so follow-up questions work. Set how often members can ask, and a slowmode for the AI channel, below. Needs ANTHROPIC_API_KEY set in Render."
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
@@ -66,6 +66,22 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
             onChange={(channelId) => persist({ ...config, chatChannelId: channelId })}
             placeholder="Respond anywhere it's @-mentioned"
           />
+          <p className="text-xs text-slate-500 mt-2 mb-3">
+            {config.chatChannelId
+              ? config.chatRequireMention
+                ? "Spartacus only answers in this channel, and only when it's @mentioned."
+                : "Spartacus answers every message in this channel, no @mention needed. It stays quiet everywhere else."
+              : "No channel picked, so Spartacus answers anywhere it's @mentioned."}
+          </p>
+          <label className={`flex items-center gap-2 text-sm mb-4 ${config.chatChannelId ? "text-slate-300" : "text-slate-600"}`}>
+            <input
+              type="checkbox"
+              checked={config.chatRequireMention}
+              disabled={!config.chatChannelId}
+              onChange={(e) => persist({ ...config, chatRequireMention: e.target.checked })}
+            />
+            Only answer when @mentioned
+          </label>
 
           <label className={label}>Personality / System Prompt</label>
           <textarea
@@ -80,7 +96,7 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
 
         <NeonCard>
           <p className="font-medium mb-1">Limits &amp; Slow Mode</p>
-          <p className="text-xs text-slate-500 mb-4">Two separate controls: the question limit only counts @mentions of Spartacus; slowmode is Discord's own and covers every message in the AI channel.</p>
+          <p className="text-xs text-slate-500 mb-4">Two separate controls: the question limit only counts messages Spartacus answers; slowmode is Discord's own and covers every message in the AI channel.</p>
 
           <label className={label}>Question limit</label>
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">

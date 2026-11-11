@@ -20,7 +20,13 @@ export const TEST_ROLES = {
   blue: "Test Blue",
   level: "Test Level 1",
   ping: "Test Ping",
+  tester: "Spartacus Tester",
 } as const;
+
+// Where anyone can tap a button to become a Tester. It is the only category
+// everyone can see; every test category is hidden from everyone but Testers.
+export const TESTER_START_CATEGORY = "🧪 start here";
+export const TESTER_START_CHANNEL = "become-a-tester";
 
 // Private channels made while testing (tickets, reports) go in this category.
 export const TEST_TICKETS_CATEGORY = "🧪 test tickets";
@@ -89,14 +95,14 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     tryIt: ["Tap I Agree.", `Check that you now have the ${TEST_ROLES.rules} role.`, "Tap it again to see the already agreed reply.", "Open the Activity tab on the dashboard to see your agreement."],
   },
   "/honeypot": {
-    prepared: "This is the trap channel. The warning message with its counter and Honeypot Stats button is posted here.",
+    prepared: "This is the trap channel, set to a 1-minute timeout so a test doesn't remove anyone. The warning message with its counter and Honeypot Stats button is posted here.",
     tryIt: [
       "Tap Honeypot Stats on the message. Only you see the reply.",
       "Post here as staff. Nothing happens, because Manage Messages is exempt.",
-      "From a test account with no staff permissions, post here. It's removed and the counter goes up.",
+      "From a Tester account, post here. The message is removed, the account is timed out for a minute and the counter goes up.",
       "Change the action on the dashboard (Ban, Soft ban, Kick, Timeout) and try again.",
     ],
-    needs: "A throwaway second account. Whoever posts here really is removed.",
+    needs: "A second account without staff permissions. A Tester works.",
   },
   "/perm-watch": {
     prepared: "Alerts post in this channel.",
@@ -124,8 +130,8 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     tryIt: ["Join this voice channel.", "You're moved into a new room named after you.", "Leave it. The room deletes itself."],
   },
   "/ai-chat": {
-    prepared: "AI Chat is limited to this channel.",
-    tryIt: ["Mention the bot here and ask it something.", "Mention it in another channel. It stays quiet there."],
+    prepared: "This is the AI channel. The bot answers every message here without being mentioned.",
+    tryIt: ["Type a question here. No mention needed.", "Mention it in another channel. It stays quiet there.", "On the dashboard, tick Only answer when @mentioned, then check it ignores a plain message here and answers a mention."],
     needs: "An Anthropic API key on the bot.",
   },
   "/birthdays": {
@@ -143,9 +149,15 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
   },
 
   "/matches": {
-    prepared: "Turned on. Matchmaking has its own setup on the dashboard.",
-    tryIt: ["Open Matchmaking on the dashboard and follow its Guide tab.", "Add a game on the Games tab.", "On the Matchmaking tab, pick this channel and turn the board on.", "Use the board's buttons here to find a 1v1."],
-    needs: "A second account to play against.",
+    prepared: "Matchmaking is on and its board is posted here, with Valorant and Rocket League added. Anyone can play, and General VC is the lobby.",
+    tryIt: [
+      "Use the board's buttons here to queue for a 1v1.",
+      "From a second account, queue for the same game to get matched.",
+      "Join General VC first if you want to be moved into a match voice channel.",
+      "Make a team with the Team buttons, then try a challenge.",
+      "Report the result from the match room.",
+    ],
+    needs: "A second account to play against. Any Tester works.",
   },
   "/events": {
     prepared: "This is the default event channel. A test event starting in 2 hours is posted.",
@@ -156,10 +168,9 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     tryIt: ["Join any voice channel.", "Type !lfg need 2 more here, or run /lfg.", "Try it without being in voice to see the error message."],
   },
   "/playing-now": {
-    prepared: "Turned on, but not set up. It needs its channel and two roles picked on the dashboard.",
+    prepared: "The Playing Now and Play Notify roles are made and the panel is posted here.",
     tryIt: [
-      "On the dashboard, open Playing Now, pick this channel and tap Make the roles for me, then Save.",
-      "Wait for the panel to appear here, then tap I'm on now and post.",
+      "Tap I'm on now, pick a mode and post it.",
       "From a second account, tap Join on the post, then tap Notify me.",
       "Tap I'm done and check the post clears.",
     ],
@@ -197,9 +208,13 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
   },
   "/stream-alerts": {
-    prepared: "Turned on. A creator has to be added on the dashboard.",
-    tryIt: ["Tap + Create New on the dashboard.", "Add a Twitch channel that's live right now, with this channel's ID.", "The alert posts here within a few minutes."],
-    needs: "A creator who is live, and Twitch or YouTube keys on the bot.",
+    prepared: "A made-up streamer called Test Streamer is added and a test alert (no ping) is posted here. Members with the Spartacus Tester role can use /golive for themselves.",
+    tryIt: [
+      "Look at the test alert above.",
+      "Run /golive to announce yourself live, then end it the same way.",
+      "On the dashboard, change the alert's look and tap Send Test to see it update.",
+      "To try real live checks, add your own Twitch channel on the dashboard.",
+    ],
   },
   "/commands": {
     prepared: "A custom command !hello is created.",
@@ -211,20 +226,20 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     needs: "Disboard in the server.",
   },
   "/partnerships": {
-    prepared: "Nothing to post. This is a list kept on the dashboard.",
-    tryIt: ["Add a partner server on the dashboard.", "Check that it shows in the list."],
+    prepared: "A sample partner called Test Partner Server is already in the list.",
+    tryIt: ["Open Server Partnerships on the dashboard and find the sample.", "Add one of your own and remove it again."],
   },
 
   "/economy-hub": {
-    prepared: `Levels, Prestige, Voice Activity, Achievements, Profile Cards and Coins are all turned on. Level-up and achievement posts go in this channel, reaching level 1 gives the ${TEST_ROLES.level} role, and the prestige max level is 2 if it hadn't been set.`,
+    prepared: `Levels, Prestige, Voice Activity, Achievements, Profile Cards and Coins are all turned on. The shop panel (with starter items and a test role) and the profile card panel are posted here within a minute. Level-up and achievement posts go in this channel, reaching level 1 gives the ${TEST_ROLES.level} role, and the prestige max level is 2 if it hadn't been set.`,
     tryIt: [
       "Chat in any channel. XP is given at most once a minute, and your level-up card appears here.",
       `At level 1, check that you have the ${TEST_ROLES.level} role.`,
       "Run /rank, /leaderboard and /profile.",
       "Run /balance and /daily, then /pay to send coins to another account.",
+      "Tap Shop on the panel here, then /shop and /crates.",
       "Reach the max level and run /prestige.",
-      "On the dashboard, open Economy Hub → Shop, add the starter items and turn the shop on, then run /shop and /crates.",
-      "Sit in a voice channel for a few minutes, then check the Boosts and Leaderboards tabs.",
+      "Sit in a voice channel for a few minutes, then check the Boosts and Leaderboards tabs on the dashboard.",
     ],
     needs: "A second account for /pay.",
   },
@@ -258,12 +273,12 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
   },
 
   "/role-manager": {
-    prepared: "Turned on. Nothing to post; it works from the dashboard and /role.",
+    prepared: "Turned on. Test Staff can use /role, and every change is logged in this channel.",
     tryIt: [
-      `Run /role give on a second account with the ${TEST_ROLES.member} role and a time of 2m.`,
+      `Run /role give on a Tester with the ${TEST_ROLES.red} role and a time of 2m.`,
       "Run /role list for that account.",
       "Wait two minutes and check the role is taken off again.",
-      "Open Role Manager on the dashboard and check History shows both changes.",
+      "Check the log here, and History on the dashboard.",
     ],
     needs: "A second account to give the role to.",
   },

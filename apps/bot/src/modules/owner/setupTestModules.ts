@@ -574,6 +574,34 @@ SEEDERS["/stream-alerts"] = async ({ client, guild, channel, roles }) => {
   if (!result.ok) throw new Error(result.error ?? "The test alert didn't post.");
 };
 
+// A posted schedule with two sample streams, clips and rewards switched on.
+SEEDERS["/stream-extras"] = async ({ client, guild, channel, sibling }) => {
+  const clips = sibling("stream-clips") ?? channel;
+  const data = {
+    scheduleChannelId: channel.id,
+    scheduleTimezone: "America/New_York",
+    clipsEnabled: true,
+    clipsChannelId: clips.id,
+    rewardsEnabled: true,
+    rewardCoins: 10,
+    rewardXp: 10,
+    rewardIntervalMin: 5,
+    rewardDailyCoinCap: 200,
+  };
+  await prisma.streamExtrasConfig.upsert({ where: { guildId: guild.id }, create: { guildId: guild.id, ...data }, update: { ...data, scheduleMessageId: null, scheduleHash: null } });
+  if (!(await prisma.streamSlot.count({ where: { guildId: guild.id } }))) {
+    await prisma.streamSlot.createMany({
+      data: [
+        { guildId: guild.id, streamer: "Test Streamer", title: "Ranked grind", dayOfWeek: 5, startMinutes: 19 * 60, durationMin: 180 },
+        { guildId: guild.id, streamer: "Test Streamer", title: "Viewer games", dayOfWeek: 6, startMinutes: 15 * 60, durationMin: 120 },
+      ],
+    });
+  }
+  const { updateSchedule } = await import("../stream/schedule");
+  const r = await updateSchedule(client, guild.id, true);
+  if (!r.message.ok) throw new Error(r.message.error ?? "The schedule didn't post.");
+};
+
 SEEDERS["/role-manager"] = async ({ guild, channel, roles }) => {
   await prisma.roleManagerConfig.upsert({
     where: { guildId: guild.id },

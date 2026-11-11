@@ -40,7 +40,7 @@ const unescapeJson = (s: string) => {
 
 // ---- Twitch (official API; needs TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET) ----
 let twitchToken: { token: string; expiresAt: number } | null = null;
-async function twitchAuth(): Promise<string | null> {
+export async function twitchAuth(): Promise<string | null> {
   if (!process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET) return null;
   if (twitchToken && twitchToken.expiresAt > Date.now()) return twitchToken.token;
   const res = await fetch("https://id.twitch.tv/oauth2/token", {

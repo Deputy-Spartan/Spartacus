@@ -392,6 +392,28 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     ],
     tips: ["Publish Now sends right away and ignores the schedule.", "Once published, it can't be edited. Use Resend under Recently Sent for a new copy."],
   },
+  "/stream-extras": {
+    title: "Stream Extras",
+    purpose: "Extras for your streamers: a Live role while they stream, Twitch clips with votes, a weekly stream schedule, and rewards for viewers who chat.",
+    steps: [
+      "Live role: on Going Live, pick the Live role and the streamer role. Members with the streamer role run /mystream link to connect their channel.",
+      "Clips: turn on Post clips and pick a channel. New clips from the Twitch streamers on your Going Live list are posted with a 🔥 vote button.",
+      "Clip of the Week: pick a day. The most-voted clip of the last 7 days is posted.",
+      "Schedule: pick a channel and your time zone, then add each stream. Streamers can also run /schedule add themselves.",
+      "Turn on Discord events if you want members to tap Interested and get a reminder. The bot needs the Manage Events permission.",
+      "Viewer rewards: turn it on and choose the coins and XP. Members run /link twitch and type their code in a live chat to prove the name is theirs.",
+      "Turn the module on at the top of the page.",
+    ],
+    members: [
+      "/schedule view shows the schedule. /link twitch connects a Twitch name. /mystream link (streamers) connects a channel.",
+    ],
+    tips: [
+      "Clips and viewer rewards need Twitch set up on the bot (TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET), and clips come from the streamers on your Going Live list.",
+      "Clips only come from Twitch. Rewards only count Twitch chat.",
+      "The bot reads Twitch chat only for streamers who are live, and never posts there.",
+      "Coins need the Economy module on and XP needs Leveling on.",
+    ],
+  },
   "/quote-of-the-day": {
     title: "Quote & Question of the Day",
     purpose: "Posts a quote and a question every day. Each one has its own tab, channel, time, message and list.",

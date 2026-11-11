@@ -183,6 +183,7 @@ enum ModuleKey {
   ROLE_MANAGER
   PROFILE_CARDS
   PLAYING_NOW
+  STREAM_EXTRAS
 }
 
 model GrowthSnapshot {
@@ -3173,4 +3174,102 @@ model PlayingNowPost {
 
   @@index([guildId, endedAt])
   @@index([endedAt, endsAt])
+}
+
+// ---- Stream Extras: clips, schedule, viewer rewards ----
+
+model StreamExtrasConfig {
+  id                   String    @id @default(cuid())
+  guildId              String    @unique
+  // Clips
+  clipsEnabled         Boolean   @default(false)
+  clipsChannelId       String?
+  clipsMinViews        Int       @default(0)
+  clipsWeekly          Boolean   @default(true) // post a Clip of the Week
+  clipsWeeklyDay       Int       @default(0) // 0 = Sunday
+  lastClipOfWeekAt     DateTime?
+  // Schedule
+  scheduleChannelId    String?
+  scheduleMessageId    String?
+  scheduleTimezone     String    @default("UTC")
+  scheduleCreateEvents Boolean   @default(false)
+  scheduleHash         String?
+  // Viewer rewards (Twitch chat)
+  rewardsEnabled       Boolean   @default(false)
+  rewardCoins          Int       @default(10)
+  rewardXp             Int       @default(10)
+  rewardIntervalMin    Int       @default(10)
+  rewardDailyCoinCap   Int       @default(200)
+}
+
+model StreamClip {
+  id        String   @id @default(cuid())
+  guildId   String
+  platform  String   @default("twitch")
+  clipId    String
+  url       String
+  title     String
+  creator   String?
+  streamer  String?
+  thumbnail String?
+  views     Int      @default(0)
+  channelId String?
+  messageId String?
+  votes     Int      @default(0)
+  clippedAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, platform, clipId])
+  @@index([guildId, clippedAt])
+}
+
+model StreamClipVote {
+  id     String @id @default(cuid())
+  clipId String
+  userId String
+
+  @@unique([clipId, userId])
+}
+
+model StreamSlot {
+  id             String    @id @default(cuid())
+  guildId        String
+  userId         String? // the streamer's Discord account, when added with /schedule
+  streamer       String // name shown on the schedule
+  title          String?
+  link           String? // where to watch
+  dayOfWeek      Int // 0 = Sunday
+  startMinutes   Int // minutes after midnight, in the server's time zone
+  durationMin    Int       @default(120)
+  discordEventId String?
+  eventAt        DateTime? // the start the Discord event was made for
+  createdAt      DateTime  @default(now())
+
+  @@index([guildId])
+}
+
+model StreamLink {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  platform   String    @default("twitch")
+  handle     String // lowercase Twitch login
+  code       String // typed once in a live chat to prove it's theirs
+  verified   Boolean   @default(false)
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@unique([guildId, platform, handle])
+  @@unique([guildId, userId, platform])
+  @@index([guildId, verified])
+}
+
+model StreamRewardDay {
+  id      String @id @default(cuid())
+  guildId String
+  userId  String
+  day     String // YYYY-MM-DD, UTC
+  coins   Int    @default(0)
+
+  @@unique([guildId, userId, day])
 }

@@ -47,6 +47,7 @@ export const ROUTE_LOADS: Record<string, Loader[]> = {
   "/status-channel": ["getAlertSettings", "getDiscordChannels", "getStatusChannels"],
   "/sticky-messages": ["getStickyMessages"],
   "/stream-alerts": ["getStreamSubscriptions"],
+  "/stream-extras": ["getStreamExtras"],
   "/suggestion-analytics": ["getSuggestionAnalyticsSettings"],
   "/support-intake": ["getSupportFlows", "getSupportSettings"],
   "/temp-channels": ["getDiscordChannels", "getDiscordEmojis", "getTempChannelLobbies"],

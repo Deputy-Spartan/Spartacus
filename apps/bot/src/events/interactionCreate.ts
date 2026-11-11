@@ -56,6 +56,13 @@ async function route(interaction: Interaction) {
     return;
   }
 
+  // Stream Extras: the vote button on a posted clip.
+  if (interaction.isButton() && interaction.customId.startsWith("clipv:")) {
+    const { handleClipVote } = await import("../modules/stream/clips");
+    await handleClipVote(interaction);
+    return;
+  }
+
   // /golive setup: the step-by-step Going Live wizard.
   if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("glw:")) {
     const { handleGoLiveSetup } = await import("../modules/community/goLiveSetup");

@@ -51,6 +51,7 @@ export const EXTRA_VOICE_CATEGORY: CategorySpec = {
 // beside its own. Question of the Day is a tab on the Quote of the Day page.
 export const EXTRA_PAGE_CHANNELS: Record<string, string[]> = {
   "/quote-of-the-day": ["question-of-the-day"],
+  "/stream-extras": ["stream-clips"],
 };
 
 // Modules with no dashboard page (/rank, /trivia and so on) still get a

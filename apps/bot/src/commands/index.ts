@@ -32,6 +32,9 @@ import remindme from "./utility/remindme";
 import serverSetup from "./utility/serverSetup";
 import role from "./utility/role";
 import golive from "./community/golive";
+import schedule from "./community/schedule";
+import link from "./community/link";
+import mystream from "./community/mystream";
 import profile from "./leveling/profile";
 import levelroles from "./leveling/levelroles";
 import shop from "./economy/shop";
@@ -72,6 +75,9 @@ for (const command of [
   serverSetup,
   role,
   golive,
+  schedule,
+  link,
+  mystream,
   profile,
   levelroles,
   shop,

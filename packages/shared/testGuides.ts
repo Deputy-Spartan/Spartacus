@@ -216,6 +216,19 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
       "To try real live checks, add your own Twitch channel on the dashboard.",
     ],
   },
+  "/stream-extras": {
+    prepared: `The schedule is posted here (in New York time) with two sample streams, clips go to #stream-clips, and viewer rewards are on at 10 coins and 10 XP every 5 minutes. Members with the ${TEST_ROLES.tester} role can add to the schedule and link a channel.`,
+    tryIt: [
+      "Look at the pinned schedule above, then run /schedule view.",
+      "Run /schedule add with a day and time to add your own, and check the message updates.",
+      "Run /schedule remove with the same day and time to take it off.",
+      "Turn on Discord events on the dashboard's Schedule tab and see an event appear under Events.",
+      "Run /mystream link with a Twitch channel, then check Going Live to see it listed.",
+      "Run /link twitch and read the steps. The code only confirms in a live Twitch chat.",
+      "Add a real Twitch streamer on Going Live to see clips with a 🔥 vote button in #stream-clips.",
+    ],
+    needs: "Twitch keys on the bot, and a live Twitch streamer, to see clips and chat rewards.",
+  },
   "/commands": {
     prepared: "A custom command !hello is created.",
     tryIt: ["Type !hello in any channel.", "Add another command on the dashboard and try it."],

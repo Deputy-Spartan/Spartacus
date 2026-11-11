@@ -14,6 +14,7 @@ import * as guildMemberRemove from "./events/guildMemberRemove";
 import { startEventReminderJob } from "./jobs/eventReminder";
 import { startEventSyncJob } from "./jobs/eventSync";
 import { startStreamPollerJob } from "./jobs/streamPoller";
+import { startStreamExtrasJobs } from "./jobs/streamExtras";
 import { startGiveawayEnderJob } from "./jobs/giveawayEnder";
 import { startGiveawayPosterJob } from "./jobs/giveawayPoster";
 import { startTicketPanelPosterJob } from "./jobs/ticketPanelPoster";
@@ -168,6 +169,8 @@ export { refreshRolePanel } from "./jobs/rolePanelPoster";
 export { bumpRulesVersion } from "./modules/security/rulesGate";
 export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 export { checkStreamerNow, sendTestAlert } from "./modules/community/goLive";
+export { removeSlot as removeStreamSlot, updateSchedule } from "./modules/stream/schedule";
+export { postClipOfTheWeek } from "./modules/stream/clips";
 export { runStreamDeck, streamDeckFace, streamDeckOptions } from "./modules/utility/streamDeck";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
@@ -263,6 +266,7 @@ export function startBot() {
     startStatChannelsJob(c);
     startStatusChannelPosterJob(c);
     startStreamPollerJob(c);
+    startStreamExtrasJobs(c);
     startGiveawayEnderJob(c);
     startGiveawayPosterJob(c);
     startTicketPanelPosterJob(c);

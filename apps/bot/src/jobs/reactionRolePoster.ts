@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
+import { shouldLook } from "../lib/quietPoll";
 import { applyEmbedExtra } from "../lib/embedExtra";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
@@ -99,6 +100,7 @@ export async function refreshReactionRolePanel(client: Client, panelId: string):
 // modules/community/reactionRoles.ts and matches purely on messageId+emoji.
 export function startReactionRolePosterJob(client: Client) {
   cron.schedule("*/5 * * * * *", async () => {
+    if (!shouldLook("reaction-roles")) return;
     let loggedThisTick = 0;
     const pending = await prisma.reactionRolePanel.findMany({
       where: { messageId: null },

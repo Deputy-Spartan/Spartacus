@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
-import { api, type ModuleState } from "../../lib/api";
+import { api } from "../../lib/api";
+import { useModules } from "../../lib/useModules";
 import { usePinnedModules } from "../../lib/usePinnedModules";
 import { hoverPrefetch } from "../../lib/prefetch";
 import { AppIcon } from "../ui/AppIcon";
@@ -64,27 +65,11 @@ export function Sidebar({
     });
   }
   const pinnedQuick = quickLinks.filter((g) => g.pinned && quickLinkMain(g));
-  const [modules, setModules] = useState<Record<string, ModuleState> | null>(null);
+  // Shared with the group tabs and the Modules page: one copy, one refresh
+  // timer, and a switch flipped on any page shows here straight away.
+  const modules = useModules(guildId);
   const setup = useSetupStatus(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
-
-  useEffect(() => {
-    let cancelled = false;
-    function load() {
-      api.getModules(guildId).then((m) => {
-        if (!cancelled) setModules(m);
-      });
-    }
-    load();
-    // Toggling a module elsewhere on the page doesn't re-render the sidebar
-    // on its own — a light poll keeps the dots honest without wiring up a
-    // dedicated event for every page that has an enable/disable switch.
-    const interval = setInterval(load, 15_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [guildId]);
 
   const baseSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
@@ -97,22 +82,27 @@ export function Sidebar({
 
   const pinnedItems = useMemo(() => allItems.filter((item) => isPinned(item.href)), [allItems, isPinned]);
 
-  // Not searching: categories collapse to one row each (icon + name), linking
-  // to that category's own card grid — browsing a category's individual
-  // pages happens there, not by expanding a list in the sidebar itself.
+  // Not searching: each group is one row (icon + name) that opens straight
+  // to a page in it — the first one that's switched on, or the first one if
+  // none are yet. The group's other pages are the tabs along the top of that
+  // page (HubTabs), so nothing needs expanding in the sidebar itself.
   // Owner Only is small (owner-exclusive tools, not real "modules") and
-  // stays a regular expandable section instead of folding into that grid.
+  // stays a regular expandable section.
   const categoryRows = useMemo(
     () =>
       baseSections
         .slice(1)
         .filter((s) => s.section !== "Owner Only")
-        .map((s) => ({
-          href: `/modules?section=${encodeURIComponent(s.section as string)}`,
-          label: s.section as string,
-          icon: s.items[0]?.icon ?? "🧩",
-        })),
-    [baseSections]
+        .map((s) => {
+          const landing = s.items.find((i) => i.moduleKey && modules?.[i.moduleKey]?.enabled) ?? s.items[0];
+          return {
+            href: landing?.href ?? `/modules?section=${encodeURIComponent(s.section as string)}`,
+            label: s.section as string,
+            icon: s.icon ?? s.items[0]?.icon ?? "🧩",
+            pages: s.items.map((i) => i.href),
+          };
+        }),
+    [baseSections, modules]
   );
   const ownerSection = useMemo(() => baseSections.find((s) => s.section === "Owner Only"), [baseSections]);
 
@@ -227,8 +217,11 @@ export function Sidebar({
                     ? section.items.map((cat) => {
                         const rawHref = cat.href as string;
                         const href = `/dashboard/${guildId}${rawHref}`;
-                        const basePath = href.split("?")[0];
-                        const active = pathname === basePath && activeSection === cat.label;
+                        // Lit while any page of the group is open, or its
+                        // list on the Modules page.
+                        const rel = pathname.slice(`/dashboard/${guildId}`.length);
+                        const pages = (cat as { pages?: string[] }).pages ?? [];
+                        const active = pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === cat.label);
                         return (
                           <Link
                             key={rawHref}

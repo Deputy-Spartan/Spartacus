@@ -1293,25 +1293,32 @@ export async function handleMatchmaking(interaction: Interaction) {
 
 const refreshedBoards = new Set<string>();
 
-export async function tickMatchmaking(client: Client) {
+// `tidy` is true on the slower turns (see tickMatches): the after-restart
+// board refresh and clearing out stale queue entries only happen then.
+// Timers (challenges, rooms, tournaments) are checked on every turn.
+export async function tickMatchmaking(client: Client, tidy = true) {
   const now = new Date();
   const { tickTournaments } = await import("./tournaments");
   await tickTournaments(client).catch((err) => logError("bot", err));
-  // After a restart, posts catch up to any change in how they look.
-  const boards = await prisma.matchmakingConfig.findMany({ where: { boardChannelId: { not: null } }, select: { guildId: true } });
-  for (const { guildId } of boards) {
-    if (refreshedBoards.has(guildId)) continue;
-    refreshedBoards.add(guildId);
-    await syncBoard(client, guildId).catch((err) => logError("bot", err, guildId));
+  if (tidy) {
+    // After a restart, posts catch up to any change in how they look.
+    const boards = await prisma.matchmakingConfig.findMany({ where: { boardChannelId: { not: null } }, select: { guildId: true } });
+    for (const { guildId } of boards) {
+      if (refreshedBoards.has(guildId)) continue;
+      refreshedBoards.add(guildId);
+      await syncBoard(client, guildId).catch((err) => logError("bot", err, guildId));
+    }
   }
 
   const configs = await prisma.matchmakingConfig.findMany({ where: { enabled: true } });
   for (const config of configs) {
     const { guildId } = config;
     if (!config.messageId || !sweptGuilds.has(guildId)) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
-    const stale = await prisma.matchQueue.deleteMany({ where: { guildId, kind: { not: LFT }, joinedAt: { lte: new Date(now.getTime() - config.queueMinutes * 60_000) } } });
-    const staleLft = await prisma.matchQueue.deleteMany({ where: { guildId, kind: LFT, joinedAt: { lte: new Date(now.getTime() - LFT_HOURS * 3_600_000) } } });
-    if (stale.count || staleLft.count) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
+    if (tidy) {
+      const stale = await prisma.matchQueue.deleteMany({ where: { guildId, kind: { not: LFT }, joinedAt: { lte: new Date(now.getTime() - config.queueMinutes * 60_000) } } });
+      const staleLft = await prisma.matchQueue.deleteMany({ where: { guildId, kind: LFT, joinedAt: { lte: new Date(now.getTime() - LFT_HOURS * 3_600_000) } } });
+      if (stale.count || staleLft.count) await syncMatchmakingPanel(client, guildId).catch((err) => logError("bot", err, guildId));
+    }
     const expired = await prisma.matchChallenge.findMany({ where: { guildId, expiresAt: { lte: now } } });
     for (const challenge of expired) await lock(guildId)(() => dropChallenge(client, challenge, config)).catch((err) => logError("bot", err, guildId));
   }

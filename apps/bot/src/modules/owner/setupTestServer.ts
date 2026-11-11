@@ -7,7 +7,7 @@ import {
   Guild,
   Message,
 } from "discord.js";
-import { EXTRAS_CATEGORY, MODULE_LABELS, NAV_SECTIONS, slugifyModuleLabel, UNLISTED_MODULES, VOICE_MODULE_KEYS } from "@spartacus/shared";
+import { EXTRAS_CATEGORY, MODULE_LABELS, NAV_SECTIONS, RETIRED_NAV_SECTIONS, slugifyModuleLabel, UNLISTED_MODULES, VOICE_MODULE_KEYS } from "@spartacus/shared";
 import { isOwner } from "../../lib/owner";
 
 // Scaffolds one category per dashboard sidebar section and one channel per
@@ -26,11 +26,11 @@ import { isOwner } from "../../lib/owner";
 // nothing about it is ever registered with Discord, so it's invisible to
 // literally everyone except whoever types the exact phrase, and it only
 // does anything at all for the owner's own account.
-interface ChannelSpec {
+export interface ChannelSpec {
   name: string;
   type: "text" | "voice";
 }
-interface CategorySpec {
+export interface CategorySpec {
   name: string;
   channels: ChannelSpec[];
 }
@@ -89,7 +89,7 @@ export function normalizeCategoryName(name: string): string {
     .toLowerCase();
 }
 
-interface Plan {
+export interface Plan {
   categoriesToCreate: string[]; // category names that don't exist yet
   // An existing category matches a spec'd one once emoji/casing is ignored,
   // but its literal name has drifted (e.g. "Moderation" vs "🔵 moderation")
@@ -115,7 +115,8 @@ interface Plan {
   duplicateCategoryLabels: string[];
 }
 
-function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
+// Exported for the tests, which run it against a made-up server.
+export function computePlan(guild: Pick<Guild, "channels">, layout: CategorySpec[]): Plan {
   const byName = new Map<string, Array<{ id: string; name: string; parentId: string | null }>>();
   for (const c of guild.channels.cache.values()) {
     if (c.type === ChannelType.GuildCategory) continue;
@@ -196,6 +197,22 @@ function computePlan(guild: Guild, layout: CategorySpec[]): Plan {
         duplicateCategoryIds.push(c.id);
         duplicateCategoryLabels.push(c.name);
       }
+    }
+  }
+
+  // A category from before the dashboard's pages were regrouped (Security,
+  // Community and so on). Its channels have been claimed above and move into
+  // their new groups; the emptied category is then removed like a duplicate.
+  const layoutNorms = new Set(layout.map((c) => normalizeCategoryName(c.name)));
+  for (const retired of RETIRED_NAV_SECTIONS) {
+    const norm = normalizeCategoryName(retired);
+    if (layoutNorms.has(norm)) continue;
+    for (const c of categoriesByNorm.get(norm) ?? []) {
+      if (claimedCategoryIds.has(c.id)) continue;
+      claimedCategoryIds.add(c.id);
+      managedCategoryIds.add(c.id);
+      duplicateCategoryIds.push(c.id);
+      duplicateCategoryLabels.push(c.name);
     }
   }
 
@@ -409,7 +426,7 @@ function summarize(plan: Plan): string {
   }
   if (plan.duplicateCategoryIds.length > 0) {
     parts.push(
-      `♻️ Would merge and delete ${plan.duplicateCategoryIds.length} duplicate categor${plan.duplicateCategoryIds.length === 1 ? "y" : "ies"} (leftover copy of a category that already exists under the current name):\n` +
+      `♻️ Would merge and delete ${plan.duplicateCategoryIds.length} old categor${plan.duplicateCategoryIds.length === 1 ? "y" : "ies"} (a leftover copy, or a group the dashboard no longer uses; their channels move to the right place first):\n` +
         plan.duplicateCategoryLabels.join("\n")
     );
   }

@@ -5,12 +5,14 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { renderPollEmbed } from "../modules/engagement/pollVotes";
+import { shouldLook } from "../lib/quietPoll";
 
 // Picks up polls created via the dashboard (messageId still null) and posts
 // them — our own embed + reaction-based voting, tracked in
 // modules/engagement/pollVotes.ts matched by messageId.
 export function startPollPosterJob(client: Client) {
   cron.schedule("*/5 * * * * *", async () => {
+    if (!shouldLook("polls")) return;
     let loggedThisTick = 0;
     const pending = await prisma.poll.findMany({ where: { messageId: null, closed: false }, take: 20 });
 

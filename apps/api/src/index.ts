@@ -10,7 +10,7 @@ import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { logError } from "@spartacus/db";
+import { logError, markChange } from "@spartacus/db";
 import { setBotClient } from "./lib/botClient";
 
 import healthRouter from "./routes/health";
@@ -129,6 +129,12 @@ app.use(githubWebhookRouter);
 // (bot-config route) — Discord itself caps avatar files at 10MB, so match that.
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
+// Any save from the dashboard tells the bot's posting jobs to look for new
+// work straight away (see markChange in packages/db).
+app.use((req, _res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") markChange();
+  next();
+});
 
 // Mounted before any auth middleware — must stay public so external
 // monitors (UptimeRobot etc.) can hit it without credentials.

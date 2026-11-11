@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { NAV_SECTIONS, type ModuleKey } from "@spartacus/shared";
 import { AppIcon } from "./AppIcon";
 import { SetupBadge, SetupNotice, setupState, useSetupStatus } from "./SetupStatus";
 import { ToggleSwitch } from "./ToggleSwitch";
-import { api } from "../../lib/api";
+import { setModuleEnabled, useModules } from "../../lib/useModules";
 import { EditableText } from "./EditableText";
 import { useEmbedded } from "./EmbeddedPage";
 
@@ -21,18 +20,16 @@ const iconFor = (key: ModuleKey) => NAV_SECTIONS.flatMap((s) => s.items).find((i
 // Drop this at the top of any module's page for a quick on/off switch
 // without leaving the page to go find it in the Modules grid.
 export function ModuleHeader({ guildId, moduleKey, title, description }: ModuleHeaderProps) {
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  // The same copy the sidebar and the group tabs read, so flipping this
+  // switch updates their dots at once and opening a page asks the API once.
+  const modules = useModules(guildId);
+  const enabled = modules ? (modules[moduleKey]?.enabled ?? false) : null;
   const embedded = useEmbedded();
   const setup = useSetupStatus(guildId);
   const missing = setup?.[moduleKey] ?? [];
 
-  useEffect(() => {
-    api.getModules(guildId).then((state) => setEnabled(state[moduleKey]?.enabled ?? false));
-  }, [guildId, moduleKey]);
-
   async function toggle(next: boolean) {
-    setEnabled(next);
-    await api.setModule(guildId, moduleKey, next).catch(() => setEnabled(!next));
+    await setModuleEnabled(guildId, moduleKey, next).catch(() => null);
   }
 
   if (embedded) return null;

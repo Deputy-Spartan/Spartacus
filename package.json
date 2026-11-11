@@ -15,6 +15,8 @@
     "start": "npm run db:deploy && npm run start --workspace=apps/api",
     "start:web": "npm run start --workspace=apps/web",
     "typecheck": "tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/bot/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "test": "node --import tsx --test \"tests/*.test.ts\"",
+    "check": "npm run typecheck && npm test",
     "deploy-commands": "npm run deploy-commands --workspace=apps/bot",
     "db:generate": "npm run generate --workspace=packages/db",
     "db:migrate": "npm run migrate --workspace=packages/db",

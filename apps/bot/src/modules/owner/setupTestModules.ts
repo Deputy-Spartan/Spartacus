@@ -35,7 +35,7 @@ import {
   type NavItem,
   type TestGuide,
 } from "@spartacus/shared";
-import { logError } from "@spartacus/db";
+import { logError, markChange } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isOwner } from "../../lib/owner";
 import { isSendableChannel } from "../../lib/channels";
@@ -973,6 +973,9 @@ async function run(client: Client, guild: Guild, ownerId: string, progress: (tex
   const lock = await lockTestChannels(guild, roles, ownerId, ticketsCategoryId).catch((err) => ({ locked: 0, problems: [`Couldn't lock the test channels: ${err instanceof Error ? err.message : err}`] }));
   report.locked = lock.locked;
   report.problems.push(...lock.problems);
+  // The panels and polls queued above are posted by the regular jobs; this
+  // tells them to look now rather than on their slower idle schedule.
+  markChange();
   return report;
 }
 

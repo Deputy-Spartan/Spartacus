@@ -2,117 +2,169 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS } from "../../../../components/nav/Sidebar";
+import Link from "next/link";
+import { MODULE_LABELS, NAV_MODULE_KEYS, NAV_SECTIONS, UNLISTED_MODULES } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { api, type ModuleState } from "../../../../lib/api";
-import { MODULE_LABELS, UNLISTED_MODULES } from "@spartacus/shared";
-import { usePinnedModules } from "../../../../lib/usePinnedModules";
-import Link from "next/link";
 import { AppIcon } from "../../../../components/ui/AppIcon";
 import { SetupBadge, setupState, useSetupStatus } from "../../../../components/ui/SetupStatus";
+import { setModuleEnabled, useModules } from "../../../../lib/useModules";
+import { usePinnedModules } from "../../../../lib/usePinnedModules";
 
-// Every card here mirrors a real sidebar link — same grouping, same order —
-// so this page reads as "the sidebar, laid out as a grid" rather than a
-// second, different module list to keep in sync by hand.
-const ALL_GRID_SECTIONS = NAV_SECTIONS.filter((s) => s.section && s.section !== "Owner Only");
+// Every group from the sidebar, each one a card that opens to show its pages
+// as one-line rows: name, status, pin and on/off switch. Closed, a group
+// shows how many of its pages are on, so the whole dashboard fits on a screen
+// instead of one tall card per page.
+const ALL_GROUPS = NAV_SECTIONS.filter((s) => s.section && s.section !== "Owner Only");
+const EXTRAS = "Commands & Background Features";
+const OPEN_KEY = "spartacus:modules-open";
 
 function ModulesContent({ guildId }: { guildId: string }) {
-  const [state, setState] = useState<Record<string, ModuleState> | null>(null);
+  const state = useModules(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
   const setup = useSetupStatus(guildId);
-  // A sidebar category link (e.g. "Moderation") opens straight to its own
-  // grid via ?section=; the plain "Modules" link shows every category.
+  // A link with ?section= (the search box and older bookmarks use it) shows
+  // just that group, already open.
   const sectionFilter = useSearchParams().get("section");
-  const GRID_SECTIONS = sectionFilter ? ALL_GRID_SECTIONS.filter((s) => s.section === sectionFilter) : ALL_GRID_SECTIONS;
+  const groups = sectionFilter ? ALL_GROUPS.filter((s) => s.section === sectionFilter) : ALL_GROUPS;
 
+  // Which groups are open is remembered on this device.
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   useEffect(() => {
-    api.getModules(guildId).then(setState);
-  }, [guildId]);
-
-  async function toggle(moduleKey: string, next: boolean) {
-    setState((prev) => (prev ? { ...prev, [moduleKey]: { ...prev[moduleKey], enabled: next } } : prev));
-    await api.setModule(guildId, moduleKey, next).catch(() => {
-      setState((prev) => (prev ? { ...prev, [moduleKey]: { ...prev[moduleKey], enabled: !next } } : prev));
-    });
+    try {
+      setOpen(JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}") as Record<string, boolean>);
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  function remember(next: Record<string, boolean>) {
+    setOpen(next);
+    try {
+      localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+    } catch {
+      /* private mode */
+    }
   }
+  const names = [...ALL_GROUPS.map((s) => s.section as string), EXTRAS];
+  const allOpen = names.every((n) => open[n]);
+  const isOpen = (name: string) => !!sectionFilter || !!open[name];
+
+  const toggle = (moduleKey: string, next: boolean) => void setModuleEnabled(guildId, moduleKey, next).catch(() => null);
 
   return (
     <div>
       {sectionFilter && (
         <Link href={`/dashboard/${guildId}/modules`} className="text-xs text-neon-blue hover:text-neon-purple mb-3 inline-block">
-          ← All Categories
+          ← All groups
         </Link>
       )}
-      <h1 className="text-2xl font-bold mb-1">{sectionFilter ?? "Modules"}</h1>
-      <p className="text-slate-400 mb-6">
-        {sectionFilter
-          ? "See what's on at a glance, and pin your daily ones to the top of the sidebar."
-          : "Browse every part of Spartacus by category, see what's on at a glance, and pin your daily ones to the top of the sidebar."}
-      </p>
-      {GRID_SECTIONS.length === 0 && <p className="text-sm text-slate-500">No category matches "{sectionFilter}".</p>}
-
-      <div className="space-y-8">
-        {GRID_SECTIONS.map((section) => (
-          <div key={section.section}>
-            {!sectionFilter && <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{section.section}</h2>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {section.items.map((item) => {
-                const moduleKey = NAV_MODULE_KEYS[item.href];
-                const enabled = moduleKey ? state?.[moduleKey]?.enabled ?? false : null;
-                const pinned = isPinned(item.href);
-                return (
-                  <NeonCard key={item.href} className="relative">
-                    <button
-                      onClick={() => togglePin(item.href)}
-                      title={pinned ? "Unpin from sidebar" : "Pin to top of sidebar"}
-                      className={`absolute top-3 right-3 text-xs w-6 h-6 flex items-center justify-center rounded transition-colors ${
-                        pinned ? "text-neon-blue" : "text-slate-600 hover:text-slate-300"
-                      }`}
-                    >
-                      📌
-                    </button>
-                    <Link href={`/dashboard/${guildId}${item.href}`} className="flex items-start gap-3 pr-7">
-                      <AppIcon emoji={item.icon} size={34} />
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{item.label}</p>
-                        {enabled !== null ? (
-                          <p className="mt-1.5">
-                            <SetupBadge state={setupState(enabled, setup?.[moduleKey!])} count={setup?.[moduleKey!]?.length ?? 0} />
-                          </p>
-                        ) : (
-                          <p className="text-xs text-slate-600 mt-1">Always on</p>
-                        )}
-                      </div>
-                    </Link>
-                    {moduleKey && (
-                      <div className="mt-3 pt-3 border-t border-white/5 flex justify-end">
-                        <ToggleSwitch enabled={enabled ?? false} onChange={(next) => toggle(moduleKey, next)} label={item.label} disabled={!state} />
-                      </div>
-                    )}
-                  </NeonCard>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold mb-1">{sectionFilter ?? "Modules"}</h1>
+          <p className="text-slate-400">Switch features on or off. Open a group to see what&apos;s inside, and pin the pages you use most to the top of the sidebar.</p>
+        </div>
         {!sectionFilter && (
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">Commands & Background Features</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {UNLISTED_MODULES.map(({ key, description }) => (
-                <NeonCard key={key}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{MODULE_LABELS[key]}</p>
-                      <p className="text-xs text-slate-500 mt-1">{description}</p>
-                    </div>
+          <button
+            type="button"
+            onClick={() => remember(allOpen ? {} : Object.fromEntries(names.map((n) => [n, true])))}
+            className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-300 border border-white/10 rounded-lg px-3 py-1.5 transition-colors"
+          >
+            {allOpen ? "Close all" : "Open all"}
+          </button>
+        )}
+      </div>
+      {groups.length === 0 && <p className="text-sm text-slate-500">No group matches &quot;{sectionFilter}&quot;.</p>}
+
+      <div className={`grid grid-cols-1 gap-3 items-start ${sectionFilter ? "" : "lg:grid-cols-2"}`}>
+        {groups.map((group) => {
+          const name = group.section as string;
+          const gated = group.items.filter((i) => i.moduleKey);
+          const on = gated.filter((i) => state?.[i.moduleKey!]?.enabled).length;
+          const needs = gated.filter((i) => state?.[i.moduleKey!]?.enabled && setup?.[i.moduleKey!]?.length).length;
+          const shown = isOpen(name);
+          return (
+            <NeonCard key={name} className="!p-0 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => !sectionFilter && remember({ ...open, [name]: !open[name] })}
+                aria-expanded={shown}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
+              >
+                <AppIcon emoji={group.icon ?? group.items[0]?.icon ?? "🧩"} size={34} />
+                <span className="flex-1 min-w-0">
+                  <span className="block font-semibold truncate">{name}</span>
+                  <span className="block text-xs text-slate-500 truncate">
+                    {state ? `${on} of ${gated.length} on` : "Loading…"}
+                    {needs > 0 && <span className="text-amber-400"> · {needs} need{needs === 1 ? "s" : ""} setup</span>}
+                    {group.description && <span className="hidden sm:inline"> · {group.description}</span>}
+                  </span>
+                </span>
+                {!sectionFilter && <span className={`text-slate-500 text-xs transition-transform ${shown ? "rotate-180" : ""}`}>▼</span>}
+              </button>
+              {shown && (
+                <ul className="border-t border-white/5 divide-y divide-white/5">
+                  {group.items.map((item) => {
+                    const moduleKey = NAV_MODULE_KEYS[item.href];
+                    const enabled = moduleKey ? (state?.[moduleKey]?.enabled ?? false) : null;
+                    const pinned = isPinned(item.href);
+                    return (
+                      <li key={item.href} className="group flex items-center gap-2 pl-4 pr-3 py-2">
+                        <Link href={`/dashboard/${guildId}${item.href}`} className="flex flex-1 min-w-0 items-center gap-3 py-1 text-sm text-slate-200 hover:text-neon-blue">
+                          <AppIcon emoji={item.icon} size={24} />
+                          <span className="min-w-0 truncate">{item.label}</span>
+                        </Link>
+                        {enabled !== null ? (
+                          <span className="hidden sm:block shrink-0">
+                            <SetupBadge state={setupState(enabled, setup?.[moduleKey!])} count={setup?.[moduleKey!]?.length ?? 0} />
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-xs text-slate-600">Always on</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => togglePin(item.href)}
+                          title={pinned ? "Unpin from sidebar" : "Pin to top of sidebar"}
+                          className={`shrink-0 text-xs w-7 h-7 flex items-center justify-center rounded transition-colors ${pinned ? "text-neon-blue" : "text-slate-600 hover:text-slate-300"}`}
+                        >
+                          📌
+                        </button>
+                        {moduleKey && <ToggleSwitch enabled={enabled ?? false} onChange={(next) => toggle(moduleKey, next)} label={item.label} disabled={!state} />}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </NeonCard>
+          );
+        })}
+
+        {!sectionFilter && (
+          <NeonCard className="!p-0 overflow-hidden">
+            <button type="button" onClick={() => remember({ ...open, [EXTRAS]: !open[EXTRAS] })} aria-expanded={isOpen(EXTRAS)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+              <AppIcon emoji="🧩" size={34} />
+              <span className="flex-1 min-w-0">
+                <span className="block font-semibold truncate">{EXTRAS}</span>
+                <span className="block text-xs text-slate-500 truncate">
+                  {state ? `${UNLISTED_MODULES.filter(({ key }) => state[key]?.enabled).length} of ${UNLISTED_MODULES.length} on` : "Loading…"}
+                  <span className="hidden sm:inline"> · Features with no settings page of their own.</span>
+                </span>
+              </span>
+              <span className={`text-slate-500 text-xs transition-transform ${isOpen(EXTRAS) ? "rotate-180" : ""}`}>▼</span>
+            </button>
+            {isOpen(EXTRAS) && (
+              <ul className="border-t border-white/5 divide-y divide-white/5">
+                {UNLISTED_MODULES.map(({ key, description }) => (
+                  <li key={key} className="flex items-center gap-3 pl-4 pr-3 py-2.5">
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-slate-200 truncate">{MODULE_LABELS[key]}</span>
+                      <span className="block text-xs text-slate-500 truncate">{description}</span>
+                    </span>
                     <ToggleSwitch enabled={state?.[key]?.enabled ?? false} onChange={(next) => toggle(key, next)} label={MODULE_LABELS[key]} disabled={!state} />
-                  </div>
-                </NeonCard>
-              ))}
-            </div>
-          </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </NeonCard>
         )}
       </div>
     </div>

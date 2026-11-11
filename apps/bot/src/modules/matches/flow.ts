@@ -1183,11 +1183,22 @@ async function refreshPanelsOnce(client: Client) {
   }
 }
 
+// This runs every 5 seconds so timers end on time. The tidy-up parts (old
+// leaderboard posts, the once-after-restart panel refresh, clearing stale
+// queue entries) don't need that, so they run every 30 seconds instead of
+// asking the database 12 times a minute each.
+const TIDY_MS = 30_000;
+let lastTidy = 0;
+
 export async function tickMatches(client: Client) {
-  await removeOldBoards(client);
-  await refreshPanelsOnce(client);
+  const tidy = Date.now() - lastTidy >= TIDY_MS;
+  if (tidy) {
+    lastTidy = Date.now();
+    await removeOldBoards(client);
+    await refreshPanelsOnce(client);
+  }
   await keepEventsAhead(client);
-  await tickMatchmaking(client);
+  await tickMatchmaking(client, tidy);
   const pending = await prisma.matchSetup.findMany({ where: { enabled: true, panelMessageId: null }, take: 10 });
   for (const setup of pending) {
     if (!(await isModuleEnabled(setup.guildId, "MATCHES"))) continue;

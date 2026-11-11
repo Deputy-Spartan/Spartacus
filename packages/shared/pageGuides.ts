@@ -50,8 +50,18 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   "/modules": {
     title: "Modules",
     purpose: "One place to turn every Spartacus feature on or off.",
-    steps: ["Find the module you want.", "Flip its switch to turn it on or off.", "Open that module's page in the sidebar to finish setting it up."],
-    tips: ["Turning a module on doesn't set it up. Most need a channel or role picked on their own page first.", "Items marked Always on can't be turned off."],
+    steps: [
+      "Open a group, like Moderation or Streaming, to see what's in it.",
+      "Flip a switch to turn that feature on or off.",
+      "Tap a feature's name to open its page and finish setting it up.",
+      "On any page, the tabs along the top are the other pages in the same group.",
+    ],
+    tips: [
+      "Turning a module on doesn't set it up. Most need a channel or role picked on their own page first.",
+      "A closed group shows how many of its features are on, and how many still need setting up.",
+      "Use Open all to see every feature at once. Which groups you leave open is remembered on this device.",
+      "Items marked Always on can't be turned off.",
+    ],
   },
   "/errors": {
     title: "Errors",

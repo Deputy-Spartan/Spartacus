@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { isModuleEnabled } from "../lib/moduleGate";
+import { shouldLook } from "../lib/quietPoll";
 import { applyEmbedExtra } from "../lib/embedExtra";
 import { describeAccess, normalizeOption } from "../lib/accessGrants";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
@@ -107,6 +108,7 @@ export async function refreshRolePanel(client: Client, panelId: string): Promise
 // message is gone).
 export function startRolePanelPosterJob(client: Client) {
   cron.schedule("*/5 * * * * *", async () => {
+    if (!shouldLook("role-panels")) return;
     let loggedThisTick = 0;
     const pending = await prisma.rolePanel.findMany({ where: { messageId: null }, take: 20 });
 

@@ -15,6 +15,7 @@ import { PageGate } from "../../../components/nav/PageGate";
 import { preloadGuild } from "../../../lib/prefetch";
 import { UserPrefsProvider } from "../../../lib/userPrefs";
 import { PhoneTabBar } from "../../../components/nav/PhoneTabBar";
+import { HubTabs } from "../../../components/nav/HubTabs";
 
 export default function DashboardLayout({
   children,
@@ -115,6 +116,7 @@ export default function DashboardLayout({
               preview column). "clip" prevents the horizontal overflow
               without that side effect. */}
           <main className="p-3 sm:p-6 pb-24 md:pb-6 overflow-x-clip">
+            <HubTabs guildId={params.guildId} />
             <PageGuideButton guildId={params.guildId} />
             <PageGate>{children}</PageGate>
           </main>

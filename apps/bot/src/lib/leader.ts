@@ -99,9 +99,31 @@ const realSchedule: Schedule = cron.schedule.bind(cron);
 // is small), so each gets its own second instead.
 let minuteJobs = 0;
 const spread = (expression: string) => (expression.trim() === "* * * * *" ? `${(minuteJobs++ * 7) % 60} * * * * *` : expression);
-(cron as { schedule: Schedule }).schedule = ((expression: string, func: (...a: unknown[]) => unknown, options?: unknown) =>
-  realSchedule(
+
+// A job that is still running when its next turn comes round skips that turn.
+// Without this, one slow moment at the database stacked a second and third
+// copy of the same job behind the first (some run every 5 seconds), each
+// holding connections, which made the slow moment longer for everything else.
+// A run that never finishes stops blocking after STUCK_MS.
+const STUCK_MS = 5 * 60_000;
+const startedAt = new Map<number, number>();
+let jobCount = 0;
+
+(cron as { schedule: Schedule }).schedule = ((expression: string, func: (...a: unknown[]) => unknown, options?: unknown) => {
+  const job = jobCount++;
+  return realSchedule(
     spread(expression),
-    ((...args: unknown[]) => (leader ? func(...args) : undefined)) as Parameters<Schedule>[1],
+    (async (...args: unknown[]) => {
+      if (!leader) return;
+      const since = startedAt.get(job);
+      if (since !== undefined && Date.now() - since < STUCK_MS) return;
+      startedAt.set(job, Date.now());
+      try {
+        await func(...args);
+      } finally {
+        startedAt.delete(job);
+      }
+    }) as Parameters<Schedule>[1],
     options as Parameters<Schedule>[2],
-  )) as Schedule;
+  );
+}) as Schedule;

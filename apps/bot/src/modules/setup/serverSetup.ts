@@ -36,7 +36,7 @@ import {
   type BlueprintRole,
   type ModuleKey,
 } from "@spartacus/shared";
-import { logError } from "@spartacus/db";
+import { logError, markChange } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { postMatchGuide } from "../matches/serverSetup";
@@ -639,6 +639,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       for (const picker of blueprintPickers(opts.games, opts.layout)) {
         if (await prisma.rolePanel.findFirst({ where: { guildId: g, name: picker.name } })) continue;
         const options = picker.options.map((o) => ({ roleIds: [o.role ? role(o.role) : null].filter(Boolean), channelIds: [], label: o.label, emoji: o.emoji })).filter((o) => o.roleIds.length);
+        if (options.length) markChange(); // the role panel job posts it straight away
         if (options.length) await prisma.rolePanel.create({ data: { guildId: g, name: picker.name, channelId: rolesChannel, description: picker.description, layout: "DROPDOWN", options } });
       }
     }],

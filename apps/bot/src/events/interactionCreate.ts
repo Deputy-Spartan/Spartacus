@@ -36,6 +36,51 @@ async function route(interaction: Interaction) {
     return;
   }
 
+  // Economy Hub: the shop, its panel, and loot crates.
+  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith("eshop:")) {
+    const shop = await import("../modules/economy/shop");
+    if (interaction.isButton() && interaction.customId.startsWith("eshop:panel:")) await shop.handleShopPanel(interaction);
+    else await shop.handleShopComponent(interaction);
+    return;
+  }
+  if (interaction.isButton() && interaction.customId.startsWith("ecrate:")) {
+    const { handleCrateButton } = await import("../modules/economy/crates");
+    await handleCrateButton(interaction);
+    return;
+  }
+
+  // Profile Cards: Edit my card, Compare, and the edit menu.
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isUserSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("pcard:")) {
+    const { handleProfileComponent } = await import("../modules/leveling/profile");
+    await handleProfileComponent(interaction);
+    return;
+  }
+
+  // /golive setup: the step-by-step Going Live wizard.
+  if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("glw:")) {
+    const { handleGoLiveSetup } = await import("../modules/community/goLiveSetup");
+    await handleGoLiveSetup(interaction);
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith("tvcp:")) {
+    const { handleTempPanel } = await import("../modules/community/tempChannelPanel");
+    await handleTempPanel(interaction);
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^tvcm?:/.test(interaction.customId)) {
+    const { handleTempChannelControl } = await import("../modules/community/tempChannelControls");
+    await handleTempChannelControl(interaction);
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("srvsetup:")) {
+    const { handleServerSetupInteraction } = await import("../modules/setup/serverSetupCommand");
+    await handleServerSetupInteraction(interaction);
+    return;
+  }
+
   if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^match(rank|draft|score|name|setup)?:/.test(interaction.customId)) {
     if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "MATCHES"))) {
       await interaction.reply({ content: "⚠️ Matches is disabled for this server.", ephemeral: true });
@@ -51,6 +96,28 @@ async function route(interaction: Interaction) {
     else if (interaction.isModalSubmit()) await (interaction.customId.startsWith("matchname:") ? handleMatchName(interaction) : handleMatchScore(interaction));
     else if (interaction.customId.startsWith("matchrank:")) await handleMatchRank(interaction);
     else await handleMatchDraft(interaction);
+    return;
+  }
+
+  if ((interaction.isButton() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) && /^(pn|pnset|pnnote)(:|$)/.test(interaction.customId)) {
+    if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "PLAYING_NOW"))) {
+      await interaction.reply({ content: "⚠️ Playing Now is turned off in this server.", ephemeral: true });
+      return;
+    }
+    const { handlePlayingNow } = await import("../modules/engagement/playingNow");
+    await handlePlayingNow(interaction);
+    return;
+  }
+
+  if (interaction.isButton() && /^cmdb(role)?:/.test(interaction.customId)) {
+    const { handleCommandButton } = await import("../modules/community/customSlashCommands");
+    await handleCommandButton(interaction);
+    return;
+  }
+
+  if (interaction.isButton() && interaction.customId === "bump:dm") {
+    const { handleBumpButton } = await import("../modules/community/bumpReminder");
+    await handleBumpButton(interaction);
     return;
   }
 
@@ -74,6 +141,14 @@ async function route(interaction: Interaction) {
   if (interaction.isButton() && interaction.customId === "verify:click") {
     const { handleVerifyButton } = await import("../modules/security/verification");
     await handleVerifyButton(interaction);
+    return;
+  }
+
+  // verify:cap:<token>:<choice> — an answer on the verification captcha.
+  if (interaction.isButton() && interaction.customId.startsWith("verify:cap:")) {
+    const [, , token, choice] = interaction.customId.split(":");
+    const { handleCaptchaAnswer } = await import("../modules/security/verification");
+    await handleCaptchaAnswer(interaction, token, Number(choice));
     return;
   }
 

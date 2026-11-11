@@ -55,10 +55,10 @@ const STEEL = "#7B99BC";
 const GREEN = "#3BA55D";
 
 const gameTokens = { game: "Rainbow Six Siege", setup: "Friday Night 5v5", number: "12" };
-const samplePlayers = "🥇 Kuro: 12W 3L · 80%\n🥈 FrostByte: 10W 4L · 71%\n🥉 Deimos: 9W 5L · 64%";
-const sampleTeams = "🥇 Night Crew: 7W 1L · 88%\n🥈 Red Line: 5W 3L · 63%";
+const samplePlayers = "**1.** @Kuro: 12W 3L · 80%\n**2.** @FrostByte: 10W 4L · 71%\n**3.** @Deimos: 9W 5L · 64%";
+const sampleTeams = "**1.** Night Crew: 7W 1L · 88%\n**2.** Red Line: 5W 3L · 63%";
 const countTokens = { progress: "🟩🟩🟩⬛⬛", count: "6", needed: "10" };
-const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it.", startTime: "Friday, November 6 at 10:00 PM (in 6 days)", format: "Tournament · Single Elimination", teams: "Up to 4 teams · Up to 5 per team", maps: "Player vote on 3 maps", signedUp: "**6** signed up", eventLink: "[View event](https://discord.com)" };
+const signupTokens = { ...gameTokens, ...countTokens, size: "5v5", start: "Starts when staff start it.", startTime: "Friday, November 6 at 10:00 PM (in 6 days)", format: "Team Match", teams: "5 per team", maps: "Player vote on 3 maps", signedUp: "**6** signed up", eventLink: "[View event](https://discord.com)" };
 const signupPlayers = [{ name: "Players", value: "Nobody yet. Be the first!" }];
 const signupRows = [
   { name: "📅 Starts", value: "{startTime}\n{eventLink}", inline: false },
@@ -75,14 +75,25 @@ const buttonLabel = (label: string, hint: string, global = false): MatchTextEntr
 const note = (label: string, hint: string, text: string, tokens: Record<string, string> = {}, global = false): MatchTextEntry => ({ group: "Labels and Notes", label, hint, defaults: { text }, tokens, global });
 
 export const MATCH_TEXTS = {
-  boardSolo: { ...embed("Matchmaking", "1v1 board", "The 1v1 half of the always-open board.", { title: "⚔️ 1v1 Matchmaking", description: "Find an opponent or challenge someone. Spartacus sets up the match right away.", color: STEEL }), global: true },
-  boardTeam: { ...embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Create a team once, then queue or challenge any time.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }), global: true },
+  boardSolo: { ...embed("Matchmaking", "1v1 board", "The 1v1 half of the always-open board.", { title: "⚔️ 1v1 Matchmaking", description: "Find a Match pairs you with the next player who taps it. Challenge a Player picks someone directly.", color: STEEL }), global: true },
+  boardTeam: { ...embed("Matchmaking", "Team board", "The team half of the always-open board.", { title: "👥 Team Matchmaking", description: "Make a team once, then the captain queues it or challenges another team. No team? Tap Looking for a Team.", footer: "{live} live now · Open all day", color: GOLD }, { live: "3 matches" }), global: true },
   boardTeamList: {
     ...embed("Matchmaking", "Teams list", "The third part of the always-open board: every team and who's on it.", { title: "🛡️ Teams", description: "Every team and who's on it. Captains manage theirs from My Teams.", color: STEEL }),
     previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }],
     global: true,
   },
-  room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
+  boardPickup: { ...embed("Matchmaking", "Pickup board", "The pickup part of the always-open board.", { title: "⚡ Pickup Match", description: "Play right now with whoever's around, even if teams aren't full. Join voice, tap the button, check who's playing, then start.", color: GREEN }), global: true },
+  boardTools: { ...embed("Matchmaking", "Teams and help board", "The last part of the always-open board.", { title: "🧰 Teams & Help", description: "Make a team, manage yours, see every team, or get listed so captains can add you. New here? Tap How it works.", color: STEEL }), global: true },
+  activeTeams: {
+    ...embed("Matchmaking", "Active Teams", "Shown privately when someone taps Active Teams. Spartacus adds every team and its players.", { title: "🛡️ Active Teams ({count})", description: "Every team and who's on it. 👑 is the captain.", color: STEEL }, { count: "2" }),
+    previewFields: [{ name: "Night Crew · Rainbow Six Siege (2/5)", value: "👑 @Kuro\n👤 @FrostByte" }, { name: "Looking for a team (1)", value: "@Ember · Rainbow Six Siege" }],
+    global: true,
+  },
+  room: embed("Matchmaking", "Match room", "The card posted in each match thread.", { title: "🔴 LIVE: {a} vs {b}", description: "{game}{onMap}\n\nWhen you're done, a captain (👑) taps who won and types the score. The other side taps Confirm.", footer: "One side reports, the other confirms", color: GREEN }, { a: "Kuro", b: "FrostByte", game: "Rainbow Six Siege", onMap: " on Bank" }),
+  helpGuide: {
+    ...embed("Matchmaking", "How it works", "Shown privately when someone taps How it works on the board. Button names fill in by themselves.", { title: "❓ How Matchmaking works", description: "**⚡ Play right now**\nJoin a voice channel, tap **{pickup}**, check who's playing, then tap **Start Match**. Teams can be uneven.\n\n**⚔️ 1v1**\n**{findSolo}** pairs you with the next player who taps it. **{challengeSolo}** sends one person a challenge.\n\n**👥 Teams**\n**{createTeam}** makes your team and **{myTeams}** adds players. The captain then taps **{findTeam}** or **{challengeTeam}**. No team yet? Tap **{lft}** so captains can add you.\n\n**🏁 After the match**\nEveryone gets a private match thread. When you're done, a captain taps who won and types the score, then the other side taps **Confirm**. The leaderboard updates and the thread is deleted.\n\n**🚪 Changed your mind?**\nThe red buttons take you out of a queue.", color: STEEL }, { pickup: "Start Pickup Match", findSolo: "1v1: Find a Match", challengeSolo: "1v1: Challenge a Player", createTeam: "Create a Team", myTeams: "My Teams", findTeam: "Teams: Find a Match", challengeTeam: "Teams: Challenge a Team", lft: "Looking for a Team" }),
+    global: true,
+  },
   challenge: line("Matchmaking", "Challenge ping", "Sent to the player or team being challenged.", "{target} {from} challenged you to {game}. This expires {expires}.", { target: "@Kuro", from: "@FrostByte", game: "Rainbow Six Siege", expires: "in 5 minutes" }),
   roomWon: line("Matchmaking", "Match finished", "Posted in the thread when a match ends.", "🏆 **{winner}** won {score}. This match is closed.", { winner: "Kuro", score: "4-2" }),
   roomCanceled: line("Matchmaking", "Match canceled", "Posted in the thread when a match is canceled.", "This match was canceled and nothing was recorded."),
@@ -92,7 +103,6 @@ export const MATCH_TEXTS = {
   boardTeams: embed("Leaderboard", "Separate: top 10 teams", "The team embed in the Separate Embeds style.", { title: "👥 Top 10 Teams: {game}", description: "{list}", footer: "Saved and named teams · Updates after every match", color: STEEL }, { game: "Rainbow Six Siege", list: sampleTeams }),
 
   signup: { ...embed("Sign-Ups", "Match sign-ups", "The panel while a match or 1v1 is open.", { title: "⚔️ Match #{number}: {size} {game} Sign-Ups", description: "Sign up below to play **{game}**.", fields: signupRows, color: STEEL }, signupTokens), previewFields: signupPlayers },
-  registration: { ...embed("Sign-Ups", "Tournament registration", "The panel while a tournament is open.", { title: "🏆 {setup}", description: "Register below to play **{game}**.", fields: signupRows, color: GOLD }, signupTokens), previewFields: signupPlayers },
   noteManual: line("Sign-Ups", "Start note: staff", "Fills in {start} when staff start it.", "Starts when staff start it."),
   noteFull: line("Sign-Ups", "Start note: when full", "Fills in {start} when it starts on a full lobby.", "Starts when the lobby fills."),
   noteTime: line("Sign-Ups", "Start note: set time", "Fills in {start} for a scheduled start.", "Starts {time}.", { time: "Saturday at 8:00 PM" }),
@@ -102,16 +112,14 @@ export const MATCH_TEXTS = {
   checkin: embed("Match Steps", "Check-in", "Shown when players ready up.", { title: "✅ Lobby Full: Check In", description: "{deadline}\n{progress} **{count}/{needed}** ready", color: GOLD }, { ...countTokens, deadline: "Ready up to continue. Staff can skip this." }),
   draft: embed("Match Steps", "Captains draft", "Shown while captains pick players.", { title: "🎯 Match #{number}: Captains Draft", description: "{captain} is picking.", color: STEEL }, { ...gameTokens, captain: "@Kuro" }),
   teams: embed("Match Steps", "Teams", "Shown once teams are made.", { title: "🎯 Match #{number}: Teams", description: "Captains can start when both sides are ready.{auto}", footer: "Captains are marked with 👑", color: STEEL }, { ...gameTokens, auto: " Waiting for a captain or staff to start." }),
-  nameTeams: embed("Match Steps", "Name your teams", "Shown when tournament captains pick team names.", { title: "🏆 {setup}: Name Your Teams", description: "Captains can name their team.{auto}", footer: "Captains are marked with 👑", color: STEEL }, { ...gameTokens, auto: " Waiting for a captain or staff to start." }),
+  nameTeams: embed("Match Steps", "Name your teams", "Shown when captains pick team names.", { title: "🏆 {setup}: Name Your Teams", description: "Captains can name their team.{auto}", footer: "Captains are marked with 👑", color: STEEL }, { ...gameTokens, auto: " Waiting for a captain or staff to start." }),
   vote: embed("Match Steps", "Map vote", "Shown during a player vote.", { title: "🗺️ Vote for the {mapWord}", description: "{deadline}", color: STEEL }, { ...matchTokens, deadline: "Voting stays open until everyone votes or staff end it." }),
   bans: embed("Match Steps", "Captain bans", "Shown while captains ban maps.", { title: "🚫 Captains Ban {mapWord}s", description: "{captain} bans next.{banned}", footer: "The last one left gets played", color: STEEL }, { ...matchTokens, captain: "@Kuro", banned: "" }),
   live: embed("Match Steps", "Live match", "Shown while a match is being played.", { title: "🔴 LIVE: {match}{onMap}", description: "{mapNote}", footer: "{reportRule}", color: GREEN }, { ...matchTokens, match: "Match #12", mapNote: "Map pick: Bank 6 · Oregon 4", reportRule: "One captain reports, the other confirms" }),
   done: embed("Match Steps", "Match finished", "Shown after a match ends.", { title: "🏆 {winner} wins {score}{onMap}", description: "{rewards}", color: GOLD }, { ...matchTokens, winner: "Team Blue", score: "4-2", rewards: "Leaderboard updated." }),
-  champion: embed("Match Steps", "Tournament champion", "Shown when a tournament ends.", { title: "🏆 {winner} won {setup}!", description: "{players}", color: GOLD }, { ...gameTokens, winner: "Night Crew", players: "@Kuro @FrostByte" }),
 
   result: embed("Results", "Match result", "Posted in the results channel.", { title: "Match #{number}: {winner} won {score}", description: "{details}", color: GOLD }, { number: "12", winner: "Team Blue", score: "4-2", details: "Map: Bank · Rounds" }),
   rosters: embed("Results", "Rosters revealed", "Posted when hidden rosters are shown.", { title: "🔓 Rosters Revealed", description: "Registration closed.", color: STEEL }),
-  bracket: embed("Results", "Bracket", "The tournament bracket post.", { title: "🏆 {setup} Bracket", color: GOLD }, { setup: "Siege Cup" }),
   stats: embed("Results", "My Stats", "The private stats reply.", { title: "🎖️ Your {game} Stats", color: STEEL }, { game: "Rainbow Six Siege" }),
 
   pingCheckIn: line("Pings", "Check-in ping", "Sent when check-in starts.", "{players} Lobby is full. Check in on the panel.", { players: "@Kuro @FrostByte" }),
@@ -124,7 +132,6 @@ export const MATCH_TEXTS = {
   pingVoice: line("Pings", "Join voice ping", "Sent to players who weren't in voice.", "{players} Your match started. Join {channel}.", { players: "@Kuro", channel: "#Kuro vs FrostByte" }),
 
   btnSignUp: buttonLabel("Sign Up", "On match sign-ups."),
-  btnRegister: buttonLabel("Register", "On tournament registration."),
   btnLeave: buttonLabel("Leave", "On sign-ups."),
   btnMyTeam: buttonLabel("My Team", "On team sign-ups."),
   btnReady: buttonLabel("Ready Up", "During check-in."),
@@ -135,7 +142,6 @@ export const MATCH_TEXTS = {
   btnDispute: buttonLabel("Dispute", "When a result needs confirming."),
   btnRunBack: buttonLabel("Run It Back", "After a match."),
   btnNewSignups: buttonLabel("New Sign-Ups", "After a match."),
-  btnNewTournament: buttonLabel("Start New Tournament", "After a tournament."),
   btnSubs: buttonLabel("Subs", "On the panel."),
   btnStats: buttonLabel("My Stats", "On the panel."),
   btnLeaderboard: buttonLabel("Leaderboard", "On the panel."),
@@ -150,6 +156,9 @@ export const MATCH_TEXTS = {
   btnCreateTeam: buttonLabel("Create a Team", "On the Matchmaking board.", true),
   btnMyTeams: buttonLabel("My Teams", "On the Matchmaking board.", true),
   btnLookingForTeam: buttonLabel("Looking for a Team", "On the Matchmaking board. Tap again to come off the list.", true),
+  btnActiveTeams: buttonLabel("Active Teams", "On the Matchmaking board. Privately shows every team and its players.", true),
+  btnHelp: buttonLabel("How it works", "On the Matchmaking board. Shows a short guide privately.", true),
+  btnPickup: buttonLabel("Start Pickup Match", "On the Matchmaking board. Picks players from voice and the Looking for a Team list, makes two teams and starts now.", true),
   btnAccept: buttonLabel("Accept", "On challenges."),
   btnDecline: buttonLabel("Decline", "On challenges."),
 
@@ -167,7 +176,6 @@ export const MATCH_TEXTS = {
   labelTeamsWaiting: note("Team queue heading", "On the Matchmaking board.", "Teams waiting ({count})", { count: "1" }, true),
   labelLookingForTeam: note("Looking for a team heading", "In the Teams list.", "Looking for a team ({count})", { count: "2" }, true),
   labelNoTeamsYet: note("No teams yet", "In the Teams list before anyone makes one.", "No teams yet. Tap Create a Team to start one.", {}, true),
-  labelMultiTeam: note("On more than one team heading", "In the Teams list.", "On more than one team", {}, true),
   noteCheckinOpen: note("Check-in with no timer", "Fills in {deadline}.", "Ready up to continue. Staff can skip this."),
   noteCheckinTimed: note("Check-in with a timer", "Fills in {deadline}.", "Ready up {time} or your slot opens for the next player.", { time: "in 2 minutes" }),
   noteVoteOpen: note("Vote with no timer", "Fills in {deadline}.", "Voting stays open until everyone votes or staff end it."),
@@ -176,13 +184,30 @@ export const MATCH_TEXTS = {
   noteTeamsAuto: note("Teams with a timer", "Fills in {auto}.", " Starts by itself {time}.", { time: "in 2 minutes" }),
   noteDone: note("Finished, no rewards", "Fills in {rewards}.", "Leaderboard updated."),
   noteDoneRewards: note("Finished, with rewards", "Fills in {rewards}.", "+{win} coins to the winners, +{loss} to the other team. Leaderboard updated.", { win: "100", loss: "25" }),
-  roundFinal: note("Final", "Bracket round name.", "Final"),
-  roundSemi: note("Semifinals", "Bracket round name.", "Semifinals"),
-  roundQuarter: note("Quarterfinals", "Bracket round name.", "Quarterfinals"),
-  roundOf: note("Early rounds", "Bracket round name.", "Round of {teams}", { teams: "16" }),
 } satisfies Record<string, MatchTextEntry>;
 
 export type MatchTextKey = keyof typeof MATCH_TEXTS;
+
+// The Matchmaking board posts one message per part, each with its buttons.
+// Servers choose which parts show and in what order.
+export type BoardButtonColor = "green" | "blue" | "red" | "gray";
+export const BOARD_PARTS = [
+  { id: "SOLO", label: "1v1 Matchmaking", embed: "boardSolo", buttons: [{ key: "btnFindSolo", customId: "mm:find:SOLO", color: "green" }, { key: "btnChallengeSolo", customId: "mm:challenge:SOLO", color: "blue" }, { key: "btnLeaveSolo", customId: "mm:leave:SOLO", color: "red" }] },
+  { id: "TEAM", label: "Team Matchmaking", embed: "boardTeam", buttons: [{ key: "btnFindTeam", customId: "mm:find:TEAM", color: "green" }, { key: "btnChallengeTeam", customId: "mm:challenge:TEAM", color: "blue" }, { key: "btnLeaveTeam", customId: "mm:leave:TEAM", color: "red" }] },
+  { id: "PICKUP", label: "Pickup Match", embed: "boardPickup", buttons: [{ key: "btnPickup", customId: "mm:pickup", color: "green" }] },
+  { id: "TEAMS", label: "Teams list", embed: "boardTeamList", buttons: [] },
+  { id: "TOOLS", label: "Teams & Help", embed: "boardTools", buttons: [{ key: "btnCreateTeam", customId: "mm:newteam", color: "gray" }, { key: "btnMyTeams", customId: "mm:myteam", color: "gray" }, { key: "btnLookingForTeam", customId: "mm:lft", color: "gray" }, { key: "btnActiveTeams", customId: "mm:teams", color: "gray" }, { key: "btnHelp", customId: "mm:help", color: "gray" }] },
+] as const satisfies ReadonlyArray<{ id: string; label: string; embed: MatchTextKey; buttons: ReadonlyArray<{ key: MatchTextKey; customId: string; color: BoardButtonColor }> }>;
+export type BoardPartId = (typeof BOARD_PARTS)[number]["id"];
+// The Teams list starts off, since Active Teams shows every team privately.
+export const DEFAULT_BOARD_PARTS: BoardPartId[] = ["SOLO", "TEAM", "PICKUP", "TOOLS"];
+
+// The saved order with anything unknown or repeated dropped.
+export function boardPartOrder(value: unknown): BoardPartId[] {
+  const known = new Set<string>(BOARD_PARTS.map((p) => p.id));
+  const list = Array.isArray(value) ? [...new Set(value.filter((v): v is BoardPartId => typeof v === "string" && known.has(v)))] : [];
+  return list.length ? list : [...DEFAULT_BOARD_PARTS];
+}
 
 export const MATCH_TEXT_GROUPS = ["Matchmaking", "Leaderboard", "Sign-Ups", "Match Steps", "Match Rooms", "Results", "Pings", "Buttons", "Labels and Notes"];
 

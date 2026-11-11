@@ -13,7 +13,8 @@ const DEFAULT_DESCRIPTION = "React below to get a role.";
 type PanelWithOptions = ReactionRolePanel & { options: ReactionRole[] };
 
 async function buildPayload(panel: PanelWithOptions): Promise<Pick<MessageCreateOptions, "content" | "embeds">> {
-  const listing = panel.options.map((o) => `${o.emoji} — <@&${o.roleId}>`).join("\n");
+  // A note shows as small grey text under its line.
+  const listing = panel.options.map((o) => `${o.emoji} — <@&${o.roleId}>${o.note ? `\n-# ${o.note}` : ""}`).join("\n");
   const description = [panel.description || DEFAULT_DESCRIPTION, "", listing].join("\n");
 
   // A saved embed from the Embed Creator library is the whole message body

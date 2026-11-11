@@ -1,4 +1,5 @@
 import { prisma } from "@spartacus/db";
+import { shouldRunJobs } from "../lib/jobGate";
 import { editChannelMessage, getChannelName, postChannelMessage, setChannelName } from "../lib/discordRest";
 import { getEffectiveBotStatus, type BotPhase } from "../lib/botStatus";
 
@@ -231,6 +232,11 @@ export async function startStatusChannelWatchdog() {
   if (stale.length) await prisma.uptimeIncident.updateMany({ where: { id: { in: stale } }, data: { endedAt: new Date() } });
   if (recent) openIncidentId = recent.id;
 
-  checkAndAnnounce();
-  setInterval(checkAndAnnounce, CHECK_INTERVAL_MS);
+  // Only the active copy posts (see lib/jobGate.ts), so a deploy doesn't
+  // announce "updating" or "back online" twice.
+  const tick = () => {
+    if (shouldRunJobs()) void checkAndAnnounce();
+  };
+  tick();
+  setInterval(tick, CHECK_INTERVAL_MS);
 }

@@ -5,13 +5,13 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { SettingRow, SettingsSection } from "../../../../components/ui/Settings";
 import { api, type CountingGameConfig } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 export default function CountingGamePage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<CountingGameConfig | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.getCountingGame(params.guildId).then(setConfig);
@@ -19,9 +19,7 @@ export default function CountingGamePage({ params }: { params: { guildId: string
 
   async function save() {
     if (!config) return;
-    setSaving(true);
     setConfig(await api.setCountingGame(params.guildId, config));
-    setSaving(false);
   }
 
   const autoSave = useAutoSave(config, save);
@@ -29,7 +27,7 @@ export default function CountingGamePage({ params }: { params: { guildId: string
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
   return (
-    <div>
+    <div className="max-w-4xl">
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="COUNTING_GAME"
@@ -37,43 +35,27 @@ export default function CountingGamePage({ params }: { params: { guildId: string
         description="Members count upward together, one number per message — the bot enforces the sequence."
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <NeonCard>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Counting Channel</label>
-          <ChannelSelect
-            guildId={params.guildId}
-            value={config.channelId}
-            onChange={(channelId) => setConfig({ ...config, channelId })}
-          />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Reset on Mistake</p>
-              <p className="text-xs text-slate-500">Restart from 1 if the wrong number is posted.</p>
-            </div>
-            <ToggleSwitch
-              enabled={config.resetOnMistake}
-              onChange={(next) => setConfig({ ...config, resetOnMistake: next })}
-              label="Reset on mistake"
-            />
-          </div>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <NeonCard className="stat-card">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Current count</p>
+          <p className="text-2xl font-bold mt-2 text-neon-blue">{config.currentCount}</p>
         </NeonCard>
-
-        <div className="space-y-4">
-          <NeonCard className="stat-card">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Current Count</p>
-            <p className="text-2xl font-bold mt-2 text-neon-blue">{config.currentCount}</p>
-          </NeonCard>
-          <NeonCard className="stat-card">
-            <p className="text-xs uppercase tracking-wide text-slate-500">High Score</p>
-            <p className="text-2xl font-bold mt-2">{config.highScore}</p>
-          </NeonCard>
-        </div>
+        <NeonCard className="stat-card">
+          <p className="text-xs uppercase tracking-wide text-slate-500">High score</p>
+          <p className="text-2xl font-bold mt-2">{config.highScore}</p>
+        </NeonCard>
       </div>
 
-      <button onClick={save} disabled={saving} className="neon-button mt-4">
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-      <SaveStatus status={autoSave} />
+      <SettingsSection title="Game">
+        <SettingRow label="Counting channel" required help="Members count here. Spartacus checks every number." tip="Pick a channel used only for counting, so normal chat doesn't break the count.">
+          <ChannelSelect guildId={params.guildId} value={config.channelId} onChange={(channelId) => setConfig({ ...config, channelId })} />
+        </SettingRow>
+        <SettingRow label="Reset on mistake" help="Start again from 1 when someone posts the wrong number.">
+          <ToggleSwitch enabled={config.resetOnMistake} onChange={(next) => setConfig({ ...config, resetOnMistake: next })} label="Reset on mistake" />
+        </SettingRow>
+      </SettingsSection>
+
+      <SaveStatus status={autoSave} onSave={save} />
     </div>
   );
 }

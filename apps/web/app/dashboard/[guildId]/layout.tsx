@@ -1,5 +1,7 @@
 "use client";
 
+import { DashboardTextProvider } from "../../../components/ui/EditableText";
+import { rememberLastUser } from "../../../lib/lastUser";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "../../../components/nav/Sidebar";
@@ -9,6 +11,10 @@ import { PageGuideButton } from "../../../components/nav/PageGuideButton";
 import { ConfirmProvider } from "../../../components/ui/ConfirmDialog";
 import { api, clearToken, type CurrentUser } from "../../../lib/api";
 import { useIdleLogout } from "../../../lib/useIdleLogout";
+import { PageGate } from "../../../components/nav/PageGate";
+import { preloadGuild } from "../../../lib/prefetch";
+import { UserPrefsProvider } from "../../../lib/userPrefs";
+import { PhoneTabBar } from "../../../components/nav/PhoneTabBar";
 
 export default function DashboardLayout({
   children,
@@ -53,6 +59,7 @@ export default function DashboardLayout({
               router.push("/dashboard");
             } else {
               setAccess("allowed");
+              preloadGuild(params.guildId);
             }
           })
           .catch(() => {
@@ -64,7 +71,15 @@ export default function DashboardLayout({
         clearToken();
         router.push("/");
       });
-    api.getMe().then(setUser).catch(() => null);
+    api
+      .getMe()
+      .then((me) => {
+        setUser(me);
+        // Keeps the sign-in page's "Welcome back" avatar current, even for
+        // people who signed in before it was added or changed their avatar.
+        rememberLastUser(me);
+      })
+      .catch(() => null);
   }, [router, params.guildId]);
 
   if (access !== "allowed") {
@@ -76,8 +91,10 @@ export default function DashboardLayout({
   }
 
   return (
+    <UserPrefsProvider>
+    <DashboardTextProvider isOwner={isOwner}>
     <ConfirmProvider>
-      <div className="min-h-screen bg-base-950">
+      <div className="sp-shell min-h-screen bg-base-950">
         <CommandPalette guildId={params.guildId} />
         <Sidebar guildId={params.guildId} open={sidebarOpen} onClose={() => setSidebarOpen(false)} isOwner={isOwner} />
         <div className={`transition-[margin] duration-200 ${sidebarOpen ? "md:ml-60" : "md:ml-0"}`}>
@@ -97,12 +114,15 @@ export default function DashboardLayout({
               position:sticky on descendants (e.g. the Embed Creator's live
               preview column). "clip" prevents the horizontal overflow
               without that side effect. */}
-          <main className="p-3 sm:p-6 overflow-x-clip">
+          <main className="p-3 sm:p-6 pb-24 md:pb-6 overflow-x-clip">
             <PageGuideButton guildId={params.guildId} />
-            {children}
+            <PageGate>{children}</PageGate>
           </main>
         </div>
+        <PhoneTabBar guildId={params.guildId} />
       </div>
     </ConfirmProvider>
+    </DashboardTextProvider>
+    </UserPrefsProvider>
   );
 }

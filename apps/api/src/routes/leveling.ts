@@ -22,7 +22,7 @@ router.get(
     const withNames = await Promise.all(
       top.map(async (row) => {
         const member = await getGuildMember(req.params.guildId, row.userId).catch(() => null);
-        return { ...row, username: member?.username ?? null, nickname: member?.nickname ?? null };
+        return { ...row, username: member?.username ?? null, nickname: member?.nickname ?? null, avatar: member?.avatar ?? null };
       })
     );
 

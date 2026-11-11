@@ -1,5 +1,6 @@
 import { prisma } from "@spartacus/db";
 import { postChannelMessage } from "../lib/discordRest";
+import { shouldRunJobs } from "../lib/jobGate";
 
 const POLL_INTERVAL_MS = 20_000;
 
@@ -17,6 +18,10 @@ export function startErrorAlertPoller() {
   const lastAlertedAt = new Map<string, number>(); // `${guildId}:${message}` → ms
 
   setInterval(async () => {
+    if (!shouldRunJobs()) {
+      lastCheckedAt = new Date();
+      return;
+    }
     const checkStartedAt = new Date();
     const newErrors = await prisma.errorLog
       .findMany({

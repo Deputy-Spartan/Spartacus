@@ -10,7 +10,8 @@ const router = Router();
 async function resolveOptionEmojis(guildId: string, options: unknown): Promise<{ options?: unknown; error?: string }> {
   if (!Array.isArray(options)) return { options };
   const out = [];
-  for (const o of options as Array<{ emoji?: string }>) {
+  for (const raw of options as Array<{ emoji?: string; note?: unknown }>) {
+    const o = { ...raw, note: typeof raw.note === "string" && raw.note.trim() ? raw.note.trim().slice(0, 200) : undefined };
     if (!o.emoji) { out.push(o); continue; }
     const r = await resolveEmojiInput(guildId, o.emoji);
     if (r.error) return { error: r.error };

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
+import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
@@ -495,12 +496,9 @@ function TypesTab({ guildId }: { guildId: string }) {
             </div>
             <div>
               <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Emoji</label>
-              <input
-                className="w-24 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-                value={editing.emoji ?? ""}
-                onChange={(e) => setEditing({ ...editing, emoji: e.target.value })}
-                placeholder="🎫"
-              />
+              <div className="w-44">
+                <EmojiPicker guildId={guildId} popover value={editing.emoji ?? ""} onChange={(emoji) => setEditing({ ...editing, emoji })} placeholder="🎫" />
+              </div>
             </div>
           </div>
 

@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { BotStatusBadge } from "./BotStatusBadge";
-import { clearToken } from "../../lib/api";
+import { AccountMenu } from "./AccountMenu";
 import { useChangelogUnseenCount } from "../../lib/useChangelogUnseen";
 
 interface Guild {
@@ -23,17 +22,11 @@ interface TopHeaderProps {
 }
 
 export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick, sidebarOpen }: TopHeaderProps) {
-  const router = useRouter();
   const installedGuilds = guilds.filter((g) => g.botInstalled);
   const unseenChangelog = useChangelogUnseenCount();
 
-  function logout() {
-    clearToken();
-    router.push("/");
-  }
-
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-base-950/80 backdrop-blur border-b border-white/5">
+    <header className="sp-header sticky top-0 z-10 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-base-950/80 backdrop-blur border-b border-white/5">
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onMenuClick}
@@ -78,20 +71,7 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
           <span>Search</span>
           <kbd className="text-[10px] border border-white/10 rounded px-1">⌘K</kbd>
         </button>
-        <span className="hidden sm:inline text-sm text-slate-300">{user.username}</span>
-        <img
-          src={user.avatar ?? "/default-avatar.png"}
-          alt={user.username}
-          className="h-8 w-8 rounded-full border border-neon-blue shadow-glow-blue"
-        />
-        <button
-          onClick={logout}
-          title="Log out"
-          aria-label="Log out"
-          className="shrink-0 text-slate-500 hover:text-rose-400 text-xs font-medium px-2 py-1.5"
-        >
-          Logout
-        </button>
+        <AccountMenu user={user} guildId={activeGuildId} />
       </div>
     </header>
   );

@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
+import { NumberInput, SettingRow, SettingsSection } from "../../../../components/ui/Settings";
 import { api, type AntiNukeConfig } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 
 export default function AntiNukePage({ params }: { params: { guildId: string } }) {
   const [config, setConfig] = useState<AntiNukeConfig | null>(null);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.getAntiNuke(params.guildId).then(setConfig);
@@ -19,9 +18,7 @@ export default function AntiNukePage({ params }: { params: { guildId: string } }
 
   async function save() {
     if (!config) return;
-    setSaving(true);
     setConfig(await api.setAntiNuke(params.guildId, config));
-    setSaving(false);
   }
 
   const autoSave = useAutoSave(config, save);
@@ -29,7 +26,7 @@ export default function AntiNukePage({ params }: { params: { guildId: string } }
   if (!config) return <p className="text-slate-400">Loading…</p>;
 
   return (
-    <div>
+    <div className="max-w-4xl">
       <ModuleHeader
         guildId={params.guildId}
         moduleKey="ANTI_NUKE"
@@ -37,52 +34,28 @@ export default function AntiNukePage({ params }: { params: { guildId: string } }
         description="Watches the audit log for mass bans or channel deletions and can strip the offending account's roles automatically."
       />
 
-      <NeonCard className="max-w-lg">
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Alert Channel</label>
-        <ChannelSelect
-          guildId={params.guildId}
-          value={config.alertChannelId}
-          onChange={(channelId) => setConfig({ ...config, alertChannelId: channelId })}
-        />
+      <SettingsSection title="Alerts">
+        <SettingRow label="Alert channel" help="Where Spartacus posts when someone trips a limit.">
+          <ChannelSelect guildId={params.guildId} value={config.alertChannelId} onChange={(channelId) => setConfig({ ...config, alertChannelId: channelId })} />
+        </SettingRow>
+      </SettingsSection>
 
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Max Bans / Minute</label>
-            <input
-              type="number"
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              value={config.maxBansPerMinute}
-              onChange={(e) => setConfig({ ...config, maxBansPerMinute: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Max Channel Deletes / Minute</label>
-            <input
-              type="number"
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              value={config.maxChannelDeletesPerMinute}
-              onChange={(e) => setConfig({ ...config, maxChannelDeletesPerMinute: Number(e.target.value) })}
-            />
-          </div>
-        </div>
+      <SettingsSection title="Limits">
+        <SettingRow label="Max bans per minute" help="More bans than this in one minute, by one account, sets it off." tip="Staff rarely ban several people a minute. A compromised account usually bans dozens.">
+          <NumberInput label="Max bans per minute" value={config.maxBansPerMinute} onChange={(n) => setConfig({ ...config, maxBansPerMinute: n })} min={1} />
+        </SettingRow>
+        <SettingRow label="Max channel deletes per minute" help="More channel deletions than this in one minute sets it off.">
+          <NumberInput label="Max channel deletes per minute" value={config.maxChannelDeletesPerMinute} onChange={(n) => setConfig({ ...config, maxChannelDeletesPerMinute: n })} min={1} />
+        </SettingRow>
+      </SettingsSection>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">Strip Roles on Trigger</p>
-            <p className="text-xs text-slate-500">Remove all roles from the account that tripped the threshold.</p>
-          </div>
-          <ToggleSwitch
-            enabled={config.stripRolesOnTrigger}
-            onChange={(next) => setConfig({ ...config, stripRolesOnTrigger: next })}
-            label="Strip roles on trigger"
-          />
-        </div>
-      </NeonCard>
+      <SettingsSection title="Response">
+        <SettingRow label="Strip roles on trigger" help="Remove every role from the account that tripped a limit." tip="Taking its roles away stops it doing more damage while you look into it. Spartacus's role must be above that account's roles.">
+          <ToggleSwitch enabled={config.stripRolesOnTrigger} onChange={(next) => setConfig({ ...config, stripRolesOnTrigger: next })} label="Strip roles on trigger" />
+        </SettingRow>
+      </SettingsSection>
 
-      <button onClick={save} disabled={saving} className="neon-button mt-4">
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-      <SaveStatus status={autoSave} />
+      <SaveStatus status={autoSave} onSave={save} />
     </div>
   );
 }

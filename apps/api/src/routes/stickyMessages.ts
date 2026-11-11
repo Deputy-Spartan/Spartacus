@@ -19,17 +19,20 @@ function sanitizeButtons(input: unknown): Prisma.InputJsonValue {
     .map((b) => ({ label: b.label.slice(0, 80), url: b.url }));
 }
 
+const cleanLabel = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 80) : null);
+
 router.get("/guilds/:guildId/sticky-messages", requireAuth, requireGuildPermission, async (req, res) => {
   const rows = await prisma.stickyMessage.findMany({ where: { guildId: req.params.guildId } });
   res.json(rows);
 });
 
 router.post("/guilds/:guildId/sticky-messages", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra, savedEmbedId } = req.body;
+  const { channelId, label, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra, savedEmbedId } = req.body;
   const data = {
     guildId: req.params.guildId,
     channelId,
-    content,
+    label: cleanLabel(label),
+    content: typeof content === "string" ? content : "",
     embedEnabled: Boolean(embedEnabled),
     embedTitle: embedTitle || null,
     embedDescription: embedDescription || null,
@@ -52,11 +55,12 @@ router.put("/guilds/:guildId/sticky-messages/:id", requireAuth, requireGuildPerm
     return res.status(404).json({ error: "Sticky message not found" });
   }
 
-  const { content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra, savedEmbedId } = req.body;
+  const { label, content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra, savedEmbedId } = req.body;
   const row = await prisma.stickyMessage.update({
     where: { id: req.params.id },
     data: {
-      content,
+      label: cleanLabel(label),
+      content: typeof content === "string" ? content : "",
       embedEnabled: Boolean(embedEnabled),
       embedTitle: embedTitle || null,
       embedDescription: embedDescription || null,

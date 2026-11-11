@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { MAX_RANKS, cleanGameOverrides, cleanOverrides, rankListProblem } from "@spartacus/shared";
+import { MAX_RANKS, cleanGameOverrides, cleanOverrides, rankListProblem, boardPartOrder } from "@spartacus/shared";
 import { Prisma, prisma } from "@spartacus/db";
 import { deleteChannelMessage } from "../lib/discordRest";
 import { getBotClient } from "../lib/botClient";
@@ -25,7 +25,6 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   const useRanks = Boolean(b.useRanks);
   const useMaps = Boolean(b.useMaps);
   const mapMethod = pick(b.mapMethod, ["VOTE", "RANDOM", "BANS"], "VOTE");
-  const format = pick(b.format, ["SINGLE", "TOURNAMENT"], "SINGLE");
   const autoMove = Boolean(b.autoMove);
   const lobbyVoiceId = optionalId(b.lobbyVoiceId);
 
@@ -34,11 +33,6 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
   if (!panelChannelId || !resultsChannelId) return { error: "Pick a panel channel and a results channel." };
   if (panelChannelId === resultsChannelId) return { error: "The panel and results need different channels." };
   if (!whole(b.teamSize, 1, 10)) return { error: "Team size must be from 1 to 10." };
-  const tournamentTeams = b.tournamentTeams as number;
-  const picking = b.joinMode === "PICK" && (b.teamSize as number) > 1;
-  if (format === "TOURNAMENT" && ![0, 2, 4, 8, 16, 32, 64].includes(tournamentTeams)) return { error: "Pick a team limit from the list." };
-  if (format === "TOURNAMENT" && picking && (tournamentTeams === 0 || tournamentTeams > 16)) return { error: "When players choose a team, use 16 teams or fewer." };
-  if (format === "TOURNAMENT" && tournamentTeams === 0 && b.startMode === "FULL") return { error: "With no team limit the lobby never fills. Pick Staff Start It or Set a Time." };
   if (useRanks && ranks.length < 2) return { error: "Add at least 2 ranks, or turn ranks off." };
   if (useRanks && rankListProblem(ranks)) return { error: rankListProblem(ranks) ?? "" };
   const startMode = pick(b.startMode, ["MANUAL", "SCHEDULED", "FULL"], "MANUAL");
@@ -59,19 +53,15 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
     if (!offOr(b.autoStartSeconds, 15, 600)) return { error: "Auto-start must be 0 (off) or from 15 to 600 seconds." };
     if (!offOr(b.reportMinutes, 5, 720)) return { error: "Score deadline must be 0 (off) or from 5 to 720 minutes." };
     if (!offOr(b.signupMinutes, 5, 10080)) return { error: "Sign-up time must be 0 (off) or from 5 to 10080 minutes." };
-    if (!whole(b.autoReopenHours, 0, 720)) return { error: "Reopen time must be from 0 to 720 hours." };
   }
-  if (![b.winCoins, b.lossCoins, b.championCoins].every((c) => whole(c, 0, 1_000_000))) return { error: "Coin rewards must be whole numbers of 0 or more." };
+  if (![b.winCoins, b.lossCoins].every((c) => whole(c, 0, 1_000_000))) return { error: "Coin rewards must be whole numbers of 0 or more." };
 
   return {
     data: {
       name,
       game,
       enabled: b.enabled === undefined ? true : Boolean(b.enabled),
-      format,
       teamSize: b.teamSize as number,
-      tournamentTeams: format === "TOURNAMENT" ? tournamentTeams : 4,
-      flexTeams: format === "TOURNAMENT" && Boolean(b.flexTeams),
       balance: pick(b.balance, ["BALANCED", "CAPTAINS", "RANDOM"], "BALANCED"),
       captainRule: pick(b.captainRule, ["TOP", "RANDOM"], "TOP"),
       team1Name: text(b.team1Name, 60) || "Team Blue",
@@ -95,7 +85,6 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       rewardsEnabled: Boolean(b.rewardsEnabled),
       joinMode: pick(b.joinMode, ["ASSIGN", "PICK"], "ASSIGN"),
       rosterView: pick(b.rosterView, ["PUBLIC", "HIDDEN"], "PUBLIC"),
-      teamNames: list(b.teamNames, 16),
       startMode,
       startAt,
       useTimers,
@@ -104,11 +93,8 @@ function readSetup(b: Record<string, unknown>): { data?: Omit<Prisma.MatchSetupU
       reportMinutes: useTimers ? (b.reportMinutes as number) : 90,
       noReportAction: pick(b.noReportAction, ["CANCEL", "ALERT"], "CANCEL"),
       signupMinutes: useTimers ? (b.signupMinutes as number) : 240,
-      autoReopenHours: useTimers ? (b.autoReopenHours as number) : 24,
       winCoins: b.winCoins as number,
       lossCoins: b.lossCoins as number,
-      championCoins: b.championCoins as number,
-      championRoleId: optionalId(b.championRoleId),
       pingRoleId: optionalId(b.pingRoleId),
       staffRoleId: optionalId(b.staffRoleId),
       panelChannelId,
@@ -246,12 +232,11 @@ router.patch("/guilds/:guildId/match-setups/:id", requireAuth, requireGuildPermi
   // A moved channel starts over with fresh messages there, and clearing the
   // ids lets the bot's timer post them within a few seconds.
   const movedPanel = data.panelChannelId !== existing.panelChannelId;
-  const movedResults = data.resultsChannelId !== existing.resultsChannelId;
   if (movedPanel && existing.panelMessageId) await deleteChannelMessage(existing.panelChannelId, existing.panelMessageId).catch(() => null);
 
   const row = await prisma.matchSetup.update({
     where: { id: existing.id },
-    data: { ...data, ...(movedPanel ? { panelMessageId: null } : {}), ...(movedResults ? { bracketMessageId: null } : {}) },
+    data: { ...data, ...(movedPanel ? { panelMessageId: null } : {}) },
   });
 
   await syncPreset(req.params.guildId, data, false);
@@ -307,7 +292,7 @@ router.get("/guilds/:guildId/match-setups/:id/roster", requireAuth, requireGuild
 
 // ---- Leaderboard and Matchmaking tabs ----
 
-const CONFIG_FIELDS = ["boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "textRooms", "textRoomName", "textRoomView", "roomCloseSeconds", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
+const CONFIG_FIELDS = ["panelParts", "boardChannelId", "boardGames", "boardStyle", "channelId", "activityChannelId", "lobbyVoiceId", "duelCategoryId", "teamCategoryId", "enabled", "createVoice", "requireLobby", "voiceSource", "voiceReturn", "voicePrivate", "voiceLimit", "voiceExtra", "voiceNumberPad", "duelVoiceName", "teamVoiceName", "textRooms", "textRoomName", "textRoomView", "roomCloseSeconds", "texts", "gameTexts", "ranked", "games", "challengeMinutes", "queueMinutes", "reportHours", "staffRoleId"];
 
 router.get("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, async (req, res) => {
   const { guildId } = req.params;
@@ -331,19 +316,23 @@ router.put("/guilds/:guildId/matchmaking", requireAuth, requireGuildPermission, 
   for (const key of ["duelVoiceName", "teamVoiceName", "textRoomName"]) if (b[key] !== undefined && !text(b[key], 100)) return res.status(400).json({ error: "Channel names can't be empty." });
   if (b.roomCloseSeconds !== undefined && !whole(b.roomCloseSeconds, 0, 600)) return res.status(400).json({ error: "Close time must be from 0 to 600 seconds." });
   if (b.textRoomView !== undefined && !["PLAYERS", "ALL"].includes(b.textRoomView as string)) return res.status(400).json({ error: "Pick who can see match channels." });
+  if (b.panelParts !== undefined && (!Array.isArray(b.panelParts) || b.panelParts.length === 0 || boardPartOrder(b.panelParts).length !== new Set(b.panelParts).size)) return res.status(400).json({ error: "Keep at least one part of the board on." });
   if (b.requireLobby && !b.lobbyVoiceId) return res.status(400).json({ error: "Pick a Lobby before requiring it." });
 
   const existing = await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId }, update: {} });
-  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 500) : b[k] === "" ? null : b[k]]));
+  const data = Object.fromEntries(CONFIG_FIELDS.filter((k) => b[k] !== undefined).map((k) => [k, k === "gameTexts" ? cleanGameOverrides(b[k]) : k === "texts" ? cleanOverrides(b[k]) : k === "games" || k === "boardGames" ? list(b[k], 500) : k === "panelParts" ? boardPartOrder(b[k]) : b[k] === "" ? null : b[k]]));
   const movedBoard = b.boardChannelId !== undefined && (b.boardChannelId || null) !== existing.boardChannelId;
   const movedPanel = b.channelId !== undefined && (b.channelId || null) !== existing.channelId;
   const switchedOff = b.enabled === false && existing.enabled;
   if (movedBoard && existing.boardChannelId) {
     for (const id of Object.values((existing.boardMessages ?? {}) as Record<string, string>)) await deleteChannelMessage(existing.boardChannelId, id).catch(() => null);
   }
-  if ((movedPanel || switchedOff) && existing.channelId && existing.messageId) await deleteChannelMessage(existing.channelId, existing.messageId).catch(() => null);
+  if ((movedPanel || switchedOff) && existing.channelId) {
+    const parts = [...new Set([...(Array.isArray(existing.panelMessages) ? (existing.panelMessages as string[]) : []), ...(existing.messageId ? [existing.messageId] : [])])];
+    for (const id of parts) await deleteChannelMessage(existing.channelId, id).catch(() => null);
+  }
 
-  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessages: {} } : {}), ...(movedPanel || switchedOff ? { messageId: null } : {}) } });
+  const config = await prisma.matchmakingConfig.update({ where: { guildId }, data: { ...data, ...(movedBoard ? { boardMessages: {} } : {}), ...(movedPanel || switchedOff ? { messageId: null, panelMessages: [] } : {}) } });
   const client = getBotClient();
   if (client) {
     const { syncBoard, syncMatchmakingPanel } = await import("@spartacus/bot");

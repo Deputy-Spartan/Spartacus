@@ -1,3 +1,4 @@
+import { countMessageActivity } from "../jobs/messageActivity";
 import { Events, Message } from "discord.js";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { checkAutomod, handleViolation, type AutomodConfig } from "../modules/moderation/automod";
@@ -89,29 +90,9 @@ export async function execute(message: Message) {
     const blacklisted = await isXpBlacklisted(message);
     if (!blacklisted) {
       const result = await awardMessageXp(message.guildId, message.author.id);
-      if (result?.leveledUp) {
-        const levelSettings = await prisma.levelingSettings.findUnique({ where: { guildId: message.guildId } });
-        const announceChannel = levelSettings?.channelId
-          ? await message.guild?.channels.fetch(levelSettings.channelId).catch(() => null)
-          : message.channel;
-        if (announceChannel && isSendableChannel(announceChannel)) {
-          const text = (levelSettings?.levelUpMessage || "🎉 {user} just reached **Level {level}**!")
-            .replace(/{user}/g, `${message.author}`)
-            .replace(/{level}/g, String(result.level));
-          await announceChannel.send(text).catch(() => null);
-        }
-        await grantLevelRoles(message.guild, message.author.id, result.level);
-
-        if (result.level >= 10) {
-          await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_10", "Level 10", message.channelId);
-        }
-        if (result.level >= 25) {
-          await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_25", "Level 25", message.channelId);
-        }
-        if (result.level >= 50) {
-          await awardAchievement(message.client, message.guildId, message.author.id, "LEVEL_50", "Level 50", message.channelId);
-        }
-        await checkCustomAchievements(message.client, message.guildId, message.author.id, "LEVEL", result.level, message.channelId);
+      if (result?.leveledUp && message.guild) {
+        const { handleLevelUp } = await import("../modules/leveling/levelUp");
+        await handleLevelUp(message.client, message.guild, message.author.id, result.from, result.level, message.channelId);
       }
     }
   }
@@ -130,6 +111,7 @@ export async function execute(message: Message) {
       create: { guildId: message.guildId, date: today, count: 1 },
       update: { count: { increment: 1 } },
     });
+    countMessageActivity(message.guildId, message.channelId);
   }
 
   // --- Counting game ---

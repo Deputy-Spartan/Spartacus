@@ -34,7 +34,8 @@ export async function buildWelcomePayload(guild: Guild, config: WelcomeConfig, m
   // Discord never delivers a ping notification for a mention that only
   // appears inside an embed, so add the bare mention back to `content` if
   // embed mode left it empty — see guildMemberAdd.ts for the full reasoning.
-  if (!payload.content?.includes(tokens["{user}"])) {
+  // Servers can turn this off to show the name only inside the embed.
+  if (config.pingAboveEmbed !== false && !payload.content?.includes(tokens["{user}"])) {
     payload.content = [tokens["{user}"], payload.content].filter(Boolean).join(" ");
   }
 
@@ -91,7 +92,8 @@ export async function sendWelcomeTest(client: Client, guildId: string, callerId:
   const guild = await client.guilds.fetch(guildId).catch(() => null);
   if (!guild) return { ok: false, error: "Couldn't load this server." };
 
-  const channel = await guild.channels.fetch(config.channelId).catch(() => null);
+  const channelId = kind === "goodbye" ? config.leaveChannelId ?? config.channelId : config.channelId;
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel)) return { ok: false, error: "The configured channel isn't postable." };
 
   const member = await guild.members.fetch(callerId).catch(() => null);

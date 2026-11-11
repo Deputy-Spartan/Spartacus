@@ -1,5 +1,6 @@
-import type { TextOverrides } from "@spartacus/shared";
+import type { TempGameChoice, TextOverrides } from "@spartacus/shared";
 import type { EmbedExtra } from "./embedExtra";
+import { cacheable, cachedGet, clearApiCache, forgetArea } from "./apiCache";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const TOKEN_KEY = "spartacus_token";
@@ -10,14 +11,33 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string) {
+  clearApiCache();
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearToken() {
+  clearApiCache();
   localStorage.removeItem(TOKEN_KEY);
 }
 
+// Loads go through the shared memory in apiCache, so pages you've opened show
+// their values straight away. Saves, creates and deletes go straight to the
+// API and make the memory forget that part of the dashboard.
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (method === "GET" && cacheable(path)) return cachedGet<T>(path, () => send(path, init).then((res) => res.text()));
+  const res = await send(path, init);
+  if (method !== "GET") {
+    forgetArea(path);
+    // Tells anything showing derived state (setup badges, the health score)
+    // that a setting just changed, so it reloads instead of going stale.
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("spartacus:saved", { detail: { path } }));
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
@@ -46,8 +66,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => null);
     throw new Error((body && typeof body.error === "string" && body.error) || `API ${path} failed: ${res.status}`);
   }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  return res;
 }
 
 // Separate from request() because a file upload must let the browser set
@@ -87,6 +106,8 @@ export interface DashboardActivityEntry {
 export interface WelcomeConfig {
   guildId: string;
   channelId: string | null;
+  leaveChannelId?: string | null;
+  pingAboveEmbed?: boolean;
   welcomeText: string;
   goodbyeText: string;
   embedColor: string;
@@ -134,10 +155,53 @@ export interface CustomCommand {
 
 export interface StreamSubscription {
   id: string;
-  platform: "twitch" | "youtube";
+  platform: "twitch" | "youtube" | "kick" | "tiktok" | "other";
   channelName: string;
   announceChannelId: string;
   isLive: boolean;
+  displayName?: string | null;
+  platformName?: string | null;
+  discordUserId?: string | null;
+  pingRoleId?: string | null;
+  liveStartedAt?: string | null;
+  lastTitle?: string | null;
+  lastGame?: string | null;
+  lastAvatar?: string | null;
+  peakViewers?: number;
+  lastError?: string | null;
+  lastNotifiedAt?: string | null;
+  alertOverrides?: Record<string, string> | null;
+}
+export interface StreamAlertSettingsRow {
+  guildId?: string;
+  defaultChannelId?: string | null;
+  pingRoleId?: string | null;
+  liveRoleId?: string | null;
+  selfServeRoleId?: string | null;
+  contentTemplate?: string | null;
+  embedTitle?: string | null;
+  embedDescription?: string | null;
+  embedColor?: string | null;
+  buttonLabel?: string | null;
+  buttonEmoji?: string | null;
+  embedExtra?: import("./embedExtra").EmbedExtra | null;
+  showThumbnail?: boolean;
+  showGame?: boolean;
+  showViewers?: boolean;
+  endedTitle?: string | null;
+  endedDescription?: string | null;
+  endedColor?: string | null;
+  updateWhileLive?: boolean;
+  endAction?: "EDIT" | "DELETE" | "KEEP";
+  cooldownMinutes?: number;
+}
+export interface LiveCheckResult {
+  live?: boolean;
+  title?: string | null;
+  game?: string | null;
+  viewers?: number | null;
+  name?: string | null;
+  error?: string;
 }
 
 export type RsvpRole = "TANK" | "DPS" | "HEALER" | "ATTENDING" | "ABSENT";
@@ -241,6 +305,13 @@ export interface StatusChannelRow {
   channelId: string;
 }
 
+export interface ActivityInsights {
+  hours: number[]; // 24 totals, by UTC hour
+  channels: Array<{ id: string; name: string | null; count: number }>;
+  days: number;
+  total: number;
+}
+
 export interface GrowthSnapshotRow {
   id: string;
   guildId: string;
@@ -254,6 +325,11 @@ export interface AiConfigRow {
   chatChannelId: string | null;
   chatSystemPrompt: string | null;
   moderationEnabled: boolean;
+  chatLimit: number; // questions per member per window; 0 = no limit
+  chatLimitWindow: number; // seconds
+  chatStaffExempt: boolean;
+  chatSlowmode: number; // seconds of Discord slowmode on chatChannelId
+  slowmodeError?: string | null;
 }
 
 export interface ServerBackupRow {
@@ -413,40 +489,23 @@ export interface EmbedCreatorFetchResult {
   embeds: EmbedCreatorEmbed[];
 }
 
-export type CustomCommandActionType = "SEND_MESSAGE" | "GIVE_ROLE" | "REMOVE_ROLE" | "ADD_CURRENCY" | "POST_EMBED";
-
-export interface CustomSlashCommandRow {
+export interface CustomSlashCommandRow extends Omit<import("@spartacus/shared").CommandDraft, "logChannelId"> {
   id: string;
-  name: string;
-  description: string;
-  actionType: CustomCommandActionType;
-  ephemeralReply: boolean;
-  messageText: string | null;
-  roleId: string | null;
-  currencyAmount: number | null;
-  embedEnabled: boolean;
-  embedTitle: string | null;
-  embedDescription: string | null;
-  embedColor: string | null;
-  buttons: StickyButton[];
-  embedExtra?: EmbedExtra;
-  savedEmbedId?: string | null;
+  logChannelId: string | null;
+  discordCommandId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
-export interface CustomSlashCommandInput {
-  name: string;
-  description: string;
-  actionType: CustomCommandActionType;
-  ephemeralReply: boolean;
-  messageText?: string;
-  roleId?: string;
-  currencyAmount?: number;
-  embedEnabled?: boolean;
-  embedTitle?: string;
-  embedDescription?: string;
-  embedColor?: string;
-  buttons?: StickyButton[];
-  embedExtra?: EmbedExtra;
-  savedEmbedId?: string | null;
+export interface CustomCommandRunRow {
+  id: string;
+  commandId: string | null;
+  commandName: string;
+  userId: string;
+  userName: string;
+  inputs: Record<string, string>;
+  result: "OK" | "PARTIAL" | "FAILED" | "DENIED" | "CANCELED";
+  details: string[];
+  createdAt: string;
 }
 
 export interface SendMessageInput {
@@ -466,6 +525,7 @@ export interface LeaderboardRow {
   level: number;
   username: string | null;
   nickname: string | null;
+  avatar?: string | null;
 }
 
 export interface DiscordChannelOption {
@@ -553,6 +613,7 @@ export interface ReactionRoleOption {
   roleId: string;
   extraRoleIds?: string[];
   channelIds?: string[];
+  note?: string | null;
 }
 export interface DiscordEmojiOption {
   id: string;
@@ -564,10 +625,7 @@ export interface MatchSetupInput {
   name: string;
   game: string;
   enabled: boolean;
-  format: "SINGLE" | "TOURNAMENT";
   teamSize: number;
-  tournamentTeams: number;
-  flexTeams: boolean;
   balance: "BALANCED" | "CAPTAINS" | "RANDOM";
   captainRule: "TOP" | "RANDOM";
   team1Name: string;
@@ -591,7 +649,6 @@ export interface MatchSetupInput {
   rewardsEnabled: boolean;
   joinMode: "ASSIGN" | "PICK";
   rosterView: "PUBLIC" | "HIDDEN";
-  teamNames: string[];
   startMode: "MANUAL" | "SCHEDULED" | "FULL";
   startAt: string | null;
   useTimers: boolean;
@@ -600,11 +657,8 @@ export interface MatchSetupInput {
   reportMinutes: number;
   noReportAction: "CANCEL" | "ALERT";
   signupMinutes: number;
-  autoReopenHours: number;
   winCoins: number;
   lossCoins: number;
-  championCoins: number;
-  championRoleId: string | null;
   pingRoleId: string | null;
   staffRoleId: string | null;
   panelChannelId: string;
@@ -633,6 +687,7 @@ export interface MatchSetupRow extends MatchSetupInput {
 }
 
 export interface MatchmakingConfigRow {
+  panelParts: string[];
   boardChannelId: string | null;
   boardGames: string[];
   boardStyle: "COMBINED" | "SEPARATE";
@@ -737,6 +792,7 @@ export interface StickyButton {
 export interface StickyMessageRow {
   id: string;
   channelId: string;
+  label?: string | null;
   content: string;
   embedEnabled: boolean;
   embedTitle: string | null;
@@ -747,6 +803,7 @@ export interface StickyMessageRow {
   savedEmbedId?: string | null;
 }
 export interface StickyMessageInput {
+  label?: string | null;
   content: string;
   embedEnabled: boolean;
   embedTitle: string | null;
@@ -774,6 +831,19 @@ export interface TempChannelLobbyRow {
   deleteAfterEmptySec: number;
   pairTextChannel: boolean;
   hideTextFromNonMembers: boolean;
+  joinToCreate: boolean;
+  gamePicker: boolean;
+  gameCategories: boolean;
+  panelChannelId: string | null;
+  panelMessageId: string | null;
+  panelTitle: string;
+  panelText: string;
+  panelColor: number;
+  controlsWhere: "VOICE" | "THREAD";
+  controlsChannelId: string | null;
+  guideButton: boolean;
+  panelGuide: string | null;
+  gameChoices: TempGameChoice[];
 }
 
 export type RolePanelLayout = "BUTTONS" | "DROPDOWN";
@@ -784,6 +854,7 @@ export interface RolePanelOption {
   channelIds?: string[];
   label: string;
   emoji?: string;
+  note?: string;
 }
 
 export interface RolePanelRow {
@@ -1266,7 +1337,44 @@ export interface VerificationConfig {
   verifiedRoleId: string | null;
   minAccountAgeDays: number;
   panelChannelId: string | null;
+  panelMessageId?: string | null;
   savedEmbedId: string | null;
+  defaultEmbedTitle?: string | null;
+  defaultEmbedDescription?: string | null;
+  embedColor?: string | null;
+  buttonLabel?: string | null;
+  buttonEmoji?: string | null;
+  method?: "BUTTON" | "CAPTCHA";
+  requireAvatar?: boolean;
+  accountTooNewMessage?: string | null;
+  noAvatarMessage?: string | null;
+  maxFailures?: number;
+  failAction?: "NONE" | "KICK";
+  unverifiedRoleId?: string | null;
+  giveUnverifiedOnJoin?: boolean;
+  logChannelId?: string | null;
+  dmConfirmEnabled?: boolean;
+  dmConfirmMessage?: string | null;
+  reminderEnabled?: boolean;
+  reminderDelayHours?: number;
+  reminderMessage?: string | null;
+  kickEnabled?: boolean;
+  kickAfterHours?: number;
+  kickMessage?: string | null;
+  verifiedReply?: string | null;
+  alreadyVerifiedReply?: string | null;
+  noRoleReply?: string | null;
+  captchaPrompt?: string | null;
+  captchaWrongReply?: string | null;
+  pendingCount?: number;
+}
+export interface VerificationLogRow {
+  id: string;
+  userId: string;
+  username: string;
+  result: "VERIFIED" | "FAILED" | "TOO_NEW" | "NO_AVATAR" | "KICKED";
+  detail: string | null;
+  createdAt: string;
 }
 export interface AntiNukeConfig {
   guildId: string;
@@ -1406,6 +1514,15 @@ export interface BumpReminderSettingsRow {
   channelId: string | null;
   mentionRoleId: string | null;
   nextReminderAt: string | null;
+  lastBumpAt?: string | null;
+  lastBumpedById?: string | null;
+  missedAlertEnabled?: boolean;
+  missedAfterMin?: number;
+  missedAlerts?: number;
+  bumpCount?: number;
+  bumpMessages?: import("@spartacus/shared").BumpMessages;
+  dmUsers?: Array<{ id: string; name: string }>;
+  removeDmUserId?: string;
 }
 
 export interface RulesGateSettingsRow {
@@ -1581,6 +1698,14 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
+export type DashboardTheme = "studio" | "glass" | "daylight";
+
+export interface UserPrefs {
+  theme: DashboardTheme;
+  reduceMotion: boolean;
+  displayName: string | null;
+}
+
 export interface AccessStatus {
   status: "owner" | "approved" | "pending" | "none";
   plan: "FREE" | "PAID" | null;
@@ -1612,14 +1737,244 @@ export interface AccessAuditEntryRow {
   createdAt: string;
 }
 
+export interface RoleManagerRole {
+  id: string;
+  name: string;
+  color: string | null;
+  managed: boolean;
+  powerful: boolean;
+  blocked: string | null; // why it can't be changed here, or null
+}
+export interface RoleManagerInfo {
+  config: { staffRoleIds: string[]; logChannelId: string | null; hiddenRoleIds: string[] };
+  roles: RoleManagerRole[];
+  isOwner: boolean;
+}
+export interface RoleManagerMember {
+  id: string;
+  displayName: string;
+  username: string;
+  avatar: string;
+  bot: boolean;
+  joinedAt: string | null;
+  roleIds: string[];
+  timed?: Array<{ roleId: string; expiresAt: string }>;
+}
+export interface BulkRoleFilter {
+  who: "everyone" | "has" | "missing";
+  filterRoleId?: string | null;
+  joinedWithinDays?: number | null;
+  includeBots?: boolean;
+}
+export interface BulkRoleJobRow {
+  id: string;
+  roleId: string;
+  action: "GIVE" | "TAKE";
+  total: number;
+  done: number;
+  failed: number;
+  status: "RUNNING" | "DONE" | "UNDOING" | "UNDONE" | "STOPPED";
+  changedCount: number;
+  byName: string;
+  createdAt: string;
+  finishedAt: string | null;
+}
+export interface TimedRoleRow {
+  id: string;
+  userId: string;
+  displayName: string;
+  roleId: string;
+  expiresAt: string;
+}
+export interface RoleChangeRow {
+  id: string;
+  userId: string;
+  username: string;
+  roleId: string;
+  roleName: string;
+  action: "GIVE" | "TAKE" | "EXPIRED";
+  source: "DASHBOARD" | "DISCORD" | "BULK" | "TIMER" | "UNDO";
+  detail: string | null;
+  byName: string | null;
+  createdAt: string;
+}
+
+export interface ShopItemRow {
+  id: string;
+  emoji: string;
+  name: string;
+  description: string;
+  price: number;
+  type: import("@spartacus/shared").ShopItemType;
+  roleId: string | null;
+  durationDays: number | null;
+  boostMult: number | null;
+  boostMinutes: number | null;
+  crateRarity: string | null;
+  stock: number | null;
+  enabled: boolean;
+}
+export interface TournamentEntryRow {
+  id: string;
+  teamId: string | null;
+  name: string;
+  captainId: string;
+  players: string[];
+  seed: number | null;
+  checkedIn: boolean;
+  out: boolean;
+}
+export interface TournamentRow extends Omit<import("@spartacus/shared").TournamentInput, "rules"> {
+  id: string;
+  status: import("@spartacus/shared").TournamentStatus;
+  rules: string | null;
+  messageId: string | null;
+  checkInEndsAt: string | null;
+  solo: string[];
+  soloReady: string[];
+  bracket: import("@spartacus/shared").TournamentBracket;
+  championEntryId: string | null;
+  runnerUpEntryId: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  entries: TournamentEntryRow[];
+}
+export interface TournamentsView {
+  games: Array<{ game: string; teamSize: number }>;
+  defaultChannelId: string | null;
+  championRoleId: string | null;
+  matchmakingReady: boolean;
+  rooms: Array<{ id: string; threadId: string | null; status: string }>;
+  names: Record<string, string>;
+  tournaments: TournamentRow[];
+}
+export interface PlayingNowView {
+  settings: import("@spartacus/shared").PlayingNowSettings;
+  posted: boolean;
+  panelError: string | null;
+  active: Array<{ userId: string; name: string; mode: string; need: number; joined: number; note: string | null; endsAt: string }>;
+}
+
+export interface EconomyHubView {
+  settings: import("@spartacus/shared").EconomyPlusSettings;
+  panel: { channelId: string | null; posted?: boolean; title: string; text: string; error?: string | null };
+  items: ShopItemRow[];
+  purchases: Array<{ id: string; userId: string; itemName: string; price: number; createdAt: string }>;
+  levelRoles: Array<{ level: number; roleId: string }>;
+}
+
+export interface ProfileCardSettingsRow {
+  stats: import("@spartacus/shared").ProfileStatKey[];
+  allowBios: boolean;
+  panelChannelId: string | null;
+  panelPosted?: boolean;
+  panelTitle: string;
+  panelText: string;
+  panelColor: string;
+  panelPublic: boolean;
+  panelError?: string | null;
+}
+
+export interface QuickLinksStatus {
+  bot: "online" | "updating" | "offline";
+  botMessage: string | null;
+  lastHeartbeatAt: string | null;
+  dashboardDeploying: boolean;
+}
+export interface QuickLinksResponse {
+  groups: import("@spartacus/shared").QuickLinkGroup[];
+  status: QuickLinksStatus | null;
+}
+
+export interface StreamDeckKeyRow {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt?: string | null;
+  key?: string; // only right after it's made
+}
+export interface StreamDeckLogRow {
+  id: string;
+  action: string;
+  ok: boolean;
+  message: string;
+  createdAt: string;
+}
+
 export const api = {
+  getTournaments: (guildId: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments`),
+  createTournament: (guildId: string, t: import("@spartacus/shared").TournamentInput) => request<TournamentsView>(`/guilds/${guildId}/tournaments`, { method: "POST", body: JSON.stringify(t) }),
+  updateTournament: (guildId: string, id: string, t: import("@spartacus/shared").TournamentInput) => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}`, { method: "PUT", body: JSON.stringify(t) }),
+  tournamentAction: (guildId: string, id: string, action: "open" | "checkin" | "start" | "cancel" | "duplicate") => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}/${action}`, { method: "POST", body: "{}" }),
+  setTournamentTieWinner: (guildId: string, id: string, round: number, index: number, side: "a" | "b") =>
+    request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}/tie`, { method: "POST", body: JSON.stringify({ round, index, side }) }),
+  removeTournamentEntry: (guildId: string, id: string, entryId: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}/entries/${entryId}/remove`, { method: "POST", body: "{}" }),
+  deleteTournament: (guildId: string, id: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments/${id}`, { method: "DELETE" }),
+  getPlayingNow: (guildId: string) => request<PlayingNowView>(`/guilds/${guildId}/playing-now`),
+  savePlayingNow: (guildId: string, s: import("@spartacus/shared").PlayingNowSettings) => request<PlayingNowView>(`/guilds/${guildId}/playing-now`, { method: "PUT", body: JSON.stringify(s) }),
+  makePlayingNowRoles: (guildId: string) => request<PlayingNowView>(`/guilds/${guildId}/playing-now/roles`, { method: "POST", body: "{}" }),
+  getEconomyHub: (guildId: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub`),
+  saveEconomyHub: (guildId: string, body: { settings: import("@spartacus/shared").EconomyPlusSettings; panel: EconomyHubView["panel"]; repost?: boolean }) =>
+    request<EconomyHubView>(`/guilds/${guildId}/economy-hub`, { method: "PUT", body: JSON.stringify(body) }),
+  addShopItem: (guildId: string, item: unknown) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items`, { method: "POST", body: JSON.stringify(item) }),
+  addStarterShopItems: (guildId: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items/starter`, { method: "POST", body: "{}" }),
+  updateShopItem: (guildId: string, id: string, item: unknown) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items/${id}`, { method: "PUT", body: JSON.stringify(item) }),
+  deleteShopItem: (guildId: string, id: string) => request<EconomyHubView>(`/guilds/${guildId}/economy-hub/items/${id}`, { method: "DELETE" }),
+  getProfileCardSettings: (guildId: string) => request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`),
+  setProfileCardSettings: (guildId: string, s: ProfileCardSettingsRow & { repost?: boolean }) =>
+    request<ProfileCardSettingsRow>(`/guilds/${guildId}/profile-cards`, { method: "PUT", body: JSON.stringify(s) }),
+  // Returns an object URL for the drawn PNG (revoke it when done).
+  getProfileCardPreview: async (guildId: string) => {
+    const res = await send(`/guilds/${guildId}/profile-cards/preview`);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? "Couldn't draw the preview.");
+    }
+    return URL.createObjectURL(await res.blob());
+  },
+  getFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean; statusUrl: string | null }>("/owner/front-page"),
+  saveStatusPage: (url: string) => request<{ statusUrl: string | null }>("/owner/status-page", { method: "PUT", body: JSON.stringify({ url }) }),
+  saveFrontPage: (cards: import("@spartacus/shared").FrontPageCard[]) => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page", { method: "PUT", body: JSON.stringify({ cards }) }),
+  resetFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page", { method: "DELETE" }),
+  getQuickLinks: () => request<QuickLinksResponse>("/owner/quick-links"),
+  saveQuickLinks: (groups: import("@spartacus/shared").QuickLinkGroup[]) =>
+    request<{ groups: import("@spartacus/shared").QuickLinkGroup[] }>("/owner/quick-links", { method: "PUT", body: JSON.stringify({ groups }) }),
+  resetQuickLinks: () => request<{ groups: import("@spartacus/shared").QuickLinkGroup[] }>("/owner/quick-links", { method: "DELETE" }),
+  getStreamDeckKeys: (guildId: string) => request<StreamDeckKeyRow[]>(`/guilds/${guildId}/stream-deck/keys`),
+  createStreamDeckKey: (guildId: string, name: string) => request<StreamDeckKeyRow>(`/guilds/${guildId}/stream-deck/keys`, { method: "POST", body: JSON.stringify({ name }) }),
+  revokeStreamDeckKey: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-deck/keys/${id}`, { method: "DELETE" }),
+  getStreamDeckLog: (guildId: string) => request<StreamDeckLogRow[]>(`/guilds/${guildId}/stream-deck/log`),
+  getRoleManager: (guildId: string) => request<RoleManagerInfo>(`/guilds/${guildId}/role-manager`),
+  setRoleManager: (guildId: string, config: RoleManagerInfo["config"]) =>
+    request(`/guilds/${guildId}/role-manager`, { method: "PUT", body: JSON.stringify(config) }),
+  searchRoleMembers: (guildId: string, q: string) => request<RoleManagerMember[]>(`/guilds/${guildId}/role-manager/members?q=${encodeURIComponent(q)}`),
+  getRoleMember: (guildId: string, userId: string) => request<RoleManagerMember>(`/guilds/${guildId}/role-manager/members/${userId}`),
+  changeMemberRole: (guildId: string, userId: string, roleId: string, action: "GIVE" | "TAKE", minutes?: number | null) =>
+    request<{ ok: boolean; message: string }>(`/guilds/${guildId}/role-manager/members/${userId}/roles`, { method: "POST", body: JSON.stringify({ roleId, action, minutes }) }),
+  previewBulkRole: (guildId: string, roleId: string, action: "GIVE" | "TAKE", filter: BulkRoleFilter) =>
+    request<{ count: number; sample: string[]; blocked: string | null }>(`/guilds/${guildId}/role-manager/bulk/preview`, { method: "POST", body: JSON.stringify({ roleId, action, filter }) }),
+  startBulkRole: (guildId: string, roleId: string, action: "GIVE" | "TAKE", filter: BulkRoleFilter) =>
+    request<{ ok: boolean; jobId: string }>(`/guilds/${guildId}/role-manager/bulk`, { method: "POST", body: JSON.stringify({ roleId, action, filter }) }),
+  getBulkRoleJobs: (guildId: string) => request<BulkRoleJobRow[]>(`/guilds/${guildId}/role-manager/bulk`),
+  undoBulkRole: (guildId: string, jobId: string) => request<{ ok: boolean; message: string }>(`/guilds/${guildId}/role-manager/bulk/${jobId}/undo`, { method: "POST" }),
+  getTimedRoles: (guildId: string) => request<TimedRoleRow[]>(`/guilds/${guildId}/role-manager/timed`),
+  endTimedRole: (guildId: string, id: string) => request<{ ok: boolean; message: string }>(`/guilds/${guildId}/role-manager/timed/${id}`, { method: "DELETE" }),
+  getRoleHistory: (guildId: string) => request<RoleChangeRow[]>(`/guilds/${guildId}/role-manager/history`),
+
   uploadImage: (guildId: string, file: File) => uploadFile(`/guilds/${guildId}/upload-image`, file),
 
   getMe: () => request<CurrentUser>("/me"),
+  getMyPrefs: () => request<UserPrefs>("/me/prefs"),
+  saveMyPrefs: (body: Partial<UserPrefs>) => request<UserPrefs>("/me/prefs", { method: "PUT", body: JSON.stringify(body) }),
   getGuilds: () =>
     request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean; owner: boolean }>>("/guilds"),
 
   getAccessStatus: () => request<AccessStatus>("/access-status"),
+  getDashboardTexts: () => request<Record<string, string>>("/dashboard-texts"),
+  setDashboardText: (key: string, text: string) =>
+    request<{ key: string; text: string | null }>(`/dashboard-texts/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify({ text }) }),
   requestAccess: (message?: string) =>
     request<AccessRequestRow>("/access-requests", { method: "POST", body: JSON.stringify({ message }) }),
   getAccessRequests: () => request<AccessRequestRow[]>("/access-requests"),
@@ -1635,6 +1990,8 @@ export const api = {
   getAccessAuditLog: () => request<AccessAuditEntryRow[]>("/access-audit-log"),
 
   getModules: (guildId: string) => request<Record<string, ModuleState>>(`/guilds/${guildId}/modules`),
+  getSetupStatus: (guildId: string) => request<Record<string, string[]>>(`/guilds/${guildId}/setup-status`),
+  getActivityInsights: (guildId: string) => request<ActivityInsights>(`/guilds/${guildId}/activity-insights`),
   getActivity: (guildId: string, limit = 20) => request<DashboardActivityEntry[]>(`/guilds/${guildId}/activity?limit=${limit}`),
   setModule: (guildId: string, key: string, enabled: boolean) =>
     request(`/guilds/${guildId}/modules/${key}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
@@ -1725,10 +2082,12 @@ export const api = {
     request(`/guilds/${guildId}/command-toggles/${name}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
 
   getCustomSlashCommands: (guildId: string) => request<CustomSlashCommandRow[]>(`/guilds/${guildId}/custom-slash-commands`),
-  createCustomSlashCommand: (guildId: string, input: CustomSlashCommandInput) =>
-    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands`, { method: "POST", body: JSON.stringify(input) }),
-  deleteCustomSlashCommand: (guildId: string, id: string) =>
-    request(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "DELETE" }),
+  createCustomSlashCommand: (guildId: string, c: import("@spartacus/shared").CommandDraft) =>
+    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands`, { method: "POST", body: JSON.stringify(c) }),
+  updateCustomSlashCommand: (guildId: string, id: string, c: import("@spartacus/shared").CommandDraft) =>
+    request<CustomSlashCommandRow>(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "PUT", body: JSON.stringify(c) }),
+  deleteCustomSlashCommand: (guildId: string, id: string) => request(`/guilds/${guildId}/custom-slash-commands/${id}`, { method: "DELETE" }),
+  getCustomCommandRuns: (guildId: string, commandId?: string) => request<CustomCommandRunRow[]>(`/guilds/${guildId}/custom-command-runs${commandId ? `?commandId=${commandId}` : ""}`),
 
   getLfgCommands: (guildId: string) => request<LfgCommandRow[]>(`/guilds/${guildId}/lfg-commands`),
   createLfgCommand: (guildId: string, input: LfgCommandInput) =>
@@ -1774,9 +2133,17 @@ export const api = {
 
   getStreamSubscriptions: (guildId: string) =>
     request<StreamSubscription[]>(`/guilds/${guildId}/stream-subscriptions`),
+  getStreamAlertSettings: (guildId: string) =>
+    request<{ settings: StreamAlertSettingsRow; keys: { TWITCH: boolean; KICK: boolean } }>(`/guilds/${guildId}/stream-alert-settings`),
+  setStreamAlertSettings: (guildId: string, settings: StreamAlertSettingsRow) =>
+    request<StreamAlertSettingsRow>(`/guilds/${guildId}/stream-alert-settings`, { method: "PUT", body: JSON.stringify(settings) }),
+  updateStreamSubscription: (guildId: string, id: string, body: Partial<StreamSubscription>) =>
+    request<StreamSubscription>(`/guilds/${guildId}/stream-subscriptions/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  checkStreamSubscription: (guildId: string, id: string) => request<LiveCheckResult>(`/guilds/${guildId}/stream-subscriptions/${id}/check`, { method: "POST" }),
+  testStreamSubscription: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-subscriptions/${id}/test`, { method: "POST" }),
   addStreamSubscription: (
     guildId: string,
-    body: { platform: "twitch" | "youtube"; channelName: string; announceChannelId: string }
+    body: Partial<StreamSubscription> & { platform: StreamSubscription["platform"]; channelName: string; announceChannelId?: string }
   ) =>
     request<StreamSubscription>(`/guilds/${guildId}/stream-subscriptions`, {
       method: "POST",
@@ -2021,6 +2388,10 @@ export const api = {
   getEconomyAnalytics: (guildId: string, days: number) => request<EconomyAnalytics>(`/guilds/${guildId}/economy/analytics?days=${days}`),
 
   getVerification: (guildId: string) => request<VerificationConfig>(`/guilds/${guildId}/verification`),
+  repostVerificationPanel: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/verification/repost`, { method: "POST" }),
+  verifyExistingMembers: (guildId: string) => request<{ given: number; failed: number; already: number; checked: number }>(`/guilds/${guildId}/verification/verify-existing`, { method: "POST" }),
+  getVerificationLogs: (guildId: string) => request<VerificationLogRow[]>(`/guilds/${guildId}/verification/logs`),
+  purgeVerificationLogs: (guildId: string) => request<{ deleted: number }>(`/guilds/${guildId}/verification/logs`, { method: "DELETE" }),
   setVerification: (guildId: string, config: Partial<VerificationConfig>) =>
     request<VerificationConfig>(`/guilds/${guildId}/verification`, { method: "PUT", body: JSON.stringify(config) }),
 
@@ -2106,6 +2477,8 @@ export const api = {
     request<PrestigeSettingsRow>(`/guilds/${guildId}/prestige-settings`, { method: "PUT", body: JSON.stringify(input) }),
 
   getBumpReminderSettings: (guildId: string) => request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`),
+  sendBumpStatusNow: (guildId: string, lastBumpAt?: string | null) =>
+    request<{ ok: boolean; stage?: string }>(`/guilds/${guildId}/bump-reminder/send`, { method: "POST", body: JSON.stringify({ lastBumpAt: lastBumpAt ?? null }) }),
   updateBumpReminderSettings: (guildId: string, input: Partial<BumpReminderSettingsRow>) =>
     request<BumpReminderSettingsRow>(`/guilds/${guildId}/bump-reminder`, { method: "PUT", body: JSON.stringify(input) }),
 

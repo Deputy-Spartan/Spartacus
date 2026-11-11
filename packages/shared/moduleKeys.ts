@@ -59,6 +59,9 @@ export const MODULE_KEYS = [
   "SUPPORT_INTAKE",
   "MATCHES",
   "QOTD",
+  "ROLE_MANAGER",
+  "PROFILE_CARDS",
+  "PLAYING_NOW",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -67,7 +70,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   MODERATION: "Moderation & Automod",
   WELCOME: "Welcome & Goodbye",
   LEVELING: "Leveling & XP",
-  STREAM_ALERTS: "Stream Alerts",
+  STREAM_ALERTS: "Going Live",
   CUSTOM_COMMANDS: "Custom Commands",
   EVENTS: "Event Coordination",
   ANTI_RAID: "Anti-Raid",
@@ -114,6 +117,8 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   BUMP_REMINDER: "Bump Reminder",
   SUGGESTION_ANALYTICS: "Suggestion Analytics",
   RANK_CARDS: "Rank Cards",
+  PROFILE_CARDS: "Profile Cards",
+  PLAYING_NOW: "Playing Now",
   CONFESSIONS: "Anonymous",
   MEMBER_MILESTONES: "Member Milestones",
   RULES_GATE: "Rules Gate",
@@ -124,6 +129,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   SUPPORT_INTAKE: "Support DM Intake",
   MATCHES: "Matchmaking",
   QOTD: "Quote & Question of the Day",
+  ROLE_MANAGER: "Role Manager",
 };
 
 export const SIGNUP_ROLES = [

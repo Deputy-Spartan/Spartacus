@@ -155,6 +155,16 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     prepared: "The !lfg and /lfg command is locked to this channel.",
     tryIt: ["Join any voice channel.", "Type !lfg need 2 more here, or run /lfg.", "Try it without being in voice to see the error message."],
   },
+  "/playing-now": {
+    prepared: "Turned on, but not set up. It needs its channel and two roles picked on the dashboard.",
+    tryIt: [
+      "On the dashboard, open Playing Now, pick this channel and tap Make the roles for me, then Save.",
+      "Wait for the panel to appear here, then tap I'm on now and post.",
+      "From a second account, tap Join on the post, then tap Notify me.",
+      "Tap I'm done and check the post clears.",
+    ],
+    needs: "A second account to join the post.",
+  },
   "/giveaways": {
     prepared: "A test giveaway that ends in 10 minutes is posted here.",
     tryIt: ["Tap Enter.", "Wait for it to end and announce a winner.", "Run /giveaway-reroll with the giveaway's message ID."],
@@ -205,37 +215,18 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     tryIt: ["Add a partner server on the dashboard.", "Check that it shows in the list."],
   },
 
-  "/leveling": {
-    prepared: "Level-up messages post in this channel.",
-    tryIt: ["Chat in any channel. XP is given at most once a minute.", "Your level-up message appears here.", "Run /leaderboard."],
-  },
-  "/level-roles": {
-    prepared: `Reaching level 1 gives the ${TEST_ROLES.level} role.`,
-    tryIt: ["Chat until you reach level 1.", `Check that you have the ${TEST_ROLES.level} role.`],
-  },
-  "/prestige": {
-    prepared: "Turned on. The max level is 2 if it hadn't been set, so it can be reached quickly.",
-    tryIt: ["Chat until you reach the max level.", "Run /prestige.", "Your level goes back to 0 and your prestige goes up."],
-  },
-  "/achievements": {
-    prepared: "Achievement posts go in this channel.",
-    tryIt: ["Send a message from an account that hasn't chatted here before. It earns First Message.", "Add a custom achievement for Level 1 on the dashboard and reach it."],
-  },
-  "/economy/settings": {
-    prepared: "Economy is on with the default currency.",
-    tryIt: ["Run /balance.", "Run /daily.", "Change the currency name on the dashboard and run /balance again."],
-  },
-  "/economy/earning": {
-    prepared: "Earning from messages, /daily and /pay are on.",
-    tryIt: ["Chat, then run /balance to see coins from messages.", "Run /pay to send coins to another account.", "Run /coinflip 10 heads or /slots 10."],
-  },
-  "/economy/leaderboard": {
-    prepared: "Nothing to post. The list is on the dashboard.",
-    tryIt: ["Earn some coins with /daily.", "Open Economy Leaderboard on the dashboard."],
-  },
-  "/economy/analytics": {
-    prepared: "Nothing to post. The charts are on the dashboard.",
-    tryIt: ["Earn and send some coins.", "Open Economy Analytics on the dashboard."],
+  "/economy-hub": {
+    prepared: `Levels, Prestige, Voice Activity, Achievements, Profile Cards and Coins are all turned on. Level-up and achievement posts go in this channel, reaching level 1 gives the ${TEST_ROLES.level} role, and the prestige max level is 2 if it hadn't been set.`,
+    tryIt: [
+      "Chat in any channel. XP is given at most once a minute, and your level-up card appears here.",
+      `At level 1, check that you have the ${TEST_ROLES.level} role.`,
+      "Run /rank, /leaderboard and /profile.",
+      "Run /balance and /daily, then /pay to send coins to another account.",
+      "Reach the max level and run /prestige.",
+      "On the dashboard, open Economy Hub → Shop, add the starter items and turn the shop on, then run /shop and /crates.",
+      "Sit in a voice channel for a few minutes, then check the Boosts and Leaderboards tabs.",
+    ],
+    needs: "A second account for /pay.",
   },
 
   "/weekly-recap": {
@@ -245,10 +236,6 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
   "/growth-analytics": {
     prepared: "Turned on. Snapshots are taken once a day at midnight UTC.",
     tryIt: ["Send a few messages today.", "Check the charts on the dashboard tomorrow."],
-  },
-  "/voice-activity": {
-    prepared: "Turned on.",
-    tryIt: ["Sit in a voice channel for a few minutes, then leave.", "Open Voice Activity on the dashboard."],
   },
   "/suggestion-analytics": {
     prepared: "This is the digest channel. Suggestions is turned on too.",
@@ -270,6 +257,16 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     needs: "DMs open with the bot.",
   },
 
+  "/role-manager": {
+    prepared: "Turned on. Nothing to post; it works from the dashboard and /role.",
+    tryIt: [
+      `Run /role give on a second account with the ${TEST_ROLES.member} role and a time of 2m.`,
+      "Run /role list for that account.",
+      "Wait two minutes and check the role is taken off again.",
+      "Open Role Manager on the dashboard and check History shows both changes.",
+    ],
+    needs: "A second account to give the role to.",
+  },
   "/channel-locks": {
     prepared: 'This channel is locked: messages containing the word "blocked" are removed, with a notice.',
     tryIt: ['From a non-staff account, send a message containing "blocked" here.', "It's deleted and a notice button appears.", "Change what's allowed on the dashboard and try again."],

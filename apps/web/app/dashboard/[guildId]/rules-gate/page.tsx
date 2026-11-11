@@ -11,6 +11,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type RulesGateSettingsRow, type RulesGateAgreementRow, type RulesGateSectionRow, type EmbedCreatorPresetRow } from "../../../../lib/api";
 import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
+import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from "../../../../components/ui/DiscordPreview";
 import { checkDiscordLimits } from "../../../../lib/discordLimits";
 import Link from "next/link";
 
@@ -228,7 +229,7 @@ function SettingsTab({
               {stepNav}
             </div>
             <div className="w-full max-w-xl xl:max-w-[640px] xl:flex-1 xl:min-w-0 xl:sticky xl:top-5">
-              <EmbedPreviewBlock guildId={guildId} savedEmbedId={settings?.savedEmbedId ?? null} />
+              <EmbedPreviewBlock guildId={guildId} settings={settings} />
             </div>
           </div>
         )}
@@ -334,18 +335,45 @@ function StepNav({ step, lastStep, setStep }: { step: number; lastStep: number; 
   );
 }
 
-function EmbedPreviewBlock({ guildId, savedEmbedId }: { guildId: string; savedEmbedId: string | null }) {
+function EmbedPreviewBlock({ guildId, settings }: { guildId: string; settings: RulesGateSettingsRow | null }) {
+  const savedEmbedId = settings?.savedEmbedId ?? null;
   const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
+  const [sections, setSections] = useState<RulesGateSectionRow[]>([]);
 
   useEffect(() => {
     api.getEmbedCreatorPresets(guildId).then(setPresets);
+    api.getRulesGateSections(guildId).then(setSections).catch(() => null);
   }, [guildId]);
+
+  // The rows apps/bot/src/jobs/rulesGatePoster.ts adds under the embed.
+  const gateRows = (
+    <>
+      <DiscordButtonRow>
+        <DiscordButton label="✅ I Agree" style="success" />
+        {settings?.declineEnabled && <DiscordButton label="❌ I Don't Agree" style="danger" />}
+      </DiscordButtonRow>
+      {sections.length > 0 && (
+        <DiscordButtonRow>
+          {sections.slice(0, 4).map((s) => (
+            <DiscordButton key={s.id} label={s.label} />
+          ))}
+        </DiscordButtonRow>
+      )}
+    </>
+  );
 
   if (!savedEmbedId) {
     return (
       <NeonCard>
         <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
-        <p className="text-xs text-slate-500">Pick a saved embed on the left to see a live preview of what gets posted here.</p>
+        <DiscordMessage>
+          <DiscordEmbed
+            color={0x3b82f6}
+            title={settings?.defaultEmbedTitle || "📜 Server Rules"}
+            description={settings?.defaultEmbedDescription || "Click the button below to confirm you've read and agree to the rules."}
+          />
+          {gateRows}
+        </DiscordMessage>
       </NeonCard>
     );
   }
@@ -382,7 +410,7 @@ function EmbedPreviewBlock({ guildId, savedEmbedId }: { guildId: string; savedEm
       {/* Capped to the viewport and scrolls inside itself, so a long
           multi-embed rules message never runs off the bottom of the screen. */}
       <div className="bg-base-950 border border-white/10 rounded-lg p-3 max-h-[70vh] xl:max-h-[calc(100vh-8rem)] overflow-y-auto">
-        <EmbedCreatorPreview guildId={guildId} state={preset.data} />
+        <EmbedCreatorPreview guildId={guildId} state={preset.data} extra={gateRows} />
       </div>
     </NeonCard>
   );

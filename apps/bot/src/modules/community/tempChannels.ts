@@ -1,6 +1,10 @@
-import { ChannelType, Client, Events, VoiceState } from "discord.js";
+import { ChannelType, Events, VoiceState, type Guild, type GuildMember, type VoiceChannel } from "discord.js";
+import type { TempChannelLobby } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
+import { cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
+import { tempChannelControls } from "./tempChannelControls";
+import { gameCategory, nextTempName, removeEmptyGameCategory } from "./tempGameCategories";
 
 export const name = Events.VoiceStateUpdate;
 
@@ -15,85 +19,46 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
 
   if (newState.channelId && newState.channelId !== oldState.channelId) {
     await handleJoin(newState);
-    await syncTextAccess(newState, true);
   }
   if (oldState.channelId && oldState.channelId !== newState.channelId) {
-    await syncTextAccess(oldState, false);
     await handleLeaveCheck(oldState);
   }
 }
 
-// A hidden paired text channel follows whoever is in the voice channel.
-async function syncTextAccess(state: VoiceState, joined: boolean) {
-  const { member } = state;
-  if (!state.channelId || !member) return;
-  const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId: state.channelId } });
-  if (!instance?.textChannelId || instance.ownerId === member.id) return;
-  const lobby = await prisma.tempChannelLobby.findUnique({ where: { id: instance.lobbyId } });
-  if (!lobby?.hideTextFromNonMembers) return;
-
-  const text = await state.guild.channels.fetch(instance.textChannelId).catch(() => null);
-  if (!text || !("permissionOverwrites" in text)) return;
-  if (joined) await text.permissionOverwrites.edit(member, { ViewChannel: true }).catch(() => null);
-  else await text.permissionOverwrites.delete(member).catch(() => null);
-}
-
-// Delete timers live in memory, so a room that emptied around a restart has
-// nothing left to clean it up. Runs once when the bot starts.
-export async function sweepTempChannels(client: Client) {
-  const instances = await prisma.tempChannelInstance.findMany();
-  for (const instance of instances) {
-    const guild = client.guilds.cache.get(instance.guildId);
-    if (!guild) continue;
-    const channel = await guild.channels.fetch(instance.channelId).catch(() => null);
-    if (channel?.isVoiceBased() && channel.members.size > 0) continue;
-
-    await channel?.delete().catch(() => null);
-    if (instance.textChannelId) {
-      const text = await guild.channels.fetch(instance.textChannelId).catch(() => null);
-      await text?.delete().catch(() => null);
-    }
-    await prisma.tempChannelInstance.delete({ where: { id: instance.id } }).catch(() => null);
-  }
-}
-
-async function handleJoin(state: VoiceState) {
-  const lobby = await prisma.tempChannelLobby.findFirst({
-    where: { guildId: state.guild.id, lobbyChannelId: state.channelId as string },
-  });
-  if (!lobby || !state.member) return;
-
-  // {index} counts currently-active channels for this lobby, so numbering
-  // stays tight (1, 2, 3…) rather than climbing forever as channels come
-  // and go — matches how most "temp voice" bots number rooms.
-  const activeCount = await prisma.tempChannelInstance.count({ where: { lobbyId: lobby.id } });
-  const name = lobby.nameFormat
-    .replace(/{user}/g, state.member.displayName)
-    .replace(/{index}|{count}/g, String(activeCount + 1))
-    .replace(/{guild}/g, state.guild.name);
-
-  const created = await state.guild.channels
+// Makes a squad channel for a member, from either way in: joining the lobby
+// voice channel, or picking a game on the panel. With a game it's named for
+// that game, and with Group Squads by Game on it goes in that game's category.
+export async function createSquad(guild: Guild, member: GuildMember, lobby: TempChannelLobby, game?: TempGameChoice): Promise<VoiceChannel | null> {
+  const parentId = (game && lobby.gameCategories ? (await gameCategory(guild, lobby, game))?.id : null) ?? lobby.categoryId ?? null;
+  const name = nextTempName(guild, parentId, game?.nameFormat ?? lobby.nameFormat, member.displayName);
+  const created = await guild.channels
     .create({
       name,
       type: ChannelType.GuildVoice,
-      parent: lobby.categoryId ?? undefined,
-      userLimit: lobby.userLimit || undefined,
-      bitrate: lobby.bitrate || undefined,
+      parent: parentId ?? undefined,
+      userLimit: game?.userLimit || lobby.userLimit || undefined,
+      bitrate: lobby.bitrate ? Math.min(lobby.bitrate, guild.maximumBitrate) : undefined,
     })
     .catch(() => null);
-  if (!created) return;
+  if (!created) {
+    await removeEmptyGameCategory(guild, parentId).catch(() => null);
+    return null;
+  }
 
-  await state.member.voice.setChannel(created.id).catch(() => null);
+  if (member.voice.channelId) await member.voice.setChannel(created.id).catch(() => null);
+  // A game picked on the panel already named the channel, so it skips the game menu.
+  const games = lobby.gamePicker && !game ? cleanTempGameChoices(lobby.gameChoices) : [];
+  const controlsThreadId = await postControls(guild, created, lobby, member, games, game);
 
   let textChannelId: string | undefined;
   if (lobby.pairTextChannel) {
-    const textChannel = await state.guild.channels
+    const textChannel = await guild.channels
       .create({
         name: `${name}-text`,
         type: ChannelType.GuildText,
-        parent: lobby.categoryId ?? undefined,
+        parent: parentId ?? undefined,
         permissionOverwrites: lobby.hideTextFromNonMembers
-          ? [{ id: state.guild.roles.everyone.id, deny: ["ViewChannel"] }, { id: state.member.id, allow: ["ViewChannel"] }]
+          ? [{ id: guild.roles.everyone.id, deny: ["ViewChannel"] }, { id: member.id, allow: ["ViewChannel"] }]
           : undefined,
       })
       .catch(() => null);
@@ -101,20 +66,48 @@ async function handleJoin(state: VoiceState) {
   }
 
   await prisma.tempChannelInstance.create({
-    data: { guildId: state.guild.id, lobbyId: lobby.id, channelId: created.id, textChannelId, ownerId: state.member.id },
+    data: { guildId: guild.id, lobbyId: lobby.id, channelId: created.id, textChannelId, controlsThreadId, ownerId: member.id },
   });
+  return created;
 }
 
-async function handleLeaveCheck(state: VoiceState) {
-  if (!state.channelId) return;
-  const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId: state.channelId } });
+// Puts the Lock, Rename and Limit buttons in the voice channel's chat, or in
+// a private thread only the creator is added to. Falls back to the voice chat
+// if the thread can't be made. Returns the thread's id when there is one.
+async function postControls(guild: Guild, squad: VoiceChannel, lobby: TempChannelLobby, member: GuildMember, games: TempGameChoice[], picked?: TempGameChoice) {
+  const options = { games, ownerId: member.id, picked, guide: lobby.guideButton, guild };
+  if (lobby.controlsWhere === "THREAD" && lobby.controlsChannelId) {
+    const parent = await guild.channels.fetch(lobby.controlsChannelId).catch(() => null);
+    if (parent?.type === ChannelType.GuildText) {
+      const thread = await parent.threads
+        .create({ name: `🔧 ${squad.name}`.slice(0, 100), type: ChannelType.PrivateThread, invitable: false, autoArchiveDuration: 10080 })
+        .catch(() => null);
+      if (thread) {
+        await thread.members.add(member.id).catch(() => null);
+        await thread.send(tempChannelControls(squad.id, { ...options, thread: true })).catch(() => null);
+        return thread.id;
+      }
+    }
+  }
+  await squad.send(tempChannelControls(squad.id, options)).catch(() => null);
+  return undefined;
+}
+
+async function handleJoin(state: VoiceState) {
+  const lobby = await prisma.tempChannelLobby.findFirst({
+    where: { guildId: state.guild.id, lobbyChannelId: state.channelId as string },
+  });
+  if (!lobby || !lobby.joinToCreate || !state.member) return;
+  await createSquad(state.guild, state.member, lobby);
+}
+
+// Deletes the squad channel after the lobby's wait if it's still empty, then
+// its paired text channel, and its game category once that's empty too.
+export async function scheduleEmptyCheck(guild: Guild, channelId: string, delaySec?: number) {
+  const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId } });
   if (!instance) return;
-
-  const channel = await state.guild.channels.fetch(state.channelId).catch(() => null);
-  if (!channel || !channel.isVoiceBased() || channel.members.size > 0) return;
-
   const lobby = await prisma.tempChannelLobby.findUnique({ where: { id: instance.lobbyId } });
-  const delaySec = lobby?.deleteAfterEmptySec ?? 0;
+  const wait = delaySec ?? lobby?.deleteAfterEmptySec ?? 0;
 
   const key = instance.id;
   if (deleteTimers.has(key)) clearTimeout(deleteTimers.get(key));
@@ -123,15 +116,26 @@ async function handleLeaveCheck(state: VoiceState) {
     key,
     setTimeout(async () => {
       deleteTimers.delete(key);
-      const stillEmpty = await state.guild.channels.fetch(state.channelId as string).catch(() => null);
+      const stillEmpty = await guild.channels.fetch(channelId).catch(() => null);
       if (stillEmpty && stillEmpty.isVoiceBased() && stillEmpty.members.size > 0) return;
 
+      const parentId = stillEmpty?.parentId;
       await stillEmpty?.delete().catch(() => null);
-      if (instance.textChannelId) {
-        const textChannel = await state.guild.channels.fetch(instance.textChannelId).catch(() => null);
-        await textChannel?.delete().catch(() => null);
+      for (const id of [instance.textChannelId, instance.controlsThreadId]) {
+        if (!id) continue;
+        const extra = await guild.channels.fetch(id).catch(() => null);
+        await extra?.delete().catch(() => null);
       }
       await prisma.tempChannelInstance.delete({ where: { id: instance.id } }).catch(() => null);
-    }, delaySec * 1000)
+      // The last squad in a game's category takes the category with it.
+      await removeEmptyGameCategory(guild, parentId).catch(() => null);
+    }, wait * 1000)
   );
+}
+
+async function handleLeaveCheck(state: VoiceState) {
+  if (!state.channelId) return;
+  const channel = await state.guild.channels.fetch(state.channelId).catch(() => null);
+  if (!channel || !channel.isVoiceBased() || channel.members.size > 0) return;
+  await scheduleEmptyCheck(state.guild, state.channelId);
 }

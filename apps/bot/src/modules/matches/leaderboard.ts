@@ -8,12 +8,11 @@ import { tallyBoard, type BoardEntry } from "./engine";
 import { withLock } from "../../lib/lock";
 import { stringList } from "./render";
 
-const MEDALS = ["🥇", "🥈", "🥉"];
 
 function line(entry: BoardEntry, index: number, name: string): string {
   const games = entry.wins + entry.losses;
   const percent = games ? Math.round((entry.wins / games) * 100) : 0;
-  return `${MEDALS[index] ?? `**${index + 1}.**`} ${name}: ${entry.wins}W ${entry.losses}L · ${percent}%`;
+  return `**${index + 1}.** ${name}: ${entry.wins}W ${entry.losses}L · ${percent}%`;
 }
 
 // Your own description stays, with the ranked list always below it.
@@ -36,7 +35,8 @@ export async function buildBoard(client: Client, guildId: string, game: string, 
   const label = game === "ALL" ? "All Games" : game;
   const say = (key: MatchTextKey) => resolveText(texts, key).text;
   const color = (key: MatchTextKey, embed: EmbedBuilder) => (texts[key]?.color ? embed : embed.setColor(parseInt(gameColor(game).slice(1), 16)));
-  const playerList = players.map((p, i) => line(p, i, members[i]?.displayName ?? "Former member")).join("\n") || say("labelNoPlayers");
+  // Mentions show as clickable names in an embed and never ping anyone.
+  const playerList = players.map((p, i) => line(p, i, members[i] ? `<@${p.key}>` : "Former member")).join("\n") || say("labelNoPlayers");
   const teamList = teams.map((t, i) => line(t, i, t.key)).join("\n") || say("labelNoTeams");
 
   if (style === "SEPARATE") {
@@ -89,6 +89,6 @@ async function postBoards(client: Client, guildId: string, game?: string) {
 export async function startBoardSeason(client: Client, guildId: string) {
   await prisma.matchmakingConfig.upsert({ where: { guildId }, create: { guildId, boardSince: new Date() }, update: { boardSince: new Date() } });
   await prisma.matchSetup.updateMany({ where: { guildId }, data: { season: { increment: 1 } } });
-  await prisma.matchPlayer.updateMany({ where: { guildId }, data: { wins: 0, losses: 0, streak: 0, tournamentWins: 0 } });
+  await prisma.matchPlayer.updateMany({ where: { guildId }, data: { wins: 0, losses: 0, streak: 0 } });
   await syncBoard(client, guildId);
 }

@@ -13,12 +13,14 @@ interface OptionInput {
   roleIds?: string[];
   channelIds?: string[];
   roleId?: string; // legacy single-role shape
+  note?: string;
 }
 
 interface CleanOption {
   emoji: string;
   roleIds: string[];
   channelIds: string[];
+  note: string | null;
 }
 
 function cleanOption(o: OptionInput): CleanOption | null {
@@ -26,7 +28,8 @@ function cleanOption(o: OptionInput): CleanOption | null {
   const roleIds = [...new Set([...(o.roleIds ?? []), ...(o.roleId ? [o.roleId] : [])].filter(Boolean))];
   const channelIds = [...new Set((o.channelIds ?? []).filter(Boolean))];
   if (!emoji || (roleIds.length === 0 && channelIds.length === 0)) return null;
-  return { emoji, roleIds, channelIds };
+  const note = typeof o.note === "string" && o.note.trim() ? o.note.trim().slice(0, 200) : null;
+  return { emoji, roleIds, channelIds, note };
 }
 
 function cleanOptions(options: OptionInput[] | undefined): CleanOption[] | undefined {
@@ -49,7 +52,7 @@ async function resolveEmojis(guildId: string, opts: CleanOption[]): Promise<stri
 }
 
 function toRow(o: CleanOption) {
-  return { emoji: o.emoji, roleId: o.roleIds[0] ?? "", extraRoleIds: o.roleIds.slice(1), channelIds: o.channelIds };
+  return { emoji: o.emoji, roleId: o.roleIds[0] ?? "", extraRoleIds: o.roleIds.slice(1), channelIds: o.channelIds, note: o.note };
 }
 
 router.get("/guilds/:guildId/reaction-role-panels", requireAuth, requireGuildPermission, async (req, res) => {

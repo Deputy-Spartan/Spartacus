@@ -2,6 +2,7 @@ import { Events, GuildMember, ButtonInteraction } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { buildWelcomePayload } from "../modules/community/welcomeRender";
+import { claimEvent, sweepEventClaims } from "../lib/eventClaims";
 
 export const name = Events.GuildMemberAdd;
 
@@ -29,6 +30,9 @@ export async function execute(member: GuildMember) {
   const channel = await member.guild.channels.fetch(config.channelId).catch(() => null);
   if (!channel?.isTextBased()) return;
 
+  // The in-memory check above only covers this copy of the bot; this one covers a deploy overlap.
+  if (!(await claimEvent(`welcome:${dedupeKey}`))) return;
+  void sweepEventClaims();
   const payload = await buildWelcomePayload(member.guild, config, member);
   await channel.send(payload);
 }

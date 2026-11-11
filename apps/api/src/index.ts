@@ -14,6 +14,14 @@ import { logError } from "@spartacus/db";
 import { setBotClient } from "./lib/botClient";
 
 import healthRouter from "./routes/health";
+import publicStatsRouter from "./routes/publicStats";
+import streamDeckRouter from "./routes/streamDeck";
+import quickLinksRouter from "./routes/quickLinks";
+import profileCardsRouter from "./routes/profileCards";
+import economyHubRouter from "./routes/economyHub";
+import tournamentsRouter from "./routes/tournaments";
+import playingNowRouter from "./routes/playingNow";
+import frontPageRouter from "./routes/frontPage";
 import matchesRouter from "./routes/matches";
 import activityRouter from "./routes/activity";
 import authRouter from "./routes/auth";
@@ -32,6 +40,7 @@ import reactionRolesRouter from "./routes/reactionRoles";
 import joinRolesRouter from "./routes/joinRoles";
 import stickyMessagesRouter from "./routes/stickyMessages";
 import starboardRouter from "./routes/starboard";
+import roleManagerRouter from "./routes/roleManager";
 import tempChannelsRouter from "./routes/tempChannels";
 import ticketsRouter from "./routes/tickets";
 import rolePanelsRouter from "./routes/rolePanels";
@@ -58,6 +67,7 @@ import botConfigRouter from "./routes/botConfig";
 import botAvatarRouter from "./routes/botAvatar";
 import meRouter from "./routes/me";
 import accessRouter from "./routes/access";
+import dashboardTextsRouter from "./routes/dashboardTexts";
 import sendMessageRouter from "./routes/sendMessage";
 import eventTemplatesRouter from "./routes/eventTemplates";
 import eventSettingsRouter from "./routes/eventSettings";
@@ -82,6 +92,8 @@ import weeklyRecapSettingsRouter from "./routes/weeklyRecapSettings";
 import voiceActivityRouter from "./routes/voiceActivity";
 import achievementsRouter from "./routes/achievements";
 import pinnedModulesRouter from "./routes/pinnedModules";
+import setupStatusRouter from "./routes/setupStatus";
+import activityInsightsRouter from "./routes/activityInsights";
 import changelogRouter from "./routes/changelog";
 import warnEscalationRouter from "./routes/warnEscalation";
 import prestigeSettingsRouter from "./routes/prestigeSettings";
@@ -95,6 +107,7 @@ import milestoneSettingsRouter from "./routes/milestoneSettings";
 import rulesGateSettingsRouter from "./routes/rulesGateSettings";
 import lfgCommandsRouter from "./routes/lfgCommands";
 import embedCreatorRouter from "./routes/embedCreator";
+import { setLeaderCheck } from "./lib/jobGate";
 
 const app = express();
 
@@ -119,6 +132,7 @@ app.use(cookieParser());
 // Mounted before any auth middleware — must stay public so external
 // monitors (UptimeRobot etc.) can hit it without credentials.
 app.use(healthRouter);
+app.use(publicStatsRouter);
 app.use(activityRouter);
 
 app.use(authRouter);
@@ -137,6 +151,14 @@ app.use(reactionRolesRouter);
 app.use(joinRolesRouter);
 app.use(stickyMessagesRouter);
 app.use(starboardRouter);
+app.use(roleManagerRouter);
+app.use(streamDeckRouter);
+app.use(quickLinksRouter);
+app.use(profileCardsRouter);
+app.use(economyHubRouter);
+app.use(tournamentsRouter);
+app.use(playingNowRouter);
+app.use(frontPageRouter);
 app.use(tempChannelsRouter);
 app.use(ticketsRouter);
 app.use(rolePanelsRouter);
@@ -163,6 +185,7 @@ app.use(botConfigRouter);
 app.use(botAvatarRouter);
 app.use(meRouter);
 app.use(accessRouter);
+app.use(dashboardTextsRouter);
 app.use(sendMessageRouter);
 app.use(eventTemplatesRouter);
 app.use(eventSettingsRouter);
@@ -184,6 +207,8 @@ app.use(weeklyRecapSettingsRouter);
 app.use(voiceActivityRouter);
 app.use(achievementsRouter);
 app.use(pinnedModulesRouter);
+app.use(setupStatusRouter);
+app.use(activityInsightsRouter);
 app.use(changelogRouter);
 app.use(growthAnalyticsRouter);
 app.use(serverTemplatesRouter);
@@ -217,9 +242,10 @@ app.listen(port, () => {
 // instead (keeps the bot's discord.js cache memory isolated from API
 // request-handling memory, if your host gives you two free services).
 if (process.env.RUN_BOT_INLINE !== "false") {
-  import("@spartacus/bot").then(({ startBot }) => {
+  import("@spartacus/bot").then(({ startBot, isLeader }) => {
     const client = startBot();
     setBotClient(client);
+    setLeaderCheck(isLeader);
   });
 }
 

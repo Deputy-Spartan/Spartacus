@@ -21,11 +21,11 @@ import {
   type UserSelectMenuInteraction,
 } from "discord.js";
 import type { MatchChallenge, MatchPreset, MatchQueue, MatchRoom, MatchTeam, MatchmakingConfig } from "@prisma/client";
-import { resolveText, textsForGame, type MatchTextKey } from "@spartacus/shared";
+import { BOARD_PARTS, boardPartOrder, resolveText, textsForGame, type BoardButtonColor, type BoardPartId, type MatchTextKey } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
-import { cleanTeamName, pickOne } from "./engine";
+import { cleanTeamName, pickOne, shuffle } from "./engine";
 import { closeVoiceRooms, openVoiceRooms } from "./voice";
 import { syncBoard } from "./leaderboard";
 import { withLock } from "../../lib/lock";
@@ -41,10 +41,13 @@ const LFT_HOURS = 24;
 const TEAMS_SHOWN = 15;
 const TEAM_LIST_CHARS = 3000;
 const INVITE_HOURS = 24;
+export const matchTiming = { threadDeleteMs: 30_000 };
 const lastPostError = new Map<string, number>();
 
 type Row = ActionRowBuilder<MessageActionRowComponentBuilder>;
-type Kind = "SOLO" | "TEAM";
+// PICKUP rooms are made on the spot from the Looking for a Team list, so they
+// count for each player but never for a team.
+type Kind = "SOLO" | "TEAM" | "PICKUP";
 type Side = { name: string; players: string[]; captain: string };
 type Reply = string | InteractionEditReplyOptions;
 type Choosing = ButtonInteraction | StringSelectMenuInteraction;
@@ -56,8 +59,8 @@ const mentionAll = (ids: string[]) => ids.map((id) => `<@${id}>`).join(" ");
 const lock = (guildId: string) => <T>(run: () => Promise<T>) => withLock(`mm:${guildId}`, run);
 const getConfig = (guildId: string) => prisma.matchmakingConfig.findUnique({ where: { guildId } });
 const textsFor = (config: MatchmakingConfig | null, game: string) => textsForGame(config?.texts, config?.gameTexts, game);
-const presetFor = (guildId: string, game: string): Promise<MatchPreset | null> => prisma.matchPreset.findFirst({ where: { guildId, game, deleted: false } });
-const teamSizeFor = (preset: MatchPreset | null) => Math.max(2, preset?.teamSize ?? 5);
+export const presetFor = (guildId: string, game: string): Promise<MatchPreset | null> => prisma.matchPreset.findFirst({ where: { guildId, game, deleted: false } });
+export const teamSizeFor = (preset: MatchPreset | null) => Math.max(2, preset?.teamSize ?? 5);
 
 function isStaff(member: GuildMember | null | undefined, config: MatchmakingConfig | null) {
   if (!member) return false;
@@ -84,69 +87,118 @@ async function buildPanel(config: MatchmakingConfig) {
   const lines = (list: string[]) => list.slice(0, 15).join("\n").slice(0, 1024) || "Nobody yet";
 
   const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
-  return {
-    embeds: [
-      styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: resolveText(config.texts, "labelWaiting", { count: solo.length }).text, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
-      styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: resolveText(config.texts, "labelTeamsWaiting", { count: squads.length }).text, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
-      teamListEmbed(config, teams, queue, rooms, presets),
-    ],
-    components: [
-      row(button("mm:find:SOLO", say("btnFindSolo"), ButtonStyle.Success), button("mm:challenge:SOLO", say("btnChallengeSolo"), ButtonStyle.Primary), button("mm:leave:SOLO", say("btnLeaveSolo"), ButtonStyle.Danger)),
-      row(button("mm:find:TEAM", say("btnFindTeam"), ButtonStyle.Success), button("mm:challenge:TEAM", say("btnChallengeTeam"), ButtonStyle.Primary), button("mm:leave:TEAM", say("btnLeaveTeam"), ButtonStyle.Danger)),
-      row(button("mm:newteam", say("btnCreateTeam"), ButtonStyle.Secondary), button("mm:myteam", say("btnMyTeams"), ButtonStyle.Secondary), button("mm:lft", say("btnLookingForTeam"), ButtonStyle.Secondary)),
-    ],
-    allowedMentions: { parse: [] as never[] },
+  const embeds: Record<BoardPartId, () => EmbedBuilder> = {
+    SOLO: () => styleEmbed(new EmbedBuilder(), config.texts, "boardSolo").addFields({ name: resolveText(config.texts, "labelWaiting", { count: solo.length }).text, value: lines(solo.map((q) => `<@${q.userId}> · ${q.game}`)) }),
+    TEAM: () => styleEmbed(new EmbedBuilder(), config.texts, "boardTeam", { live: `${live} match${live === 1 ? "" : "es"}` }).addFields({ name: resolveText(config.texts, "labelTeamsWaiting", { count: squads.length }).text, value: lines(squads.map((q) => `${teams.find((t) => t.id === q.teamId)?.name ?? "A team"} · ${q.game}`)) }),
+    PICKUP: () => styleEmbed(new EmbedBuilder(), config.texts, "boardPickup"),
+    TEAMS: () => teamListEmbed(config, teams, queue, rooms, presets),
+    TOOLS: () => styleEmbed(new EmbedBuilder(), config.texts, "boardTools"),
   };
+  // Each part is its own message so its buttons sit right under it. The
+  // server picks which parts show and their order on the dashboard.
+  return boardPartOrder(config.panelParts).map((id) => {
+    const { buttons } = BOARD_PARTS.find((p) => p.id === id)!;
+    const rows = buttons.length ? [row(...buttons.map((b) => button(b.customId, say(b.key), BUTTON_STYLES[b.color])))] : [];
+    return { embeds: [embeds[id]()], components: rows, allowedMentions: { parse: [] as never[] } };
+  });
 }
+
+const BUTTON_STYLES: Record<BoardButtonColor, ButtonStyle> = { green: ButtonStyle.Success, blue: ButtonStyle.Primary, red: ButtonStyle.Danger, gray: ButtonStyle.Secondary };
 
 // Every team with its players, so people can see who's where. Someone on two
 // teams shows under both, and is listed again at the bottom.
+function teamField(t: MatchTeam, queue: MatchQueue[], rooms: MatchRoom[], presets: MatchPreset[]) {
+  const players = stringList(t.players);
+  const size = teamSizeFor(presets.find((p) => p.game === t.game) ?? null);
+  const playing = rooms.some((r) => r.kind === "TEAM" && r.game === t.game && (r.aName === t.name || r.bName === t.name));
+  const queued = queue.some((q) => q.kind === "TEAM" && q.teamId === t.id);
+  const status = playing ? " · ⚔️ playing" : queued ? " · 🔍 in queue" : "";
+  const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `👤 <@${id}>`));
+  return { name: `${t.name} · ${t.game} (${players.length}/${size})${status}`.slice(0, 256), value: names.join("\n").slice(0, 1024) };
+}
+
+const sortTeams = (teams: MatchTeam[]) => [...teams].sort((x, y) => x.game.localeCompare(y.game) || x.name.localeCompare(y.name));
+
+// Every team, privately, a page at a time with Previous and Next.
+const TEAMS_PER_PAGE = 10;
+const PAGE_CHARS = 5000;
+async function activeTeams(config: MatchmakingConfig, page = 0): Promise<InteractionEditReplyOptions> {
+  const { guildId } = config;
+  const [teams, queue, rooms, presets] = await Promise.all([
+    prisma.matchTeam.findMany({ where: { guildId } }),
+    prisma.matchQueue.findMany({ where: { guildId } }),
+    prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } }),
+    prisma.matchPreset.findMany({ where: { guildId, deleted: false } }),
+  ]);
+  const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
+  const lft = queue.filter((q) => q.kind === LFT);
+  const lftField = lft.length ? { name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) } : null;
+
+  // Pages fill up to 10 teams, or less when big teams would pass Discord's 6,000 characters.
+  const pages: Array<Array<{ name: string; value: string }>> = [[]];
+  let chars = 0;
+  for (const t of sortTeams(teams)) {
+    const field = teamField(t, queue, rooms, presets);
+    const length = field.name.length + field.value.length;
+    if (pages.at(-1)!.length === TEAMS_PER_PAGE || (pages.at(-1)!.length && chars + length > PAGE_CHARS)) {
+      pages.push([]);
+      chars = 0;
+    }
+    pages.at(-1)!.push(field);
+    chars += length;
+  }
+  const last = pages.length - 1;
+  const at = Math.min(Math.max(0, page), last);
+  const embed = styleEmbed(new EmbedBuilder(), config.texts, "activeTeams", { count: teams.length });
+  if (teams.length === 0) embed.setDescription(say("labelNoTeamsYet"));
+  embed.addFields(pages[at]);
+  if (at === last && lftField) embed.addFields(lftField);
+  if (pages.length > 1) embed.setFooter({ text: `Page ${at + 1} of ${pages.length}` });
+  const nav = pages.length > 1
+    ? [row(button(`mm:teams:${at - 1}`, "◀ Previous", ButtonStyle.Secondary).setDisabled(at === 0), button(`mm:teams:${at + 1}`, "Next ▶", ButtonStyle.Secondary).setDisabled(at === last))]
+    : [];
+  return { embeds: [embed], components: nav, allowedMentions: { parse: [] } };
+}
+
 function teamListEmbed(config: MatchmakingConfig, teams: MatchTeam[], queue: MatchQueue[], rooms: MatchRoom[], presets: MatchPreset[]) {
   const say = (key: MatchTextKey, tokens: Record<string, string | number> = {}) => resolveText(config.texts, key, tokens).text;
   const embed = styleEmbed(new EmbedBuilder(), config.texts, "boardTeamList");
-  const sorted = [...teams].sort((x, y) => x.game.localeCompare(y.game) || x.name.localeCompare(y.name));
-  const queued = new Set(queue.filter((q) => q.kind === "TEAM").map((q) => q.teamId));
-  const playing = (t: MatchTeam) => rooms.some((r) => r.kind === "TEAM" && r.game === t.game && (r.aName === t.name || r.bName === t.name));
-
-  const teamsOf = new Map<string, string[]>();
-  for (const t of sorted) for (const id of stringList(t.players)) teamsOf.set(id, [...(teamsOf.get(id) ?? []), t.name]);
+  const sorted = sortTeams(teams);
 
   // Discord refuses a message whose embeds pass 6,000 characters, so big
   // teams stop the list early instead of breaking the whole board.
   const fields: Array<{ name: string; value: string }> = [];
   let budget = TEAM_LIST_CHARS;
   for (const t of sorted.slice(0, TEAMS_SHOWN)) {
-    const players = stringList(t.players);
-    const size = teamSizeFor(presets.find((p) => p.game === t.game) ?? null);
-    const status = playing(t) ? " · ⚔️ playing" : queued.has(t.id) ? " · 🔍 in queue" : "";
-    const names = [t.captainId, ...players.filter((id) => id !== t.captainId)].map((id) => (id === t.captainId ? `👑 <@${id}>` : `👤 <@${id}>`));
-    const field = { name: `${t.name} · ${t.game} (${players.length}/${size})${status}`.slice(0, 256), value: names.join("\n").slice(0, 1024) };
+    const field = teamField(t, queue, rooms, presets);
     budget -= field.name.length + field.value.length;
     if (budget < 0) break;
     fields.push(field);
   }
   const shown = fields.length;
   if (sorted.length === 0) fields.push({ name: "\u200b", value: say("labelNoTeamsYet") });
-  if (sorted.length > shown) fields.push({ name: "\u200b", value: `And ${sorted.length - shown} more. Tap My Teams to see yours.` });
-
-  const shared = [...teamsOf].filter(([, names]) => names.length > 1);
-  if (shared.length) fields.push({ name: say("labelMultiTeam"), value: shared.slice(0, 15).map(([id, names]) => `<@${id}>: ${names.join(", ")}`).join("\n").slice(0, 1024) });
+  if (sorted.length > shown) fields.push({ name: "\u200b", value: `And ${sorted.length - shown} more. Tap Active Teams to see them all.` });
 
   const lft = queue.filter((q) => q.kind === LFT);
   if (lft.length) fields.push({ name: say("labelLookingForTeam", { count: lft.length }), value: lft.slice(0, 15).map((q) => `<@${q.userId}> · ${q.game}`).join("\n").slice(0, 1024) });
   return embed.addFields(fields);
 }
 
-// Finds extra boards from two posts landing together, and keeps the saved one.
+// Finds leftover board messages, like the old one-message board or two posts
+// landing together, and keeps the saved ones.
 async function removeExtraPanels(client: Client, channelId: string, guildId: string) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
-  const keep = (await getConfig(guildId))?.messageId;
-  if (!keep) return;
+  const config = await getConfig(guildId);
+  const keep = new Set(stringList(config?.panelMessages));
+  if (!keep.size) return;
+  const teamsTitle = resolveText(config?.texts, "boardTeamList").title;
   const recent = await channel.messages.fetch({ limit: 30 }).catch(() => null);
   for (const message of recent?.values() ?? []) {
-    const isBoard = message.components.some((r) => "components" in r && r.components.some((c) => "customId" in c && c.customId === "mm:find:SOLO"));
-    if (isBoard && message.author.id === client.user?.id && message.id !== keep) await message.delete().catch(() => null);
+    if (message.author.id !== client.user?.id || keep.has(message.id)) continue;
+    const hasBoardButtons = message.components.some((r) => "components" in r && r.components.some((c) => "customId" in c && !!c.customId?.startsWith("mm:")));
+    const isTeamsList = message.components.length === 0 && !!teamsTitle && message.embeds[0]?.title === teamsTitle;
+    if (hasBoardButtons || isTeamsList) await message.delete().catch(() => null);
   }
 }
 
@@ -157,16 +209,31 @@ export function syncMatchmakingPanel(client: Client, guildId: string) {
 
 const sweptGuilds = new Set<string>();
 
+// What each board message last showed, so only parts that changed are edited.
+const shownParts = new Map<string, string>();
+
 async function postPanel(client: Client, guildId: string) {
   const config = await getConfig(guildId);
   if (!config?.enabled || !config.channelId) return;
   const channel = await client.channels.fetch(config.channelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
-  const payload = await buildPanel(config);
+  const parts = await buildPanel(config);
+  const ids = stringList(config.panelMessages);
 
-  if (config.messageId) {
-    const message = await channel.messages.fetch(config.messageId).catch(() => null);
-    if (await message?.edit(payload).catch(() => null)) {
+  if (ids.length === parts.length) {
+    let intact = true;
+    for (const [i, part] of parts.entries()) {
+      const shown = JSON.stringify(part);
+      // The bot's own messages are cached, so checking one is still there is free.
+      const message = await channel.messages.fetch(ids[i]).catch(() => null);
+      if (message && shownParts.get(ids[i]) === shown) continue;
+      if (!(await message?.edit(part).catch(() => null))) {
+        intact = false;
+        break;
+      }
+      shownParts.set(ids[i], shown);
+    }
+    if (intact) {
       if (!sweptGuilds.has(guildId)) {
         sweptGuilds.add(guildId);
         await removeExtraPanels(client, config.channelId, guildId);
@@ -174,24 +241,43 @@ async function postPanel(client: Client, guildId: string) {
       return;
     }
   }
-  const sent = await channel.send(payload).catch((err) => {
-    if (Date.now() - (lastPostError.get(guildId) ?? 0) > POST_ERROR_GAP_MS) {
-      lastPostError.set(guildId, Date.now());
-      logError("bot", err, guildId);
-    }
-    return null;
-  });
-  if (!sent) return;
-  await prisma.matchmakingConfig.update({ where: { guildId }, data: { messageId: sent.id } });
+
+  // A part is missing, so the whole board posts again to keep it in order.
+  for (const id of [...ids, ...(config.messageId && !ids.includes(config.messageId) ? [config.messageId] : [])]) {
+    shownParts.delete(id);
+    const old = await channel.messages.fetch(id).catch(() => null);
+    await old?.delete().catch(() => null);
+  }
+  const sent: string[] = [];
+  for (const part of parts) {
+    const message = await channel.send(part).catch((err) => {
+      if (Date.now() - (lastPostError.get(guildId) ?? 0) > POST_ERROR_GAP_MS) {
+        lastPostError.set(guildId, Date.now());
+        logError("bot", err, guildId);
+      }
+      return null;
+    });
+    if (!message) break;
+    sent.push(message.id);
+    shownParts.set(message.id, JSON.stringify(part));
+  }
+  await prisma.matchmakingConfig.update({ where: { guildId }, data: { messageId: sent[0] ?? null, panelMessages: sent } });
+  if (sent.length < parts.length) return;
   sweptGuilds.add(guildId);
   await removeExtraPanels(client, config.channelId, guildId);
 }
 
 // ---- Match rooms ----
 
+// The captain is listed first with a crown, since they're the one who reports.
+function sideList(room: MatchRoom, players: string[], captain: string) {
+  if (room.kind === "SOLO") return mentionAll(players);
+  return [captain, ...players.filter((id) => id !== captain)].map((id) => (id === captain ? `👑 <@${id}>` : `👤 <@${id}>`)).join("\n");
+}
+
 function roomEmbed(room: MatchRoom, texts: unknown) {
   const embed = styleEmbed(new EmbedBuilder(), texts, "room", { a: room.aName, b: room.bName, game: room.game, onMap: room.map ? ` on ${room.map}` : "" })
-    .addFields({ name: room.aName.slice(0, 256), value: mentionAll(stringList(room.aPlayers)).slice(0, 1024), inline: true }, { name: room.bName.slice(0, 256), value: mentionAll(stringList(room.bPlayers)).slice(0, 1024), inline: true });
+    .addFields({ name: room.aName.slice(0, 256), value: sideList(room, stringList(room.aPlayers), room.aCaptain).slice(0, 1024), inline: true }, { name: room.bName.slice(0, 256), value: sideList(room, stringList(room.bPlayers), room.bCaptain).slice(0, 1024), inline: true });
   if (room.status === "DONE") embed.setColor(0xf0b232);
   if (room.status === "CANCELED") embed.setColor(0xed4245).setTitle(`Canceled: ${room.aName} vs ${room.bName}`.slice(0, 256));
   if (room.status === "CONFIRM") embed.addFields({ name: "Waiting for confirmation", value: `<@${room.reportedBy}> reported **${room.reportSide === "a" ? room.aName : room.bName}** won ${room.reportHigh}-${room.reportLow}. It's accepted automatically in 5 minutes.` });
@@ -202,7 +288,8 @@ function roomEmbed(room: MatchRoom, texts: unknown) {
 function roomButtons(room: MatchRoom, texts: unknown): Row[] {
   if (room.status === "CONFIRM") return [row(button(`mmroom:${room.id}:confirm`, resolveText(texts, "btnConfirm").text, ButtonStyle.Success), button(`mmroom:${room.id}:dispute`, resolveText(texts, "btnDispute").text, ButtonStyle.Danger))];
   if (room.status !== "LIVE") return [];
-  return [row(button(`mmroom:${room.id}:report:a`, `${room.aName} Won`, ButtonStyle.Primary), button(`mmroom:${room.id}:report:b`, `${room.bName} Won`, ButtonStyle.Secondary), button(`mmroom:${room.id}:cancel`, "Cancel Match", ButtonStyle.Danger))];
+  const report = [button(`mmroom:${room.id}:report:a`, `${room.aName} Won`, ButtonStyle.Primary), button(`mmroom:${room.id}:report:b`, `${room.bName} Won`, ButtonStyle.Secondary)];
+  return [row(...report, ...(room.tournamentId ? [] : [button(`mmroom:${room.id}:cancel`, "Cancel Match", ButtonStyle.Danger)]))];
 }
 
 async function roomThread(client: Client, room: MatchRoom) {
@@ -218,7 +305,15 @@ async function refreshRoom(client: Client, room: MatchRoom) {
   await message?.edit({ embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts) }).catch(() => null);
 }
 
-async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, game: string, a: Side, b: Side) {
+// A tournament match carries its place in the bracket, and a line for the thread.
+export interface TournamentTieRef {
+  tournamentId: string;
+  tieRound: number;
+  tieIndex: number;
+  note: string;
+}
+
+export async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, game: string, a: Side, b: Side, tie?: TournamentTieRef) {
   const { guildId } = config;
   const updated = await prisma.matchmakingConfig.update({ where: { guildId }, data: { nextRoomNumber: { increment: 1 } } });
   const preset = await presetFor(guildId, game);
@@ -240,6 +335,7 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
       bCaptain: b.captain,
       map: maps.length ? pickOne(maps) : null,
       expiresAt: new Date(Date.now() + config.reportHours * 3_600_000),
+      ...(tie ? { tournamentId: tie.tournamentId, tieRound: tie.tieRound, tieIndex: tie.tieIndex } : {}),
     },
   });
 
@@ -265,7 +361,7 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
   if (thread) {
     for (const id of everyone) await thread.members.add(id).catch(() => null);
     const card = await thread
-      .send({ content: [mentionAll(everyone), ...notes].join("\n").slice(0, 2000), embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts), allowedMentions: { parse: ["users"] } })
+      .send({ content: [mentionAll(everyone), ...(tie ? [tie.note] : []), ...notes].join("\n").slice(0, 2000), embeds: [roomEmbed(room, texts)], components: roomButtons(room, texts), allowedMentions: { parse: ["users"] } })
       .catch((err) => {
         logError("bot", err, guildId);
         return null;
@@ -275,14 +371,20 @@ async function openRoom(client: Client, config: MatchmakingConfig, kind: Kind, g
   return room;
 }
 
-async function closeRoom(client: Client, room: MatchRoom, closing: string) {
+export async function closeRoom(client: Client, room: MatchRoom, closing: string) {
   const config = await getConfig(room.guildId);
   await closeVoiceRooms(client, config, stringList(room.voiceIds), config?.lobbyVoiceId ?? null, room.guildId);
   await refreshRoom(client, room);
   const thread = await roomThread(client, room);
-  await thread?.send({ content: closing, allowedMentions: { parse: [] } }).catch(() => null);
-  await thread?.setLocked(true).catch(() => null);
-  await thread?.setArchived(true).catch(() => null);
+  if (!thread) return;
+  const seconds = Math.round(matchTiming.threadDeleteMs / 1000);
+  await thread.send({ content: `${closing}\n-# This thread is deleted in ${seconds} seconds. Results are on the leaderboard.`, allowedMentions: { parse: [] } }).catch(() => null);
+  await thread.setLocked(true).catch(() => null);
+  // Deleted after a short wait so players see the result first. If the bot
+  // can't delete it, it's archived instead.
+  setTimeout(() => {
+    thread.delete().catch(async () => void (await thread.setArchived(true).catch(() => null)));
+  }, matchTiming.threadDeleteMs).unref?.();
 }
 
 async function finishRoom(client: Client, room: MatchRoom, side: string, high: number, low: number) {
@@ -307,13 +409,17 @@ async function finishRoom(client: Client, room: MatchRoom, side: string, high: n
     },
   });
   await closeRoom(client, { ...done, voiceIds: room.voiceIds }, resolveText(textsFor(config, room.game), "roomWon", { winner, score: `${high}-${low}` }).text);
+  if (done.tournamentId) {
+    const { tournamentMatchDone } = await import("./tournaments");
+    await tournamentMatchDone(client, done).catch((err) => logError("bot", err, room.guildId));
+  }
   await syncBoard(client, room.guildId, room.game);
   await syncMatchmakingPanel(client, room.guildId);
 }
 
 export async function cancelRoom(client: Client, roomId: string): Promise<boolean> {
   const room = await prisma.matchRoom.findUnique({ where: { id: roomId } });
-  if (!room || !OPEN_ROOMS.includes(room.status)) return false;
+  if (!room || !OPEN_ROOMS.includes(room.status) || room.tournamentId) return false;
   await lock(room.guildId)(async () => {
     const closed = await prisma.matchRoom.update({ where: { id: room.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
     await closeRoom(client, { ...closed, voiceIds: room.voiceIds }, resolveText(textsFor(await getConfig(room.guildId), room.game), "roomCanceled").text);
@@ -392,7 +498,109 @@ async function find(client: Client, config: MatchmakingConfig, kind: Kind, game:
 function gameAction(client: Client, config: MatchmakingConfig, action: string, kind: Kind, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
   if (action === "find") return find(client, config, kind, game, userId, guild);
   if (action === "lft") return lookingForTeam(config.guildId, game, userId);
+  if (action === "pickup") return pickup(config, game, userId, guild);
   return challengePicker(config, kind, game, userId);
+}
+
+// ---- Pickup matches ----
+// Start Pickup Match walks through who's playing and how teams are made, then
+// starts right away, even if the teams aren't full or are uneven.
+// pool is everyone offered so far; players is who's ticked.
+type PickupSetup = { game: string; pool: string[]; players: string[]; mode: "random" | "pick"; teamOne: string[] | null; names?: Record<string, string> };
+const pendingPickups = new Map<string, PickupSetup>();
+const pickupKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
+
+async function playersInMatches(guildId: string): Promise<Set<string>> {
+  const rooms = await prisma.matchRoom.findMany({ where: { guildId, status: { in: OPEN_ROOMS } } });
+  return new Set(rooms.flatMap((r) => [...stringList(r.aPlayers), ...stringList(r.bPlayers)]));
+}
+
+// Whoever is in the tapper's voice channel (or the lobby when they aren't in
+// one), then the Looking for a Team list.
+async function pickupDefaults(config: MatchmakingConfig, game: string, userId: string, guild: Interaction["guild"], size: number): Promise<string[]> {
+  const member = await guild?.members.fetch({ user: userId, force: true }).catch(() => null);
+  const voiceId = member?.voice.channelId ?? config.lobbyVoiceId;
+  const voice = voiceId ? await guild?.channels.fetch(voiceId).catch(() => null) : null;
+  const inVoice = voice?.isVoiceBased() ? [...voice.members.entries()].filter(([, m]) => !m.user?.bot).map(([id]) => id) : [];
+  const waiting = await prisma.matchQueue.findMany({ where: { guildId: config.guildId, game, kind: LFT }, orderBy: { joinedAt: "asc" } });
+  const playing = await playersInMatches(config.guildId);
+  return [...new Set([userId, ...inVoice, ...waiting.map((q) => q.userId)])].filter((id) => !playing.has(id)).slice(0, size * 2);
+}
+
+function pickupScreen(index: number, setup: PickupSetup, size: number, note = ""): InteractionEditReplyOptions {
+  const { players, mode, teamOne } = setup;
+  const max = Math.min(25, size * 2);
+  // Discord draws name chips over the message for any menu that takes more
+  // than one pick, so every menu here takes one pick and applies it at once.
+  const nameList = (ids: string[]) => ids.map((id) => setup.names?.[id] ?? "Player").join(", ");
+  const fit = (text: string) => (text.length > 150 ? `${text.slice(0, 149)}…` : text);
+  const out = players.length
+    ? [row(new StringSelectMenuBuilder().setCustomId(`mmpickwho:${index}`).setPlaceholder(fit(`Playing (${players.length}): ${nameList(players)}`)).setMinValues(1).setMaxValues(1)
+        .addOptions(players.map((id) => ({ label: setup.names?.[id] ?? "Player", description: "Tap to take out", value: id }))))]
+    : [];
+  const add = new UserSelectMenuBuilder().setCustomId(`mmpickadd:${index}`).setPlaceholder("Add someone else").setMinValues(1).setMaxValues(1);
+  const how = new StringSelectMenuBuilder().setCustomId(`mmpickhow:${index}`).addOptions(
+    { label: "Random teams", description: "Shuffle everyone into two even sides", value: "random", default: mode === "random" },
+    { label: "I'll pick the teams", description: "Move players between Team 1 and Team 2", value: "pick", default: mode === "pick" },
+  );
+  const rows: Row[] = [...out, row(add), row(how)];
+  const lines = [`⚡ **Pickup match · ${setup.game}** (up to ${size}v${size})`, `Players (${players.length}): ${players.length ? mentionAll(players) : "nobody yet"}`];
+  if (mode === "pick" && players.length >= 2) {
+    const chosen = (teamOne ?? []).filter((id) => players.includes(id));
+    rows.push(row(new StringSelectMenuBuilder().setCustomId(`mmpickside:${index}`).setPlaceholder("Move a player to the other team").setMinValues(1).setMaxValues(1)
+      .addOptions(players.map((id) => ({ label: setup.names?.[id] ?? id, description: chosen.includes(id) ? "On Team 1 · tap to move to Team 2" : "On Team 2 · tap to move to Team 1", value: id })))));
+    lines.push(`Team 1: ${chosen.length ? mentionAll(chosen) : "nobody yet"}`, `Team 2: ${mentionAll(players.filter((id) => !chosen.includes(id))) || "nobody yet"}`);
+  }
+  rows.push(row(button(`mmpickgo:${index}`, "Start Match", ButtonStyle.Success)));
+  lines.push("", "Take out anyone who isn't playing, add anyone missing, choose how teams are made, then tap **Start Match**.");
+  if (note) lines.push("", note);
+  return { content: lines.join("\n").slice(0, 2000), components: rows, allowedMentions: { parse: [] } };
+}
+
+async function pickup(config: MatchmakingConfig, game: string, userId: string, guild: Interaction["guild"]): Promise<Reply> {
+  const busy = await openRoomFor(config.guildId, [userId]);
+  if (busy) return inRoomMessage(busy);
+  const size = teamSizeFor(await presetFor(config.guildId, game));
+  const players = await pickupDefaults(config, game, userId, guild, size);
+  const setup: PickupSetup = { game, pool: players, players, mode: "random", teamOne: null };
+  await nameAll(setup, guild);
+  pendingPickups.set(pickupKey(config.guildId, userId), setup);
+  return pickupScreen(stringList(config.games).indexOf(game), setup, size);
+}
+
+async function nameAll(setup: PickupSetup, guild: Interaction["guild"]) {
+  const ids = [...new Set([...setup.pool, ...setup.players])];
+  const names = await Promise.all(ids.map((id) => guild?.members.fetch(id).catch(() => null)));
+  setup.names = Object.fromEntries(ids.map((id, i) => [id, (names[i]?.displayName ?? "Player").slice(0, 100)]));
+}
+
+async function startPickup(client: Client, config: MatchmakingConfig, setup: PickupSetup, guild: Interaction["guild"]): Promise<string> {
+  const { guildId } = config;
+  const size = teamSizeFor(await presetFor(guildId, setup.game));
+  const playing = await playersInMatches(guildId);
+  const busy = setup.players.filter((id) => playing.has(id));
+  if (busy.length) return `${mentionAll(busy)} ${busy.length === 1 ? "is" : "are"} already in a match. Take them out of the players first.`;
+  if (setup.players.length < 2) return "Pick at least 2 players.";
+  if (setup.players.length > size * 2) return `That's too many for ${setup.game}. Pick up to ${size * 2} players.`;
+
+  let one: string[], two: string[];
+  if (setup.mode === "pick") {
+    one = (setup.teamOne ?? []).filter((id) => setup.players.includes(id));
+    two = setup.players.filter((id) => !one.includes(id));
+    if (!one.length || !two.length) return "Each team needs at least one player. Move someone to the other team.";
+  } else {
+    const mixed = shuffle(setup.players);
+    one = mixed.slice(0, Math.ceil(mixed.length / 2));
+    two = mixed.slice(one.length);
+  }
+  await nameAll(setup, guild);
+  const side = (ids: string[]): Side => ({ name: `Team ${setup.names?.[ids[0]] ?? "Player"}`.slice(0, 80), players: ids, captain: ids[0] });
+  const a = side(one);
+  const b = side(two);
+  if (a.name === b.name) b.name = `${b.name} 2`;
+  await prisma.matchQueue.deleteMany({ where: { guildId, game: setup.game, kind: LFT, userId: { in: setup.players } } });
+  const room = await openRoom(client, config, "PICKUP", setup.game, a, b);
+  return `⚡ Pickup match started, ${one.length}v${two.length}: ${room.threadId ? `<#${room.threadId}>` : "your match"}`;
 }
 
 async function challengePicker(config: MatchmakingConfig, kind: Kind, game: string, userId: string): Promise<Reply> {
@@ -608,7 +816,7 @@ async function lookingForTeam(guildId: string, game: string, userId: string): Pr
     return `You're off the Looking for a Team list for ${game}.`;
   }
   await prisma.matchQueue.create({ data: { guildId, game, kind: LFT, userId } });
-  return `You're on the Looking for a Team list for ${game}. Captains can add you from My Teams. Tap the button again to come off it.`;
+  return `You're on the Looking for a Team list for ${game}. Captains can add you from My Teams, or anyone waiting can tap Start Pickup Match to play now. Tap the button again to come off it.`;
 }
 
 async function recruitPicker(guild: Interaction["guild"], team: MatchTeam): Promise<Reply> {
@@ -662,8 +870,26 @@ async function reportAllowed(room: MatchRoom, userId: string, staff: boolean): P
   return [room.aCaptain, room.bCaptain].includes(userId) ? null : "Only the team captains can report.";
 }
 
+// Discord leaves channel mentions blank inside the embeds of "only you can
+// see this" replies, so there they become links named after the channel.
+function linkChannels(text: string, guild: Interaction["guild"]) {
+  return text.replace(/<#(\d+)>/g, (whole, id: string) => {
+    const channel = guild?.channels.cache?.get(id);
+    if (!guild || !channel) return whole;
+    return `[${channel.isVoiceBased() ? "🔊" : "#"}${channel.name}](https://discord.com/channels/${guild.id}/${id})`;
+  });
+}
+
+function withChannelLinks(embed: EmbedBuilder, guild: Interaction["guild"]) {
+  if (embed.data.description) embed.setDescription(linkChannels(embed.data.description, guild));
+  if (embed.data.fields?.length) embed.setFields(embed.data.fields.map((f) => ({ ...f, value: linkChannels(f.value, guild).slice(0, 1024) })));
+  return embed;
+}
+
 async function reply(interaction: ButtonInteraction | StringSelectMenuInteraction | UserSelectMenuInteraction | ModalSubmitInteraction, value: Reply) {
-  await interaction.editReply(typeof value === "string" ? { content: value, components: [] } : value);
+  const payload = typeof value === "string" ? { content: value, components: [] } : value;
+  const embeds = payload.embeds?.map((e) => (e instanceof EmbedBuilder ? withChannelLinks(e, interaction.guild) : e));
+  await interaction.editReply(embeds ? { ...payload, embeds } : payload);
 }
 
 const failed = "Something went wrong with that. Staff can see the details on the Errors page.";
@@ -684,6 +910,27 @@ export async function handleMatchmaking(interaction: Interaction) {
       return;
     }
     const games = stringList(config.games);
+    const say = (key: MatchTextKey) => resolveText(config.texts, key).text;
+
+    // "Let me play" / "Ping me" (from #how-to-play, or the locked message below).
+    if (prefix === "mm" && interaction.isButton() && parts[1] === "role") {
+      const roleId = parts[2] === "alerts" ? config.alertsRoleId : config.playerRoleId;
+      if (!roleId || !member) return void (await interaction.reply({ content: "That role isn't set up. Ask an admin to run /match setup.", ephemeral: true }));
+      const has = member.roles.cache.has(roleId);
+      const ok = await (has ? member.roles.remove(roleId) : member.roles.add(roleId)).then(() => true, () => false);
+      const what = parts[2] === "alerts" ? "You'll get a ping when games start and tournaments open." : "You can play now: use the buttons and hop in the Matchmaking Lobby.";
+      return void (await interaction.reply({ content: !ok ? "I couldn't change that role (my role needs to be above it)." : has ? `Took <@&${roleId}> off. Tap again to get it back.` : `You have <@&${roleId}> now. ${what}`, ephemeral: true, allowedMentions: { parse: [] } }));
+    }
+    // Only the Matchmaking role can play; everyone else gets a way to join in.
+    if (config.playerRoleId && member && !member.roles.cache.has(config.playerRoleId) && !isStaff(member, config)) {
+      const { roleButtons } = await import("./serverSetup");
+      return void (await interaction.reply({ content: `🔒 **Matchmaking is for players.** Get <@&${config.playerRoleId}> to play: tap **Let me play** below (or pick it in Channels & Roles).`, components: [roleButtons()], ephemeral: true, allowedMentions: { parse: [] } }));
+    }
+
+    if ((prefix === "mmt" && interaction.isButton()) || (prefix === "mmtreg" && interaction.isStringSelectMenu())) {
+      const { handleTournament } = await import("./tournaments");
+      return void (await handleTournament(interaction));
+    }
 
     if (prefix === "mm" && interaction.isButton()) {
       const [, action, arg] = parts;
@@ -693,8 +940,18 @@ export async function handleMatchmaking(interaction: Interaction) {
         if (typeof team === "string") return void (await interaction.reply({ content: team, ephemeral: true }));
         return void (await renameModal(interaction, team));
       }
+      // Previous and Next turn the page of the same private message.
+      if (action === "teams" && arg !== undefined) {
+        await interaction.deferUpdate();
+        return void (await reply(interaction, await activeTeams(config, Number(arg) || 0)));
+      }
       await interaction.deferReply({ ephemeral: true });
-      if (action === "find" || action === "challenge" || action === "newteam" || action === "lft") {
+      if (action === "teams") return void (await reply(interaction, await activeTeams(config)));
+      if (action === "help") {
+        const tokens = { pickup: say("btnPickup"), findSolo: say("btnFindSolo"), challengeSolo: say("btnChallengeSolo"), createTeam: say("btnCreateTeam"), myTeams: say("btnMyTeams"), findTeam: say("btnFindTeam"), challengeTeam: say("btnChallengeTeam"), lft: say("btnLookingForTeam") };
+        return void (await reply(interaction, { embeds: [styleEmbed(new EmbedBuilder(), config.texts, "helpGuide", tokens)], components: [] }));
+      }
+      if (action === "find" || action === "challenge" || action === "newteam" || action === "lft" || action === "pickup") {
         const game = await chooseGame(interaction, config, action, arg ?? "");
         if (!game) return;
         await reply(interaction, await run(() => gameAction(client, config, action, arg as Kind, game, user.id, interaction.guild)));
@@ -788,6 +1045,44 @@ export async function handleMatchmaking(interaction: Interaction) {
       const picked = interaction.users.filter((u) => !u.bot && u.id !== user.id).map((u) => u.id);
       if (picked.length === 0) return void (await reply(interaction, "Pick someone other than yourself."));
       await reply(interaction, { content: await sendInvites(client, interaction.guild, team, member?.displayName ?? user.username, picked), components: [], allowedMentions: { parse: [] } });
+      return;
+    }
+
+    if (prefix.startsWith("mmpick") && prefix !== "mmpickgo") {
+      await interaction.deferUpdate();
+      const setup = pendingPickups.get(pickupKey(guildId, user.id));
+      if (!setup) return void (await reply(interaction, "This setup timed out. Tap Start Pickup Match again."));
+      const size = teamSizeFor(await presetFor(guildId, setup.game));
+      if (prefix === "mmpickwho" && interaction.isStringSelectMenu()) {
+        setup.players = setup.players.filter((id) => id !== interaction.values[0]);
+      } else if (prefix === "mmpickadd" && interaction.isUserSelectMenu()) {
+        const added = [...interaction.users.filter((u) => !u.bot).keys()];
+        setup.pool = [...new Set([...setup.pool, ...added])].slice(-25);
+        setup.players = setup.pool.filter((id) => setup.players.includes(id) || added.includes(id)).slice(0, size * 2);
+        await nameAll(setup, interaction.guild);
+      } else if (prefix === "mmpickhow" && interaction.isStringSelectMenu()) {
+        setup.mode = interaction.values[0] === "pick" ? "pick" : "random";
+        // Picking starts from an even split, so it's one tap per player moved.
+        if (setup.mode === "pick" && !setup.teamOne?.some((id) => setup.players.includes(id))) setup.teamOne = setup.players.slice(0, Math.ceil(setup.players.length / 2));
+      } else if (prefix === "mmpickside" && interaction.isStringSelectMenu()) {
+        const moved = interaction.values[0];
+        const one = setup.teamOne ?? [];
+        setup.teamOne = one.includes(moved) ? one.filter((id) => id !== moved) : [...one, moved];
+      }
+      await reply(interaction, pickupScreen(Number(parts[1]), setup, size));
+      return;
+    }
+
+    if (prefix === "mmpickgo" && interaction.isButton()) {
+      await interaction.deferUpdate();
+      const key = pickupKey(guildId, user.id);
+      const setup = pendingPickups.get(key);
+      if (!setup) return void (await reply(interaction, "This setup timed out. Tap Start Pickup Match again."));
+      const result = await run(() => startPickup(client, config, setup, interaction.guild));
+      if (!result.startsWith("⚡")) return void (await reply(interaction, pickupScreen(Number(parts[1]), setup, teamSizeFor(await presetFor(guildId, setup.game)), result)));
+      pendingPickups.delete(key);
+      await reply(interaction, { content: result, components: [] });
+      await syncMatchmakingPanel(client, guildId);
       return;
     }
 
@@ -931,6 +1226,7 @@ export async function handleMatchmaking(interaction: Interaction) {
           const fresh = await prisma.matchRoom.findUnique({ where: { id: roomId } });
           if (!fresh || !OPEN_ROOMS.includes(fresh.status)) return "This match is already closed.";
           if (action === "cancel") {
+            if (fresh.tournamentId) return "Tournament matches can't be canceled. Staff can set the winner on the dashboard (Matchmaking → Tournaments).";
             if (!staff && ![fresh.aCaptain, fresh.bCaptain].includes(user.id)) return "Only the players or staff can cancel.";
             const closed = await prisma.matchRoom.update({ where: { id: fresh.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
             await closeRoom(client, { ...closed, voiceIds: fresh.voiceIds }, resolveText(textsFor(config, fresh.game), "roomCanceled").text);
@@ -968,6 +1264,9 @@ export async function handleMatchmaking(interaction: Interaction) {
           if (!room || room.status !== "LIVE") return "This match isn't waiting for a result.";
           const blocked = await reportAllowed(room, user.id, staff);
           if (blocked) return blocked;
+          const { tournamentScoreProblem } = await import("./tournaments");
+          const wrongScore = await tournamentScoreProblem(room, high, low);
+          if (wrongScore) return wrongScore;
           if (staff && ![room.aCaptain, room.bCaptain].includes(user.id)) {
             await finishRoom(client, room, parts[2], high, low);
             return "Result saved.";
@@ -996,6 +1295,8 @@ const refreshedBoards = new Set<string>();
 
 export async function tickMatchmaking(client: Client) {
   const now = new Date();
+  const { tickTournaments } = await import("./tournaments");
+  await tickTournaments(client).catch((err) => logError("bot", err));
   // After a restart, posts catch up to any change in how they look.
   const boards = await prisma.matchmakingConfig.findMany({ where: { boardChannelId: { not: null } }, select: { guildId: true } });
   for (const { guildId } of boards) {
@@ -1021,7 +1322,12 @@ export async function tickMatchmaking(client: Client) {
       const fresh = await prisma.matchRoom.findUnique({ where: { id: room.id } });
       if (!fresh?.expiresAt || fresh.expiresAt > new Date()) return;
       if (fresh.status === "CONFIRM") await finishRoom(client, fresh, fresh.reportSide!, fresh.reportHigh!, fresh.reportLow!);
-      else if (fresh.status === "LIVE") {
+      else if (fresh.status === "LIVE" && fresh.tournamentId) {
+        await prisma.matchRoom.update({ where: { id: fresh.id }, data: { expiresAt: null } });
+        const config = await getConfig(fresh.guildId);
+        const thread = await roomThread(client, fresh);
+        await thread?.send({ content: `${config?.staffRoleId ? `<@&${config.staffRoleId}> ` : ""}No score yet for this tournament match. Captains, report it above. Staff can report it here or set the winner on the dashboard (Matchmaking → Tournaments).`, allowedMentions: { roles: config?.staffRoleId ? [config.staffRoleId] : [] } }).catch(() => null);
+      } else if (fresh.status === "LIVE") {
         const closed = await prisma.matchRoom.update({ where: { id: fresh.id }, data: { status: "CANCELED", voiceIds: [], expiresAt: null } });
         await closeRoom(client, { ...closed, voiceIds: fresh.voiceIds }, "Nobody reported a result in time, so this match was closed and nothing was recorded.");
         await syncMatchmakingPanel(client, fresh.guildId);

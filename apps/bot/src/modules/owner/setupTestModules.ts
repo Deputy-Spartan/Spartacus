@@ -491,6 +491,16 @@ const SEEDERS: Record<string, (ctx: Ctx) => Promise<void>> = {
 
 // ---- roles, categories and channel lookup ----
 
+// The Economy Hub page holds what used to be separate pages, so its channel
+// gets all of their set-up.
+SEEDERS["/economy-hub"] = async (ctx) => {
+  for (const key of ["/leveling", "/level-roles", "/prestige", "/achievements", "/economy/settings"]) await SEEDERS[key](ctx);
+};
+
+// Switched on with everything else: these are tabs of the Economy Hub, so no
+// page of their own lists them.
+const HUB_MODULE_KEYS: ModuleKey[] = ["LEVELING", "PRESTIGE", "VOICE_ACTIVITY", "ACHIEVEMENTS", "PROFILE_CARDS"];
+
 async function ensureRoles(guild: Guild): Promise<Record<RoleKey, Role>> {
   await guild.roles.fetch();
   const roles = {} as Record<RoleKey, Role>;
@@ -614,7 +624,7 @@ async function run(client: Client, guild: Guild, ownerId: string, progress: (tex
 
   // Everything is switched on before anything posts, since most posters
   // check their module's switch first.
-  const keys = [...new Set(targets.map((t) => t.moduleKey).filter((k): k is ModuleKey => !!k))];
+  const keys = [...new Set([...targets.map((t) => t.moduleKey).filter((k): k is ModuleKey => !!k), ...HUB_MODULE_KEYS])];
   for (const key of keys) {
     await prisma.moduleToggle.upsert({ where: { guildId_key: { guildId: guild.id, key } }, create: { guildId: guild.id, key, enabled: true }, update: { enabled: true } });
     invalidateModuleCache(guild.id, key);

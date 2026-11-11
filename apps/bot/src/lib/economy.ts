@@ -122,7 +122,8 @@ export async function awardMessageEarnings(
   }
 
   const base = Math.floor(Math.random() * (config.messageEarnMax - config.messageEarnMin + 1)) + config.messageEarnMin;
-  const amount = Math.round(base * multiplierFor(member, channelId, config));
+  const { coinBonus } = await import("./economyPlus");
+  const amount = Math.round(base * multiplierFor(member, channelId, config) * (await coinBonus(guildId, member.id)));
 
   await prisma.economyBalance.upsert({
     where: { guildId_userId: { guildId, userId: member.id } },
@@ -147,7 +148,18 @@ async function recordDaily(guildId: string, userId: string, config: Awaited<Retu
   const hoursSince = row?.lastDailyClaim ? (now.getTime() - row.lastDailyClaim.getTime()) / 3_600_000 : Infinity;
   if (hoursSince < 24) return { ok: false as const, reason: "cooldown" as const, hoursRemaining: 24 - hoursSince };
 
-  const streakContinues = hoursSince < 48; // claimed yesterday or today, within a 48h grace window
+  const hoursSinceLast = row?.lastDailyClaim ? (now.getTime() - row.lastDailyClaim.getTime()) / 3_600_000 : Infinity;
+  let streakContinues = hoursSinceLast < 48; // claimed yesterday or today, within a 48h grace window
+  // Streak freezes (from the shop or crates) each cover one missed day.
+  let usedFreezes = 0;
+  if (!streakContinues && Number.isFinite(hoursSinceLast) && (row?.dailyStreak ?? 0) > 0) {
+    const needed = Math.floor((hoursSinceLast - 48) / 24) + 1;
+    const spent = await prisma.economyInventory.updateMany({ where: { guildId, userId, streakFreezes: { gte: needed } }, data: { streakFreezes: { decrement: needed } } }).catch(() => ({ count: 0 }));
+    if (spent.count) {
+      streakContinues = true;
+      usedFreezes = needed;
+    }
+  }
   const nextStreak = streakContinues ? (row?.dailyStreak ?? 0) + 1 : 1;
   const cappedStreak = Math.min(nextStreak, config.streakCapDays);
   const amount = config.dailyAmount + cappedStreak * config.streakBonusPerDay;
@@ -160,7 +172,7 @@ async function recordDaily(guildId: string, userId: string, config: Awaited<Retu
   });
   await applyBalance(guildId, userId, amount, "daily", config.maxBalance);
 
-  return { ok: true as const, amount, streak: nextStreak };
+  return { ok: true as const, amount, streak: nextStreak, usedFreezes };
 }
 
 export async function transfer(guildId: string, fromUserId: string, toUserId: string, amount: number) {

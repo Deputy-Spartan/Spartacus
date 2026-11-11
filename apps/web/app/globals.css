@@ -180,3 +180,160 @@
     background-position: -100% 0;
   }
 }
+
+/* Login page: the feature details panel fading in. */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #feature-details * { animation: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Dashboard themes (Account settings → Theme), saved per person:
+   Studio (default), Glass and Daylight. Same colors in all three:
+   #1C1D20 #242529 #2C2E33 #37393F and the steel blues #7B99BC #5E7FA6 #94A3B8.
+   Cards never get transform, filter or backdrop-filter: those would make the
+   fixed-position pop-ups inside some cards (cropper, embed editors) jump.
+   ------------------------------------------------------------------------- */
+
+/* App-style icon tiles (components/ui/AppIcon.tsx). */
+.app-tile {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tc) 78%, #fff 22%), var(--tc) 55%, color-mix(in srgb, var(--tc) 80%, #000 20%));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 0 rgba(0, 0, 0, 0.18), 0 2px 6px color-mix(in srgb, var(--tc) 40%, transparent);
+}
+.app-tile svg { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+
+/* Leaderboard rank badges. */
+.rank-badge { background: #5f6673; color: #fff; }
+.rank-1 { background: linear-gradient(135deg, #f7d774, #c9a03a); color: #1c1d20; }
+.rank-2 { background: linear-gradient(135deg, #e3e7ed, #9aa3af); color: #1c1d20; }
+.rank-3 { background: linear-gradient(135deg, #e0a26a, #a9652e); color: #1c1d20; }
+html[data-theme="daylight"] .chart-grid { stroke: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .sp-tabbar { background: rgba(255, 255, 255, 0.95); border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="glass"] .sp-tabbar { background: rgba(36, 37, 41, 0.7); }
+
+/* ---------- Studio: solid and bold, an accent bar on every card ---------- */
+html[data-theme="studio"] .neon-card {
+  border-color: #37393f;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #5e7fa6, #7b99bc, #94a3b8) top left / 100% 3px no-repeat, #2a2c31;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+html[data-theme="studio"] .neon-card:hover { border-color: #4a4d55; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4); }
+html[data-theme="studio"] .sp-sidebar { background: #242529; border-color: #37393f; }
+html[data-theme="studio"] .sp-sidebar .bg-base-800.text-neon-blue { background: #7b99bc; color: #10151c; font-weight: 600; box-shadow: none; }
+html[data-theme="studio"] .neon-button,
+html[data-theme="studio"] .neon-button-sm { background: #7b99bc; color: #10151c; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); transition: background-color 0.15s; }
+html[data-theme="studio"] .neon-button:hover,
+html[data-theme="studio"] .neon-button-sm:hover { background: #94b0cf; }
+
+/* ---------- Glass: a colorful glow behind frosted panels ---------- */
+html[data-theme="glass"] body {
+  background:
+    radial-gradient(900px 620px at 6% 0%, rgba(123, 153, 188, 0.42), transparent 62%),
+    radial-gradient(860px 680px at 100% 100%, rgba(94, 127, 166, 0.5), transparent 62%),
+    radial-gradient(620px 460px at 65% 25%, rgba(148, 163, 184, 0.24), transparent 62%),
+    #1c1d20;
+  background-attachment: fixed;
+}
+html[data-theme="glass"] .sp-shell,
+html[data-theme="glass"] .sp-login { background: transparent; }
+html[data-theme="glass"] .neon-card {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  background:
+    linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.12) 50%, transparent 60%) 140% 0 / 250% 100% no-repeat,
+    linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.035)),
+    rgba(36, 37, 41, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 10px 34px rgba(0, 0, 0, 0.3);
+  transition: background-position 0.9s ease, border-color 0.25s, box-shadow 0.25s;
+}
+html[data-theme="glass"] .neon-card:hover {
+  background-position: -140% 0, 0 0, 0 0;
+  border-color: rgba(255, 255, 255, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.36), 0 18px 44px rgba(0, 0, 0, 0.4);
+}
+html[data-theme="glass"] .sp-sidebar {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+html[data-theme="glass"] .sp-sidebar .bg-base-800 { background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+html[data-theme="glass"] .sp-header { background: rgba(28, 29, 32, 0.35); border-color: rgba(255, 255, 255, 0.12); }
+html[data-theme="glass"] .neon-button,
+html[data-theme="glass"] .neon-button-sm { border-radius: 9999px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 18px rgba(94, 127, 166, 0.4); }
+html[data-theme="glass"] .sp-hero { background: rgba(255, 255, 255, 0.03); border-right: 1px solid rgba(255, 255, 255, 0.1); }
+html[data-theme="glass"] .sp-login-card { background: rgba(36, 37, 41, 0.45); border-color: rgba(255, 255, 255, 0.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.45); backdrop-filter: blur(22px) saturate(150%); -webkit-backdrop-filter: blur(22px) saturate(150%); }
+
+/* ---------- Daylight: light gray page, white cards, dark text ----------
+   The dashboard's pages were built dark, so this remaps its dark colors.
+   Anything inside a Discord preview (those use fixed bg-[#…] colors) is
+   left alone so previews still look like Discord. */
+html[data-theme="daylight"] { color-scheme: light; }
+html[data-theme="daylight"] body { background: #eef1f5; color: #1c1d20; }
+html[data-theme="daylight"] select,
+html[data-theme="daylight"] select option { background-color: #ffffff; color: #1c1d20; }
+html[data-theme="daylight"] :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #f6f8fa; }
+html[data-theme="daylight"] :is(.sp-shell, .sp-login) { background-color: #eef1f5 !important; }
+html[data-theme="daylight"] :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #ffffff; }
+html[data-theme="daylight"] :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #eef2f7; }
+html[data-theme="daylight"] .bg-base-700:not([class*="bg-[#"] *) { background-color: #d5dbe3; }
+html[data-theme="daylight"] :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #eef2f7; }
+html[data-theme="daylight"] .text-slate-100:not([class*="bg-[#"] *) { color: #1c1d20; }
+html[data-theme="daylight"] .text-slate-200:not([class*="bg-[#"] *) { color: #23262b; }
+html[data-theme="daylight"] .text-slate-300:not([class*="bg-[#"] *) { color: #37393f; }
+html[data-theme="daylight"] .text-slate-400:not([class*="bg-[#"] *) { color: #4b515c; }
+html[data-theme="daylight"] .text-slate-500:not([class*="bg-[#"] *) { color: #5f6673; }
+html[data-theme="daylight"] .text-slate-600:not([class*="bg-[#"] *) { color: #7a808b; }
+html[data-theme="daylight"] :is(.hover\:text-slate-100, .hover\:text-slate-200, .hover\:text-slate-300):hover:not([class*="bg-[#"] *) { color: #1c1d20; }
+html[data-theme="daylight"] .text-neon-blue:not([class*="bg-[#"] *) { color: #3f5f86; }
+html[data-theme="daylight"] :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/\[0\.07\]):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.1); }
+html[data-theme="daylight"] :is(.border-white\/20, .border-white\/30):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.18); }
+html[data-theme="daylight"] :is(.hover\:border-white\/15, .hover\:border-white\/20, .hover\:border-white\/25):hover:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.25); }
+html[data-theme="daylight"] :is(.divide-white\/5) > * + *:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] :is(.bg-white\/5, .bg-white\/10, .bg-white\/\[0\.03\], .bg-white\/\[0\.06\], .bg-black\/20, .bg-black\/10):not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.04); }
+html[data-theme="daylight"] :is(.hover\:bg-white\/5, .hover\:bg-white\/10, .hover\:bg-white\/\[0\.06\], .hover\:bg-white\/\[0\.07\]):hover:not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.06); }
+html[data-theme="daylight"] :is(input, textarea, select):not([class*="bg-[#"] *) { color: #1c1d20; }
+html[data-theme="daylight"] ::placeholder { color: #8a909b; }
+html[data-theme="daylight"] .neon-card {
+  background: #ffffff;
+  border-color: rgba(28, 29, 32, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(28, 29, 32, 0.05), 0 4px 14px rgba(28, 29, 32, 0.04);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+html[data-theme="daylight"] .neon-card:hover { border-color: #7b99bc; box-shadow: 0 2px 4px rgba(28, 29, 32, 0.07), 0 14px 30px rgba(94, 127, 166, 0.15); }
+html[data-theme="daylight"] .sp-sidebar { background: #ffffff; border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .sp-sidebar .bg-base-800.text-neon-blue { background: rgba(123, 153, 188, 0.18); color: #2f4a68; font-weight: 600; box-shadow: none; }
+html[data-theme="daylight"] .sp-header { background: rgba(255, 255, 255, 0.85); border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .neon-button,
+html[data-theme="daylight"] .neon-button-sm { background: #5e7fa6; color: #fff; box-shadow: 0 1px 2px rgba(28, 29, 32, 0.15); }
+html[data-theme="daylight"] .neon-button:hover,
+html[data-theme="daylight"] .neon-button-sm:hover { background: #4f6e93; }
+html[data-theme="daylight"] .neon-toggle-on { background: #5e7fa6; }
+html[data-theme="daylight"] .spartacus-wave { background-image: linear-gradient(90deg, #3f5f86 0%, #3f5f86 35%, #7b99bc 50%, #3f5f86 65%, #3f5f86 100%); }
+html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgba(123, 153, 188, 0.22), transparent 65%), #e9edf2; color: #1c1d20; }
+html[data-theme="daylight"] .sp-login-card { background: #ffffff; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
+html[data-theme="daylight"] .setup-ready { background: rgba(31, 138, 76, 0.12); color: #1f7a45; }
+html[data-theme="daylight"] .setup-needs { background: rgba(201, 138, 46, 0.16); color: #8a5a10; }
+html[data-theme="daylight"] :is(.text-amber-300, .text-amber-400):not([class*="bg-[#"] *) { color: #8a5a10; }
+html[data-theme="daylight"] :is(.text-emerald-300, .text-emerald-400):not([class*="bg-[#"] *) { color: #1f7a45; }
+html[data-theme="daylight"] :is(.text-rose-300, .text-rose-400):not([class*="bg-[#"] *) { color: #b42318; }
+html[data-theme="daylight"] .stroke-white\/10 { stroke: rgba(28, 29, 32, 0.1); }
+html[data-theme="daylight"] * { scrollbar-color: rgba(28, 29, 32, 0.2) transparent; }
+
+/* Account settings → Reduce motion: no sweeps, sheens or fades. */
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  transition: none !important;
+  animation: none !important;
+}

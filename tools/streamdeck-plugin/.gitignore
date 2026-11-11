@@ -1,0 +1,5 @@
+node_modules/
+com.spartacus.streamdeck.sdPlugin/
+Spartacus.zip
+dist-actions.mjs
+src/glyphs.gen.ts

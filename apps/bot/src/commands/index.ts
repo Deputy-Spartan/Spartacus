@@ -29,6 +29,13 @@ import confess from "./community/confess";
 import giveawayReroll from "./engagement/giveawayReroll";
 import prestige from "./leveling/prestige";
 import remindme from "./utility/remindme";
+import serverSetup from "./utility/serverSetup";
+import role from "./utility/role";
+import golive from "./community/golive";
+import profile from "./leveling/profile";
+import levelroles from "./leveling/levelroles";
+import shop from "./economy/shop";
+import crates from "./economy/crates";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -62,6 +69,13 @@ for (const command of [
   giveawayReroll,
   prestige,
   remindme,
+  serverSetup,
+  role,
+  golive,
+  profile,
+  levelroles,
+  shop,
+  crates,
 ]) {
   commands.set(command.data.name, command);
 }

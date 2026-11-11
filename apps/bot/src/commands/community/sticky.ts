@@ -83,7 +83,7 @@ const command: CommandModule = {
         return;
       }
 
-      const lines = stickies.map((s) => `• <#${s.channelId}> — ${s.embedEnabled ? "embed" : "text"} sticky`);
+      const lines = stickies.map((s) => `• <#${s.channelId}> — ${s.label ? `**${s.label}**` : s.savedEmbedId || s.embedEnabled ? "embed sticky" : "text sticky"}`);
       await interaction.reply({ content: `📌 ${stickies.length} sticky message(s) set up:\n${lines.join("\n")}`, ephemeral: true });
       return;
     }

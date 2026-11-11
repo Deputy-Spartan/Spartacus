@@ -14,6 +14,7 @@ import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 import type { SupportQuestion } from "@spartacus/db";
 import type { Prisma } from "@prisma/client";
+import { activeDmConversation } from "../../lib/dmConversations";
 
 export const name = Events.MessageCreate;
 
@@ -176,6 +177,8 @@ async function sendFlowPicker(guild: { id: string; name: string }, username: str
 // carries no guild context of its own.
 export async function execute(message: Message) {
   if (message.author.bot || message.guild) return;
+  // An application in progress owns the DM; its answers aren't support requests.
+  if ((await activeDmConversation(message.author.id)) === "application") return;
 
   const openTicket = await prisma.supportTicket.findFirst({
     where: { userId: message.author.id, status: { in: ["OPEN", "CLAIMED"] } },

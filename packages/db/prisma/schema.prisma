@@ -8,114 +8,114 @@ generator client {
 }
 
 model Guild {
-  id                String               @id // Discord guild ID
-  name              String?
+  id                          String                       @id // Discord guild ID
+  name                        String?
   // A text channel the bot creates on first upload to host images the
   // dashboard's "upload an image" controls send — Discord's CDN needs a
   // real message to attach a file to, so this is where those messages live.
-  assetChannelId    String?
-  modules           ModuleToggle[]
-  welcomeConfig     WelcomeConfig?
-  customCommands    CustomCommand[]
-  events            Event[]
-  streamSubs        StreamSubscription[]
-  members           MemberXp[]
-  loggingConfig     LoggingConfig?
-  antiRaidConfig    AntiRaidConfig?
-  reactionRoles     ReactionRole[]
-  reactionRolePanels ReactionRolePanel[]
-  joinRoles         JoinRole[]
-  stickyMessages    StickyMessage[]
-  starboardConfig   StarboardConfig?
-  starredMessages   StarredMessage[]
-  tempChannelLobbies TempChannelLobby[]
-  tempChannelInstances TempChannelInstance[]
-  ticketPanels      TicketPanel[]
-  tickets           Ticket[]
-  ticketTypes       TicketType[]
-  ticketTags        TicketTag[]
-  ticketCannedResponses TicketCannedResponse[]
-  ticketKnowledgeBases TicketKnowledgeBase[]
-  ticketSettings    TicketSettings?
-  giveaways         Giveaway[]
-  moderationCases   ModerationCase[]
-  verificationConfig VerificationConfig?
-  quarantineRecords QuarantineRecord[]
-  antiNukeConfig    AntiNukeConfig?
-  honeypotConfig    HoneypotConfig?
-  roleSnapshots     RoleSnapshot[]
-  scheduledMessages ScheduledMessage[]
-  polls             Poll[]
-  suggestions       Suggestion[]
-  economyConfig     EconomyConfig?
-  economyBalances   EconomyBalance[]
-  economyTransactions EconomyTransaction[]
-  levelRoles        LevelRole[]
-  levelingSettings  LevelingSettings?
-  xpBlacklist       XpBlacklistEntry[]
-  countingGameConfig CountingGameConfig?
-  invites           InviteStat[]
-  modmailThreads    ModmailThread[]
-  serverPartnerships ServerPartnership[]
-  playerReports     PlayerReport[]
-  playerReportSettings PlayerReportSettings?
-  permWatchConfig   PermWatchConfig?
-  channelLocks      ChannelLock[]
-  commandToggles    CommandToggle[]
-  customSlashCommands CustomSlashCommand[]
-  statChannels      StatChannel[]
-  statusChannels    StatusChannel[]
-  alertSettings     AlertSettings?
-  warnEscalationSettings WarnEscalationSettings?
-  appealSettings    AppealSettings?
-  appeals           Appeal[]
-  modDigestSettings ModDigestSettings?
-  voiceSessions     VoiceSession[]
-  voiceActivity     VoiceActivity[]
-  weeklyRecapSettings WeeklyRecapSettings?
-  achievements      Achievement[]
-  achievementSettings AchievementSettings?
-  customAchievements CustomAchievement[]
-  aiConfig          AiConfig?
-  serverBackups     ServerBackup[]
-  buttonPresets     ButtonPreset[]
-  savedEmbeds       SavedEmbed[]
-  eventTemplates    EventTemplate[]
-  eventSettings     EventSettings?
-  dashboardAuditEntries DashboardAuditEntry[]
-  pinnedModules     PinnedModule[]
-  rolePanels        RolePanel[]
-  announcements     Announcement[]
-  autoPurgeConfigs  AutoPurgeConfig[]
-  birthdayConfig    BirthdayConfig?
-  birthdays         Birthday[]
-  applicationPanels ApplicationPanel[]
-  applicationTypes  ApplicationType[]
-  applications      Application[]
-  applicationDrafts ApplicationDraft[]
-  applicationSettings ApplicationSettings?
-  growthSnapshots   GrowthSnapshot[]
-  bumpReminderSettings BumpReminderSettings?
-  confessionSettings ConfessionSettings?
-  milestoneSettings MilestoneSettings?
-  rulesGateSettings RulesGateSettings?
-  prestigeSettings  PrestigeSettings?
+  assetChannelId              String?
+  modules                     ModuleToggle[]
+  welcomeConfig               WelcomeConfig?
+  customCommands              CustomCommand[]
+  events                      Event[]
+  streamSubs                  StreamSubscription[]
+  members                     MemberXp[]
+  loggingConfig               LoggingConfig?
+  antiRaidConfig              AntiRaidConfig?
+  reactionRoles               ReactionRole[]
+  reactionRolePanels          ReactionRolePanel[]
+  joinRoles                   JoinRole[]
+  stickyMessages              StickyMessage[]
+  starboardConfig             StarboardConfig?
+  starredMessages             StarredMessage[]
+  tempChannelLobbies          TempChannelLobby[]
+  tempChannelInstances        TempChannelInstance[]
+  ticketPanels                TicketPanel[]
+  tickets                     Ticket[]
+  ticketTypes                 TicketType[]
+  ticketTags                  TicketTag[]
+  ticketCannedResponses       TicketCannedResponse[]
+  ticketKnowledgeBases        TicketKnowledgeBase[]
+  ticketSettings              TicketSettings?
+  giveaways                   Giveaway[]
+  moderationCases             ModerationCase[]
+  verificationConfig          VerificationConfig?
+  quarantineRecords           QuarantineRecord[]
+  antiNukeConfig              AntiNukeConfig?
+  honeypotConfig              HoneypotConfig?
+  roleSnapshots               RoleSnapshot[]
+  scheduledMessages           ScheduledMessage[]
+  polls                       Poll[]
+  suggestions                 Suggestion[]
+  economyConfig               EconomyConfig?
+  economyBalances             EconomyBalance[]
+  economyTransactions         EconomyTransaction[]
+  levelRoles                  LevelRole[]
+  levelingSettings            LevelingSettings?
+  xpBlacklist                 XpBlacklistEntry[]
+  countingGameConfig          CountingGameConfig?
+  invites                     InviteStat[]
+  modmailThreads              ModmailThread[]
+  serverPartnerships          ServerPartnership[]
+  playerReports               PlayerReport[]
+  playerReportSettings        PlayerReportSettings?
+  permWatchConfig             PermWatchConfig?
+  channelLocks                ChannelLock[]
+  commandToggles              CommandToggle[]
+  customSlashCommands         CustomSlashCommand[]
+  statChannels                StatChannel[]
+  statusChannels              StatusChannel[]
+  alertSettings               AlertSettings?
+  warnEscalationSettings      WarnEscalationSettings?
+  appealSettings              AppealSettings?
+  appeals                     Appeal[]
+  modDigestSettings           ModDigestSettings?
+  voiceSessions               VoiceSession[]
+  voiceActivity               VoiceActivity[]
+  weeklyRecapSettings         WeeklyRecapSettings?
+  achievements                Achievement[]
+  achievementSettings         AchievementSettings?
+  customAchievements          CustomAchievement[]
+  aiConfig                    AiConfig?
+  serverBackups               ServerBackup[]
+  buttonPresets               ButtonPreset[]
+  savedEmbeds                 SavedEmbed[]
+  eventTemplates              EventTemplate[]
+  eventSettings               EventSettings?
+  dashboardAuditEntries       DashboardAuditEntry[]
+  pinnedModules               PinnedModule[]
+  rolePanels                  RolePanel[]
+  announcements               Announcement[]
+  autoPurgeConfigs            AutoPurgeConfig[]
+  birthdayConfig              BirthdayConfig?
+  birthdays                   Birthday[]
+  applicationPanels           ApplicationPanel[]
+  applicationTypes            ApplicationType[]
+  applications                Application[]
+  applicationDrafts           ApplicationDraft[]
+  applicationSettings         ApplicationSettings?
+  growthSnapshots             GrowthSnapshot[]
+  bumpReminderSettings        BumpReminderSettings?
+  confessionSettings          ConfessionSettings?
+  milestoneSettings           MilestoneSettings?
+  rulesGateSettings           RulesGateSettings?
+  prestigeSettings            PrestigeSettings?
   suggestionAnalyticsSettings SuggestionAnalyticsSettings?
-  lfgCommands       LfgCommand[]
-  embedCreatorPresets EmbedCreatorPreset[]
-  embedComponentActions EmbedComponentAction[]
-  supportFlows      SupportFlow[]
-  supportTickets    SupportTicket[]
-  supportSettings   SupportSettings?
-  welcomeGreetings  WelcomeGreeting[]
-  matchSetups       MatchSetup[]
-  matchPresets      MatchPreset[]
-  matchmakingConfig MatchmakingConfig?
-  matchTeams        MatchTeam[]
-  matchRooms        MatchRoom[]
-  dailyPostConfigs  DailyPostConfig[]
-  dailyPostEntries  DailyPostEntry[]
-  createdAt         DateTime             @default(now())
+  lfgCommands                 LfgCommand[]
+  embedCreatorPresets         EmbedCreatorPreset[]
+  embedComponentActions       EmbedComponentAction[]
+  supportFlows                SupportFlow[]
+  supportTickets              SupportTicket[]
+  supportSettings             SupportSettings?
+  welcomeGreetings            WelcomeGreeting[]
+  matchSetups                 MatchSetup[]
+  matchPresets                MatchPreset[]
+  matchmakingConfig           MatchmakingConfig?
+  matchTeams                  MatchTeam[]
+  matchRooms                  MatchRoom[]
+  dailyPostConfigs            DailyPostConfig[]
+  dailyPostEntries            DailyPostEntry[]
+  createdAt                   DateTime                     @default(now())
 }
 
 enum ModuleKey {
@@ -180,6 +180,9 @@ enum ModuleKey {
   SUPPORT_INTAKE
   MATCHES
   QOTD
+  ROLE_MANAGER
+  PROFILE_CARDS
+  PLAYING_NOW
 }
 
 model GrowthSnapshot {
@@ -199,13 +202,26 @@ model GrowthSnapshot {
 // by a cron job (not setTimeout) specifically so it survives a bot restart.
 
 model BumpReminderSettings {
-  id             String    @id @default(cuid())
-  guild          Guild     @relation(fields: [guildId], references: [id])
-  guildId        String    @unique
-  channelId      String?
-  mentionRoleId  String?
-  nextReminderAt DateTime?
-  reminded       Boolean   @default(true) // true = nothing pending; set false the moment a bump is detected
+  id                 String    @id @default(cuid())
+  guild              Guild     @relation(fields: [guildId], references: [id])
+  guildId            String    @unique
+  channelId          String?
+  mentionRoleId      String?
+  nextReminderAt     DateTime?
+  reminded           Boolean   @default(true) // true = nothing pending; set false the moment a bump is detected
+  lastBumpAt         DateTime?
+  lastBumpedById     String?
+  // Post "Bump missed!" when nobody bumps this many minutes after it's ready,
+  // then again for every 2-hour window missed after that.
+  missedAlertEnabled Boolean   @default(true)
+  missedAfterMin     Int       @default(30)
+  missedAlerts       Int       @default(0) // alerts sent since the last bump
+  // The one Spartacus message in the bump channel, edited or replaced at
+  // each stage, and how each stage looks (see packages/shared/bumpMessages.ts).
+  statusMessageId    String?
+  bumpMessages       Json?
+  bumpCount          Int       @default(0)
+  dmUserIds          Json      @default("[]") // people who tapped "DM me when it's ready"
 }
 
 // ---- Suggestion Analytics ----
@@ -218,6 +234,21 @@ model SuggestionAnalyticsSettings {
   guild     Guild   @relation(fields: [guildId], references: [id])
   guildId   String  @unique
   channelId String?
+}
+
+// Messages per hour (UTC) and per channel: counts only, never message text.
+// Feeds the Overview's Busiest hours and Top channels charts. Rows older
+// than 35 days are deleted by the bot's flush job.
+model MessageActivity {
+  id        String   @id @default(cuid())
+  guildId   String
+  day       DateTime @db.Date
+  hour      Int
+  channelId String
+  count     Int      @default(0)
+
+  @@unique([guildId, day, hour, channelId])
+  @@index([guildId, day])
 }
 
 model DailyMessageCount {
@@ -242,18 +273,20 @@ model ModuleToggle {
 }
 
 model WelcomeConfig {
-  id           String  @id @default(cuid())
-  guild        Guild   @relation(fields: [guildId], references: [id])
-  guildId      String  @unique
-  channelId    String?
-  welcomeText  String?
-  goodbyeText  String?
-  embedColor   String? @default("#00E5FF")
-  embedEnabled Boolean @default(false)
-  embedTitle   String?
-  buttons      Json    @default("[]")
-  embedExtra   Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
-  savedEmbedId String? // when set, overrides embedTitle/embedExtra/etc. with an EmbedCreatorPreset's content at send time
+  id             String  @id @default(cuid())
+  guild          Guild   @relation(fields: [guildId], references: [id])
+  guildId        String  @unique
+  channelId      String?
+  leaveChannelId String? // goodbyes post here when set, otherwise in channelId
+  pingAboveEmbed Boolean @default(true) // embed mentions never notify, so the new member is also pinged above the embed
+  welcomeText    String?
+  goodbyeText    String?
+  embedColor     String? @default("#00E5FF")
+  embedEnabled   Boolean @default(false)
+  embedTitle     String?
+  buttons        Json    @default("[]")
+  embedExtra     Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
+  savedEmbedId   String? // when set, overrides embedTitle/embedExtra/etc. with an EmbedCreatorPreset's content at send time
 }
 
 // A pool of alternate join messages — when at least one is enabled, the bot
@@ -297,13 +330,54 @@ model StreamSubscription {
   id                String    @id @default(cuid())
   guild             Guild     @relation(fields: [guildId], references: [id])
   guildId           String
-  platform          String // "twitch" | "youtube"
-  channelName       String
+  platform          String // twitch | youtube | kick | tiktok | other (manual, via /golive)
+  channelName       String // the handle, or the stream link for "other"
   announceChannelId String
   isLive            Boolean   @default(false)
   lastNotifiedAt    DateTime?
 
+  // Going Live (see packages/shared/goLive.ts)
+  displayName    String?
+  platformName   String? // for "other", e.g. Facebook
+  discordUserId  String? // the streamer's own account: gets the live role, can use /golive
+  pingRoleId     String? // overrides the server's ping role
+  liveMessageId  String?
+  liveStartedAt  DateTime?
+  lastTitle      String?
+  lastGame       String?
+  lastThumbnail  String?
+  lastAvatar     String?
+  peakViewers    Int       @default(0)
+  offlineStrikes Int       @default(0) // offline checks in a row, so a blip doesn't end the stream
+  lastError      String?
+  alertOverrides Json? // this streamer's own alert look (message, title, text, color, button, images); empty parts use the server's
+
   @@index([guildId])
+}
+
+model StreamAlertSettings {
+  id               String  @id @default(cuid())
+  guildId          String  @unique
+  defaultChannelId String?
+  pingRoleId       String?
+  liveRoleId       String? // given to a linked streamer while they're live
+  selfServeRoleId  String? // members with this role can use /golive for themselves
+  contentTemplate  String?
+  embedTitle       String?
+  embedDescription String?
+  embedColor       String? // empty = each platform's own color
+  buttonLabel      String?
+  buttonEmoji      String?
+  embedExtra       Json? // author, thumbnail, image, footer, fields (same shape as other modules)
+  showThumbnail    Boolean @default(true)
+  updateWhileLive  Boolean @default(true) // keep viewers, title and game fresh on the post
+  endAction        String  @default("EDIT") // EDIT (stream ended summary) | DELETE | KEEP
+  cooldownMinutes  Int     @default(30) // no second post if they come back within this
+  showGame         Boolean @default(true) // the "Playing" field
+  showViewers      Boolean @default(true) // the "Viewers" field
+  endedTitle       String? // the summary when the stream ends ({duration}, {peak} work here)
+  endedDescription String?
+  endedColor       String?
 }
 
 model MemberXp {
@@ -426,26 +500,26 @@ model EventTemplate {
 }
 
 model EventSettings {
-  id                String  @id @default(cuid())
-  guild             Guild   @relation(fields: [guildId], references: [id])
-  guildId           String  @unique
-  defaultChannelId  String?
-  defaultReminder   Int     @default(15)
-  mentionRoleId     String?
+  id               String  @id @default(cuid())
+  guild            Guild   @relation(fields: [guildId], references: [id])
+  guildId          String  @unique
+  defaultChannelId String?
+  defaultReminder  Int     @default(15)
+  mentionRoleId    String?
 }
 
 // ---- Logging ----
 
 model LoggingConfig {
-  id             String   @id @default(cuid())
-  guild          Guild    @relation(fields: [guildId], references: [id])
-  guildId        String   @unique
-  logChannelId   String?
+  id           String  @id @default(cuid())
+  guild        Guild   @relation(fields: [guildId], references: [id])
+  guildId      String  @unique
+  logChannelId String?
 
   // Moderation Events
-  logMemberMuted    Boolean @default(true)
-  logMemberUnmuted  Boolean @default(true)
-  logModerationBan  Boolean @default(true)
+  logMemberMuted     Boolean @default(true)
+  logMemberUnmuted   Boolean @default(true)
+  logModerationBan   Boolean @default(true)
   logModerationUnban Boolean @default(true)
 
   // Message Events
@@ -461,9 +535,9 @@ model LoggingConfig {
   logUserUpdated     Boolean @default(false)
 
   // Role Events
-  logRoleCreated       Boolean @default(false)
-  logRoleUpdated       Boolean @default(false)
-  logRoleDeleted       Boolean @default(false)
+  logRoleCreated        Boolean @default(false)
+  logRoleUpdated        Boolean @default(false)
+  logRoleDeleted        Boolean @default(false)
   logMemberRolesChanged Boolean @default(false)
 
   // Voice Events
@@ -519,7 +593,7 @@ model ReactionRolePanel {
   embedColor   String?
   embedExtra   Json?
   savedEmbedId String? // shared Embed Creator preset used as the message body, resolved live at post time
-  notifyMode String @default("PRIVATE") // PRIVATE (hidden reply / short-lived message) | DM | NONE
+  notifyMode   String         @default("PRIVATE") // PRIVATE (hidden reply / short-lived message) | DM | NONE
   createdAt    DateTime       @default(now())
   options      ReactionRole[]
 
@@ -527,20 +601,21 @@ model ReactionRolePanel {
 }
 
 model ReactionRole {
-  id        String            @id @default(cuid())
-  guild     Guild             @relation(fields: [guildId], references: [id])
-  guildId   String
-  panel     ReactionRolePanel @relation(fields: [panelId], references: [id], onDelete: Cascade)
-  panelId   String
-  channelId String
-  messageId String?
-  emoji     String
+  id           String            @id @default(cuid())
+  guild        Guild             @relation(fields: [guildId], references: [id])
+  guildId      String
+  panel        ReactionRolePanel @relation(fields: [panelId], references: [id], onDelete: Cascade)
+  panelId      String
+  channelId    String
+  messageId    String?
+  emoji        String
   // roleId is the first role granted ("" when the option only grants channel
   // access); extraRoleIds/channelIds hold any further roles and the channels
   // this reaction unlocks for the member (a per-member view permission).
-  roleId    String
-  extraRoleIds Json @default("[]")
-  channelIds   Json @default("[]")
+  roleId       String
+  extraRoleIds Json              @default("[]")
+  channelIds   Json              @default("[]")
+  note         String? // small text under this option in the panel
 
   @@unique([messageId, emoji])
   @@index([guildId])
@@ -565,6 +640,8 @@ model StickyMessage {
   guild            Guild   @relation(fields: [guildId], references: [id])
   guildId          String
   channelId        String  @unique
+  // A name for the dashboard list; never posted in Discord.
+  label            String?
   content          String
   lastMessageId    String?
   embedEnabled     Boolean @default(false)
@@ -581,20 +658,20 @@ model StickyMessage {
 // ---- Starboard ----
 
 model StarboardConfig {
-  id          String @id @default(cuid())
-  guild       Guild  @relation(fields: [guildId], references: [id])
-  guildId     String @unique
-  channelId   String?
-  threshold   Int    @default(5)
+  id        String  @id @default(cuid())
+  guild     Guild   @relation(fields: [guildId], references: [id])
+  guildId   String  @unique
+  channelId String?
+  threshold Int     @default(5)
 }
 
 model StarredMessage {
-  id                String @id @default(cuid())
-  guild             Guild  @relation(fields: [guildId], references: [id])
-  guildId           String
-  originalMessageId String
+  id                 String  @id @default(cuid())
+  guild              Guild   @relation(fields: [guildId], references: [id])
+  guildId            String
+  originalMessageId  String
   starboardMessageId String?
-  starCount         Int    @default(0)
+  starCount          Int     @default(0)
 
   @@unique([guildId, originalMessageId])
 }
@@ -602,31 +679,59 @@ model StarredMessage {
 // ---- Temp Channels ----
 
 model TempChannelLobby {
-  id               String  @id @default(cuid())
-  guild            Guild   @relation(fields: [guildId], references: [id])
-  guildId          String
-  name             String
-  lobbyChannelId   String
-  categoryId       String?
-  nameFormat       String  @default("Channel")
-  userLimit        Int     @default(0)
-  bitrate          Int     @default(64000)
-  deleteAfterEmptySec Int  @default(0)
-  pairTextChannel  Boolean @default(false)
+  id                     String  @id @default(cuid())
+  guild                  Guild   @relation(fields: [guildId], references: [id])
+  guildId                String
+  name                   String
+  lobbyChannelId         String
+  categoryId             String?
+  nameFormat             String  @default("Channel")
+  userLimit              Int     @default(0)
+  bitrate                Int     @default(64000)
+  deleteAfterEmptySec    Int     @default(0)
+  pairTextChannel        Boolean @default(false)
   hideTextFromNonMembers Boolean @default(true)
+  joinToCreate           Boolean @default(true) // off: joining lobbyChannelId does nothing, only the panel makes squads
+  gamePicker             Boolean @default(false) // false: named from nameFormat only. true: also shows the game menu
+  gameCategories         Boolean @default(false) // picking a game moves the squad into a category for that game
+  gameChoices            Json    @default("[]") // [{ label, emoji, nameFormat, userLimit }]: the "What are you playing?" menu
+  // The text channel way in: an embed with a game dropdown that makes the squad channel.
+  panelChannelId         String?
+  panelMessageId         String?
+  panelTitle             String  @default("🔊 Create a Squad")
+  panelText              String  @default("Pick the game you're playing below and Spartacus makes a voice channel for your squad.\n\nOr join {lobby} to make one straight away.")
+  panelColor             Int     @default(5793266)
+  controlsWhere          String  @default("VOICE") // VOICE: in the voice channel's chat. THREAD: a private thread in controlsChannelId
+  controlsChannelId      String?
+  guideButton            Boolean @default(true) // the "How it works" button on the panel and in squad channels
+  panelGuide             String? // the guide's text; empty uses the built-in step-by-step guide
 
   @@index([guildId])
 }
 
-model TempChannelInstance {
+// A category made for one game's squads. Deleted once its last squad is gone.
+model TempGameCategory {
   id         String   @id @default(cuid())
-  guild      Guild    @relation(fields: [guildId], references: [id])
   guildId    String
   lobbyId    String
-  channelId  String
-  textChannelId String?
-  ownerId    String
+  label      String // the game's name, lowercased
+  categoryId String   @unique
   createdAt  DateTime @default(now())
+
+  @@unique([lobbyId, label])
+  @@index([guildId])
+}
+
+model TempChannelInstance {
+  id               String   @id @default(cuid())
+  guild            Guild    @relation(fields: [guildId], references: [id])
+  guildId          String
+  lobbyId          String
+  channelId        String
+  textChannelId    String?
+  controlsThreadId String? // the private controls thread, when the lobby uses one
+  ownerId          String
+  createdAt        DateTime @default(now())
 
   @@index([guildId])
 }
@@ -653,7 +758,7 @@ model TicketPanel {
 
   // Legacy single-type fields, kept for panels created before ticket types existed.
   categoryId    String?
-  buttonLabel   String            @default("Open a Ticket")
+  buttonLabel   String  @default("Open a Ticket")
   supportRoleId String?
   savedEmbedId  String? // overrides name/description above with a shared Embed Creator preset, resolved live at send time — the open-ticket button/select row still always posts alongside it
 
@@ -696,23 +801,23 @@ enum TicketStatus {
 }
 
 model Ticket {
-  id           String       @id @default(cuid())
-  guild        Guild        @relation(fields: [guildId], references: [id])
-  guildId      String
-  panelId      String
-  typeId       String?
-  ticketNumber Int
-  channelId    String
-  userId       String
-  claimedById  String?
-  status       TicketStatus @default(OPEN)
-  priority     String?
-  tags         Json         @default("[]")
-  closeReason  String?
-  transcriptUrl String?
+  id             String       @id @default(cuid())
+  guild          Guild        @relation(fields: [guildId], references: [id])
+  guildId        String
+  panelId        String
+  typeId         String?
+  ticketNumber   Int
+  channelId      String
+  userId         String
+  claimedById    String?
+  status         TicketStatus @default(OPEN)
+  priority       String?
+  tags           Json         @default("[]")
+  closeReason    String?
+  transcriptUrl  String?
   feedbackRating Int?
-  createdAt    DateTime     @default(now())
-  closedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  closedAt       DateTime?
 
   @@index([guildId, status])
 }
@@ -748,39 +853,39 @@ model TicketKnowledgeBase {
 }
 
 model TicketSettings {
-  id                  String  @id @default(cuid())
-  guild               Guild   @relation(fields: [guildId], references: [id])
-  guildId             String  @unique
+  id                  String              @id @default(cuid())
+  guild               Guild               @relation(fields: [guildId], references: [id])
+  guildId             String              @unique
   logChannelId        String?
   transcriptChannelId String?
   closeBehavior       TicketCloseBehavior @default(DELETE_AND_DM)
-  channelNameFormat   String  @default("ticket-{user}")
-  ticketCap           Int     @default(0)
-  requireCloseReason  Boolean @default(false)
-  supportRoleIds      Json    @default("[]")
-  blacklistUserIds    Json    @default("[]")
-  blacklistRoleIds    Json    @default("[]")
+  channelNameFormat   String              @default("ticket-{user}")
+  ticketCap           Int                 @default(0)
+  requireCloseReason  Boolean             @default(false)
+  supportRoleIds      Json                @default("[]")
+  blacklistUserIds    Json                @default("[]")
+  blacklistRoleIds    Json                @default("[]")
 }
 
 // ---- Giveaways ----
 
 model Giveaway {
-  id          String   @id @default(cuid())
-  guild       Guild    @relation(fields: [guildId], references: [id])
-  guildId     String
-  channelId   String
-  messageId   String?
-  prize       String
-  description String?
-  embedColor  String?  @default("#B14BFF")
-  imageUrl    String?
-  buttons     Json     @default("[]")
-  embedExtra  Json?
+  id           String          @id @default(cuid())
+  guild        Guild           @relation(fields: [guildId], references: [id])
+  guildId      String
+  channelId    String
+  messageId    String?
+  prize        String
+  description  String?
+  embedColor   String?         @default("#B14BFF")
+  imageUrl     String?
+  buttons      Json            @default("[]")
+  embedExtra   Json?
   savedEmbedId String?
-  winnerCount Int      @default(1)
-  endsAt      DateTime
-  ended       Boolean  @default(false)
-  entries     GiveawayEntry[]
+  winnerCount  Int             @default(1)
+  endsAt       DateTime
+  ended        Boolean         @default(false)
+  entries      GiveawayEntry[]
 
   @@index([guildId, endsAt])
 }
@@ -834,6 +939,71 @@ model VerificationConfig {
   panelChannelId String?
   panelMessageId String?
   savedEmbedId   String? // shared Embed Creator preset used as the panel body; falls back to a bare placeholder embed if unset
+
+  // The panel when no saved embed is picked, and its button.
+  defaultEmbedTitle       String?
+  defaultEmbedDescription String?
+  embedColor              String?
+  buttonLabel             String?
+  buttonEmoji             String?
+
+  // BUTTON = one tap. CAPTCHA = pick the matching code, which stops simple bots.
+  method String @default("BUTTON")
+
+  // Safety checks, run before the role is given.
+  requireAvatar        Boolean @default(false)
+  accountTooNewMessage String?
+  noAvatarMessage      String?
+  maxFailures          Int     @default(3) // wrong captcha answers before failAction
+  failAction           String  @default("NONE") // NONE | KICK
+
+  // Join extras.
+  unverifiedRoleId     String? // removed on verify; optionally given on join
+  giveUnverifiedOnJoin Boolean @default(false)
+  logChannelId         String?
+  dmConfirmEnabled     Boolean @default(false)
+  dmConfirmMessage     String?
+
+  // Reminder DM, and kicking anyone who never verifies.
+  reminderEnabled    Boolean @default(false)
+  reminderDelayHours Int     @default(24)
+  reminderMessage    String?
+  kickEnabled        Boolean @default(false)
+  kickAfterHours     Int     @default(48)
+  kickMessage        String?
+
+  // Editable replies; each falls back to a default when blank. All support {server}.
+  verifiedReply        String?
+  alreadyVerifiedReply String?
+  noRoleReply          String?
+  captchaPrompt        String?
+  captchaWrongReply    String?
+}
+
+// Members who joined and haven't verified yet, for reminders and auto-kick.
+// Created on join, deleted on verify.
+model VerificationPendingMember {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  joinedAt   DateTime  @default(now())
+  remindedAt DateTime?
+  failures   Int       @default(0)
+
+  @@unique([guildId, userId])
+}
+
+// The Activity tab's audit trail: every verify, failed try and kick.
+model VerificationLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  username  String
+  result    String // VERIFIED | FAILED | TOO_NEW | NO_AVATAR | KICKED
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
 }
 
 // ---- Quarantine ----
@@ -855,13 +1025,13 @@ model QuarantineRecord {
 // ---- Anti-Nuke ----
 
 model AntiNukeConfig {
-  id                String  @id @default(cuid())
-  guild             Guild   @relation(fields: [guildId], references: [id])
-  guildId           String  @unique
-  alertChannelId    String?
-  maxBansPerMinute  Int     @default(3)
-  maxChannelDeletesPerMinute Int @default(3)
-  stripRolesOnTrigger Boolean @default(true)
+  id                         String  @id @default(cuid())
+  guild                      Guild   @relation(fields: [guildId], references: [id])
+  guildId                    String  @unique
+  alertChannelId             String?
+  maxBansPerMinute           Int     @default(3)
+  maxChannelDeletesPerMinute Int     @default(3)
+  stripRolesOnTrigger        Boolean @default(true)
 }
 
 // ---- Honeypot ----
@@ -915,13 +1085,13 @@ model RoleSnapshot {
 // ---- Scheduled Messages ----
 
 model ScheduledMessage {
-  id            String    @id @default(cuid())
-  guild         Guild     @relation(fields: [guildId], references: [id])
-  guildId       String
-  channelId     String
-  content       String
-  cronExpr      String // e.g. "0 9 * * 1" (every Monday 9am)
-  lastSentAt    DateTime?
+  id         String    @id @default(cuid())
+  guild      Guild     @relation(fields: [guildId], references: [id])
+  guildId    String
+  channelId  String
+  content    String
+  cronExpr   String // e.g. "0 9 * * 1" (every Monday 9am)
+  lastSentAt DateTime?
 
   @@index([guildId])
 }
@@ -944,39 +1114,39 @@ enum PollBarStyle {
 }
 
 model Poll {
-  id           String           @id @default(cuid())
-  guild        Guild            @relation(fields: [guildId], references: [id])
-  guildId      String
-  channelId    String
-  messageId    String?
-  question     String
-  options      String[] // display labels, indexed by position
-  emojis       String[] // reaction emoji per option, same index as options — what members actually click to vote
+  id                String           @id @default(cuid())
+  guild             Guild            @relation(fields: [guildId], references: [id])
+  guildId           String
+  channelId         String
+  messageId         String?
+  question          String
+  options           String[] // display labels, indexed by position
+  emojis            String[] // reaction emoji per option, same index as options — what members actually click to vote
   // When false (default), each member's single reaction (or their write-in)
   // IS their one answer — picking a different option, or submitting a
   // write-in, replaces whatever they picked before. When true, a member can
   // react to several options and also submit a write-in, all counted at once.
-  allowMultiselect   Boolean          @default(false)
-  color              String?          @default("#00E5FF") // the embed's left border accent
-  barColor           String?          @default("#00E5FF") // the result bar's "primary" (filled) color — preview-only, Discord can't color plain text on the live message
-  barColorSecondary  String?          @default("#99AAB5") // the result bar's "secondary" (empty/remaining) color — same rules as barColor
-  resultsStyle PollResultsStyle @default(BARS)
-  barStyle     PollBarStyle     @default(SOLID)
-  isPrivate    Boolean          @default(false) // hides the tally/percentages in the embed itself until the poll closes
-  durationMode PollDurationMode @default(MANUAL)
-  endsAt       DateTime? // set only when durationMode = TIMER
-  closed       Boolean          @default(false)
-  closedAt     DateTime?
-  allowWriteIn Boolean          @default(false) // adds a "✍️ Write In" button that opens a modal to collect a free-text answer instead of one of the fixed options
+  allowMultiselect  Boolean          @default(false)
+  color             String?          @default("#00E5FF") // the embed's left border accent
+  barColor          String?          @default("#00E5FF") // the result bar's "primary" (filled) color — preview-only, Discord can't color plain text on the live message
+  barColorSecondary String?          @default("#99AAB5") // the result bar's "secondary" (empty/remaining) color — same rules as barColor
+  resultsStyle      PollResultsStyle @default(BARS)
+  barStyle          PollBarStyle     @default(SOLID)
+  isPrivate         Boolean          @default(false) // hides the tally/percentages in the embed itself until the poll closes
+  durationMode      PollDurationMode @default(MANUAL)
+  endsAt            DateTime? // set only when durationMode = TIMER
+  closed            Boolean          @default(false)
+  closedAt          DateTime?
+  allowWriteIn      Boolean          @default(false) // adds a "✍️ Write In" button that opens a modal to collect a free-text answer instead of one of the fixed options
   // Adds a "🔒 Lock In" button — once a member clicks it, their current
   // reaction(s)/write-in are final: further reactions are removed on sight
   // and un-reacting no longer undoes their vote. Requires at least one
   // answer already in before it can be clicked.
-  allowLockIn  Boolean          @default(false)
-  createdAt    DateTime         @default(now())
-  votes        PollVote[]
-  writeIns     PollWriteIn[]
-  submissions  PollSubmission[]
+  allowLockIn       Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  votes             PollVote[]
+  writeIns          PollWriteIn[]
+  submissions       PollSubmission[]
 
   @@index([guildId])
   @@index([messageId])
@@ -1048,24 +1218,24 @@ model Suggestion {
 // ---- Economy ----
 
 model EconomyConfig {
-  id           String  @id @default(cuid())
-  guild        Guild   @relation(fields: [guildId], references: [id])
-  guildId      String  @unique
-  currencyName String  @default("Coins")
-  currencyIcon String  @default("🪙")
-  embedColor   String  @default("#E8C547")
-  maxBalance   Int     @default(1000000000)
+  id           String @id @default(cuid())
+  guild        Guild  @relation(fields: [guildId], references: [id])
+  guildId      String @unique
+  currencyName String @default("Coins")
+  currencyIcon String @default("🪙")
+  embedColor   String @default("#E8C547")
+  maxBalance   Int    @default(1000000000)
 
-  earnOnMessages    Boolean @default(true)
-  messageEarnMin    Int     @default(2)
-  messageEarnMax    Int     @default(6)
-  messageCooldownSec Int    @default(60)
-  minMessageLength  Int     @default(4)
+  earnOnMessages     Boolean @default(true)
+  messageEarnMin     Int     @default(2)
+  messageEarnMax     Int     @default(6)
+  messageCooldownSec Int     @default(60)
+  minMessageLength   Int     @default(4)
 
-  dailyEnabled   Boolean @default(true)
-  dailyAmount    Int     @default(200)
-  streakBonusPerDay Int  @default(0)
-  streakCapDays  Int     @default(7)
+  dailyEnabled      Boolean @default(true)
+  dailyAmount       Int     @default(200)
+  streakBonusPerDay Int     @default(0)
+  streakCapDays     Int     @default(7)
 
   transfersEnabled   Boolean @default(true)
   transferMinAmount  Int     @default(1)
@@ -1074,19 +1244,19 @@ model EconomyConfig {
   channelMultipliers Json @default("[]") // [{ channelId, multiplier }]
   roleMultipliers    Json @default("[]") // [{ roleId, multiplier }]
 
-  maxBet       Int     @default(5000)
+  maxBet Int @default(5000)
 }
 
 model EconomyBalance {
-  id             String    @id @default(cuid())
-  guild          Guild     @relation(fields: [guildId], references: [id])
-  guildId        String
-  userId         String
-  balance        Int       @default(0)
-  totalEarned    Int       @default(0)
-  totalSpent     Int       @default(0)
-  dailyStreak    Int       @default(0)
-  lastDailyClaim DateTime?
+  id                String    @id @default(cuid())
+  guild             Guild     @relation(fields: [guildId], references: [id])
+  guildId           String
+  userId            String
+  balance           Int       @default(0)
+  totalEarned       Int       @default(0)
+  totalSpent        Int       @default(0)
+  dailyStreak       Int       @default(0)
+  lastDailyClaim    DateTime?
   lastMessageEarnAt DateTime?
 
   @@unique([guildId, userId])
@@ -1120,11 +1290,14 @@ model LevelRole {
 // Where level-up announcements post — without this, the bot just posts in
 // whatever channel the XP-earning message happened to be sent in.
 model LevelingSettings {
-  id             String  @id @default(cuid())
-  guild          Guild   @relation(fields: [guildId], references: [id])
-  guildId        String  @unique
+  id             String    @id @default(cuid())
+  guild          Guild     @relation(fields: [guildId], references: [id])
+  guildId        String    @unique
   channelId      String?
-  levelUpMessage String  @default("🎉 {user} just reached **Level {level}**!")
+  levelUpMessage String    @default("🎉 {user} just reached **Level {level}**!")
+  // A server-wide XP boost (Stream Deck's XP Boost dial), e.g. 2x for an hour.
+  xpBoost        Float     @default(1)
+  xpBoostEndsAt  DateTime?
 }
 
 enum XpBlacklistType {
@@ -1170,14 +1343,14 @@ model InviteStat {
 // ---- Modmail ----
 
 model ModmailThread {
-  id         String   @id @default(cuid())
-  guild      Guild    @relation(fields: [guildId], references: [id])
-  guildId    String
-  userId     String
-  channelId  String // staff-side thread channel
-  subject    String?
-  open       Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  guild     Guild    @relation(fields: [guildId], references: [id])
+  guildId   String
+  userId    String
+  channelId String // staff-side thread channel
+  subject   String?
+  open      Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   @@index([guildId, open])
 }
@@ -1219,10 +1392,10 @@ model PlayerReport {
   // events/messageCreate.ts) so it survives even after the channel closes.
   reportNumber Int? // sequential per guild, from PlayerReportSettings.reportCounter — used in the channel name
   messageId    String?
-  channelId    String?    @unique
+  channelId    String?   @unique
   claimedById  String?
   closedAt     DateTime?
-  transcript   Json       @default("[]") // [{ authorTag, authorId, content, attachmentUrls, at }, ...]
+  transcript   Json      @default("[]") // [{ authorTag, authorId, content, attachmentUrls, at }, ...]
 
   createdAt DateTime @default(now())
 
@@ -1274,31 +1447,31 @@ model PermWatchConfig {
 // ---- Channel Locks ----
 
 model ChannelLock {
-  id                String   @id @default(cuid())
-  guild             Guild    @relation(fields: [guildId], references: [id])
+  id                String  @id @default(cuid())
+  guild             Guild   @relation(fields: [guildId], references: [id])
   guildId           String
-  channelId         String   @unique
-  allowImages       Boolean  @default(true)
-  allowLinks        Boolean  @default(true)
-  allowFiles        Boolean  @default(true)
-  allowMessages     Boolean  @default(true) // if false, only images/links/files/commands per the other toggles are allowed through
-  slashCommandsOnly Boolean  @default(false) // deletes every regular message, only slash command usage is untouched
+  channelId         String  @unique
+  allowImages       Boolean @default(true)
+  allowLinks        Boolean @default(true)
+  allowFiles        Boolean @default(true)
+  allowMessages     Boolean @default(true) // if false, only images/links/files/commands per the other toggles are allowed through
+  slashCommandsOnly Boolean @default(false) // deletes every regular message, only slash command usage is untouched
   // When slashCommandsOnly is on and this is non-empty, only these specific
   // slash command names are allowed through — anything else gets refused
   // before it runs (interactions can't be "deleted" the way a message can).
   // Empty means every slash command is allowed, same as before this existed.
-  allowedCommands   Json     @default("[]")
+  allowedCommands   Json    @default("[]")
   // Messages must start with one of these to survive (in addition to
   // whatever the other toggles already allow) — empty means no requirement.
-  requiredPrefixes  Json     @default("[]")
-  bannedWords       Json     @default("[]")
+  requiredPrefixes  Json    @default("[]")
+  bannedWords       Json    @default("[]")
   // A non-empty allowlist restricts who can post a regular message here at
   // all — anyone whose id isn't listed and holds none of the listed roles
   // gets deleted immediately, before the allowImages/allowLinks/etc. checks
   // even run. A bot is just a user id here, same as a member. Empty means
   // no restriction (anyone allowed by the other toggles can post).
-  allowedUserIds    Json     @default("[]")
-  allowedRoleIds    Json     @default("[]")
+  allowedUserIds    Json    @default("[]")
+  allowedRoleIds    Json    @default("[]")
 
   // When a regular message gets deleted for breaking one of the rules
   // above, this posts a small button in-channel; clicking it (only the
@@ -1310,13 +1483,30 @@ model ChannelLock {
   notifyEnabled Boolean @default(false)
   notifyContent String? @default("{user}, that message isn't allowed in {channel}.")
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 // ---- Error Log ----
 // Deliberately not a relation to Guild — an error can happen before a
 // guild row exists (that's sometimes exactly the bug being logged), or
 // entirely outside any guild context (auth failures, startup errors).
+
+// One row per Discord event a bot copy has handled, so two copies running
+// during a deploy don't both act on it (a join welcomed twice).
+model EventClaim {
+  key       String   @id
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Which running copy of the bot is the active one (see apps/bot/src/lib/leader.ts).
+// One row; the active copy refreshes heartbeatAt every few seconds.
+model BotLeader {
+  id          String   @id
+  instanceId  String
+  heartbeatAt DateTime
+}
 
 model ErrorLog {
   id        String   @id @default(cuid())
@@ -1338,11 +1528,11 @@ model ErrorLog {
 // schema change.
 
 model DashboardAccess {
-  id             String   @id @default(cuid())
-  discordUserId  String   @unique
-  username       String // captured at grant time, for the owner's own reference in the UI
-  plan           String   @default("FREE") // FREE | PAID
-  grantedAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  discordUserId String   @unique
+  username      String // captured at grant time, for the owner's own reference in the UI
+  plan          String   @default("FREE") // FREE | PAID
+  grantedAt     DateTime @default(now())
 }
 
 model AccessRequest {
@@ -1375,11 +1565,11 @@ model AccessAuditEntry {
 // no author info attached, numbered sequentially per guild.
 
 model ConfessionSettings {
-  id        String  @id @default(cuid())
-  guild     Guild   @relation(fields: [guildId], references: [id])
-  guildId   String  @unique
-  channelId String?
-  nextNumber Int    @default(1)
+  id         String  @id @default(cuid())
+  guild      Guild   @relation(fields: [guildId], references: [id])
+  guildId    String  @unique
+  channelId  String?
+  nextNumber Int     @default(1)
 }
 
 // ---- Member Milestones ----
@@ -1407,15 +1597,15 @@ model RulesGateSettings {
   roleId       String?
   savedEmbedId String? // shared Embed Creator preset used as the rules message body — supports multiple embeds/fields/images/links; resolved live at post time
 
-  roleToRemoveId String? // e.g. @Unverified — stripped when the member agrees, alongside granting roleId
-  logChannelId    String? // posts a line here each time someone agrees, for an audit trail
+  roleToRemoveId   String? // e.g. @Unverified — stripped when the member agrees, alongside granting roleId
+  logChannelId     String? // posts a line here each time someone agrees, for an audit trail
   dmConfirmEnabled Boolean @default(false)
   dmConfirmMessage String? // falls back to a default when blank; supports {server} token
 
   // Editable copies of the ephemeral replies the "I Agree" button sends —
   // each falls back to a built-in default when blank; all support {server}
-  agreeReplyMessage    String? // sent on a successful agree
-  alreadyAgreedMessage String? // sent when they've already agreed
+  agreeReplyMessage       String? // sent on a successful agree
+  alreadyAgreedMessage    String? // sent when they've already agreed
   noRoleConfiguredMessage String? // sent when the server hasn't set a role to grant yet
 
   // Bumped by the "New Rules Version" action in Settings — revokes roleId
@@ -1426,10 +1616,10 @@ model RulesGateSettings {
   minAccountAgeDays    Int? // reject the agree click if the Discord account is younger than this
   accountTooNewMessage String?
 
-  declineEnabled       Boolean                @default(false)
-  declineAction        RulesGateDeclineAction  @default(NONE)
-  declineChannelId     String? // where to direct them when declineAction = CHANNEL
-  declineReplyMessage  String? // shown after a decline (before a KICK, or instead of one for CHANNEL)
+  declineEnabled      Boolean                @default(false)
+  declineAction       RulesGateDeclineAction @default(NONE)
+  declineChannelId    String? // where to direct them when declineAction = CHANNEL
+  declineReplyMessage String? // shown after a decline (before a KICK, or instead of one for CHANNEL)
 
   reminderEnabled    Boolean @default(false)
   reminderDelayHours Int     @default(24)
@@ -1490,16 +1680,16 @@ model RulesGatePendingMember {
 // apps/api/src/routes/rulesGateSettings.ts), same reasoning as Player Reports'
 // transcript purge — this is evidence staff agreed to the rules.
 model RulesGateAgreement {
-  id        String             @id @default(cuid())
-  settings  RulesGateSettings  @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  id         String            @id @default(cuid())
+  settings   RulesGateSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
   settingsId String
-  guildId   String
-  userId    String
-  username  String // cached at agree time so the trail still reads if the member leaves
-  roleId    String?
-  agreedAt  DateTime @default(now())
-  version   Int      @default(1) // settings.rulesVersion at the time of this agreement
-  sectionId String?  // non-null when this is a per-section acknowledgment, not the main agreement
+  guildId    String
+  userId     String
+  username   String // cached at agree time so the trail still reads if the member leaves
+  roleId     String?
+  agreedAt   DateTime          @default(now())
+  version    Int               @default(1) // settings.rulesVersion at the time of this agreement
+  sectionId  String? // non-null when this is a per-section acknowledgment, not the main agreement
 
   @@index([guildId, agreedAt])
 }
@@ -1541,22 +1731,25 @@ model Reminder {
 // every server it's in. Always exactly one row (id "singleton").
 
 model BotConfig {
-  id              String    @id @default("singleton")
-  username        String?
-  description     String?
-  statusType      String    @default("online") // online | idle | dnd | invisible
-  activityType    String    @default("PLAYING") // PLAYING | WATCHING | LISTENING | COMPETING | CUSTOM
-  activityText    String?
-  lastHeartbeatAt DateTime? // written every ~20s by the running bot process; the dashboard/status channel treat this as stale (offline) after ~60s
-  lastDeployCommit String?  // RENDER_GIT_COMMIT at last boot — comparing this on startup is how a "new deploy" is detected
-  lastDeployAt     DateTime?
-  deployingSince   DateTime? // set right before `prisma migrate deploy` runs, cleared by the next heartbeat — see apps/api/src/routes/botStatus.ts
-  dashboardDeployingSince DateTime? // set the moment a push to main lands (or a Vercel build starts) until it's live everywhere — see apps/api/src/jobs/deployTracker.ts
-  pendingDeployCommit     String?   // the pushed commit sha that Vercel and Render both have to be running before the flag above clears
-  manualStatusOverride String? // "ONLINE" | "OFFLINE" | "MAINTENANCE" | null — null means fully automatic (heartbeat-based). Owner-set, takes precedence over everything else.
-  manualStatusMessage  String? // shown alongside the override everywhere the status appears
+  id                         String    @id @default("singleton")
+  statusPageUrl              String? // public status page link, shown on the sign-in page and in the account menu
+  username                   String?
+  description                String?
+  statusType                 String    @default("online") // online | idle | dnd | invisible
+  activityType               String    @default("PLAYING") // PLAYING | WATCHING | LISTENING | COMPETING | CUSTOM
+  activityText               String?
+  lastHeartbeatAt            DateTime? // written every ~20s by the running bot process; the dashboard/status channel treat this as stale (offline) after ~60s
+  lastDeployCommit           String? // RENDER_GIT_COMMIT at last boot — comparing this on startup is how a "new deploy" is detected
+  lastDeployAt               DateTime?
+  deployingSince             DateTime? // set right before `prisma migrate deploy` runs, cleared by the next heartbeat — see apps/api/src/routes/botStatus.ts
+  dashboardDeployingSince    DateTime? // set the moment a push to main lands (or a Vercel build starts) until it's live everywhere — see apps/api/src/jobs/deployTracker.ts
+  pendingDeployCommit        String? // the pushed commit sha that Vercel and Render both have to be running before the flag above clears
+  manualStatusOverride       String? // "ONLINE" | "OFFLINE" | "MAINTENANCE" | null — null means fully automatic (heartbeat-based). Owner-set, takes precedence over everything else.
+  manualStatusMessage        String? // shown alongside the override everywhere the status appears
+  quickLinks                 Json? // Owner Only → Quick Links (packages/shared/quickLinks.ts); null = the starting set
+  frontPage                  Json? // Owner Only → Front Page: the sign-in page info boxes (packages/shared/frontPage.ts); null = the defaults
   supportServerPickerMessage String? // Support DM Intake: shown when a member shares multiple servers with the module enabled, before any one is picked — account-wide like everything else on this model, since no single server's settings could own it
-  updatedAt       DateTime  @updatedAt
+  updatedAt                  DateTime  @updatedAt
 }
 
 // ---- Server Stat Channels ----
@@ -1595,14 +1788,14 @@ model StatusChannel {
 // Spartacus post about itself" settings for that server.
 
 model AlertSettings {
-  id              String  @id @default(cuid())
-  guild           Guild   @relation(fields: [guildId], references: [id])
-  guildId         String  @unique
-  errorChannelId  String? // new ErrorLog rows for this guild get posted here as an embed
-  errorPingRoleId String? // role mentioned on each error alert, so staff actually get notified
-  errorPingUserId String? // single user mentioned on each error alert (the dashboard's "Ping me" toggle)
-  deployChannelId String? // posted once per new production deploy (detected via RENDER_GIT_COMMIT change)
-  uptimeChannelId String? // a running log of bot went-offline / back-online events, distinct from the live status embed
+  id                  String  @id @default(cuid())
+  guild               Guild   @relation(fields: [guildId], references: [id])
+  guildId             String  @unique
+  errorChannelId      String? // new ErrorLog rows for this guild get posted here as an embed
+  errorPingRoleId     String? // role mentioned on each error alert, so staff actually get notified
+  errorPingUserId     String? // single user mentioned on each error alert (the dashboard's "Ping me" toggle)
+  deployChannelId     String? // posted once per new production deploy (detected via RENDER_GIT_COMMIT change)
+  uptimeChannelId     String? // a running log of bot went-offline / back-online events, distinct from the live status embed
   botUpdatesChannelId String? // mirrors every What's New changelog post (apps/api/src/routes/changelog.ts) here as an embed
 }
 
@@ -1630,6 +1823,10 @@ model AiConfig {
   chatChannelId     String? // null = respond anywhere the bot is @-mentioned
   chatSystemPrompt  String?
   moderationEnabled Boolean @default(false)
+  chatLimit         Int     @default(5) // questions per member per window; 0 = no limit
+  chatLimitWindow   Int     @default(60) // seconds
+  chatStaffExempt   Boolean @default(true) // Manage Server skips the limit
+  chatSlowmode      Int     @default(0) // Discord slowmode (seconds) put on chatChannelId
 }
 
 // ---- Server Backup ----
@@ -1665,28 +1862,61 @@ model CommandToggle {
 // action. discordCommandId is what Discord assigns on registration, needed
 // to update/delete the live command later.
 
+// Command Builder: a /command made from steps (packages/shared/commandBuilder.ts).
 model CustomSlashCommand {
-  id               String  @id @default(cuid())
-  guild            Guild   @relation(fields: [guildId], references: [id])
+  id               String   @id @default(cuid())
+  guild            Guild    @relation(fields: [guildId], references: [id])
   guildId          String
   name             String
   description      String
   discordCommandId String?
-  actionType       String // SEND_MESSAGE | GIVE_ROLE | REMOVE_ROLE | ADD_CURRENCY | POST_EMBED
-  ephemeralReply   Boolean @default(true)
-  messageText      String? // SEND_MESSAGE
-  roleId           String? // GIVE_ROLE / REMOVE_ROLE
-  currencyAmount   Int? // ADD_CURRENCY
-  embedEnabled     Boolean @default(false) // POST_EMBED
-  embedTitle       String?
-  embedDescription String?
-  embedColor       String?
-  buttons          Json    @default("[]")
-  embedExtra       Json?
-  savedEmbedId     String?
+  enabled          Boolean  @default(true)
+  access           String   @default("EVERYONE") // EVERYONE | ROLES | MODS | ADMINS
+  roleIds          Json     @default("[]") // for ROLES
+  channelIds       Json     @default("[]") // only works in these (empty = anywhere)
+  cooldownSec      Int      @default(0)
+  checkPerms       Boolean  @default(true) // the person must have each step's Discord permission
+  skipConfirm      Boolean  @default(false) // risky steps run without "Yes, do it"
+  inputs           Json     @default("[]")
+  steps            Json     @default("[]")
+  reply            String   @default("")
+  replyPublic      Boolean  @default(false)
+  logChannelId     String?
   createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
 
   @@unique([guildId, name])
+}
+
+// Every time a Command Builder command runs: the Command Log.
+model CustomCommandRun {
+  id          String   @id @default(cuid())
+  guildId     String
+  commandId   String?
+  commandName String
+  userId      String
+  inputs      Json     @default("{}")
+  result      String // OK | PARTIAL | FAILED | DENIED | CANCELED
+  details     Json     @default("[]") // one line per step
+  createdAt   DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// Things a command does later: lift a temporary ban, take back a temporary
+// role, or send a message.
+model CommandTimer {
+  id        String   @id @default(cuid())
+  guildId   String
+  kind      String // UNBAN | REMOVE_ROLE | SEND
+  userId    String?
+  roleId    String?
+  channelId String?
+  text      String?
+  runAt     DateTime
+  createdAt DateTime @default(now())
+
+  @@index([runAt])
 }
 
 // ---- LFG (Looking For Group) ----
@@ -1700,27 +1930,27 @@ model CustomSlashCommand {
 // template or a full embed (title/description/color + the shared
 // embedExtra author/thumbnail/image/footer/fields set) — never both.
 model LfgCommand {
-  id                  String   @id @default(cuid())
-  guild               Guild    @relation(fields: [guildId], references: [id])
+  id                  String        @id @default(cuid())
+  guild               Guild         @relation(fields: [guildId], references: [id])
   guildId             String
   trigger             String // used as both the "!trigger" prefix word and the /trigger slash command name
-  description         String   @default("Post that you're looking for a group.") // shown in Discord's slash command picker
+  description         String        @default("Post that you're looking for a group.") // shown in Discord's slash command picker
   discordCommandId    String?
   channelId           String
   roleId              String? // optional role pinged alongside the sender
-  includeSender       Boolean  @default(true)
-  enabled             Boolean  @default(true)
-  mode                String   @default("plain") // "plain" | "embed"
+  includeSender       Boolean       @default(true)
+  enabled             Boolean       @default(true)
+  mode                String        @default("plain") // "plain" | "embed"
   message             String? // plain-text template: {user} {voice} {message}
   embedTitle          String?
   embedDescription    String?
   embedColor          String?
   embedExtra          Json?
   savedEmbedId        String?
-  errorMessage        String   @default("You need to be in a voice channel to use this command.")
-  wrongChannelMessage String   @default("This command can only be used in {channel}.")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  errorMessage        String        @default("You need to be in a voice channel to use this command.")
+  wrongChannelMessage String        @default("This command can only be used in {channel}.")
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
   categories          LfgCategory[]
 
   @@unique([guildId, trigger])
@@ -1732,16 +1962,16 @@ model LfgCommand {
 // and, optionally, its own role ping and announcement text. Anything left
 // blank falls back to the parent command's own setting.
 model LfgCategory {
-  id         String     @id @default(cuid())
-  lfgCommand LfgCommand @relation(fields: [lfgCommandId], references: [id], onDelete: Cascade)
+  id           String     @id @default(cuid())
+  lfgCommand   LfgCommand @relation(fields: [lfgCommandId], references: [id], onDelete: Cascade)
   lfgCommandId String
-  guildId    String
-  name       String
-  channelId  String
-  roleId     String?
-  message    String?
-  sortOrder  Int        @default(0)
-  createdAt  DateTime   @default(now())
+  guildId      String
+  name         String
+  channelId    String
+  roleId       String?
+  message      String?
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
 
   @@unique([lfgCommandId, name])
 }
@@ -1761,16 +1991,16 @@ model LfgCategory {
 // through its own existing channel/message flow — this tracking is only
 // for the preset's own direct send history.
 model EmbedCreatorPreset {
-  id               String   @id @default(cuid())
-  guild            Guild    @relation(fields: [guildId], references: [id])
-  guildId          String
-  name             String
-  data             Json // { content, embeds: [...], components: [...] }
-  lastSentMode     String? // "bot" | "webhook"
-  lastSentChannelId String?
+  id                 String   @id @default(cuid())
+  guild              Guild    @relation(fields: [guildId], references: [id])
+  guildId            String
+  name               String
+  data               Json // { content, embeds: [...], components: [...] }
+  lastSentMode       String? // "bot" | "webhook"
+  lastSentChannelId  String?
   lastSentWebhookUrl String?
-  lastSentMessageId String?
-  createdAt        DateTime @default(now())
+  lastSentMessageId  String?
+  createdAt          DateTime @default(now())
 
   @@unique([guildId, name])
 }
@@ -1789,7 +2019,7 @@ model EmbedComponentAction {
   guildId   String
   kind      String // "button" | "select"
   config    Json // button: {type, roleId?, currencyAmount?, messageText?, embedPresetId?, ephemeral?}
-                  // select: {selectType, defaultAction?, options?: [{value, action}]}
+  // select: {selectType, defaultAction?, options?: [{value, action}]}
   createdAt DateTime @default(now())
 
   @@index([guildId])
@@ -1812,13 +2042,13 @@ model RolePanel {
   channelId    String
   description  String?
   layout       RolePanelLayout @default(BUTTONS)
-  options      Json            @default("[]") // [{ roleId, label, emoji }]
+  options      Json            @default("[]") // [{ roleIds, channelIds, label, emoji, note }]
   messageId    String?
   embedEnabled Boolean         @default(false)
   embedColor   String?
   embedExtra   Json? // author/thumbnail/image/footer/fields — same shape as ReactionRolePanel.embedExtra, kept in sync for UI parity
   savedEmbedId String? // shared Embed Creator preset used as the message body, resolved live at post time
-  notifyMode String @default("PRIVATE")
+  notifyMode   String          @default("PRIVATE")
 
   @@index([guildId])
 }
@@ -1909,38 +2139,38 @@ enum ApplicationPanelLayout {
 }
 
 model ApplicationPanel {
-  id          String                 @id @default(cuid())
-  guild       Guild                  @relation(fields: [guildId], references: [id])
-  guildId     String
-  name        String
-  channelId   String
-  description String?
-  layout      ApplicationPanelLayout @default(BUTTONS)
-  typeIds     Json                   @default("[]") // ordered ApplicationType ids offered on this panel
-  messageId   String?
-  paused      Boolean                @default(false)
+  id           String                 @id @default(cuid())
+  guild        Guild                  @relation(fields: [guildId], references: [id])
+  guildId      String
+  name         String
+  channelId    String
+  description  String?
+  layout       ApplicationPanelLayout @default(BUTTONS)
+  typeIds      Json                   @default("[]") // ordered ApplicationType ids offered on this panel
+  messageId    String?
+  paused       Boolean                @default(false)
   savedEmbedId String? // overrides name/description above with a shared Embed Creator preset, resolved live at send time — the apply button/select row still always posts alongside it
 
   @@index([guildId])
 }
 
 model ApplicationType {
-  id              String   @id @default(cuid())
-  guild           Guild    @relation(fields: [guildId], references: [id])
-  guildId         String
-  name            String
-  emoji           String?
-  description     String?
-  reviewChannelId String?
-  staffRoleIds    Json     @default("[]")
-  questions       Json     @default("[]") // [{ label, style: "SHORT"|"PARAGRAPH", required }] — unlimited, asked one per DM
-  introMessage    String?  // sent as the opening DM before the first question; {type} placeholder
+  id               String   @id @default(cuid())
+  guild            Guild    @relation(fields: [guildId], references: [id])
+  guildId          String
+  name             String
+  emoji            String?
+  description      String?
+  reviewChannelId  String?
+  staffRoleIds     Json     @default("[]")
+  questions        Json     @default("[]") // [{ label, style: "SHORT"|"PARAGRAPH", required }] — unlimited, asked one per DM
+  introMessage     String? // sent as the opening DM before the first question; {type} placeholder
   submittedMessage String? // sent as the DM confirmation once every question is answered; {type} placeholder
-  acceptMessage   String?  @default("🎉 Your application for {type} was accepted!")
-  denyMessage     String?  @default("Your application for {type} was not accepted this time.")
-  customResponses Json     @default("[]") // [{ id, label, message }] — extra buttons on the review embed that just DM the applicant, no status change; capped at 3 in the UI
-  enabled         Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  acceptMessage    String?  @default("🎉 Your application for {type} was accepted!")
+  denyMessage      String?  @default("Your application for {type} was not accepted this time.")
+  customResponses  Json     @default("[]") // [{ id, label, message }] — extra buttons on the review embed that just DM the applicant, no status change; capped at 3 in the UI
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
 
   @@index([guildId])
 }
@@ -1994,15 +2224,15 @@ model ApplicationSettings {
 // Guild-wide text for the Support DM Intake module — the one message that
 // isn't per-flow, since it's sent before the member has picked a flow.
 model SupportSettings {
-  id           String  @id @default(cuid())
-  guild        Guild   @relation(fields: [guildId], references: [id])
-  guildId      String  @unique
-  introMessage String?
-  noFlowsMessage String?
-  alreadyOpenMessage  String? // DM reply when they already have a request in progress (DRAFT/OPEN/CLAIMED)
-  ticketOpenedMessage String? // DM sent right after the question chain finishes and the ticket channel is created
+  id                   String  @id @default(cuid())
+  guild                Guild   @relation(fields: [guildId], references: [id])
+  guildId              String  @unique
+  introMessage         String?
+  noFlowsMessage       String?
+  alreadyOpenMessage   String? // DM reply when they already have a request in progress (DRAFT/OPEN/CLAIMED)
+  ticketOpenedMessage  String? // DM sent right after the question chain finishes and the ticket channel is created
   ticketClaimedMessage String? // DM sent when a staff member claims their ticket
-  ticketClosedMessage String? // DM sent when their ticket is closed
+  ticketClosedMessage  String? // DM sent when their ticket is closed
 }
 
 // ---- Dashboard Activity ----
@@ -2010,6 +2240,16 @@ model SupportSettings {
 // A dashboard user's pinned sidebar links for one server — synced to
 // their account (keyed by Discord user id) rather than the browser, so it
 // follows them between devices the way the rest of the dashboard does.
+// One row per dashboard user (Discord user id): how the dashboard looks for
+// them, saved to their account so it follows them to every device.
+model DashboardUserPrefs {
+  userId       String   @id
+  theme        String   @default("studio") // studio | glass | daylight
+  reduceMotion Boolean  @default(false)
+  displayName  String?
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
 model PinnedModule {
   id        String   @id @default(cuid())
   guild     Guild    @relation(fields: [guildId], references: [id])
@@ -2211,18 +2451,18 @@ model CustomAchievement {
 // DM conversation instead of a panel button in a guild channel.
 
 model SupportFlow {
-  id          String   @id @default(cuid())
-  guild       Guild    @relation(fields: [guildId], references: [id])
-  guildId     String
-  label       String // button text shown in the DM, e.g. "🐛 Bug Report"
-  color       String? @default("#5865F2")
-  categoryId  String? // Discord category the ticket channel is created under
-  roleId      String? // support role pinged when a ticket opens
-  enabled     Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  questions   SupportQuestion[]
-  tickets     SupportTicket[]
-  createdAt   DateTime @default(now())
+  id         String            @id @default(cuid())
+  guild      Guild             @relation(fields: [guildId], references: [id])
+  guildId    String
+  label      String // button text shown in the DM, e.g. "🐛 Bug Report"
+  color      String?           @default("#5865F2")
+  categoryId String? // Discord category the ticket channel is created under
+  roleId     String? // support role pinged when a ticket opens
+  enabled    Boolean           @default(true)
+  sortOrder  Int               @default(0)
+  questions  SupportQuestion[]
+  tickets    SupportTicket[]
+  createdAt  DateTime          @default(now())
 
   @@index([guildId])
 }
@@ -2252,20 +2492,20 @@ enum SupportTicketStatus {
 }
 
 model SupportTicket {
-  id           String              @id @default(cuid())
-  guild        Guild               @relation(fields: [guildId], references: [id])
-  guildId      String
-  flow         SupportFlow         @relation(fields: [flowId], references: [id])
-  flowId       String
-  userId       String // the member's Discord user id (the DM side)
-  channelId    String? // set once the question chain finishes and the ticket channel is created
-  questionIndex Int                @default(0) // which question in the flow they're currently answering
-  answers      Json                @default("[]") // [{ prompt, answer }, ...] in question order
-  transcript   Json                @default("[]") // [{ from: "member"|"staff"|"system", authorTag, content, at }, ...] appended live so it survives the channel being deleted on close
-  status       SupportTicketStatus @default(DRAFT)
-  claimedById  String?
-  createdAt    DateTime            @default(now())
-  closedAt     DateTime?
+  id            String              @id @default(cuid())
+  guild         Guild               @relation(fields: [guildId], references: [id])
+  guildId       String
+  flow          SupportFlow         @relation(fields: [flowId], references: [id])
+  flowId        String
+  userId        String // the member's Discord user id (the DM side)
+  channelId     String? // set once the question chain finishes and the ticket channel is created
+  questionIndex Int                 @default(0) // which question in the flow they're currently answering
+  answers       Json                @default("[]") // [{ prompt, answer }, ...] in question order
+  transcript    Json                @default("[]") // [{ from: "member"|"staff"|"system", authorTag, content, at }, ...] appended live so it survives the channel being deleted on close
+  status        SupportTicketStatus @default(DRAFT)
+  claimedById   String?
+  createdAt     DateTime            @default(now())
+  closedAt      DateTime?
 
   @@index([guildId, status])
   @@index([userId, status])
@@ -2296,63 +2536,55 @@ model MatchPreset {
 // All the rules for one game and format, built step by step on the
 // dashboard. Every setup has its own panel, results channel and leaderboard.
 model MatchSetup {
-  id                   String   @id @default(cuid())
-  guild                Guild    @relation(fields: [guildId], references: [id])
+  id                   String    @id @default(cuid())
+  guild                Guild     @relation(fields: [guildId], references: [id])
   guildId              String
   name                 String
   game                 String
-  enabled              Boolean  @default(true)
-  format               String   @default("SINGLE") // SINGLE | TOURNAMENT
-  teamSize             Int      @default(5)
-  joinMode             String   @default("ASSIGN") // ASSIGN | PICK
-  rosterView           String   @default("PUBLIC") // PUBLIC | HIDDEN until registration closes
-  teamNames            Json     @default("[]") // tournament slots when players pick a team
-  startMode            String   @default("MANUAL") // MANUAL | SCHEDULED | FULL
+  enabled              Boolean   @default(true)
+  teamSize             Int       @default(5)
+  joinMode             String    @default("ASSIGN") // ASSIGN | PICK
+  rosterView           String    @default("PUBLIC") // PUBLIC | HIDDEN until registration closes
+  startMode            String    @default("MANUAL") // MANUAL | SCHEDULED | FULL
   startAt              DateTime?
-  useTimers            Boolean  @default(false)
-  tournamentTeams      Int      @default(4) // 2 to 64, or 0 for no limit
-  flexTeams            Boolean  @default(false) // fit team size to whoever signed up
-  balance              String   @default("BALANCED") // BALANCED | CAPTAINS | RANDOM
-  captainRule          String   @default("TOP") // TOP | RANDOM
-  team1Name            String   @default("Team Blue")
-  team2Name            String   @default("Team Orange")
-  useRanks             Boolean  @default(false)
-  ranks                Json     @default("[]") // lowest to highest
-  scoreName            String   @default("Rounds")
-  useMaps              Boolean  @default(false)
-  mapWord              String   @default("Map")
-  maps                 Json     @default("[]")
-  mapMethod            String   @default("VOTE") // VOTE | RANDOM | BANS
-  mapChoices           Int      @default(3)
-  voteSeconds          Int      @default(0) // whole vote, or each captain's ban turn. 0 has no limit
-  skipRecent           Int      @default(0)
-  checkIn              Boolean  @default(false)
-  checkInSeconds       Int      @default(120)
-  autoMove             Boolean  @default(true)
-  reportBy             String   @default("BOTH") // BOTH | CAPTAIN | STAFF
+  useTimers            Boolean   @default(false)
+  balance              String    @default("BALANCED") // BALANCED | CAPTAINS | RANDOM
+  captainRule          String    @default("TOP") // TOP | RANDOM
+  team1Name            String    @default("Team Blue")
+  team2Name            String    @default("Team Orange")
+  useRanks             Boolean   @default(false)
+  ranks                Json      @default("[]") // lowest to highest
+  scoreName            String    @default("Rounds")
+  useMaps              Boolean   @default(false)
+  mapWord              String    @default("Map")
+  maps                 Json      @default("[]")
+  mapMethod            String    @default("VOTE") // VOTE | RANDOM | BANS
+  mapChoices           Int       @default(3)
+  voteSeconds          Int       @default(0) // whole vote, or each captain's ban turn. 0 has no limit
+  skipRecent           Int       @default(0)
+  checkIn              Boolean   @default(false)
+  checkInSeconds       Int       @default(120)
+  autoMove             Boolean   @default(true)
+  reportBy             String    @default("BOTH") // BOTH | CAPTAIN | STAFF
   lobbyVoiceId         String? // only on older setups, newer ones use the Voice tab's Lobby
   voiceCategoryId      String? // where this setup's temporary voice channels go
-  rewardsEnabled       Boolean  @default(false)
-  teamNaming           String   @default("SET") // SET | CAPTAIN
-  autoStartSeconds     Int      @default(120) // 0 waits for a captain or staff
-  reportMinutes        Int      @default(90) // 0 never chases a missing score
-  noReportAction       String   @default("CANCEL") // CANCEL | ALERT
-  signupMinutes        Int      @default(240) // from the first sign-up, 0 stays open
-  autoReopenHours      Int      @default(24) // tournaments, 0 waits for staff
-  winCoins             Int      @default(100)
-  lossCoins            Int      @default(25)
-  championCoins        Int      @default(500)
-  championRoleId       String?
+  rewardsEnabled       Boolean   @default(false)
+  teamNaming           String    @default("SET") // SET | CAPTAIN
+  autoStartSeconds     Int       @default(120) // 0 waits for a captain or staff
+  reportMinutes        Int       @default(90) // 0 never chases a missing score
+  noReportAction       String    @default("CANCEL") // CANCEL | ALERT
+  signupMinutes        Int       @default(240) // from the first sign-up, 0 stays open
+  winCoins             Int       @default(100)
+  lossCoins            Int       @default(25)
   pingRoleId           String?
   staffRoleId          String?
   panelChannelId       String
   resultsChannelId     String
   panelMessageId       String?
   leaderboardMessageId String?
-  bracketMessageId     String?
-  season               Int      @default(1)
-  nextMatchNumber      Int      @default(1)
-  createdAt            DateTime @default(now())
+  season               Int       @default(1)
+  nextMatchNumber      Int       @default(1)
+  createdAt            DateTime  @default(now())
 
   sessions MatchSession[]
   players  MatchPlayer[]
@@ -2369,7 +2601,7 @@ model MatchSession {
   setupId     String
   guildId     String
   number      Int
-  kind        String // SINGLE | TOURNAMENT
+  kind        String // SINGLE
   phase       String // SIGNUP | CHECKIN | DRAFT | TEAMS | MAP | LIVE | CONFIRM | DONE
   state       Json       @default("{}")
   phaseEndsAt DateTime?
@@ -2382,18 +2614,17 @@ model MatchSession {
 }
 
 model MatchPlayer {
-  id             String     @id @default(cuid())
-  setup          MatchSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
-  setupId        String
-  guildId        String
-  userId         String
-  rank           Int? // index into MatchSetup.ranks
-  rating         Int        @default(1000)
-  wins           Int        @default(0)
-  losses         Int        @default(0)
-  streak         Int        @default(0)
-  tournamentWins Int        @default(0)
-  coinsEarned    Int        @default(0)
+  id          String     @id @default(cuid())
+  setup       MatchSetup @relation(fields: [setupId], references: [id], onDelete: Cascade)
+  setupId     String
+  guildId     String
+  userId      String
+  rank        Int? // index into MatchSetup.ranks
+  rating      Int        @default(1000)
+  wins        Int        @default(0)
+  losses      Int        @default(0)
+  streak      Int        @default(0)
+  coinsEarned Int        @default(0)
 
   @@unique([setupId, userId])
   @@index([setupId, wins])
@@ -2416,10 +2647,10 @@ model MatchResult {
   loserScore  Int
   winners     Json // user ids
   losers      Json
-  winCoins    Int        @default(0) // what was paid, so a void reverses the exact amount
-  lossCoins   Int        @default(0)
-  voided      Boolean    @default(false)
-  createdAt   DateTime   @default(now())
+  winCoins    Int         @default(0) // what was paid, so a void reverses the exact amount
+  lossCoins   Int         @default(0)
+  voided      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
 
   @@index([setupId, createdAt])
   @@index([guildId, createdAt])
@@ -2427,44 +2658,51 @@ model MatchResult {
 
 // The Leaderboard and Matchmaking tabs. One per server, across every game.
 model MatchmakingConfig {
-  id               String    @id @default(cuid())
-  guild            Guild     @relation(fields: [guildId], references: [id])
-  guildId          String    @unique
-  boardChannelId   String?
-  boardGames       Json      @default("[\"ALL\"]") // ALL and/or game names, one post each
-  boardMessages    Json      @default("{}") // posted message id per entry above
-  boardSince       DateTime?
-  boardStyle       String    @default("COMBINED") // COMBINED | SEPARATE
-  enabled          Boolean   @default(false)
-  channelId        String?
-  messageId        String?
-  activityChannelId String? // challenges and match threads, or the board's channel if unset
-  lobbyVoiceId     String?
-  duelCategoryId   String? // where 1v1 voice channels go, or the Lobby's category if unset
-  teamCategoryId   String? // same for team voice channels
-  createVoice      Boolean   @default(true)
-  requireLobby     Boolean   @default(false)
-  voiceSource      String    @default("LOBBY") // LOBBY | ANY
-  voiceReturn      Boolean   @default(true)
-  voicePrivate     Boolean   @default(false)
-  voiceLimit       String    @default("TEAM") // TEAM | EXTRA | NONE
-  voiceExtra       Int       @default(0)
-  voiceNumberPad   Int       @default(1)
-  duelVoiceName    String    @default("{a} vs {b}")
-  teamVoiceName    String    @default("{team}")
-  textRooms        Boolean   @default(true) // each match gets its own temporary text channel
-  textRoomName     String    @default("match-{number}-{a}-vs-{b}")
-  textRoomView     String    @default("PLAYERS") // PLAYERS | ALL
-  roomCloseSeconds Int       @default(60)
-  texts            Json      @default("{}") // custom wording and embed styles, by MATCH_TEXTS key
-  gameTexts        Json      @default("{}") // the same, per game, on top of texts
-  ranked           Boolean   @default(true)
-  games            Json      @default("[]")
-  challengeMinutes Int       @default(5)
-  queueMinutes     Int       @default(60)
-  reportHours      Int       @default(3)
-  staffRoleId      String?
-  nextRoomNumber   Int       @default(1)
+  id                  String    @id @default(cuid())
+  guild               Guild     @relation(fields: [guildId], references: [id])
+  guildId             String    @unique
+  boardChannelId      String?
+  boardGames          Json      @default("[\"ALL\"]") // ALL and/or game names, one post each
+  boardMessages       Json      @default("{}") // posted message id per entry above
+  boardSince          DateTime?
+  boardStyle          String    @default("COMBINED") // COMBINED | SEPARATE
+  enabled             Boolean   @default(false)
+  channelId           String?
+  messageId           String?
+  panelMessages       Json      @default("[]") // each part of the board in order; messageId is the first
+  panelParts          Json      @default("[\"SOLO\",\"TEAM\",\"PICKUP\",\"TOOLS\"]") // which parts show, in order
+  activityChannelId   String? // challenges and match threads, or the board's channel if unset
+  lobbyVoiceId        String?
+  duelCategoryId      String? // where 1v1 voice channels go, or the Lobby's category if unset
+  teamCategoryId      String? // same for team voice channels
+  createVoice         Boolean   @default(true)
+  requireLobby        Boolean   @default(false)
+  voiceSource         String    @default("LOBBY") // LOBBY | ANY
+  voiceReturn         Boolean   @default(true)
+  voicePrivate        Boolean   @default(false)
+  voiceLimit          String    @default("TEAM") // TEAM | EXTRA | NONE
+  voiceExtra          Int       @default(0)
+  voiceNumberPad      Int       @default(1)
+  duelVoiceName       String    @default("{a} vs {b}")
+  teamVoiceName       String    @default("{team}")
+  textRooms           Boolean   @default(true) // each match gets its own temporary text channel
+  textRoomName        String    @default("match-{number}-{a}-vs-{b}")
+  textRoomView        String    @default("PLAYERS") // PLAYERS | ALL
+  roomCloseSeconds    Int       @default(60)
+  texts               Json      @default("{}") // custom wording and embed styles, by MATCH_TEXTS key
+  gameTexts           Json      @default("{}") // the same, per game, on top of texts
+  ranked              Boolean   @default(true)
+  games               Json      @default("[]")
+  challengeMinutes    Int       @default(5)
+  queueMinutes        Int       @default(60)
+  reportHours         Int       @default(3)
+  staffRoleId         String?
+  championRoleId      String? // given to tournament champions for a week
+  playerRoleId        String? // only this role can use the board, tournaments and the Lobby (from /match setup)
+  alertsRoleId        String? // pinged when tournaments open
+  tournamentChannelId String? // where tournament posts go by default
+  setupCategoryId     String? // the category /match setup made
+  nextRoomNumber      Int       @default(1)
 }
 
 // A saved team for one game. Its name is what the team leaderboard tracks.
@@ -2512,30 +2750,34 @@ model MatchChallenge {
 
 // One Matchmaking match: its private thread, voice channels and result.
 model MatchRoom {
-  id          String    @id @default(cuid())
-  guild       Guild     @relation(fields: [guildId], references: [id])
-  guildId     String
-  number      Int
-  kind        String // SOLO | TEAM
-  game        String
-  aName       String
-  bName       String
-  aPlayers    Json
-  bPlayers    Json
-  aCaptain    String
-  bCaptain    String
-  map         String?
-  threadId    String?
-  voiceIds    Json      @default("[]")
-  messageId   String?
-  status      String    @default("LIVE") // LIVE | CONFIRM | DONE | CANCELED
-  reportSide  String?
-  reportHigh  Int?
-  reportLow   Int?
-  reportedBy  String?
-  disputes    Int       @default(0)
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
+  id           String    @id @default(cuid())
+  guild        Guild     @relation(fields: [guildId], references: [id])
+  guildId      String
+  number       Int
+  kind         String // SOLO | TEAM
+  game         String
+  aName        String
+  bName        String
+  aPlayers     Json
+  bPlayers     Json
+  aCaptain     String
+  bCaptain     String
+  map          String?
+  threadId     String?
+  voiceIds     Json      @default("[]")
+  messageId    String?
+  status       String    @default("LIVE") // LIVE | CONFIRM | DONE | CANCELED
+  reportSide   String?
+  reportHigh   Int?
+  reportLow    Int?
+  reportedBy   String?
+  disputes     Int       @default(0)
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+  // Set when the match is part of a tournament bracket.
+  tournamentId String?
+  tieRound     Int?
+  tieIndex     Int?
 
   @@index([guildId, status])
   @@index([status, expiresAt])
@@ -2581,4 +2823,353 @@ model DailyPostEntry {
   createdAt DateTime  @default(now())
 
   @@index([guildId, kind])
+}
+
+// The owner's wording for dashboard explanation text, keyed by where it shows.
+model DashboardText {
+  key       String   @id
+  text      String
+  updatedAt DateTime @updatedAt
+}
+
+// ---- Role Manager ----
+// Give and take roles from the dashboard or /role, in bulk, or for a set
+// time (apps/bot/src/modules/utility/roleManager.ts).
+model RoleManagerConfig {
+  id            String   @id @default(cuid())
+  guildId       String   @unique
+  staffRoleIds  String[] // besides Manage Roles, these can use /role
+  logChannelId  String?
+  hiddenRoleIds String[] // never shown or changed here, e.g. Booster
+}
+
+// A role given for a set time; taken off when it ends.
+model TimedRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roleId    String
+  expiresAt DateTime
+  byUserId  String
+  createdAt DateTime @default(now())
+
+  @@unique([guildId, userId, roleId])
+  @@index([expiresAt])
+}
+
+// One bulk give or take, kept so it can be undone for 24 hours.
+model BulkRoleJob {
+  id         String    @id @default(cuid())
+  guildId    String
+  roleId     String
+  action     String // GIVE | TAKE
+  filter     Json
+  total      Int       @default(0)
+  done       Int       @default(0)
+  failed     Int       @default(0)
+  status     String    @default("RUNNING") // RUNNING | DONE | UNDOING | UNDONE
+  changedIds String[] // members actually changed, for undo
+  byUserId   String
+  byName     String
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([guildId, createdAt])
+}
+
+// Every role change made through Spartacus.
+model RoleChangeLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  username  String
+  roleId    String
+  roleName  String
+  action    String // GIVE | TAKE | EXPIRED
+  source    String // DASHBOARD | DISCORD | BULK | TIMER | UNDO
+  detail    String?
+  byUserId  String?
+  byName    String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// ---- Stream Deck ----
+// A connection key for the Spartacus Stream Deck plugin. Only its SHA-256 is
+// stored; the key itself is shown once when it's made. One key controls one
+// server, acts as the person who made it, and can be cancelled any time.
+model StreamDeckKey {
+  id         String    @id @default(cuid())
+  guildId    String
+  userId     String
+  name       String
+  prefix     String // the first characters, so the dashboard can tell keys apart
+  hash       String    @unique
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([guildId])
+}
+
+// Every Stream Deck press, for the dashboard's history.
+model StreamDeckLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  keyId     String
+  action    String
+  ok        Boolean
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// What a Stream Deck toggle changed, so pressing it again undoes exactly that
+// (channels that were already locked, the old slowmode, a channel's old name).
+model StreamDeckState {
+  id      String @id @default(cuid())
+  guildId String
+  key     String
+  value   Json
+
+  @@unique([guildId, key])
+}
+
+// ---- Profile Cards (/profile) ----
+// What a member picked for their card in one server.
+model ProfileCard {
+  id             String   @id @default(cuid())
+  guildId        String
+  userId         String
+  title          String?
+  bio            String?
+  theme          String?
+  badges         String[] @default([]) // Achievement.type values, up to 3
+  games          String[] @default([])
+  unlockedThemes String[] @default([]) // themes bought with coins
+  updatedAt      DateTime @updatedAt
+
+  @@unique([guildId, userId])
+}
+
+// Per-server Profile Card settings.
+model ProfileCardSettings {
+  id             String   @id @default(cuid())
+  guildId        String   @unique
+  stats          String[] @default(["rank", "voice", "matches", "coins", "invites", "achievements"])
+  allowBios      Boolean  @default(true)
+  // Button panel: an embed in panelChannelId with My card / Someone's card.
+  panelChannelId String?
+  panelMessageId String? // null with a channel set = (re)post it
+  panelTitle     String?
+  panelText      String?
+  panelColor     String?
+  panelPublic    Boolean  @default(false) // cards from the panel: in the channel for everyone, or only the clicker sees them
+}
+
+// ---- Economy Hub (one module: Economy) ----
+// Every toggle and option on the Economy Hub page. One row per server.
+model EconomyPlus {
+  id                 String   @id @default(cuid())
+  guildId            String   @unique
+  levelColors        Boolean  @default(true)
+  levelUpCard        Boolean  @default(true)
+  levelUpCoins       Int      @default(50)
+  keepTopLevelRole   Boolean  @default(true)
+  shopEnabled        Boolean  @default(false)
+  shopLogChannelId   String?
+  shopPanelChannelId String?
+  shopPanelMessageId String?
+  shopPanelTitle     String?
+  shopPanelText      String?
+  cratesEnabled      Boolean  @default(false)
+  crateEveryLevels   Int      @default(5)
+  crateOnStreak      Boolean  @default(true)
+  crateChannelId     String?
+  voiceXpEnabled     Boolean  @default(false)
+  voiceXpPerMin      Int      @default(5)
+  voiceCoinsPer10    Int      @default(3)
+  timezone           String   @default("America/New_York")
+  weekendEnabled     Boolean  @default(false)
+  weekendMult        Float    @default(2)
+  happyEnabled       Boolean  @default(false)
+  happyHour          Int      @default(20)
+  happyMult          Float    @default(1.5)
+  eventChannelId     String?
+  eventState         String? // "weekend" | "happy" | null, so start/end are announced once
+  prestigeBonusPct   Int      @default(10)
+  champsEnabled      Boolean  @default(false)
+  champsChannelId    String?
+  champsRoleId       String?
+  champsCategories   String[] @default(["xp", "coins", "voice", "streak"])
+  lastChampsWeek     String?
+  ladder             Json? // this server's level role ladder; null = defaults
+  ladderRoles        Json? // rung key -> role id, written by /levelroles
+}
+
+model ShopItem {
+  id           String   @id @default(cuid())
+  guildId      String
+  emoji        String   @default("🛒")
+  name         String
+  description  String   @default("")
+  price        Int
+  type         String // ROLE | XP_BOOST | CRATE | STREAK_FREEZE | CUSTOM
+  roleId       String?
+  durationDays Int?
+  boostMult    Float?
+  boostMinutes Int?
+  crateRarity  String?
+  stock        Int? // null = unlimited
+  enabled      Boolean  @default(true)
+  sort         Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([guildId])
+}
+
+model ShopPurchase {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  itemName  String
+  price     Int
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
+}
+
+// Crates, streak freezes and a running XP potion, per member per server.
+model EconomyInventory {
+  id            String    @id @default(cuid())
+  guildId       String
+  userId        String
+  common        Int       @default(0)
+  rare          Int       @default(0)
+  epic          Int       @default(0)
+  legendary     Int       @default(0)
+  streakFreezes Int       @default(0)
+  boostUntil    DateTime?
+  boostMult     Float     @default(1)
+
+  @@unique([guildId, userId])
+}
+
+// Roles bought in the shop for a number of days.
+model EconomyTimedRole {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  roleId    String
+  expiresAt DateTime
+
+  @@unique([guildId, userId, roleId])
+  @@index([expiresAt])
+}
+
+// XP and voice minutes per week, for Weekly Champions.
+model WeeklyStat {
+  id       String @id @default(cuid())
+  guildId  String
+  userId   String
+  week     String // Monday's date in the server's timezone
+  xp       Int    @default(0)
+  voiceMin Int    @default(0)
+
+  @@unique([guildId, userId, week])
+  @@index([guildId, week])
+}
+
+// ---- Matchmaking tournaments ----
+// A bracket for the teams people already have in Matchmaking. Each match runs
+// as a normal match room; the bracket (rounds of ties) lives in `bracket`.
+model MatchTournament {
+  id              String    @id @default(cuid())
+  guildId         String
+  name            String
+  game            String
+  status          String    @default("DRAFT") // DRAFT | OPEN | CHECKIN | LIVE | DONE | CANCELED
+  maxTeams        Int       @default(8) // 4 | 8 | 16 | 32
+  bestOf          String    @default("BO1F3") // BO1 | BO1F3 (final is BO3) | BO3
+  seeding         String    @default("RECORD") // RECORD | RANDOM
+  checkIn         Boolean   @default(true)
+  checkInMinutes  Int       @default(15)
+  soloSignups     Boolean   @default(true)
+  startAt         DateTime?
+  checkInEndsAt   DateTime?
+  channelId       String?
+  messageId       String?
+  pingRoleId      String?
+  rules           String?
+  winCoins        Int       @default(100)
+  championCoins   Int       @default(500)
+  runnerUpCoins   Int       @default(150)
+  championRoleId  String?
+  solo            Json      @default("[]") // players signed up without a team
+  soloReady       Json      @default("[]") // solo players who checked in
+  bracket         Json      @default("[]")
+  championEntryId String?
+  runnerUpEntryId String?
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  endedAt         DateTime?
+
+  entries MatchTournamentEntry[]
+
+  @@index([guildId, status])
+  @@index([status, startAt])
+}
+
+model MatchTournamentEntry {
+  id           String          @id @default(cuid())
+  tournament   MatchTournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournamentId String
+  teamId       String? // the Matchmaking team, or null for a team made from solo players
+  name         String
+  captainId    String
+  players      Json            @default("[]")
+  seed         Int?
+  checkedIn    Boolean         @default(false)
+  out          Boolean         @default(false) // withdrew, removed, or missed check-in
+  createdAt    DateTime        @default(now())
+
+  @@index([tournamentId])
+}
+
+// ---- Playing Now ----
+model PlayingNowConfig {
+  id                String    @id @default(cuid())
+  guildId           String    @unique
+  channelId         String?
+  panelMessageId    String?
+  roleId            String? // shown separately in the member list
+  notifyRoleId      String? // opt-in, pinged when someone's on
+  maxMinutes        Int       @default(120)
+  pingCooldown      Int       @default(20) // minutes between Notify pings
+  endOnVoiceLeave   Boolean   @default(true)
+  modes             Json      @default("[\"Ranked\",\"Quick Match\",\"Unranked\",\"Arcade\",\"Customs\"]")
+  matchmakingButton Boolean   @default(true)
+  lastPingAt        DateTime?
+}
+
+model PlayingNowPost {
+  id        String    @id @default(cuid())
+  guildId   String
+  userId    String
+  mode      String
+  need      Int
+  joined    Json      @default("[]")
+  note      String?
+  voiceId   String?
+  messageId String?
+  endsAt    DateTime
+  endedAt   DateTime?
+  seenVoice Boolean   @default(false)
+  awaySince DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([guildId, endedAt])
+  @@index([endedAt, endsAt])
 }

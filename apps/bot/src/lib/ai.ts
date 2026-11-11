@@ -1,43 +1,71 @@
-import fetch from "node-fetch";
+import Anthropic from "@anthropic-ai/sdk";
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-haiku-4-5-20251001"; // cheapest current model — fine for chat replies and moderation classification
+// Claude Haiku 5.5: the fast, low-cost model, fine for chat replies and for
+// classifying messages. It thinks before answering by default; effort "low"
+// keeps that short (and skips it on easy messages), and max_tokens leaves
+// room for the thinking plus the answer so a reply is never cut off empty.
+const MODEL = "claude-haiku-5-5";
 
-// Both AI_CHAT and AI_MODERATION are opt-in module toggles, but they also
-// require an API key the free-hosting setup doesn't come with — this
-// fails soft (returns null, caller no-ops) rather than crashing the bot
-// or spamming errors for servers that never turned the feature on wrong.
-export async function askClaude(system: string, userMessage: string, maxTokens = 300): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.error("[ai] ANTHROPIC_API_KEY is not set — AI Chat/Moderation features are enabled but can't run.");
-    return null;
+export type AiTurn = Anthropic.MessageParam;
+
+// Why a call didn't produce text, so callers can say something useful
+// instead of always blaming a missing key.
+export type AiFailure = "no_key" | "bad_key" | "no_credit" | "busy" | "refused" | "error";
+export type AiResult = { ok: true; text: string } | { ok: false; reason: AiFailure };
+
+let client: Anthropic | null = null;
+let clientKey = "";
+function getClient(): Anthropic | null {
+  const key = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!key) return null;
+  if (!client || clientKey !== key) {
+    client = new Anthropic({ apiKey: key, maxRetries: 1, timeout: 30_000 });
+    clientKey = key;
   }
+  return client;
+}
 
-  const res = await fetch(ANTHROPIC_API, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+export async function askClaudeTurns(system: string, messages: AiTurn[], maxTokens = 1024): Promise<AiResult> {
+  const c = getClient();
+  if (!c) {
+    console.error("[ai] ANTHROPIC_API_KEY is not set — AI Chat/Moderation are on but can't run.");
+    return { ok: false, reason: "no_key" };
+  }
+  try {
+    const res = await c.messages.create({
       model: MODEL,
       max_tokens: maxTokens,
       system,
-      messages: [{ role: "user", content: userMessage }],
-    }),
-  }).catch(() => null);
+      messages,
+      output_config: { effort: "low" },
+    });
+    if (res.stop_reason === "refusal") return { ok: false, reason: "refused" };
+    // Read the answer by block type: the response can start with a thinking block.
+    const text = res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    return text ? { ok: true, text } : { ok: false, reason: "error" };
+  } catch (err) {
+    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
+      console.error("[ai] Anthropic rejected the API key — check ANTHROPIC_API_KEY in Render.");
+      return { ok: false, reason: "bad_key" };
+    }
+    if (err instanceof Anthropic.BadRequestError && /credit|billing|balance/i.test(err.message)) {
+      console.error("[ai] The Anthropic account is out of credit:", err.message);
+      return { ok: false, reason: "no_credit" };
+    }
+    if (err instanceof Anthropic.RateLimitError || (err instanceof Anthropic.APIError && (err.status === 529 || (err.status ?? 0) >= 500))) {
+      return { ok: false, reason: "busy" };
+    }
+    console.error("[ai] Anthropic request failed:", err instanceof Error ? err.message : err);
+    return { ok: false, reason: "error" };
+  }
+}
 
-  if (!res) {
-    console.error("[ai] Request to Anthropic failed (network error) — AI Chat/Moderation reply will be skipped.");
-    return null;
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error(`[ai] Anthropic API returned ${res.status} ${res.statusText} — check ANTHROPIC_API_KEY is valid. Body: ${body.slice(0, 500)}`);
-    return null;
-  }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
-  return data.content?.find((c) => c.type === "text")?.text ?? null;
+// One question, one answer (used by AI Moderation). Null when it couldn't answer.
+export async function askClaude(system: string, userMessage: string, maxTokens = 1024): Promise<string | null> {
+  const r = await askClaudeTurns(system, [{ role: "user", content: userMessage }], maxTokens);
+  return r.ok ? r.text : null;
 }

@@ -1,10 +1,12 @@
 import { AttachmentBuilder, SlashCommandBuilder } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { generateRankCard } from "../../lib/rankCard";
+import { xpForLevel } from "@spartacus/shared";
 import type { CommandModule } from "../types";
 
+// 100 XP per level: the XP total needed for the next level.
 function xpForNextLevel(level: number) {
-  return 5 * level * level + 50 * level + 100;
+  return xpForLevel(level + 1);
 }
 
 const command: CommandModule = {

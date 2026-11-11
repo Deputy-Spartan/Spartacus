@@ -6,6 +6,7 @@ import { ActivityType, Client, Events, GatewayIntentBits, Options, Partials, typ
 import { logError, prisma } from "@spartacus/db";
 import { commands } from "./commands";
 import { registerCommands } from "./lib/registerCommands";
+import { isLeader, startLeaderLoop, takeLeadership } from "./lib/leader";
 import * as interactionCreate from "./events/interactionCreate";
 import * as messageCreate from "./events/messageCreate";
 import * as guildMemberAdd from "./events/guildMemberAdd";
@@ -38,7 +39,15 @@ import { startMemberMilestonesJob } from "./jobs/memberMilestones";
 import { startRulesGatePosterJob } from "./jobs/rulesGatePoster";
 import { startRulesGateReminderJob } from "./jobs/rulesGateReminder";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
+import { startVerificationReminderJob } from "./jobs/verificationReminder";
+import { startRoleManagerJobs } from "./modules/utility/roleManager";
+import { onVerificationJoin } from "./modules/security/verification";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
+import { startProfilePanelPosterJob } from "./jobs/profilePanelPoster";
+import { startPlayingNowJob } from "./jobs/playingNowJob";
+import { startCommandTimersJob } from "./jobs/commandTimers";
+import { startMessageActivityJob } from "./jobs/messageActivity";
+import { startEconomyJobs } from "./jobs/economyJobs";
 import { startMatchTickerJob } from "./jobs/matchTicker";
 import { startDailyPostsJob } from "./jobs/dailyPosts";
 
@@ -133,6 +142,11 @@ async function sendHeartbeat(client: Client) {
 }
 
 export { commands } from "./commands";
+export { isLeader } from "./lib/leader";
+export { renderProfile } from "./modules/leveling/profile";
+export { postProfilePanel } from "./jobs/profilePanelPoster";
+export { postShopPanel } from "./jobs/economyJobs";
+export { forgetEconomyPlus } from "./lib/economyPlus";
 // Re-exported so apps/api's "Resend Now" button can repost a sticky through
 // the exact same guarded delete+send logic the bot itself uses, instead of
 // a separate raw REST call that the bot's in-memory duplicate-post guards
@@ -152,9 +166,13 @@ export { postRulesGatePanel } from "./jobs/rulesGatePoster";
 export { refreshReactionRolePanel } from "./jobs/reactionRolePoster";
 export { refreshRolePanel } from "./jobs/rolePanelPoster";
 export { bumpRulesVersion } from "./modules/security/rulesGate";
+export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
+export { checkStreamerNow, sendTestAlert } from "./modules/community/goLive";
+export { runStreamDeck, streamDeckFace, streamDeckOptions } from "./modules/utility/streamDeck";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
-export { postVerificationPanel } from "./modules/security/verification";
+export { postVerificationPanel, verifyExistingMembers } from "./modules/security/verification";
+export { changeRole, roleBlockReason, bulkTargets, startBulk, undoBulk, isPowerful, type BulkFilter } from "./modules/utility/roleManager";
 // Same reasoning — apps/api's report-settings route posts/reposts the
 // "Report a Player" panel immediately on save.
 export { postPlayerReportPanel } from "./modules/moderation/playerReports";
@@ -178,6 +196,11 @@ export { syncHoneypotMessage, getHoneypotStats } from "./modules/security/honeyp
 // start a season or void a result through the same queue players' clicks use.
 export { refreshMatchPanel, deleteMatch, matchRoster, voidMatchResult } from "./modules/matches/flow";
 export { cancelRoom, syncMatchmakingPanel } from "./modules/matches/matchmaking";
+// Re-exported so apps/api's Tournaments tab can run a tournament.
+export { openTournament, tournamentCheckIn, startTournamentNow, setTieWinner, removeTournamentEntry, cancelTournament, deleteTournament, refreshTournament } from "./modules/matches/tournaments";
+// Re-exported so apps/api's Playing Now page can post the panel and make roles.
+export { syncPlayingNowPanel, createPlayingNowRoles } from "./modules/engagement/playingNow";
+export { syncTempPanel } from "./modules/community/tempChannelPanel";
 export { startBoardSeason, syncBoard } from "./modules/matches/leaderboard";
 
 export function startBot() {
@@ -213,8 +236,23 @@ export function startBot() {
 
   client.commands = commands;
 
+  // Only the active copy acts on Discord events (see lib/leader.ts). During a
+  // deploy the old copy keeps its connection but stops answering, so nothing
+  // is posted twice. Connection events still go through on every copy.
+  const ALWAYS = new Set<string>([
+    Events.ClientReady, "ready", Events.Error, Events.Warn, Events.Debug, Events.Invalidated, Events.CacheSweep,
+    Events.ShardReady, Events.ShardResume, Events.ShardDisconnect, Events.ShardError, Events.ShardReconnecting,
+  ]);
+  const realEmit = client.emit.bind(client) as (event: string | symbol, ...args: unknown[]) => boolean;
+  client.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (typeof event === "string" && !ALWAYS.has(event) && !isLeader()) return false;
+    return realEmit(event, ...args);
+  }) as typeof client.emit;
+  startLeaderLoop();
+
   client.once("ready", async (c) => {
     console.log(`[bot] Logged in as ${c.user.tag}`);
+    await takeLeadership();
 
     registerCommands()
       .then(({ count, scope }) => console.log(`[bot] Registered ${count} slash command(s) ${scope}.`))
@@ -228,6 +266,7 @@ export function startBot() {
     startGiveawayEnderJob(c);
     startGiveawayPosterJob(c);
     startTicketPanelPosterJob(c);
+    import("./modules/community/tempChannelPanel").then((m) => m.syncAllTempPanels(c)).catch(() => null);
     startRolePanelPosterJob(c);
     startReactionRolePosterJob(c);
     startPollPosterJob(c);
@@ -248,14 +287,20 @@ export function startBot() {
     startRulesGatePosterJob(c);
     startRulesGateReminderJob(c);
     startVerificationPosterJob(c);
+    startVerificationReminderJob(c);
+    startRoleManagerJobs(c);
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
     startDailyPostsJob(c);
     honeypot.startHoneypotMessageJob(c);
+    startProfilePanelPosterJob(c);
+    startPlayingNowJob(c);
+    startCommandTimersJob(c);
+    startMessageActivityJob();
+    startEconomyJobs(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);
-    await tempChannels.sweepTempChannels(c).catch((err) => logError("bot", err));
 
     await applyBotPresence(c);
     setInterval(() => applyBotPresence(c), 30_000);
@@ -293,6 +338,7 @@ export function startBot() {
   client.on(Events.MessageUpdate, logger.onMessageUpdate);
   client.on(Events.GuildMemberAdd, logger.onMemberAdd);
   client.on(Events.GuildMemberAdd, guildMemberAdd.onMemberJoin);
+  client.on(Events.GuildMemberAdd, (m) => void onVerificationJoin(m).catch(() => null));
   client.on(Events.GuildMemberRemove, logger.onMemberRemove);
   client.on(Events.GuildMemberUpdate, logger.onMemberUpdate);
   client.on(Events.VoiceStateUpdate, logger.onVoiceStateUpdate);
@@ -313,12 +359,14 @@ export function startBot() {
   client.on(Events.VoiceStateUpdate, tempChannels.execute);
   client.on(Events.VoiceStateUpdate, voiceActivity.execute);
   client.on(bumpReminder.name, bumpReminder.execute);
+  client.on(Events.MessageUpdate, bumpReminder.onUpdate);
 
   client.on(Events.MessageReactionAdd, reactionRoles.onReactionAdd);
   client.on(Events.MessageReactionRemove, reactionRoles.onReactionRemove);
   client.on(Events.MessageReactionAdd, pollVotes.onReactionAdd);
   client.on(Events.MessageReactionRemove, pollVotes.onReactionRemove);
   client.on(Events.MessageReactionAdd, starboard.execute);
+  client.on(Events.MessageReactionRemove, starboard.onReactionRemove);
 
   client.on(Events.GuildAuditLogEntryCreate, antiNuke.execute);
   client.on(Events.GuildAuditLogEntryCreate, permWatch.execute);

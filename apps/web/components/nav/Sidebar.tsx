@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api, type ModuleState } from "../../lib/api";
 import { usePinnedModules } from "../../lib/usePinnedModules";
+import { hoverPrefetch } from "../../lib/prefetch";
+import { AppIcon } from "../ui/AppIcon";
+import { useSetupStatus } from "../ui/SetupStatus";
 
 // NAV_SECTIONS/NAV_MODULE_KEYS/MODULE_KEY_TO_HREF/OWNER_NAV_SECTION now live
 // in packages/shared/navItems.ts — the bot's !setup-test-server scaffold
@@ -31,7 +34,38 @@ export function Sidebar({
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
+
+  // Owner Only → Quick Links: the pinned sites, listed under that item when
+  // its arrow is open. Reloaded when the Quick Links page saves.
+  const [quickLinks, setQuickLinks] = useState<QuickLinkGroup[]>([]);
+  const [quickOpen, setQuickOpen] = useState(false);
+  useEffect(() => {
+    try {
+      setQuickOpen(localStorage.getItem("spartacus:quick-links-open") === "1");
+    } catch {
+      /* private mode */
+    }
+  }, []);
+  useEffect(() => {
+    if (!isOwner) return;
+    const load = () => api.getQuickLinks().then((r) => setQuickLinks(r.groups)).catch(() => null);
+    load();
+    window.addEventListener(QUICK_LINKS_EVENT, load);
+    return () => window.removeEventListener(QUICK_LINKS_EVENT, load);
+  }, [isOwner]);
+  function toggleQuick() {
+    setQuickOpen((v) => {
+      try {
+        localStorage.setItem("spartacus:quick-links-open", v ? "0" : "1");
+      } catch {
+        /* private mode */
+      }
+      return !v;
+    });
+  }
+  const pinnedQuick = quickLinks.filter((g) => g.pinned && quickLinkMain(g));
   const [modules, setModules] = useState<Record<string, ModuleState> | null>(null);
+  const setup = useSetupStatus(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
 
   useEffect(() => {
@@ -136,7 +170,7 @@ export function Sidebar({
       {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={onClose} aria-hidden="true" />}
       <aside
         className={[
-          "fixed left-0 top-0 h-screen w-64 sm:w-60 bg-base-900 border-r border-white/5 flex flex-col overflow-y-auto z-40",
+          "sp-sidebar fixed left-0 top-0 h-screen w-64 sm:w-60 bg-base-900 border-r border-white/5 flex flex-col overflow-y-auto z-40",
           "transition-transform duration-200",
           open ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
@@ -200,6 +234,7 @@ export function Sidebar({
                             key={rawHref}
                             href={href}
                             onClick={onNavigate}
+                            {...hoverPrefetch(guildId, href)}
                             className={[
                               "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                               active
@@ -215,7 +250,7 @@ export function Sidebar({
                                 active ? "h-5 opacity-100" : "h-0 opacity-0"
                               }`}
                             />
-                            <span>{cat.icon}</span>
+                            <AppIcon emoji={cat.icon} size={22} />
                             <span className="flex-1 min-w-0 truncate">{cat.label}</span>
                           </Link>
                         );
@@ -228,11 +263,12 @@ export function Sidebar({
                     // selected (i.e. the plain All Categories view).
                     const active = pathname === href && (item.href !== "/modules" || !activeSection);
                     const moduleKey = NAV_MODULE_KEYS[item.href];
-                    const enabled = moduleKey ? (modules?.[moduleKey]?.enabled ?? false) : null;
+                    const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
                     const pinned = isPinned(item.href);
+                    const isQuick = item.href === "/quick-links" && section.section === "Owner Only";
                     return (
+                      <Fragment key={`${section.section ?? "top"}:${item.href}`}>
                       <div
-                        key={`${section.section ?? "top"}:${item.href}`}
                         className={[
                           "group relative flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
                           active
@@ -248,13 +284,13 @@ export function Sidebar({
                             active ? "h-5 opacity-100" : "h-0 opacity-0"
                           }`}
                         />
-                        <Link href={href} onClick={onNavigate} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
-                          <span>{item.icon}</span>
+                        <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
+                          <AppIcon emoji={item.icon} size={22} />
                           <span className="flex-1 min-w-0 truncate">{item.label}</span>
                           {enabled !== null && (
                             <span
-                              className={`h-2 w-2 rounded-full shrink-0 ${enabled ? "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]" : "bg-rose-500"}`}
-                              title={enabled ? "Enabled" : "Disabled"}
+                              className={`h-2 w-2 rounded-full shrink-0 ${!enabled ? "bg-rose-500" : setup?.[moduleKey!]?.length ? "bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" : "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]"}`}
+                              title={!enabled ? "Disabled" : setup?.[moduleKey!]?.length ? "Needs setup" : "Enabled"}
                             />
                           )}
                         </Link>
@@ -268,7 +304,36 @@ export function Sidebar({
                         >
                           📌
                         </button>
+                        {isQuick && pinnedQuick.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={toggleQuick}
+                            title={quickOpen ? "Hide links" : "Show links here"}
+                            aria-expanded={quickOpen}
+                            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-[10px] text-slate-500 hover:text-slate-200"
+                          >
+                            {quickOpen ? "▾" : "▸"}
+                          </button>
+                        )}
                       </div>
+                      {isQuick && quickOpen && pinnedQuick.length > 0 && (
+                        <div className="ml-7 pl-2 border-l border-white/10 space-y-0.5">
+                          {pinnedQuick.map((g) => (
+                            <a
+                              key={g.id}
+                              href={quickLinkMain(g) as string}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-400 hover:text-slate-100 hover:bg-base-800/60"
+                            >
+                              <span>{g.icon.startsWith("<") ? "🔗" : g.icon}</span>
+                              <span className="flex-1 min-w-0 truncate">{g.name}</span>
+                              <span className="text-slate-600">↗</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </div>

@@ -62,17 +62,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/birthdays", label: "Birthdays", icon: "🎂", moduleKey: "BIRTHDAYS" },
       { href: "/member-milestones", label: "Member Milestones", icon: "🏅", moduleKey: "MEMBER_MILESTONES" },
       { href: "/confessions", label: "Anonymous", icon: "🤫", moduleKey: "CONFESSIONS" },
-    ],
-  },
-  {
-    section: "Games & Events",
-    items: [
-      { href: "/matches", label: "Matchmaking", icon: "⚔️", moduleKey: "MATCHES" },
-      { href: "/events", label: "Event Scheduler", icon: "📅", moduleKey: "EVENTS" },
-      { href: "/lfg", label: "LFG", icon: "🎮", moduleKey: "LFG" },
-      { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
-      { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
-      { href: "/counting-game", label: "Counting Game", icon: "🔢", moduleKey: "COUNTING_GAME" },
+      { href: "/events", label: "Event Scheduler", icon: "⚔️", moduleKey: "EVENTS" },
+      { href: "/lfg", label: "LFG", icon: "🔊", moduleKey: "LFG" },
     ],
   },
   {
@@ -81,32 +72,23 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/embed-creator", label: "Embed Creator", icon: "🧩", moduleKey: "EMBED_CREATOR" },
       { href: "/announcements", label: "Announcements", icon: "📢", moduleKey: "ANNOUNCEMENTS" },
       { href: "/quote-of-the-day", label: "Quote of the Day", icon: "💭", moduleKey: "QOTD" },
-      { href: "/stream-alerts", label: "Stream Alerts", icon: "🔴", moduleKey: "STREAM_ALERTS" },
+      { href: "/matches", label: "Matchmaking", icon: "⚔️", moduleKey: "MATCHES" },
+      { href: "/playing-now", label: "Playing Now", icon: "🎮", moduleKey: "PLAYING_NOW" },
+      { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
+      { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
+      { href: "/stream-alerts", label: "Going Live", icon: "🔴", moduleKey: "STREAM_ALERTS" },
       { href: "/commands", label: "Custom Commands", icon: "💬", moduleKey: "CUSTOM_COMMANDS" },
+      { href: "/weekly-recap", label: "Weekly Recap", icon: "📊", moduleKey: "WEEKLY_RECAP" },
       { href: "/bump-reminder", label: "Bump Reminder", icon: "⏰", moduleKey: "BUMP_REMINDER" },
+      { href: "/suggestion-analytics", label: "Suggestion Analytics", icon: "💡", moduleKey: "SUGGESTION_ANALYTICS" },
       { href: "/partnerships", label: "Server Partnerships", icon: "🤝" }, // no module toggle of its own
+      { href: "/counting-game", label: "Counting Game", icon: "🔢", moduleKey: "COUNTING_GAME" },
     ],
   },
   {
     section: "Levelling & Economy",
     items: [
-      { href: "/leveling", label: "Leaderboard", icon: "📈", moduleKey: "LEVELING" },
-      { href: "/level-roles", label: "Level Roles", icon: "🏅", moduleKey: "LEVELING" },
-      { href: "/prestige", label: "Prestige", icon: "⭐", moduleKey: "PRESTIGE" },
-      { href: "/achievements", label: "Achievements", icon: "🏆", moduleKey: "ACHIEVEMENTS" },
-      { href: "/economy/settings", label: "Economy Settings", icon: "⚙️", moduleKey: "ECONOMY" },
-      { href: "/economy/earning", label: "Economy Earning", icon: "📈", moduleKey: "ECONOMY" },
-      { href: "/economy/leaderboard", label: "Economy Leaderboard", icon: "🏅", moduleKey: "ECONOMY" },
-      { href: "/economy/analytics", label: "Economy Analytics", icon: "📊", moduleKey: "ECONOMY" },
-    ],
-  },
-  {
-    section: "Insights",
-    items: [
-      { href: "/weekly-recap", label: "Weekly Recap", icon: "📊", moduleKey: "WEEKLY_RECAP" },
-      { href: "/growth-analytics", label: "Growth Analytics", icon: "📉", moduleKey: "GROWTH_ANALYTICS" },
-      { href: "/voice-activity", label: "Voice Activity", icon: "🎙️", moduleKey: "VOICE_ACTIVITY" },
-      { href: "/suggestion-analytics", label: "Suggestion Analytics", icon: "💡", moduleKey: "SUGGESTION_ANALYTICS" },
+      { href: "/economy-hub", label: "Economy Hub", icon: "💰", moduleKey: "ECONOMY" },
     ],
   },
   {
@@ -120,11 +102,13 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     section: "Utility",
     items: [
+      { href: "/role-manager", label: "Role Manager", icon: "🎭", moduleKey: "ROLE_MANAGER" },
       { href: "/channel-locks", label: "Channel Locks", icon: "🔒", moduleKey: "CHANNEL_LOCKS" },
       { href: "/slow-mode", label: "Slow Mode", icon: "🐢", moduleKey: "SLOW_MODE" },
       { href: "/stat-channels", label: "Server Stat Channels", icon: "📈", moduleKey: "STAT_CHANNELS" },
       { href: "/status-channel", label: "Status Channel", icon: "🟢", moduleKey: "STATUS_CHANNEL" },
       { href: "/server-templates", label: "Server Config Templates", icon: "📋", moduleKey: "SERVER_TEMPLATES" },
+      { href: "/growth-analytics", label: "Growth Analytics", icon: "📉", moduleKey: "GROWTH_ANALYTICS" },
     ],
   },
 ];
@@ -137,6 +121,9 @@ export const OWNER_NAV_SECTION: NavSection = {
   items: [
     { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
     { href: "/owner-panel", label: "Command Center", icon: "🔑" },
+    { href: "/stream-deck", label: "Stream Deck", icon: "🎛️" },
+    { href: "/quick-links", label: "Quick Links", icon: "🔗" },
+    { href: "/front-page", label: "Front Page", icon: "🏠" },
     { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],
 };
@@ -165,6 +152,15 @@ export const MODULE_KEY_TO_HREF: Partial<Record<ModuleKey, string>> = {};
 for (const [href, key] of Object.entries(NAV_MODULE_KEYS)) {
   if (!(key in MODULE_KEY_TO_HREF)) MODULE_KEY_TO_HREF[key as ModuleKey] = href;
 }
+// These are tabs of the Economy Hub rather than sidebar pages.
+Object.assign(MODULE_KEY_TO_HREF, {
+  LEVELING: "/economy-hub?tab=levels",
+  PRESTIGE: "/economy-hub?tab=boosts",
+  VOICE_ACTIVITY: "/economy-hub?tab=boosts",
+  ACHIEVEMENTS: "/economy-hub?tab=achievements",
+  PROFILE_CARDS: "/economy-hub?tab=profile",
+  RANK_CARDS: "/economy-hub?tab=levels",
+});
 
 // A handful of modules are meaningfully tied to a voice channel rather than
 // a text one (a stat channel's whole point is a voice channel with a locked

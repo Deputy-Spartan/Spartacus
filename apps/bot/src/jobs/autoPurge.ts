@@ -15,10 +15,13 @@ function shouldSkip(
   if (config.ignoreImages && message.attachments.some((a) => (a.contentType ?? "").startsWith("image/"))) return true;
   if (config.ignoreLinks && URL_PATTERN.test(message.content)) return true;
 
-  const protectedEmojis = Array.isArray(config.protectedEmojis) ? (config.protectedEmojis as string[]) : [];
+  // Server emojis are saved as <:name:id> but reactions report the id, and a
+  // standard emoji may or may not carry the U+FE0F variation selector.
+  const keyOf = (e: string) => (e.match(/^<a?:\w+:(\d+)>$/)?.[1] ?? e).replace(/\uFE0F/g, "");
+  const protectedEmojis = Array.isArray(config.protectedEmojis) ? (config.protectedEmojis as string[]).map(keyOf) : [];
   if (protectedEmojis.length > 0) {
     const hasProtectedReaction = message.reactions.cache.some((r) => {
-      const key = r.emoji.id ?? r.emoji.name ?? "";
+      const key = keyOf(r.emoji.id ?? r.emoji.name ?? "");
       return protectedEmojis.includes(key);
     });
     if (hasProtectedReaction) return true;

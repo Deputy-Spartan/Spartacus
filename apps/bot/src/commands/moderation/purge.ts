@@ -2,6 +2,7 @@ import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { CommandModule } from "../types";
 
 const MAX_TOTAL = 1000;
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 const command: CommandModule = {
   moduleKey: "MODERATION",
@@ -52,6 +53,8 @@ const command: CommandModule = {
       }
 
       if (messages.size < 100) break; // reached the start of the channel's history
+      // Nothing past this point can be bulk-deleted, so don't page the rest of the channel.
+      if (Date.now() - (messages.last()?.createdTimestamp ?? 0) >= FOURTEEN_DAYS_MS) break;
     }
 
     await interaction.editReply(

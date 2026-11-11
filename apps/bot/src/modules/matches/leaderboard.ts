@@ -5,7 +5,7 @@ import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { tallyBoard, type BoardEntry } from "./engine";
-import { withLock } from "./lock";
+import { withLock } from "../../lib/lock";
 import { stringList } from "./render";
 
 const MEDALS = ["🥇", "🥈", "🥉"];

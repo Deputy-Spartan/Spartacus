@@ -4,6 +4,7 @@ import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { isModuleEnabled } from "../lib/moduleGate";
 
 let twitchAppToken: { token: string; expiresAt: number } | null = null;
 
@@ -49,9 +50,13 @@ export function startStreamPollerJob(client: Client) {
 
     let loggedThisTick = 0;
     const uniqueChannels = [...new Set(subs.map((s) => s.channelName.toLowerCase()))];
-    const liveNow = await checkTwitchLive(uniqueChannels).catch(() => new Set<string>());
+    // A failed check says nothing about who's live. Treating it as "everyone
+    // went offline" would announce every streamer again on the next good one.
+    const liveNow = await checkTwitchLive(uniqueChannels).catch(() => null);
+    if (!liveNow) return;
 
     for (const sub of subs) {
+      if (!(await isModuleEnabled(sub.guildId, "STREAM_ALERTS"))) continue;
       const isLive = liveNow.has(sub.channelName.toLowerCase());
 
       if (isLive && !sub.isLive) {

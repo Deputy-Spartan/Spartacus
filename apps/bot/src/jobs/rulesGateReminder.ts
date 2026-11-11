@@ -10,7 +10,7 @@ const DEFAULT_REMINDER =
 // DM after reminderDelayHours. With reminderRepeatEnabled, keeps sending
 // again every week on the chosen weekday/hour (UTC) until they agree.
 // Keyed off RulesGatePendingMember rows created in guildMemberAdd.onMemberJoin
-// and deleted the moment they agree (modules/community/rulesGate.ts).
+// and deleted the moment they agree (modules/security/rulesGate.ts).
 export function startRulesGateReminderJob(client: Client) {
   cron.schedule("*/15 * * * *", async () => {
     const pending = await prisma.rulesGatePendingMember.findMany({ take: 200 });

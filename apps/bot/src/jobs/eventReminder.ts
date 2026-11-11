@@ -3,6 +3,7 @@ import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { isModuleEnabled } from "../lib/moduleGate";
 
 // Runs every minute and checks for events starting within their configured
 // reminder window (15-30 min out) that haven't been reminded yet. One tick
@@ -15,6 +16,7 @@ export function startEventReminderJob(client: Client) {
     const upcoming = await prisma.event.findMany({
       where: { status: "SCHEDULED" },
       include: { signups: { where: { reminded: false } } },
+      orderBy: { startTime: "asc" }, // soonest first, so the batch limit can't starve one
       take: 100, // bounded batch per tick
     });
 
@@ -23,6 +25,7 @@ export function startEventReminderJob(client: Client) {
       const reminderWindowMs = event.reminderMinutesBefore * 60 * 1000;
 
       if (msUntilStart > reminderWindowMs || msUntilStart < 0) continue;
+      if (!(await isModuleEnabled(event.guildId, "EVENTS"))) continue;
 
       const channel = await client.channels.fetch(event.channelId).catch((err) => {
         if (loggedThisTick < 5) { logError("bot", err, event.guildId); loggedThisTick++; }

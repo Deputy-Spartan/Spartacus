@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { CommandModule } from "../types";
 import { logCase } from "../../lib/cases";
+import { moderationBlock } from "../../lib/moderationGuard";
 
 const command: CommandModule = {
   moduleKey: "MODERATION",
@@ -22,6 +23,12 @@ const command: CommandModule = {
     const member = await interaction.guild?.members.fetch(user.id).catch(() => null);
     if (!member) {
       await interaction.reply({ content: "Could not find that member.", ephemeral: true });
+      return;
+    }
+
+    const blocked = (await moderationBlock(interaction, member)) ?? (member.moderatable ? null : "I can't mute that member. Drag my role above theirs.");
+    if (blocked) {
+      await interaction.reply({ content: blocked, ephemeral: true });
       return;
     }
 

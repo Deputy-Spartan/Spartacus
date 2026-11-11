@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 
 const router = Router();
 

@@ -20,14 +20,15 @@ export async function postBirthdayAnnouncement(client: Client, config: BirthdayC
   const mentions = userIds.map((id) => `<@${id}>`).join(", ");
   const message = (config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, mentions);
 
+  const ping = config.pingRoleId ? `<@&${config.pingRoleId}> ` : "";
   const saved = await resolveSavedEmbed(config.savedEmbedId);
   const sent = saved
-    ? await channel.send({ ...(await buildSavedEmbedPayload(config.guildId, saved)), content: prefix || undefined }).catch((err) => {
+    ? await channel.send({ ...(await buildSavedEmbedPayload(config.guildId, saved, { "{user}": mentions })), content: `${prefix}${ping}🎂 ${mentions}` }).catch((err) => {
         logError("bot", err, config.guildId);
         return null;
       })
     : await channel
-        .send({ content: `${prefix}${config.pingRoleId ? `<@&${config.pingRoleId}> ` : ""}${message}` })
+        .send({ content: `${prefix}${ping}${message}` })
         .catch((err) => {
           logError("bot", err, config.guildId);
           return null;

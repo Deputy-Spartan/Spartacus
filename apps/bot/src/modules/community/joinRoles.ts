@@ -1,6 +1,7 @@
 import { Events, GuildMember } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
+import { assignableRoleIds } from "../../lib/memberRoles";
 
 export const name = Events.GuildMemberAdd;
 
@@ -11,5 +12,5 @@ export async function execute(member: GuildMember) {
   const roles = await prisma.joinRole.findMany({ where: { guildId: member.guild.id } });
   if (roles.length === 0) return;
 
-  await member.roles.add(roles.map((r) => r.roleId)).catch(() => null);
+  await member.roles.add(assignableRoleIds(member.guild, roles.map((r) => r.roleId))).catch(() => null);
 }

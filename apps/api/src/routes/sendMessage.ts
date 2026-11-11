@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
-import { buildRestMessagePayload, postChannelMessage } from "../lib/discordRest";
+import { buildRestMessagePayload, getGuildChannels, postChannelMessage } from "../lib/discordRest";
 
 const router = Router();
 
@@ -21,6 +21,9 @@ router.post("/guilds/:guildId/send-message", requireAuth, requireGuildPermission
   };
 
   if (!channelId) return res.status(400).json({ error: "channelId is required" });
+
+  const channels = await getGuildChannels(req.params.guildId);
+  if (!channels.some((c) => c.id === channelId)) return res.status(400).json({ error: "That channel isn't in this server." });
 
   const payload = buildRestMessagePayload({ content, embedEnabled, embedTitle, embedDescription, embedColor, buttons, embedExtra });
   const result = await postChannelMessage(channelId, payload);

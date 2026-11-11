@@ -113,6 +113,8 @@ model Guild {
   matchmakingConfig MatchmakingConfig?
   matchTeams        MatchTeam[]
   matchRooms        MatchRoom[]
+  dailyPostConfigs  DailyPostConfig[]
+  dailyPostEntries  DailyPostEntry[]
   createdAt         DateTime             @default(now())
 }
 
@@ -177,6 +179,7 @@ enum ModuleKey {
   EMBED_CREATOR
   SUPPORT_INTAKE
   MATCHES
+  QOTD
 }
 
 model GrowthSnapshot {
@@ -868,6 +871,32 @@ model HoneypotConfig {
   guild     Guild   @relation(fields: [guildId], references: [id])
   guildId   String  @unique
   channelId String?
+
+  action         String  @default("BAN") // BAN | SOFTBAN | KICK | TIMEOUT
+  timeoutMinutes Int     @default(1440) // only read when action is TIMEOUT
+  deleteMessage  Boolean @default(true) // remove what they posted
+
+  // The warning message that sits in the honeypot channel. Built in the
+  // dashboard's embed editor, stored the way the Embed Creator saves one.
+  messageEnabled  Boolean @default(false)
+  messageId       String?
+  creatorData     Json?
+  savedEmbedId    String?
+  showCounter     Boolean @default(true) // a greyed-out button under the message, like "🍯 Bans: 367"
+  counterScope    String  @default("SERVER") // SERVER | WEEK | GLOBAL
+  showStatsButton Boolean @default(true) // a button that privately shows this server's and all servers' numbers
+}
+
+// One row each time the honeypot removes someone. Counted for the message's
+// counter, the stats button and the dashboard, here and across all servers.
+model HoneypotCatch {
+  id        String   @id @default(cuid())
+  guildId   String
+  userId    String
+  action    String // BAN | SOFTBAN | KICK | TIMEOUT
+  createdAt DateTime @default(now())
+
+  @@index([guildId, createdAt])
 }
 
 // ---- Role Persistence ----
@@ -2510,4 +2539,46 @@ model MatchRoom {
 
   @@index([guildId, status])
   @@index([status, expiresAt])
+}
+
+// ---- Quote of the Day / Question of the Day ----
+// One row per feed (kind), so the two can use different channels, times and
+// messages, or the same ones. The message is stored the way the Embed
+// Creator saves one and is sent with the same builder as a saved embed.
+model DailyPostConfig {
+  id           String  @id @default(cuid())
+  guild        Guild   @relation(fields: [guildId], references: [id])
+  guildId      String
+  kind         String // QUOTE | QUESTION
+  enabled      Boolean @default(false)
+  channelId    String?
+  pingRoleId   String?
+  postTime     String  @default("09:00") // HH:MM on a clock in timeZone
+  timeZone     String  @default("UTC")
+  days         Json    @default("[0,1,2,3,4,5,6]") // 0 = Sunday .. 6 = Saturday
+  order        String  @default("RANDOM") // RANDOM | IN_ORDER
+  useBuiltIn   Boolean @default(true)
+  usedBuiltIn  Json    @default("[]") // built-in list positions already posted this time through
+  createThread Boolean @default(false)
+  creatorData  Json? // { content, embeds, components }, or null for the default message
+  savedEmbedId String?
+  lastPostedOn String? // YYYY-MM-DD in timeZone, so a day is only ever posted once
+  postCount    Int     @default(0)
+
+  @@unique([guildId, kind])
+}
+
+// A server's own quotes or questions. usedAt clears once every entry has had
+// a turn, so nothing repeats until the whole list has been posted.
+model DailyPostEntry {
+  id        String    @id @default(cuid())
+  guild     Guild     @relation(fields: [guildId], references: [id])
+  guildId   String
+  kind      String // QUOTE | QUESTION
+  text      String
+  author    String?
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([guildId, kind])
 }

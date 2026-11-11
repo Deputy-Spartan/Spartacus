@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.post("/guilds/:guildId/commands", requireAuth, requireGuildPermission, as
   res.status(201).json(command);
 });
 
-router.put("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.put("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission, ownedByGuild("customCommand"), async (req, res) => {
   const existing = await prisma.customCommand.findUnique({ where: { id: req.params.id } });
   if (!existing || existing.guildId !== req.params.guildId) {
     return res.status(404).json({ error: "Command not found" });
@@ -82,7 +83,7 @@ router.put("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission,
   res.json(command);
 });
 
-router.delete("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/commands/:id", requireAuth, requireGuildPermission, ownedByGuild("customCommand"), async (req, res) => {
   await prisma.customCommand.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

@@ -58,7 +58,7 @@ import {
 import { buildBracket as bracketEmbed, buildLeaderboard, buildPanel, buildResult, buildRoomNotice, buildRoomWelcome, buildRosters, buildStats, stringList, type PlayerMap } from "./render";
 import { closeVoiceRooms, nameVoiceForMap, openTextRoom, openVoiceRooms, swapRoomAccess } from "./voice";
 import { syncBoard } from "./leaderboard";
-import { withLock } from "./lock";
+import { withLock } from "../../lib/lock";
 import { startServerSetup } from "./serverSetup";
 import { syncMatchmakingPanel, tickMatchmaking } from "./matchmaking";
 

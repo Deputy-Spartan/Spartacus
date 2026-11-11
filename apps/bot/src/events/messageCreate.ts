@@ -34,8 +34,14 @@ export async function execute(message: Message) {
   // only way this is ever reachable at all is typing the exact phrase, and
   // it only does anything for the owner's own account.
   if (message.content.trim() === "!setup-test-server" && isOwner(message.author.id)) {
-    const { runSetupTestServer } = await import("../commands/utility/setupTestServer");
+    const { runSetupTestServer } = await import("../modules/owner/setupTestServer");
     await runSetupTestServer(message);
+    return;
+  }
+  // Same rules: owner only, and never registered with Discord.
+  if (message.content.trim() === "!setup-test-modules" && isOwner(message.author.id)) {
+    const { runSetupTestModules } = await import("../modules/owner/setupTestModules");
+    await runSetupTestModules(message);
     return;
   }
 

@@ -138,7 +138,7 @@ router.put("/guilds/:guildId/rules-gate-settings", requireAuth, requireGuildPerm
 
 // "New Rules Version" — bumps rulesVersion and revokes the role from
 // everyone holding it, so they have to re-agree. See bumpRulesVersion in
-// apps/bot/src/modules/community/rulesGate.ts for the actual revoke/DM logic.
+// apps/bot/src/modules/security/rulesGate.ts for the actual revoke/DM logic.
 router.post("/guilds/:guildId/rules-gate-settings/bump-version", requireAuth, requireGuildPermission, async (req, res) => {
   const client = getBotClient();
   if (!client) {

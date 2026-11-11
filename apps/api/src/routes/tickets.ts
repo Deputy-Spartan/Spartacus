@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 import { buildTicketPanelPayload, postChannelMessage, fetchChannelTranscriptText, postTranscriptMessage } from "../lib/discordRest";
 import { buildMessagePayload } from "../lib/embedCreatorPayload";
 
@@ -74,7 +75,7 @@ router.post("/guilds/:guildId/ticket-panels", requireAuth, requireGuildPermissio
   res.status(201).json({ ...row, messageId: posted.id ?? row.messageId, postError: posted.error });
 });
 
-router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketPanel"), async (req, res) => {
   const { name, layout, typeIds, description, paused, buttonLabel, supportRoleId, savedEmbedId } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
@@ -95,7 +96,7 @@ router.patch("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPerm
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/ticket-panels/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketPanel"), async (req, res) => {
   await prisma.ticketPanel.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
@@ -135,7 +136,7 @@ router.post("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission
   res.status(201).json(row);
 });
 
-router.patch("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketType"), async (req, res) => {
   const fields = [
     "name",
     "emoji",
@@ -156,7 +157,7 @@ router.patch("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermi
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketType"), async (req, res) => {
   await prisma.ticketType.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
@@ -197,7 +198,7 @@ router.get("/guilds/:guildId/tickets/counts", requireAuth, requireGuildPermissio
   res.json({ open, claimed, closed, archived: 0 });
 });
 
-router.patch("/guilds/:guildId/tickets/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/tickets/:id", requireAuth, requireGuildPermission, ownedByGuild("ticket"), async (req, res) => {
   const { status, claimedById, priority, tags, closeReason } = req.body;
   const data: Record<string, unknown> = {};
   if (status !== undefined) data.status = status;
@@ -242,7 +243,7 @@ router.post("/guilds/:guildId/ticket-tags", requireAuth, requireGuildPermission,
   const { name, color } = req.body;
   res.status(201).json(await prisma.ticketTag.create({ data: { guildId: req.params.guildId, name, color: color ?? "#5865F2" } }));
 });
-router.delete("/guilds/:guildId/ticket-tags/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/ticket-tags/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketTag"), async (req, res) => {
   await prisma.ticketTag.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
@@ -256,14 +257,14 @@ router.post("/guilds/:guildId/ticket-canned-responses", requireAuth, requireGuil
   const { title, content } = req.body;
   res.status(201).json(await prisma.ticketCannedResponse.create({ data: { guildId: req.params.guildId, title, content } }));
 });
-router.patch("/guilds/:guildId/ticket-canned-responses/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/ticket-canned-responses/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketCannedResponse"), async (req, res) => {
   const { title, content } = req.body;
   const data: Record<string, unknown> = {};
   if (title !== undefined) data.title = title;
   if (content !== undefined) data.content = content;
   res.json(await prisma.ticketCannedResponse.update({ where: { id: req.params.id }, data }));
 });
-router.delete("/guilds/:guildId/ticket-canned-responses/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/ticket-canned-responses/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketCannedResponse"), async (req, res) => {
   await prisma.ticketCannedResponse.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
@@ -277,14 +278,14 @@ router.post("/guilds/:guildId/ticket-knowledge", requireAuth, requireGuildPermis
   const { name, content } = req.body;
   res.status(201).json(await prisma.ticketKnowledgeBase.create({ data: { guildId: req.params.guildId, name, content } }));
 });
-router.patch("/guilds/:guildId/ticket-knowledge/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/ticket-knowledge/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketKnowledgeBase"), async (req, res) => {
   const { name, content } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
   if (content !== undefined) data.content = content;
   res.json(await prisma.ticketKnowledgeBase.update({ where: { id: req.params.id }, data }));
 });
-router.delete("/guilds/:guildId/ticket-knowledge/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/ticket-knowledge/:id", requireAuth, requireGuildPermission, ownedByGuild("ticketKnowledgeBase"), async (req, res) => {
   await prisma.ticketKnowledgeBase.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

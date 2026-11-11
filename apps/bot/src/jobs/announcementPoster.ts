@@ -12,7 +12,7 @@ import { resolveSavedEmbed, buildSavedEmbedPayload, type SavedEmbedData } from "
 // (apps/api's announcements route, via getBotClient()), so a manual publish
 // goes through the exact same module-enabled check and payload-building as
 // a scheduled one instead of a separate raw-REST path.
-export async function publishAnnouncement(client: Client, announcementId: string): Promise<{ ok: boolean; error?: string }> {
+export async function publishAnnouncement(client: Client, announcementId: string, options: { giveUpOnFailure?: boolean } = {}): Promise<{ ok: boolean; error?: string }> {
   const announcement = await prisma.announcement.findUnique({ where: { id: announcementId } });
   if (!announcement) return { ok: false, error: "Announcement not found" };
   if (announcement.sentAt) return { ok: false, error: "This announcement was already published." };
@@ -48,6 +48,9 @@ export async function publishAnnouncement(client: Client, announcementId: string
     logError("bot", err, announcement.guildId);
     return null;
   });
+  // Left unsent so "Publish Now" can retry. The schedule gives up instead of
+  // retrying a rejected message every minute.
+  if (!sent && !options.giveUpOnFailure) return { ok: false, error: "Discord rejected the message — check the channel and try again." };
   await prisma.announcement.update({ where: { id: announcement.id }, data: { sentAt: new Date(), messageId: sent?.id ?? null } });
 
   return sent ? { ok: true } : { ok: false, error: "Discord rejected the message — check the channel and try again." };
@@ -67,7 +70,7 @@ export function startAnnouncementPosterJob(client: Client) {
     });
 
     for (const announcement of due) {
-      await publishAnnouncement(client, announcement.id);
+      await publishAnnouncement(client, announcement.id, { giveUpOnFailure: true });
     }
   });
 }

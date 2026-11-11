@@ -254,6 +254,11 @@ export async function handleApplicationReview(interaction: ButtonInteraction, ap
 // afterward. Any staff member can use these (unlike Accept/Deny, which
 // requires Manage Guild) since they don't decide the outcome.
 export async function handleApplicationCustomResponse(interaction: ButtonInteraction, applicationId: string, indexStr: string) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    await interaction.reply({ content: "You don't have permission to review applications.", ephemeral: true });
+    return;
+  }
+
   const application = await prisma.application.findUnique({ where: { id: applicationId } });
   if (!application) {
     await interaction.reply({ content: "This application no longer exists.", ephemeral: true });

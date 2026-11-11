@@ -1,4 +1,4 @@
-import { ChannelType, Events, VoiceState } from "discord.js";
+import { ChannelType, Client, Events, VoiceState } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 
@@ -15,9 +15,45 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
 
   if (newState.channelId && newState.channelId !== oldState.channelId) {
     await handleJoin(newState);
+    await syncTextAccess(newState, true);
   }
   if (oldState.channelId && oldState.channelId !== newState.channelId) {
+    await syncTextAccess(oldState, false);
     await handleLeaveCheck(oldState);
+  }
+}
+
+// A hidden paired text channel follows whoever is in the voice channel.
+async function syncTextAccess(state: VoiceState, joined: boolean) {
+  const { member } = state;
+  if (!state.channelId || !member) return;
+  const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId: state.channelId } });
+  if (!instance?.textChannelId || instance.ownerId === member.id) return;
+  const lobby = await prisma.tempChannelLobby.findUnique({ where: { id: instance.lobbyId } });
+  if (!lobby?.hideTextFromNonMembers) return;
+
+  const text = await state.guild.channels.fetch(instance.textChannelId).catch(() => null);
+  if (!text || !("permissionOverwrites" in text)) return;
+  if (joined) await text.permissionOverwrites.edit(member, { ViewChannel: true }).catch(() => null);
+  else await text.permissionOverwrites.delete(member).catch(() => null);
+}
+
+// Delete timers live in memory, so a room that emptied around a restart has
+// nothing left to clean it up. Runs once when the bot starts.
+export async function sweepTempChannels(client: Client) {
+  const instances = await prisma.tempChannelInstance.findMany();
+  for (const instance of instances) {
+    const guild = client.guilds.cache.get(instance.guildId);
+    if (!guild) continue;
+    const channel = await guild.channels.fetch(instance.channelId).catch(() => null);
+    if (channel?.isVoiceBased() && channel.members.size > 0) continue;
+
+    await channel?.delete().catch(() => null);
+    if (instance.textChannelId) {
+      const text = await guild.channels.fetch(instance.textChannelId).catch(() => null);
+      await text?.delete().catch(() => null);
+    }
+    await prisma.tempChannelInstance.delete({ where: { id: instance.id } }).catch(() => null);
   }
 }
 

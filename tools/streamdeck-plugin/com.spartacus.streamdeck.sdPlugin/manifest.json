@@ -1,0 +1,764 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.spartacus.streamdeck",
+  "Name": "Spartacus",
+  "Version": "1.0.0.0",
+  "Author": "Spartacus",
+  "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
+  "Category": "Spartacus",
+  "CategoryIcon": "imgs/plugin/category",
+  "Icon": "imgs/plugin/icon",
+  "URL": "https://spartc.us",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 2,
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    },
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    }
+  ],
+  "Nodejs": {
+    "Version": "20",
+    "Debug": "enabled"
+  },
+  "Actions": [
+    {
+      "UUID": "com.spartacus.streamdeck.raid",
+      "Name": "Raid Lockdown",
+      "Icon": "imgs/actions/raid",
+      "Tooltip": "Read-only chat and paused invites. Press again to undo.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/raid",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.safe",
+      "Name": "Stream Safe Mode",
+      "Icon": "imgs/actions/safe",
+      "Tooltip": "Pauses invites and turns on slowmode while you stream.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/safe",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.golive",
+      "Name": "Go Live",
+      "Icon": "imgs/actions/golive",
+      "Tooltip": "Live Indicator, Stream Safe and your Go Live post in one press.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/golive",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.liveind",
+      "Name": "Live Indicator",
+      "Icon": "imgs/actions/liveind",
+      "Tooltip": "Renames a channel to 🔴 LIVE while you stream.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/liveind",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.post",
+      "Name": "Go Live Post",
+      "Icon": "imgs/actions/post",
+      "Tooltip": "Posts a saved embed with a role ping.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/post",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.bump",
+      "Name": "Bump Timer",
+      "Icon": "imgs/actions/bump",
+      "Tooltip": "Live countdown. Press to send the bump message.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/bump",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.lock",
+      "Name": "Lock Channel",
+      "Icon": "imgs/actions/lock",
+      "Tooltip": "Locks or unlocks a channel.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/lock",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.slow",
+      "Name": "Slowmode",
+      "Icon": "imgs/actions/slow",
+      "Tooltip": "Off, 5s, 10s, 30s, 1m.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/slow",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.module",
+      "Name": "Module Switch",
+      "Icon": "imgs/actions/module",
+      "Tooltip": "Turns a module on or off.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/module",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.role",
+      "Name": "My Role",
+      "Icon": "imgs/actions/role",
+      "Tooltip": "Gives you a role or takes it away.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/role",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.squadlock",
+      "Name": "Lock My Squad",
+      "Icon": "imgs/actions/squadlock",
+      "Tooltip": "Locks the voice channel you're in.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/squadlock",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.mute",
+      "Name": "Mute Squad",
+      "Icon": "imgs/actions/mute",
+      "Tooltip": "Mutes everyone in your voice channel but you.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/mute",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.pull",
+      "Name": "Pull My Squad",
+      "Icon": "imgs/actions/pull",
+      "Tooltip": "Moves everyone from a lobby into your channel.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/pull",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.newsquad",
+      "Name": "New Squad",
+      "Icon": "imgs/actions/newsquad",
+      "Tooltip": "Makes a temp squad for a game and moves you in.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/newsquad",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.online",
+      "Name": "Online",
+      "Icon": "imgs/actions/online",
+      "Tooltip": "Live online count.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/online",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.tickets",
+      "Name": "Open Tickets",
+      "Icon": "imgs/actions/tickets",
+      "Tooltip": "Count. Press to open the Tickets page.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/tickets",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.claim",
+      "Name": "Claim Ticket",
+      "Icon": "imgs/actions/claim",
+      "Tooltip": "Claims the oldest waiting ticket.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/claim",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.apps",
+      "Name": "Applications",
+      "Icon": "imgs/actions/apps",
+      "Tooltip": "Count. Press to open them.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/apps",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.giveaway",
+      "Name": "Giveaway",
+      "Icon": "imgs/actions/giveaway",
+      "Tooltip": "Starts a giveaway and counts down.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/giveaway",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.purge",
+      "Name": "Clear Chat",
+      "Icon": "imgs/actions/purge",
+      "Tooltip": "Deletes the last few messages.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/purge",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.poll",
+      "Name": "Quick Poll",
+      "Icon": "imgs/actions/poll",
+      "Tooltip": "Posts a 👍 / 👎 poll.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/poll",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.say",
+      "Name": "Say",
+      "Icon": "imgs/actions/say",
+      "Tooltip": "Posts a message as Spartacus.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/say",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.shout",
+      "Name": "Shoutout",
+      "Icon": "imgs/actions/shout",
+      "Tooltip": "Posts a shoutout card for a streamer.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/shout",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.event",
+      "Name": "Start Event",
+      "Icon": "imgs/actions/event",
+      "Tooltip": "Starts your next event and pings sign-ups.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/event",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.sticky",
+      "Name": "Resend Sticky",
+      "Icon": "imgs/actions/sticky",
+      "Tooltip": "Moves a sticky back to the bottom.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/sticky",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.status",
+      "Name": "My Status",
+      "Icon": "imgs/actions/status",
+      "Tooltip": "Live, Be right back, Offline.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/status",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.botstat",
+      "Name": "Bot Status",
+      "Icon": "imgs/actions/botstat",
+      "Tooltip": "Is Spartacus online, and its ping.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/botstat",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dslow",
+      "Name": "Slowmode Dial",
+      "Icon": "imgs/actions/dslow",
+      "Tooltip": "Turn for seconds. Press to turn it off.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dslow",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dslow",
+        "TriggerDescription": {
+          "Rotate": "Slowmode seconds",
+          "Push": "Turn it off"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dlimit",
+      "Name": "Squad Limit Dial",
+      "Icon": "imgs/actions/dlimit",
+      "Tooltip": "Turn for your voice channel's limit. Press to lock.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dlimit",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dlimit",
+        "TriggerDescription": {
+          "Rotate": "User limit",
+          "Push": "Lock or unlock"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dlock",
+      "Name": "Channel Lock Dial",
+      "Icon": "imgs/actions/dlock",
+      "Tooltip": "Turn to pick a channel. Press to lock or unlock it.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dlock",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dlock",
+        "TriggerDescription": {
+          "Rotate": "Pick a channel",
+          "Push": "Lock or unlock"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dstats",
+      "Name": "Live Stats Dial",
+      "Icon": "imgs/actions/dstats",
+      "Tooltip": "Turn to flip between live counts.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dstats",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dstats",
+        "TriggerDescription": {
+          "Rotate": "Next stat",
+          "Push": "Refresh",
+          "Touch": "Next stat"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dtimer",
+      "Name": "Quick Timer Dial",
+      "Icon": "imgs/actions/dtimer",
+      "Tooltip": "Turn for minutes, tap for giveaway or poll, press to start.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dtimer",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dtimer",
+        "TriggerDescription": {
+          "Rotate": "Minutes",
+          "Push": "Start",
+          "Touch": "Giveaway or poll"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dxp",
+      "Name": "XP Boost Dial",
+      "Icon": "imgs/actions/dxp",
+      "Tooltip": "Turn 1x to 3x. Press for an hour of boosted XP.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dxp",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dxp",
+        "TriggerDescription": {
+          "Rotate": "1x to 3x",
+          "Push": "Start an hour"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dpurge",
+      "Name": "Clear Chat Dial",
+      "Icon": "imgs/actions/dpurge",
+      "Tooltip": "Turn for how many. Press twice to clear.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dpurge",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dpurge",
+        "TriggerDescription": {
+          "Rotate": "How many",
+          "Push": "Clear (press twice)"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dmm",
+      "Name": "Matchmaking Dial",
+      "Icon": "imgs/actions/dmm",
+      "Tooltip": "Press to open or close matchmaking.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dmm",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dmm",
+        "TriggerDescription": {
+          "Rotate": "—",
+          "Push": "Open or close"
+        }
+      },
+      "UserTitleEnabled": false
+    }
+  ]
+}

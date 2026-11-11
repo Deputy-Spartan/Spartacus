@@ -22,7 +22,7 @@ export function startRemindersJob(client: Client) {
       if (!dmSent) {
         const channel = await client.channels.fetch(reminder.channelId).catch(() => null);
         if (channel && channel.isTextBased() && !channel.isDMBased() && "send" in channel) {
-          await channel.send(`<@${reminder.userId}> ${content}`).catch(() => null);
+          await channel.send({ content: `<@${reminder.userId}> ${content}`, allowedMentions: { users: [reminder.userId] } }).catch(() => null);
         }
       }
 

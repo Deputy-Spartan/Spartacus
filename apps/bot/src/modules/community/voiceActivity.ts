@@ -37,6 +37,10 @@ export async function execute(oldState: VoiceState, newState: VoiceState) {
     });
     if (!existing) {
       await prisma.voiceSession.create({ data: { guildId, userId: member.id } });
+    } else if (!oldState.channelId) {
+      // A fresh join, so they left while the bot was offline. Counting from
+      // the old start would add all the time they were gone.
+      await prisma.voiceSession.update({ where: { id: existing.id }, data: { joinedAt: new Date() } });
     }
   }
 

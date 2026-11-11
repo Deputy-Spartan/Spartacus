@@ -1,9 +1,7 @@
-import { Events, GuildMember, PartialGuildMember } from "discord.js";
+import { GuildMember, PartialGuildMember } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
-
-export const saveName = Events.GuildMemberRemove;
-export const restoreName = Events.GuildMemberAdd;
+import { assignableRoleIds } from "../../lib/memberRoles";
 
 export async function onLeave(member: GuildMember | PartialGuildMember) {
   const enabled = await isModuleEnabled(member.guild.id, "ROLE_PERSISTENCE");
@@ -26,5 +24,5 @@ export async function onRejoin(member: GuildMember) {
   const snapshot = await prisma.roleSnapshot.findUnique({ where: { guildId_userId: { guildId: member.guild.id, userId: member.id } } });
   if (!snapshot) return;
 
-  await member.roles.add(snapshot.roleIds).catch(() => null);
+  await member.roles.add(assignableRoleIds(member.guild, snapshot.roleIds)).catch(() => null);
 }

@@ -1,5 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { moderationBlock } from "../../lib/moderationGuard";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -21,7 +22,31 @@ const command: CommandModule = {
       return;
     }
 
-    const roleIds = member.roles.cache.filter((r) => r.id !== interaction.guild?.roles.everyone.id).map((r) => r.id);
+    const blocked = await moderationBlock(interaction, member);
+    if (blocked) {
+      await interaction.reply({ content: blocked, ephemeral: true });
+      return;
+    }
+
+    // A second record would store no roles and /release would restore that one.
+    const active = await prisma.quarantineRecord.findFirst({ where: { guildId: interaction.guildId as string, userId: user.id, active: true } });
+    if (active) {
+      await interaction.reply({ content: "This member is already quarantined.", ephemeral: true });
+      return;
+    }
+
+    // Booster and integration roles can't be removed, and including one fails the whole change.
+    const managed = member.roles.cache.filter((r) => r.managed).map((r) => r.id);
+    const roleIds = member.roles.cache.filter((r) => r.id !== interaction.guild?.roles.everyone.id && !r.managed).map((r) => r.id);
+
+    const stripped = await member.roles.set(managed).then(
+      () => true,
+      () => false
+    );
+    if (!stripped) {
+      await interaction.reply({ content: "I couldn't remove their roles. Drag my role above theirs.", ephemeral: true });
+      return;
+    }
 
     await prisma.quarantineRecord.create({
       data: {
@@ -33,7 +58,6 @@ const command: CommandModule = {
       },
     });
 
-    await member.roles.set([]).catch(() => null);
     await interaction.reply(`⚠️ Quarantined **${user.tag}** — ${reason}. Use /release to restore their roles.`);
   },
 };

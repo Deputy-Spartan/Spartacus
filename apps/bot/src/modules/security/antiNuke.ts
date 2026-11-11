@@ -22,6 +22,7 @@ export async function execute(entry: GuildAuditLogsEntry, guild: Guild) {
   const enabled = await isModuleEnabled(guild.id, "ANTI_NUKE");
   if (!enabled) return;
   if (!entry.executorId) return;
+  if (entry.executorId === guild.client.user.id || entry.executorId === guild.ownerId) return;
 
   const isBan = entry.action === AuditLogEvent.MemberBanAdd;
   const isChannelDelete = entry.action === AuditLogEvent.ChannelDelete;
@@ -37,9 +38,13 @@ export async function execute(entry: GuildAuditLogsEntry, guild: Guild) {
   if (count < threshold) return;
 
   const actor = await guild.members.fetch(entry.executorId).catch(() => null);
-  if (actor && config.stripRolesOnTrigger) {
-    const strippable = actor.roles.cache.filter((r) => r.id !== guild.roles.everyone.id);
-    await actor.roles.remove(strippable).catch(() => null);
+  let outcome = "";
+  if (config.stripRolesOnTrigger) {
+    // A bot's own role can't be removed, and including it fails the whole change.
+    const roles = actor?.roles.cache.filter((r) => r.id !== guild.roles.everyone.id);
+    const strippable = roles?.filter((r) => r.editable && !r.managed);
+    const stripped = strippable ? await actor!.roles.remove(strippable).then(() => true, () => false) : false;
+    outcome = stripped && strippable?.size === roles?.size ? "\nTheir roles have been stripped." : "\n⚠️ I couldn't strip all of their roles. Deal with them by hand now.";
   }
 
   if (config.alertChannelId) {
@@ -52,8 +57,7 @@ export async function execute(entry: GuildAuditLogsEntry, guild: Guild) {
               .setColor(0xfb7185)
               .setTitle("🚨 Anti-Nuke triggered")
               .setDescription(
-                `<@${entry.executorId}> performed ${count} ${isBan ? "bans" : "channel deletions"} in under a minute.` +
-                  (config.stripRolesOnTrigger ? "\nTheir roles have been stripped." : "")
+                `<@${entry.executorId}> performed ${count} ${isBan ? "bans" : "channel deletions"} in under a minute.${outcome}`
               )
               .setTimestamp(),
           ],

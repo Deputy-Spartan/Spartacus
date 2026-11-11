@@ -56,8 +56,9 @@ function linkButtonsRow(buttons: unknown) {
 // plus an optional second row of link buttons. The embed toggle controls
 // only whether the decorative info card renders vs a plain-text summary;
 // RSVP still works either way.
-export function buildEventPayload(event: EventLike): BaseMessageOptions {
+export function buildEventPayload(event: EventLike, signups: Array<{ userId: string; role: string }> = []): BaseMessageOptions {
   const roles = parseEnabledRoles(event.enabledRoles);
+  const signedUp = (role: RsvpRole) => signups.filter((s) => s.role === role).map((s) => `<@${s.userId}>`).join("\n").slice(0, 1024) || "—";
   const rows = [rsvpRow(event.id, roles), linkButtonsRow(event.buttons)].filter(
     (r): r is ActionRowBuilder<ButtonBuilder> => r !== null
   );
@@ -73,7 +74,7 @@ export function buildEventPayload(event: EventLike): BaseMessageOptions {
     .setDescription(event.description ?? "No description provided.")
     .addFields(
       { name: "🕒 Starts", value: `<t:${Math.floor(event.startTime.getTime() / 1000)}:F>`, inline: true },
-      ...roles.map((role) => ({ name: RSVP_ROLE_META[role].fieldName, value: "—", inline: true }))
+      ...roles.map((role) => ({ name: RSVP_ROLE_META[role].fieldName, value: signedUp(role), inline: true }))
     )
     .setFooter({ text: "Spartacus Event Coordination" });
   applyEmbedExtra(embed, event.embedExtra);

@@ -30,6 +30,9 @@ const command: CommandModule = {
 
 export default command;
 
+// The buttons come off once someone is right, but two clicks can land first.
+const answered = new Set<string>();
+
 export async function handleTriviaAnswer(
   interaction: import("discord.js").ButtonInteraction,
   correctIndex: number,
@@ -40,9 +43,19 @@ export async function handleTriviaAnswer(
   const correct = correctIndex === chosenIndex;
 
   if (correct) {
+    if (answered.has(interaction.message.id)) {
+      await interaction.reply({ content: "Someone already got that one.", ephemeral: true });
+      return;
+    }
+    if (answered.size > 1000) answered.clear();
+    answered.add(interaction.message.id);
     const config = await getConfig(interaction.guildId);
     await addBalance(interaction.guildId, interaction.user.id, reward, "trivia", config.maxBalance);
-    await interaction.reply(`✅ Correct! You earned **${reward} ${config.currencyName}**.`);
+    await interaction.update({
+      content: `${interaction.message.content}\n✅ ${interaction.user} got it and earned **${reward} ${config.currencyName}**.`,
+      components: [],
+      allowedMentions: { parse: [] },
+    });
   } else {
     await interaction.reply({ content: "❌ Not quite — try the next one!", ephemeral: true });
   }

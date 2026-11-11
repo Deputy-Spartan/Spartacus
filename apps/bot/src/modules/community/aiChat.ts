@@ -11,7 +11,7 @@ const DEFAULT_SYSTEM_PROMPT =
 
 export async function execute(message: Message) {
   if (message.author.bot || !message.guildId || !message.client.user) return;
-  if (!message.mentions.has(message.client.user)) return;
+  if (!message.mentions.has(message.client.user, { ignoreEveryone: true, ignoreRoles: true })) return;
 
   const enabled = await isModuleEnabled(message.guildId, "AI_CHAT");
   if (!enabled) return;
@@ -28,7 +28,7 @@ export async function execute(message: Message) {
   const reply = await askClaude(config?.chatSystemPrompt || DEFAULT_SYSTEM_PROMPT, content);
 
   if (reply) {
-    await message.reply(reply.slice(0, 2000)).catch(() => null);
+    await message.reply({ content: reply.slice(0, 2000), allowedMentions: { parse: [] } }).catch(() => null);
   } else {
     await message.reply("AI chat isn't configured on this bot yet — ask the owner to add an API key.").catch(() => null);
   }

@@ -3,6 +3,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, typ
 import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
+import { isModuleEnabled } from "../lib/moduleGate";
 import { applyEmbedExtra } from "../lib/embedExtra";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 
@@ -19,14 +20,22 @@ export function startGiveawayPosterJob(client: Client) {
     const pending = await prisma.giveaway.findMany({ where: { messageId: null, ended: false }, take: 20 });
 
     for (const giveaway of pending) {
+      if (!(await isModuleEnabled(giveaway.guildId, "GIVEAWAYS"))) continue;
       const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
       if (!isSendableChannel(channel)) continue;
 
       const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
       let payload: BaseMessageOptions;
 
+      const linkButtons = Array.isArray(giveaway.buttons) ? (giveaway.buttons as unknown as GiveawayButton[]) : [];
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`giveaway:${giveaway.id}:enter`).setLabel("Enter").setStyle(ButtonStyle.Success),
+        ...linkButtons.map((b) => new ButtonBuilder().setLabel(b.label).setURL(b.url).setStyle(ButtonStyle.Link))
+      );
+
       if (saved) {
-        payload = await buildSavedEmbedPayload(giveaway.guildId, saved);
+        const built = await buildSavedEmbedPayload(giveaway.guildId, saved);
+        payload = { ...built, components: [...(built.components ?? []).slice(0, 4), row] };
       } else {
         const embed = new EmbedBuilder()
           .setColor((giveaway.embedColor as `#${string}`) || "#B14BFF")
@@ -37,12 +46,6 @@ export function startGiveawayPosterJob(client: Client) {
           .setFooter({ text: `${giveaway.winnerCount} winner(s)` });
         if (giveaway.imageUrl) embed.setImage(giveaway.imageUrl);
         applyEmbedExtra(embed, giveaway.embedExtra);
-
-        const linkButtons = Array.isArray(giveaway.buttons) ? (giveaway.buttons as unknown as GiveawayButton[]) : [];
-        const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder().setCustomId(`giveaway:${giveaway.id}:enter`).setLabel("Enter").setStyle(ButtonStyle.Success),
-          ...linkButtons.map((b) => new ButtonBuilder().setLabel(b.label).setURL(b.url).setStyle(ButtonStyle.Link))
-        );
         payload = { embeds: [embed], components: [row] };
       }
 

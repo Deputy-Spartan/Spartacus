@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { logError } from "@spartacus/db";
 import { buildEventPayload } from "../lib/eventRender";
 import { isSendableChannel } from "../lib/channels";
+import { isModuleEnabled } from "../lib/moduleGate";
 
 // Dashboard-created/edited events only write to the database — this is
 // what actually turns that into a real Discord message. Runs every 15s so
@@ -12,16 +13,17 @@ import { isSendableChannel } from "../lib/channels";
 export function startEventSyncJob(client: Client) {
   cron.schedule("*/15 * * * * *", async () => {
     let loggedThisTick = 0;
-    const pending = await prisma.event.findMany({ where: { needsSync: true }, take: 50 });
+    const pending = await prisma.event.findMany({ where: { needsSync: true }, include: { signups: true }, take: 50 });
 
     for (const event of pending) {
+      if (!(await isModuleEnabled(event.guildId, "EVENTS"))) continue;
       const channel = await client.channels.fetch(event.channelId).catch(() => null);
       if (!isSendableChannel(channel)) {
         await prisma.event.update({ where: { id: event.id }, data: { needsSync: false } }).catch(() => null);
         continue;
       }
 
-      const payload = buildEventPayload(event);
+      const payload = buildEventPayload(event, event.signups);
 
       if (event.messageId) {
         const existing = await channel.messages.fetch(event.messageId).catch(() => null);

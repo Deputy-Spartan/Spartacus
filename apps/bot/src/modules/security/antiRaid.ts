@@ -10,6 +10,9 @@ export const name = Events.GuildMemberAdd;
 const joinWindows = new Map<string, number[]>();
 const MAX_TRACKED_JOINS = 50;
 
+// One alert per raid window, not one per join.
+const lastAlert = new Map<string, number>();
+
 export async function execute(member: GuildMember) {
   const guildId = member.guild.id;
   const enabled = await isModuleEnabled(guildId, "ANTI_RAID");
@@ -33,7 +36,10 @@ export async function execute(member: GuildMember) {
     await member.kick("Anti-raid: new-account filter during detected raid").catch(() => null);
   }
 
-  if (raidDetected && config.alertChannelId) {
+  const alertDue = raidDetected && now - (lastAlert.get(guildId) ?? 0) >= windowMs;
+  if (alertDue) lastAlert.set(guildId, now);
+
+  if (alertDue && config.alertChannelId) {
     const channel = await member.guild.channels.fetch(config.alertChannelId).catch(() => null);
     if (isSendableChannel(channel)) {
       await channel

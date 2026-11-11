@@ -1,5 +1,6 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { assignableRoleIds } from "../../lib/memberRoles";
 import type { CommandModule } from "../types";
 
 const command: CommandModule = {
@@ -23,7 +24,14 @@ const command: CommandModule = {
     }
 
     const member = await interaction.guild?.members.fetch(user.id).catch(() => null);
-    await member?.roles.set(record.previousRoles).catch(() => null);
+    const restored = member ? await member.roles.add(assignableRoleIds(member.guild, record.previousRoles)).then(
+      () => true,
+      () => false
+    ) : true;
+    if (!restored) {
+      await interaction.reply({ content: "I couldn't restore their roles. Drag my role above them and try again.", ephemeral: true });
+      return;
+    }
     await prisma.quarantineRecord.update({ where: { id: record.id }, data: { active: false } });
 
     await interaction.reply(`✅ Released **${user.tag}** and restored their previous roles.`);

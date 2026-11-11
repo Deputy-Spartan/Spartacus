@@ -32,7 +32,7 @@ function sectionRow(settingsId: string, sections: RulesGateSection[]) {
 // its full rules embed(s) from the Embed Creator if one's configured,
 // otherwise a bare placeholder embed, always followed by the Agree button.
 // Shared by the catch-up cron below and the dashboard's immediate "Save"
-// trigger (see modules/community/rulesGate.ts's postRulesGateNow).
+// trigger (see modules/security/rulesGate.ts's postRulesGateNow).
 export async function postRulesGatePanel(client: Client, settings: RulesGateSettings): Promise<boolean> {
   if (!settings.channelId) return false;
   const enabled = await isModuleEnabled(settings.guildId, "RULES_GATE");

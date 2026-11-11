@@ -47,7 +47,7 @@ export async function handleWave(interaction: ButtonInteraction, targetUserId: s
 
 // Tracks the member for the Rules reminder job (apps/bot/src/jobs/rulesGateReminder.ts)
 // so it can nudge whoever hasn't agreed yet without scanning the whole member list.
-// Deleted the moment they agree (see modules/community/rulesGate.ts).
+// Deleted the moment they agree (see modules/security/rulesGate.ts).
 export async function onMemberJoin(member: GuildMember) {
   const enabled = await isModuleEnabled(member.guild.id, "RULES_GATE");
   if (!enabled) return;

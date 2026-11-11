@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.post("/guilds/:guildId/application-panels", requireAuth, requireGuildPerm
   res.status(201).json(row);
 });
 
-router.patch("/guilds/:guildId/application-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/application-panels/:id", requireAuth, requireGuildPermission, ownedByGuild("applicationPanel"), async (req, res) => {
   const { name, description, layout, typeIds, paused, savedEmbedId } = req.body;
   const data: Record<string, unknown> = {};
   if (name !== undefined) data.name = name;
@@ -34,7 +35,7 @@ router.patch("/guilds/:guildId/application-panels/:id", requireAuth, requireGuil
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/application-panels/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/application-panels/:id", requireAuth, requireGuildPermission, ownedByGuild("applicationPanel"), async (req, res) => {
   await prisma.applicationPanel.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
@@ -68,7 +69,7 @@ router.post("/guilds/:guildId/application-types", requireAuth, requireGuildPermi
   res.status(201).json(row);
 });
 
-router.patch("/guilds/:guildId/application-types/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/application-types/:id", requireAuth, requireGuildPermission, ownedByGuild("applicationType"), async (req, res) => {
   const fields = [
     "name",
     "emoji",
@@ -89,7 +90,7 @@ router.patch("/guilds/:guildId/application-types/:id", requireAuth, requireGuild
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/application-types/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/application-types/:id", requireAuth, requireGuildPermission, ownedByGuild("applicationType"), async (req, res) => {
   await prisma.applicationType.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

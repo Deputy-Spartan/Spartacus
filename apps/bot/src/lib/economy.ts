@@ -1,5 +1,6 @@
 import { GuildMember } from "discord.js";
 import { prisma } from "./prisma";
+import { withLock } from "./lock";
 
 const DEFAULTS = {
   currencyName: "Coins",
@@ -38,10 +39,27 @@ export async function getBalance(guildId: string, userId: string): Promise<numbe
   return row?.balance ?? 0;
 }
 
+// Balance changes read then write, so two at once could spend the same coins.
+// Everything that touches one member's balance runs in turn.
+const balanceLock = (guildId: string, userId: string) => `balance:${guildId}:${userId}`;
+
 // The single choke point every earn/spend/transfer passes through — clamps
 // to [0, maxBalance], tracks lifetime earned/spent, and drops a ledger row
 // so analytics has real history instead of guessing from the current balance.
-export async function addBalance(guildId: string, userId: string, amount: number, reason: string, maxBalance?: number) {
+export function addBalance(guildId: string, userId: string, amount: number, reason: string, maxBalance?: number) {
+  return withLock(balanceLock(guildId, userId), () => applyBalance(guildId, userId, amount, reason, maxBalance));
+}
+
+// Checks the stake and pays out as one step. `play` returns the balance change.
+export function settleWager(guildId: string, userId: string, amount: number, maxBalance: number, play: () => number): Promise<boolean> {
+  return withLock(balanceLock(guildId, userId), async () => {
+    if (amount > (await getBalance(guildId, userId))) return false;
+    await applyBalance(guildId, userId, play(), "casino", maxBalance);
+    return true;
+  });
+}
+
+async function applyBalance(guildId: string, userId: string, amount: number, reason: string, maxBalance?: number) {
   const cap = maxBalance ?? DEFAULTS.maxBalance;
   const existing = await prisma.economyBalance.findUnique({ where: { guildId_userId: { guildId, userId } } });
   const current = existing?.balance ?? 0;
@@ -119,17 +137,17 @@ export async function awardMessageEarnings(
 export async function claimDaily(guildId: string, userId: string) {
   const config = await getConfig(guildId);
   if (!config.dailyEnabled) return { ok: false as const, reason: "disabled" as const };
+  return withLock(balanceLock(guildId, userId), () => recordDaily(guildId, userId, config));
+}
 
+async function recordDaily(guildId: string, userId: string, config: Awaited<ReturnType<typeof getConfig>>) {
   const row = await prisma.economyBalance.findUnique({ where: { guildId_userId: { guildId, userId } } });
   const now = new Date();
 
-  if (row?.lastDailyClaim) {
-    const hoursSince = (now.getTime() - row.lastDailyClaim.getTime()) / 3_600_000;
-    if (hoursSince < 24) return { ok: false as const, reason: "cooldown" as const, hoursRemaining: 24 - hoursSince };
-  }
+  const hoursSince = row?.lastDailyClaim ? (now.getTime() - row.lastDailyClaim.getTime()) / 3_600_000 : Infinity;
+  if (hoursSince < 24) return { ok: false as const, reason: "cooldown" as const, hoursRemaining: 24 - hoursSince };
 
-  const daysSinceLast = row?.lastDailyClaim ? (now.getTime() - row.lastDailyClaim.getTime()) / 86_400_000 : Infinity;
-  const streakContinues = daysSinceLast < 48; // claimed yesterday or today, within a 48h grace window
+  const streakContinues = hoursSince < 48; // claimed yesterday or today, within a 48h grace window
   const nextStreak = streakContinues ? (row?.dailyStreak ?? 0) + 1 : 1;
   const cappedStreak = Math.min(nextStreak, config.streakCapDays);
   const amount = config.dailyAmount + cappedStreak * config.streakBonusPerDay;
@@ -140,7 +158,7 @@ export async function claimDaily(guildId: string, userId: string) {
   }).catch(async () => {
     await prisma.economyBalance.create({ data: { guildId, userId, lastDailyClaim: now, dailyStreak: nextStreak } });
   });
-  await addBalance(guildId, userId, amount, "daily", config.maxBalance);
+  await applyBalance(guildId, userId, amount, "daily", config.maxBalance);
 
   return { ok: true as const, amount, streak: nextStreak };
 }
@@ -150,13 +168,16 @@ export async function transfer(guildId: string, fromUserId: string, toUserId: st
   if (!config.transfersEnabled) return { ok: false as const, reason: "disabled" as const };
   if (amount < config.transferMinAmount) return { ok: false as const, reason: "below_minimum" as const };
 
-  const fromBalance = await getBalance(guildId, fromUserId);
-  if (fromBalance < amount) return { ok: false as const, reason: "insufficient" as const };
+  const paid = await withLock(balanceLock(guildId, fromUserId), async () => {
+    if ((await getBalance(guildId, fromUserId)) < amount) return false;
+    await applyBalance(guildId, fromUserId, -amount, "transfer_out", config.maxBalance);
+    return true;
+  });
+  if (!paid) return { ok: false as const, reason: "insufficient" as const };
 
   const tax = Math.floor((amount * config.transferTaxPercent) / 100);
   const received = amount - tax;
 
-  await addBalance(guildId, fromUserId, -amount, "transfer_out", config.maxBalance);
   await addBalance(guildId, toUserId, received, "transfer_in", config.maxBalance);
   if (tax > 0) await prisma.economyTransaction.create({ data: { guildId, userId: fromUserId, amount: -tax, reason: "transfer_tax" } });
 

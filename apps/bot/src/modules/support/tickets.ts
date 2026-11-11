@@ -158,6 +158,11 @@ export async function handleTicketControl(interaction: ButtonInteraction, ticket
   }
 
   if (action === "claim") {
+    // Only the opener and staff can see a ticket channel.
+    if (interaction.user.id === ticket.userId) {
+      await interaction.reply({ content: "Only staff can claim a ticket.", ephemeral: true });
+      return;
+    }
     await prisma.ticket.update({ where: { id: ticketId }, data: { status: "CLAIMED", claimedById: interaction.user.id } });
     await interaction.reply(`🙋 Ticket claimed by <@${interaction.user.id}>.`);
     return;
@@ -303,9 +308,4 @@ async function postTranscript(
   if (transcriptUrl) {
     await prisma.ticket.update({ where: { id: ticket.id }, data: { transcriptUrl } }).catch(() => null);
   }
-}
-
-export function findPanelType(panel: TicketPanel, types: TicketType[]) {
-  const ids = Array.isArray(panel.typeIds) ? (panel.typeIds as string[]) : [];
-  return types.filter((t) => ids.includes(t.id) && t.enabled);
 }

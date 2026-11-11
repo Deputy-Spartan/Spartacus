@@ -25,6 +25,13 @@ const command: CommandModule = {
       return;
     }
 
+    // The bot can post anywhere, so the member has to be able to post there too.
+    const allowed = !channelOpt || ("permissionsFor" in channel && channel.permissionsFor(interaction.user)?.has(["ViewChannel", "SendMessages"]));
+    if (!allowed) {
+      await interaction.reply({ content: "You can only post suggestions in channels you can post in.", ephemeral: true });
+      return;
+    }
+
     const suggestion = await prisma.suggestion.create({
       data: { guildId: interaction.guildId, channelId: channel.id, userId: interaction.user.id, content },
     });

@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction } from "discord.js";
+import { ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
 import type { CustomSlashCommand } from "@spartacus/db";
 import { addBalance } from "../../lib/economy";
 import { buildStickyPayload } from "../../lib/stickyRender";
@@ -38,25 +38,36 @@ export async function executeCustomCommand(interaction: ChatInputCommandInteract
       return;
     }
     const targetUser = interaction.options.getUser("user") ?? interaction.user;
+    if (targetUser.id !== interaction.user.id && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
+      await interaction.reply({ content: "You need Manage Roles to use this on someone else.", ephemeral: true });
+      return;
+    }
     const member = await interaction.guild?.members.fetch(targetUser.id).catch(() => null);
     if (!member) {
       await interaction.reply({ content: "Couldn't find that member.", ephemeral: true });
       return;
     }
 
-    if (command.actionType === "GIVE_ROLE") {
-      await member.roles.add(command.roleId).catch(() => null);
-      await interaction.reply({ content: `✅ Gave <@&${command.roleId}> to ${targetUser}.`, ephemeral });
-    } else {
-      await member.roles.remove(command.roleId).catch(() => null);
-      await interaction.reply({ content: `✅ Removed <@&${command.roleId}> from ${targetUser}.`, ephemeral });
+    const giving = command.actionType === "GIVE_ROLE";
+    const changed = await (giving ? member.roles.add(command.roleId) : member.roles.remove(command.roleId)).then(
+      () => true,
+      () => false
+    );
+    if (!changed) {
+      await interaction.reply({ content: "⚠️ I couldn't change that role. Drag my role above it.", ephemeral: true });
+      return;
     }
+    await interaction.reply({ content: `✅ ${giving ? "Gave" : "Removed"} <@&${command.roleId}> ${giving ? "to" : "from"} ${targetUser}.`, ephemeral });
     return;
   }
 
   if (command.actionType === "ADD_CURRENCY") {
     if (!command.currencyAmount || !interaction.guildId) {
       await interaction.reply({ content: "This command isn't fully configured (no amount set).", ephemeral: true });
+      return;
+    }
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+      await interaction.reply({ content: "You need Manage Server to give currency.", ephemeral: true });
       return;
     }
     const targetUser = interaction.options.getUser("user", true);

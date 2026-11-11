@@ -6,6 +6,7 @@ import { NAV_SECTIONS, NAV_MODULE_KEYS } from "../../../../components/nav/Sideba
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { api, type ModuleState } from "../../../../lib/api";
+import { MODULE_LABELS, UNLISTED_MODULES } from "@spartacus/shared";
 import { usePinnedModules } from "../../../../lib/usePinnedModules";
 import Link from "next/link";
 
@@ -93,6 +94,24 @@ function ModulesContent({ guildId }: { guildId: string }) {
             </div>
           </div>
         ))}
+        {!sectionFilter && (
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">Commands & Background Features</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {UNLISTED_MODULES.map(({ key, description }) => (
+                <NeonCard key={key}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{MODULE_LABELS[key]}</p>
+                      <p className="text-xs text-slate-500 mt-1">{description}</p>
+                    </div>
+                    <ToggleSwitch enabled={state?.[key]?.enabled ?? false} onChange={(next) => toggle(key, next)} label={MODULE_LABELS[key]} disabled={!state} />
+                  </div>
+                </NeonCard>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

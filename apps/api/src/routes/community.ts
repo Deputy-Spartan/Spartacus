@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.post("/guilds/:guildId/partnerships", requireAuth, requireGuildPermission
   res.status(201).json(row);
 });
 
-router.delete("/guilds/:guildId/partnerships/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/partnerships/:id", requireAuth, requireGuildPermission, ownedByGuild("serverPartnership"), async (req, res) => {
   await prisma.serverPartnership.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

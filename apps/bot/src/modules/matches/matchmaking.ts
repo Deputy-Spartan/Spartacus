@@ -28,7 +28,7 @@ import { isSendableChannel } from "../../lib/channels";
 import { cleanTeamName, pickOne } from "./engine";
 import { closeVoiceRooms, openVoiceRooms } from "./voice";
 import { syncBoard } from "./leaderboard";
-import { withLock } from "./lock";
+import { withLock } from "../../lib/lock";
 import { stringList, styleEmbed } from "./render";
 import { isModuleEnabled } from "../../lib/moduleGate";
 

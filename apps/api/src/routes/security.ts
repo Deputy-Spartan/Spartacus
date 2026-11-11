@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
+import { Prisma, prisma } from "@spartacus/db";
+import { HONEYPOT_ACTIONS, HONEYPOT_COUNTER_SCOPES, type HoneypotAction, type HoneypotCounterScope } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission, requireGuildOwner } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
@@ -93,19 +94,75 @@ router.put("/guilds/:guildId/anti-nuke", requireAuth, requireGuildPermission, as
 });
 
 // --- Honeypot ---
+const HONEYPOT_DEFAULTS = {
+  channelId: null as string | null,
+  action: "BAN",
+  timeoutMinutes: 1440,
+  deleteMessage: true,
+  messageEnabled: false,
+  creatorData: null,
+  savedEmbedId: null as string | null,
+  showCounter: true,
+  counterScope: "SERVER",
+  showStatsButton: true,
+};
+
 router.get("/guilds/:guildId/honeypot", requireAuth, requireGuildPermission, async (req, res) => {
   const config = await prisma.honeypotConfig.findUnique({ where: { guildId: req.params.guildId } });
-  res.json(config ?? { guildId: req.params.guildId, channelId: null });
+  res.json(config ?? { guildId: req.params.guildId, ...HONEYPOT_DEFAULTS });
 });
 
 router.put("/guilds/:guildId/honeypot", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId } = req.body;
-  const config = await prisma.honeypotConfig.upsert({
-    where: { guildId: req.params.guildId },
-    create: { guildId: req.params.guildId, channelId },
-    update: { channelId },
-  });
-  res.json(config);
+  const { guildId } = req.params;
+  const body = req.body as Record<string, unknown>;
+  const existing = await prisma.honeypotConfig.findUnique({ where: { guildId } });
+  const channelId = (body.channelId as string | null) || null;
+
+  // The old message is in the old channel, so it's taken down there before
+  // the new one is posted.
+  const client = getBotClient();
+  if (existing?.messageId && existing.channelId && existing.channelId !== channelId && client) {
+    const oldChannel = await client.channels.fetch(existing.channelId).catch(() => null);
+    if (oldChannel && "messages" in oldChannel) await oldChannel.messages.delete(existing.messageId).catch(() => null);
+  }
+
+  const data = {
+    channelId,
+    action: HONEYPOT_ACTIONS.includes(body.action as HoneypotAction) ? (body.action as string) : "BAN",
+    timeoutMinutes: Math.min(Math.max(Math.round(Number(body.timeoutMinutes)) || 1440, 1), 40320),
+    deleteMessage: body.deleteMessage !== false,
+    messageEnabled: Boolean(body.messageEnabled),
+    creatorData: body.creatorData ? (body.creatorData as Prisma.InputJsonValue) : Prisma.JsonNull,
+    savedEmbedId: (body.savedEmbedId as string | null) || null,
+    showCounter: body.showCounter !== false,
+    counterScope: HONEYPOT_COUNTER_SCOPES.includes(body.counterScope as HoneypotCounterScope) ? (body.counterScope as string) : "SERVER",
+    showStatsButton: body.showStatsButton !== false,
+    ...(existing && existing.channelId !== channelId ? { messageId: null } : {}),
+  };
+  const config = await prisma.honeypotConfig.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });
+
+  // Posts, edits or removes the channel's message to match what was saved.
+  let messageError: string | null = null;
+  if (client) {
+    const { syncHoneypotMessage } = await import("@spartacus/bot");
+    const result = await syncHoneypotMessage(client, guildId);
+    if (!result.ok) messageError = result.error ?? "The message couldn't be posted.";
+  }
+  const fresh = await prisma.honeypotConfig.findUnique({ where: { guildId } });
+  res.json({ ...(fresh ?? config), messageError });
+});
+
+// This server's catches and the totals across every server, plus the most
+// recent catches here for the dashboard's list.
+router.get("/guilds/:guildId/honeypot/stats", requireAuth, requireGuildPermission, async (req, res) => {
+  const { guildId } = req.params;
+  const { getHoneypotStats } = await import("@spartacus/bot");
+  const [stats, recent, byAction] = await Promise.all([
+    getHoneypotStats(guildId),
+    prisma.honeypotCatch.findMany({ where: { guildId }, orderBy: { createdAt: "desc" }, take: 25 }),
+    prisma.honeypotCatch.groupBy({ by: ["action"], where: { guildId }, _count: { _all: true } }),
+  ]);
+  res.json({ ...stats, recent, byAction: Object.fromEntries(byAction.map((row) => [row.action, row._count._all])) });
 });
 
 // --- Moderation Cases (read history) ---

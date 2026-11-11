@@ -26,7 +26,11 @@ export async function verifyMember(
     return { ok: true, message: "You're already verified!" };
   }
 
-  await member.roles.add(config.verifiedRoleId).catch(() => null);
+  const added = await member.roles.add(config.verifiedRoleId).then(
+    () => true,
+    () => false
+  );
+  if (!added) return { ok: false, message: "I couldn't give you the verified role. Ask an admin to drag my role above it." };
   return { ok: true, message: "✅ You're verified! Welcome to the server." };
 }
 

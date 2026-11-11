@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 
 const router = Router();
 
@@ -30,12 +31,16 @@ router.post("/guilds/:guildId/temp-channels/lobbies", requireAuth, requireGuildP
   res.status(201).json(row);
 });
 
-router.put("/guilds/:guildId/temp-channels/lobbies/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  const row = await prisma.tempChannelLobby.update({ where: { id: req.params.id }, data: req.body });
+router.put("/guilds/:guildId/temp-channels/lobbies/:id", requireAuth, requireGuildPermission, ownedByGuild("tempChannelLobby"), async (req, res) => {
+  const { name, lobbyChannelId, categoryId, nameFormat, userLimit, bitrate, deleteAfterEmptySec, pairTextChannel, hideTextFromNonMembers } = req.body;
+  const row = await prisma.tempChannelLobby.update({
+    where: { id: req.params.id },
+    data: { name, lobbyChannelId, categoryId, nameFormat, userLimit, bitrate, deleteAfterEmptySec, pairTextChannel, hideTextFromNonMembers },
+  });
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/temp-channels/lobbies/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/temp-channels/lobbies/:id", requireAuth, requireGuildPermission, ownedByGuild("tempChannelLobby"), async (req, res) => {
   await prisma.tempChannelLobby.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

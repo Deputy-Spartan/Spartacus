@@ -62,8 +62,17 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/birthdays", label: "Birthdays", icon: "🎂", moduleKey: "BIRTHDAYS" },
       { href: "/member-milestones", label: "Member Milestones", icon: "🏅", moduleKey: "MEMBER_MILESTONES" },
       { href: "/confessions", label: "Anonymous", icon: "🤫", moduleKey: "CONFESSIONS" },
-      { href: "/events", label: "Event Scheduler", icon: "⚔️", moduleKey: "EVENTS" },
-      { href: "/lfg", label: "LFG", icon: "🔊", moduleKey: "LFG" },
+    ],
+  },
+  {
+    section: "Games & Events",
+    items: [
+      { href: "/matches", label: "Matchmaking", icon: "⚔️", moduleKey: "MATCHES" },
+      { href: "/events", label: "Event Scheduler", icon: "📅", moduleKey: "EVENTS" },
+      { href: "/lfg", label: "LFG", icon: "🎮", moduleKey: "LFG" },
+      { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
+      { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
+      { href: "/counting-game", label: "Counting Game", icon: "🔢", moduleKey: "COUNTING_GAME" },
     ],
   },
   {
@@ -71,14 +80,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/embed-creator", label: "Embed Creator", icon: "🧩", moduleKey: "EMBED_CREATOR" },
       { href: "/announcements", label: "Announcements", icon: "📢", moduleKey: "ANNOUNCEMENTS" },
-      { href: "/matches", label: "Matchmaking", icon: "⚔️", moduleKey: "MATCHES" },
-      { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
-      { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
+      { href: "/quote-of-the-day", label: "Quote of the Day", icon: "💭", moduleKey: "QOTD" },
       { href: "/stream-alerts", label: "Stream Alerts", icon: "🔴", moduleKey: "STREAM_ALERTS" },
       { href: "/commands", label: "Custom Commands", icon: "💬", moduleKey: "CUSTOM_COMMANDS" },
-      { href: "/weekly-recap", label: "Weekly Recap", icon: "📊", moduleKey: "WEEKLY_RECAP" },
       { href: "/bump-reminder", label: "Bump Reminder", icon: "⏰", moduleKey: "BUMP_REMINDER" },
-      { href: "/suggestion-analytics", label: "Suggestion Analytics", icon: "💡", moduleKey: "SUGGESTION_ANALYTICS" },
       { href: "/partnerships", label: "Server Partnerships", icon: "🤝" }, // no module toggle of its own
     ],
   },
@@ -88,14 +93,20 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/leveling", label: "Leaderboard", icon: "📈", moduleKey: "LEVELING" },
       { href: "/level-roles", label: "Level Roles", icon: "🏅", moduleKey: "LEVELING" },
       { href: "/prestige", label: "Prestige", icon: "⭐", moduleKey: "PRESTIGE" },
-      { href: "/voice-activity", label: "Voice Activity", icon: "🎙️", moduleKey: "VOICE_ACTIVITY" },
       { href: "/achievements", label: "Achievements", icon: "🏆", moduleKey: "ACHIEVEMENTS" },
-      { href: "/growth-analytics", label: "Growth Analytics", icon: "📉", moduleKey: "GROWTH_ANALYTICS" },
       { href: "/economy/settings", label: "Economy Settings", icon: "⚙️", moduleKey: "ECONOMY" },
       { href: "/economy/earning", label: "Economy Earning", icon: "📈", moduleKey: "ECONOMY" },
       { href: "/economy/leaderboard", label: "Economy Leaderboard", icon: "🏅", moduleKey: "ECONOMY" },
       { href: "/economy/analytics", label: "Economy Analytics", icon: "📊", moduleKey: "ECONOMY" },
-      { href: "/counting-game", label: "Counting Game", icon: "🔢", moduleKey: "COUNTING_GAME" },
+    ],
+  },
+  {
+    section: "Insights",
+    items: [
+      { href: "/weekly-recap", label: "Weekly Recap", icon: "📊", moduleKey: "WEEKLY_RECAP" },
+      { href: "/growth-analytics", label: "Growth Analytics", icon: "📉", moduleKey: "GROWTH_ANALYTICS" },
+      { href: "/voice-activity", label: "Voice Activity", icon: "🎙️", moduleKey: "VOICE_ACTIVITY" },
+      { href: "/suggestion-analytics", label: "Suggestion Analytics", icon: "💡", moduleKey: "SUGGESTION_ANALYTICS" },
     ],
   },
   {
@@ -129,6 +140,19 @@ export const OWNER_NAV_SECTION: NavSection = {
     { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],
 };
+
+// Modules with no settings page of their own. They still default to off, so
+// the Modules page gives them a switch here.
+export const UNLISTED_MODULES: Array<{ key: ModuleKey; description: string }> = [
+  { key: "RANK_CARDS", description: "/rank" },
+  { key: "REMINDERS", description: "/remindme" },
+  { key: "SUGGESTIONS", description: "/suggest, /approve-suggestion and /deny-suggestion" },
+  { key: "QUARANTINE", description: "/quarantine and /release" },
+  { key: "TRIVIA", description: "/trivia" },
+  { key: "CASINO", description: "/coinflip and /slots" },
+  { key: "ROLE_PERSISTENCE", description: "Gives members their roles back when they rejoin" },
+  { key: "INVITE_TRACKING", description: "Counts who invited each new member" },
+];
 
 export const NAV_MODULE_KEYS: Record<string, ModuleKey> = Object.fromEntries(
   NAV_SECTIONS.flatMap((s) => s.items).filter((i): i is NavItem & { moduleKey: ModuleKey } => !!i.moduleKey).map((i) => [i.href, i.moduleKey])

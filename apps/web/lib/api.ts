@@ -868,6 +868,39 @@ export interface BirthdayConfigRow {
   savedEmbedId?: string | null;
 }
 
+// ---- Quote of the Day / Question of the Day ----
+export type DailyPostFeedKind = "QUOTE" | "QUESTION";
+export type DailyPostCreatorData = Pick<EmbedCreatorState, "content" | "embeds" | "components">;
+export interface DailyPostConfigRow {
+  guildId: string;
+  kind: DailyPostFeedKind;
+  enabled: boolean;
+  channelId: string | null;
+  pingRoleId: string | null;
+  postTime: string; // HH:MM on a clock in timeZone
+  timeZone: string;
+  days: number[]; // 0 = Sunday .. 6 = Saturday
+  order: "RANDOM" | "IN_ORDER";
+  useBuiltIn: boolean;
+  createThread: boolean;
+  creatorData: DailyPostCreatorData | null;
+  savedEmbedId: string | null;
+  lastPostedOn: string | null;
+  postCount: number;
+}
+export interface DailyPostEntryRow {
+  id: string;
+  text: string;
+  author: string | null;
+  usedAt: string | null;
+  createdAt: string;
+}
+export interface DailyPostFeed {
+  config: DailyPostConfigRow;
+  entries: DailyPostEntryRow[];
+  builtInCount: number;
+}
+
 export interface BirthdayRow {
   id: string;
   userId: string;
@@ -1245,6 +1278,26 @@ export interface AntiNukeConfig {
 export interface HoneypotConfig {
   guildId: string;
   channelId: string | null;
+  action: "BAN" | "SOFTBAN" | "KICK" | "TIMEOUT";
+  timeoutMinutes: number;
+  deleteMessage: boolean;
+  messageEnabled: boolean;
+  messageId?: string | null;
+  creatorData: DailyPostCreatorData | null;
+  savedEmbedId: string | null;
+  showCounter: boolean;
+  counterScope: "SERVER" | "WEEK" | "GLOBAL";
+  showStatsButton: boolean;
+  // only on the save response: why the channel's message couldn't be posted
+  messageError?: string | null;
+}
+export interface HoneypotStatsRow {
+  server: number;
+  week: number;
+  global: number;
+  servers: number;
+  recent: Array<{ id: string; userId: string; action: string; createdAt: string }>;
+  byAction: Record<string, number>;
 }
 export interface LevelRoleRow {
   id: string;
@@ -1876,6 +1929,19 @@ export const api = {
   setBirthdayConfig: (guildId: string, body: Partial<BirthdayConfigRow>) =>
     request<BirthdayConfigRow>(`/guilds/${guildId}/birthday-config`, { method: "PUT", body: JSON.stringify(body) }),
   sendBirthdayTest: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/birthday-config/send-test`, { method: "POST" }),
+  getDailyPostFeed: (guildId: string, kind: DailyPostFeedKind) => request<DailyPostFeed>(`/guilds/${guildId}/daily-posts/${kind}`),
+  saveDailyPostConfig: (guildId: string, kind: DailyPostFeedKind, body: Partial<DailyPostConfigRow>) =>
+    request<DailyPostConfigRow>(`/guilds/${guildId}/daily-posts/${kind}`, { method: "PUT", body: JSON.stringify(body) }),
+  addDailyPostEntries: (guildId: string, kind: DailyPostFeedKind, items: Array<{ text: string; author?: string | null }>) =>
+    request<DailyPostFeed>(`/guilds/${guildId}/daily-posts/${kind}/entries`, { method: "POST", body: JSON.stringify({ items }) }),
+  updateDailyPostEntry: (guildId: string, kind: DailyPostFeedKind, id: string, body: { text: string; author?: string | null }) =>
+    request<DailyPostEntryRow>(`/guilds/${guildId}/daily-posts/${kind}/entries/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteDailyPostEntry: (guildId: string, kind: DailyPostFeedKind, id: string) =>
+    request(`/guilds/${guildId}/daily-posts/${kind}/entries/${id}`, { method: "DELETE" }),
+  resetDailyPostList: (guildId: string, kind: DailyPostFeedKind) =>
+    request<DailyPostFeed>(`/guilds/${guildId}/daily-posts/${kind}/reset`, { method: "POST" }),
+  sendDailyPost: (guildId: string, kind: DailyPostFeedKind, test: boolean) =>
+    request<{ ok: boolean }>(`/guilds/${guildId}/daily-posts/${kind}/send`, { method: "POST", body: JSON.stringify({ test }) }),
   getBirthdays: (guildId: string) => request<BirthdayRow[]>(`/guilds/${guildId}/birthdays`),
   deleteBirthday: (guildId: string, userId: string) => request(`/guilds/${guildId}/birthdays/${userId}`, { method: "DELETE" }),
 
@@ -1963,6 +2029,7 @@ export const api = {
     request<AntiNukeConfig>(`/guilds/${guildId}/anti-nuke`, { method: "PUT", body: JSON.stringify(config) }),
 
   getHoneypot: (guildId: string) => request<HoneypotConfig>(`/guilds/${guildId}/honeypot`),
+  getHoneypotStats: (guildId: string) => request<HoneypotStatsRow>(`/guilds/${guildId}/honeypot/stats`),
   setHoneypot: (guildId: string, config: Partial<HoneypotConfig>) =>
     request<HoneypotConfig>(`/guilds/${guildId}/honeypot`, { method: "PUT", body: JSON.stringify(config) }),
 

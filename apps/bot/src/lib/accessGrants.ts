@@ -69,15 +69,6 @@ export function describeAccess(target: AccessTarget): string {
   return [...target.roleIds.map((r) => `<@&${r}>`), ...target.channelIds.map((c) => `<#${c}>`)].join(", ");
 }
 
-// DMs can't resolve <@&id> / <#id> mentions (they show as "@unknown-role"),
-// so anything sent outside the server spells the names out.
-export function describeAccessNames(guild: Guild, target: AccessTarget): string {
-  return [
-    ...target.roleIds.map((r) => `@${guild.roles.cache.get(r)?.name ?? "role"}`),
-    ...target.channelIds.map((c) => `#${guild.channels.cache.get(c)?.name ?? "channel"}`),
-  ].join(", ");
-}
-
 // "You now have the @Champ role." / "You no longer have the @Champ role."
 // Channel grants read "access to #name". Pass a guild to spell names out
 // (DMs) instead of using clickable mentions.

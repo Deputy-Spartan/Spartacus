@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
-import { withLock } from "./lock";
+import { withLock } from "../../lib/lock";
 
 const ROLES = [
   { name: "Matchmaking", mentionable: false },

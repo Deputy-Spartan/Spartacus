@@ -1,6 +1,7 @@
 import { PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 import type { CommandModule } from "../types";
 import { logCase } from "../../lib/cases";
+import { moderationBlock } from "../../lib/moderationGuard";
 
 const command: CommandModule = {
   moduleKey: "MODERATION",
@@ -14,6 +15,13 @@ const command: CommandModule = {
   async execute(interaction) {
     const user = interaction.options.getUser("user", true);
     const reason = interaction.options.getString("reason", true);
+
+    const member = await interaction.guild?.members.fetch(user.id).catch(() => null);
+    const blocked = member ? await moderationBlock(interaction, member) : null;
+    if (blocked) {
+      await interaction.reply({ content: blocked, ephemeral: true });
+      return;
+    }
 
     const caseRow = await logCase({
       guildId: interaction.guildId as string,

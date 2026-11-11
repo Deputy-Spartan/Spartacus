@@ -64,7 +64,7 @@ function formatTranscriptLines(entries: TranscriptEntry[]): string {
 }
 
 // Discord channel names are lowercase-and-dashes only, so tokens get
-// substituted before that normalization runs. Mirrors modules/tickets/
+// substituted before that normalization runs. Mirrors modules/support/
 // tickets.ts's buildChannelName — same idea, different token set.
 function buildChannelName(format: string | undefined, tokens: { user: string; reported: string; number: string }) {
   const name = (format || "report-{number}")
@@ -187,7 +187,7 @@ export async function handlePlayerReportPanelButton(interaction: ButtonInteracti
 // /report (see commands/moderation/report.ts). Creates a brand-new private
 // channel under the configured category, named from channelNameFormat and
 // numbered via an atomic counter (same "increment on create" pattern as
-// TicketPanel.ticketCounter in modules/tickets/tickets.ts), posts the
+// TicketPanel.ticketCounter in modules/support/tickets.ts), posts the
 // Claim/Close control embed as its first message, and pings the staff role.
 // The reporter is never added to the channel — everything they see comes
 // back to them as a DM or an ephemeral reply, never channel access.
@@ -369,7 +369,7 @@ export async function handleReportClaim(interaction: ButtonInteraction, reportId
 
 // Shared by both terminal buttons (Resolved and Close) — same DM-with-
 // transcript + auto-delete behavior either way, only the final status and
-// the reply wording differ. Mirrors modules/tickets/tickets.ts's
+// the reply wording differ. Mirrors modules/support/tickets.ts's
 // closeTicket: reply first ("closing in N seconds"), then delete on a
 // timer so staff see the confirmation before the channel disappears.
 async function finalizeReport(interaction: ButtonInteraction, reportId: string, finalStatus: "RESOLVED" | "CLOSED") {

@@ -32,7 +32,9 @@ export function startGiveawayEnderJob(client: Client) {
         const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
         let payload: BaseMessageOptions;
         if (saved) {
-          payload = await buildSavedEmbedPayload(giveaway.guildId, saved);
+          const built = await buildSavedEmbedPayload(giveaway.guildId, saved);
+          const line = winners.length > 0 ? `🎉 Congratulations ${winners.map((w) => `<@${w}>`).join(", ")}!` : "No valid entries — no winner could be selected.";
+          payload = { ...built, content: [built.content, line].filter(Boolean).join("\n") };
         } else {
           const embed = new EmbedBuilder()
             .setColor(0xb14bff)

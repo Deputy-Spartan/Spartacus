@@ -1,6 +1,5 @@
 import { ChatInputCommandInteraction, EmbedBuilder, Message, ColorResolvable, VoiceBasedChannel } from "discord.js";
 import type { LfgCommand, LfgCategory } from "@spartacus/db";
-import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
 import { applyEmbedExtra } from "../../lib/embedExtra";
 import { substituteLfgTokens, buildLfgPingLine } from "../../lib/lfg";
@@ -135,7 +134,7 @@ export async function handleLfgInteraction(interaction: ChatInputCommandInteract
   const note = interaction.options.getString("message") ?? "";
   const payload = await buildAnnouncement(cfg, eff, `${interaction.user}`, voiceChannel, note);
   payload.content = [payload.content, voiceJumpLink(cfg.guildId, voiceChannel)].filter(Boolean).join("\n");
-  await interaction.reply(payload);
+  await interaction.reply({ ...payload, allowedMentions: { parse: ["users", "roles"] } });
 }
 
 // ---- Prefix path (!trigger [note...]) ----
@@ -169,9 +168,5 @@ export async function handleLfgMessage(message: Message, cfg: LfgCommandWithCate
   if (!isSendableChannel(message.channel)) return;
   const payload = await buildAnnouncement(cfg, eff, `${message.author}`, voiceChannel, note);
   payload.content = [payload.content, voiceJumpLink(cfg.guildId, voiceChannel)].filter(Boolean).join("\n");
-  await message.channel.send(payload);
-}
-
-export async function findLfgCommandByTrigger(guildId: string, trigger: string): Promise<LfgCommandWithCategories | null> {
-  return prisma.lfgCommand.findUnique({ where: { guildId_trigger: { guildId, trigger } }, include: { categories: true } });
+  await message.channel.send({ ...payload, allowedMentions: { parse: ["users", "roles"] } });
 }

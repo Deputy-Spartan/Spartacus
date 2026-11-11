@@ -57,7 +57,7 @@ Pick the kind of bot code you need:
 | You need the bot to… | Put it in | Then register it in |
 | --- | --- | --- |
 | Respond to a slash command | `src/commands/<category>/<name>.ts` | `src/commands/index.ts` |
-| React to Discord activity (messages, joins, reactions) | `src/modules/<category>/<name>.ts` | `src/index.ts` (`client.on(...)`) or `src/events/` |
+| React to Discord activity (messages, joins, reactions) | `src/modules/<sidebar area>/<name>.ts` | `src/index.ts` (`client.on(...)`) or `src/events/` |
 | Do something on a timer, or post what the dashboard saved | `src/jobs/<name>.ts` | `src/index.ts` (`start…Job(c)`) |
 | Handle a button/menu/modal click | `src/events/interactionCreate.ts` | — |
 

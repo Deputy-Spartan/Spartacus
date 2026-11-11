@@ -5,7 +5,21 @@ import { commands } from "../commands";
 
 export const name = Events.InteractionCreate;
 
+// Buttons and menus fail with Discord's bare "This interaction failed" if a
+// handler throws, so they get a real reply and land on the Errors page.
 export async function execute(interaction: Interaction) {
+  try {
+    await route(interaction);
+  } catch (err) {
+    console.error("[interaction] failed:", err);
+    logError("bot", err, interaction.guildId ?? undefined);
+    if (!interaction.isRepliable()) return;
+    const payload = { content: "Something went wrong with that.", ephemeral: true };
+    await (interaction.replied || interaction.deferred ? interaction.followUp(payload) : interaction.reply(payload)).catch(() => null);
+  }
+}
+
+async function route(interaction: Interaction) {
   // These two happen in a DM (the appeal button/modal live on a DM the bot
   // sent), so they must be handled before the guild-only gate below.
   if (interaction.isButton() && interaction.customId.startsWith("appeal:start:")) {
@@ -143,6 +157,12 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.isButton() && interaction.customId === "honeypot:stats") {
+    const { handleHoneypotStats } = await import("../modules/security/honeypot");
+    await handleHoneypotStats(interaction);
+    return;
+  }
+
   if (interaction.isButton() && interaction.customId.startsWith("ecaction:")) {
     const actionId = interaction.customId.split(":")[1];
     const { handleEmbedButtonAction } = await import("../modules/community/embedActions");
@@ -157,7 +177,10 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
-  if (!interaction.guildId) return;
+  if (!interaction.guildId) {
+    if (interaction.isChatInputCommand()) await interaction.reply({ content: "This command only works in a server.", ephemeral: true });
+    return;
+  }
 
   if (interaction.isChatInputCommand()) {
     // A Channel Lock restricted to specific slash commands refuses anything
@@ -285,7 +308,7 @@ export async function execute(interaction: Interaction) {
 
   if (interaction.isModalSubmit() && interaction.customId.startsWith("ticketclose:")) {
     const ticketId = interaction.customId.split(":")[1];
-    const { handleTicketCloseModal } = await import("../modules/tickets/tickets");
+    const { handleTicketCloseModal } = await import("../modules/support/tickets");
     await handleTicketCloseModal(interaction, ticketId);
     return;
   }
@@ -320,7 +343,7 @@ export async function execute(interaction: Interaction) {
       return;
     }
     const panelId = interaction.customId.split(":")[1];
-    const { handleOpenTicket } = await import("../modules/tickets/tickets");
+    const { handleOpenTicket } = await import("../modules/support/tickets");
     await handleOpenTicket(interaction, panelId, interaction.values[0]);
     return;
   }
@@ -332,7 +355,7 @@ export async function execute(interaction: Interaction) {
       return;
     }
     const panelId = interaction.customId.split(":")[1];
-    const { handleApplyButton } = await import("../modules/community/applications");
+    const { handleApplyButton } = await import("../modules/support/applications");
     await handleApplyButton(interaction, panelId);
     return;
   }
@@ -374,23 +397,30 @@ export async function execute(interaction: Interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith("setuptestmodules:")) {
+    const [, action, token] = interaction.customId.split(":");
+    const { handleSetupTestModules } = await import("../modules/owner/setupTestModules");
+    await handleSetupTestModules(interaction, action, token);
+    return;
+  }
+
   if (interaction.customId.startsWith("setuptestserver:confirm:")) {
     const token = interaction.customId.split(":")[2];
-    const { handleSetupTestServerConfirm } = await import("../commands/utility/setupTestServer");
+    const { handleSetupTestServerConfirm } = await import("../modules/owner/setupTestServer");
     await handleSetupTestServerConfirm(interaction, token);
     return;
   }
 
   if (interaction.customId.startsWith("setuptestserver:deleteonly:")) {
     const token = interaction.customId.split(":")[2];
-    const { handleSetupTestServerDeleteOnly } = await import("../commands/utility/setupTestServer");
+    const { handleSetupTestServerDeleteOnly } = await import("../modules/owner/setupTestServer");
     await handleSetupTestServerDeleteOnly(interaction, token);
     return;
   }
 
   if (interaction.customId.startsWith("setuptestserver:skip:")) {
     const token = interaction.customId.split(":")[2];
-    const { handleSetupTestServerSkip } = await import("../commands/utility/setupTestServer");
+    const { handleSetupTestServerSkip } = await import("../modules/owner/setupTestServer");
     await handleSetupTestServerSkip(interaction, token);
     return;
   }
@@ -402,7 +432,7 @@ export async function execute(interaction: Interaction) {
       return;
     }
     var ticketPanelParts = interaction.customId.split(":");
-    const { handleOpenTicket } = await import("../modules/tickets/tickets");
+    const { handleOpenTicket } = await import("../modules/support/tickets");
     await handleOpenTicket(interaction, ticketPanelParts[1], ticketPanelParts[2]);
     return;
   }
@@ -433,7 +463,7 @@ export async function execute(interaction: Interaction) {
 
   if (interaction.customId.startsWith("ticket:")) {
     var ticketParts = interaction.customId.split(":");
-    const { handleTicketControl } = await import("../modules/tickets/tickets");
+    const { handleTicketControl } = await import("../modules/support/tickets");
     await handleTicketControl(interaction, ticketParts[1], ticketParts[2] as "claim" | "close");
     return;
   }
@@ -501,7 +531,7 @@ export async function execute(interaction: Interaction) {
       return;
     }
     var applicationPanelParts = interaction.customId.split(":");
-    const { handleApplyButton } = await import("../modules/community/applications");
+    const { handleApplyButton } = await import("../modules/support/applications");
     await handleApplyButton(interaction, applicationPanelParts[1], applicationPanelParts[2]);
     return;
   }
@@ -514,11 +544,11 @@ export async function execute(interaction: Interaction) {
     }
     var applicationParts = interaction.customId.split(":");
     if (applicationParts[2] === "custom") {
-      const { handleApplicationCustomResponse } = await import("../modules/community/applications");
+      const { handleApplicationCustomResponse } = await import("../modules/support/applications");
       await handleApplicationCustomResponse(interaction, applicationParts[1], applicationParts[3]);
       return;
     }
-    const { handleApplicationReview } = await import("../modules/community/applications");
+    const { handleApplicationReview } = await import("../modules/support/applications");
     await handleApplicationReview(interaction, applicationParts[1], applicationParts[2] as "accept" | "deny");
     return;
   }
@@ -532,17 +562,17 @@ export async function execute(interaction: Interaction) {
     const rgParts = interaction.customId.split(":");
     const rgAction = rgParts[1];
     if (rgAction === "agree") {
-      const { handleRulesGateAgree } = await import("../modules/community/rulesGate");
+      const { handleRulesGateAgree } = await import("../modules/security/rulesGate");
       await handleRulesGateAgree(interaction, rgParts[2]);
       return;
     }
     if (rgAction === "decline") {
-      const { handleRulesGateDecline } = await import("../modules/community/rulesGate");
+      const { handleRulesGateDecline } = await import("../modules/security/rulesGate");
       await handleRulesGateDecline(interaction, rgParts[2]);
       return;
     }
     if (rgAction === "section") {
-      const { handleRulesGateSection } = await import("../modules/community/rulesGate");
+      const { handleRulesGateSection } = await import("../modules/security/rulesGate");
       await handleRulesGateSection(interaction, rgParts[2], rgParts[3]);
       return;
     }
@@ -555,12 +585,8 @@ export async function execute(interaction: Interaction) {
       await interaction.reply({ content: "⚠️ Giveaways is disabled for this server.", ephemeral: true });
       return;
     }
-    var giveawayId = interaction.customId.split(":")[1];
-    const { prisma } = await import("../lib/prisma");
-    await prisma.giveawayEntry
-      .create({ data: { giveawayId, userId: interaction.user.id } })
-      .then(() => interaction.reply({ content: "🎉 You're entered!", ephemeral: true }))
-      .catch(() => interaction.reply({ content: "You're already entered in this giveaway.", ephemeral: true }));
+    const { handleGiveawayEntry } = await import("../modules/engagement/giveaways");
+    await handleGiveawayEntry(interaction, interaction.customId.split(":")[1]);
     return;
   }
 

@@ -40,6 +40,7 @@ import { startRulesGateReminderJob } from "./jobs/rulesGateReminder";
 import { startVerificationPosterJob } from "./jobs/verificationPoster";
 import { startPlayerReportPosterJob } from "./jobs/playerReportPoster";
 import { startMatchTickerJob } from "./jobs/matchTicker";
+import { startDailyPostsJob } from "./jobs/dailyPosts";
 
 import * as logger from "./modules/logging/logger";
 import * as antiRaid from "./modules/security/antiRaid";
@@ -56,9 +57,9 @@ import * as voiceActivity from "./modules/community/voiceActivity";
 import * as bumpReminder from "./modules/community/bumpReminder";
 import * as rolePersistence from "./modules/community/rolePersistence";
 import * as inviteTracking from "./modules/community/inviteTracking";
-import * as modmail from "./modules/modmail/modmail";
+import * as modmail from "./modules/support/modmail";
 import * as supportIntake from "./modules/support/supportIntake";
-import * as applications from "./modules/community/applications";
+import * as applications from "./modules/support/applications";
 import * as channelLocks from "./modules/utility/channelLocks";
 import * as aiChat from "./modules/community/aiChat";
 import * as aiModeration from "./modules/moderation/aiModeration";
@@ -150,7 +151,7 @@ export { renderPollEmbed, announcePollClosed } from "./modules/engagement/pollVo
 export { postRulesGatePanel } from "./jobs/rulesGatePoster";
 export { refreshReactionRolePanel } from "./jobs/reactionRolePoster";
 export { refreshRolePanel } from "./jobs/rolePanelPoster";
-export { bumpRulesVersion } from "./modules/community/rulesGate";
+export { bumpRulesVersion } from "./modules/security/rulesGate";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
 export { postVerificationPanel } from "./modules/security/verification";
@@ -167,6 +168,12 @@ export { postWeeklyRecap } from "./jobs/weeklyRecap";
 // Re-exported so apps/api's Birthdays "Send Test" button can announce a
 // test birthday for the clicking admin on demand.
 export { sendBirthdayTest } from "./jobs/birthdayAnnouncer";
+// Re-exported so apps/api's Quote/Question of the Day "Send Test" and
+// "Post Now" buttons send through the same code as the daily schedule.
+export { sendDailyPost } from "./jobs/dailyPosts";
+// Re-exported so apps/api's Honeypot page can post or refresh the channel's
+// warning message on save, and show the same numbers the message does.
+export { syncHoneypotMessage, getHoneypotStats } from "./modules/security/honeypot";
 // Re-exported so apps/api's Matches page can refresh a panel, cancel a match,
 // start a season or void a result through the same queue players' clicks use.
 export { refreshMatchPanel, deleteMatch, matchRoster, voidMatchResult } from "./modules/matches/flow";
@@ -243,9 +250,12 @@ export function startBot() {
     startVerificationPosterJob(c);
     startPlayerReportPosterJob(c);
     startMatchTickerJob(c);
+    startDailyPostsJob(c);
+    honeypot.startHoneypotMessageJob(c);
 
     const { primeAllGuildInvites } = await import("./modules/community/inviteTracking");
     await primeAllGuildInvites(c);
+    await tempChannels.sweepTempChannels(c).catch((err) => logError("bot", err));
 
     await applyBotPresence(c);
     setInterval(() => applyBotPresence(c), 30_000);

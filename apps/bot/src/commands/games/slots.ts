@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { addBalance, getBalance, getConfig } from "../../lib/economy";
+import { getConfig, settleWager } from "../../lib/economy";
 import type { CommandModule } from "../types";
 
 const SYMBOLS = ["🍒", "🍋", "🔔", "⭐", "💎"];
@@ -25,21 +25,21 @@ const command: CommandModule = {
     if (!interaction.guildId) return;
     const amount = interaction.options.getInteger("amount", true);
 
-    const [balance, config] = await Promise.all([getBalance(interaction.guildId, interaction.user.id), getConfig(interaction.guildId)]);
+    const config = await getConfig(interaction.guildId);
 
     if (amount > config.maxBet) {
       await interaction.reply({ content: `The max bet is ${config.maxBet.toLocaleString()} ${config.currencyName}.`, ephemeral: true });
-      return;
-    }
-    if (amount > balance) {
-      await interaction.reply({ content: "You don't have enough coins for that wager.", ephemeral: true });
       return;
     }
 
     const reels = spin();
     const multiplier = payoutMultiplier(reels);
     const delta = multiplier > 0 ? Math.floor(amount * multiplier) - amount : -amount;
-    await addBalance(interaction.guildId, interaction.user.id, delta, "casino", config.maxBalance);
+    const placed = await settleWager(interaction.guildId, interaction.user.id, amount, config.maxBalance, () => delta);
+    if (!placed) {
+      await interaction.reply({ content: "You don't have enough coins for that wager.", ephemeral: true });
+      return;
+    }
 
     const outcome = multiplier > 0 ? `You won **${Math.floor(amount * multiplier).toLocaleString()} ${config.currencyName}**! 🎉` : `You lost **${amount.toLocaleString()} ${config.currencyName}**.`;
 

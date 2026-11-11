@@ -3,3 +3,7 @@ export * from "./navItems";
 export * from "./voiceNames";
 export * from "./matchTexts";
 export * from "./rankGroups";
+export * from "./dailyPosts";
+export * from "./honeypot";
+export * from "./pageGuides";
+export * from "./testGuides";

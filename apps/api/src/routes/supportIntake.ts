@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "@spartacus/db";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.post("/guilds/:guildId/support-flows", requireAuth, requireGuildPermissio
   res.status(201).json(row);
 });
 
-router.patch("/guilds/:guildId/support-flows/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/support-flows/:id", requireAuth, requireGuildPermission, ownedByGuild("supportFlow"), async (req, res) => {
   const fields = ["label", "color", "categoryId", "roleId", "enabled", "sortOrder"];
   const data: Record<string, unknown> = {};
   for (const f of fields) if (req.body[f] !== undefined) data[f] = req.body[f];
@@ -41,14 +42,14 @@ router.patch("/guilds/:guildId/support-flows/:id", requireAuth, requireGuildPerm
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/support-flows/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/support-flows/:id", requireAuth, requireGuildPermission, ownedByGuild("supportFlow"), async (req, res) => {
   await prisma.supportFlow.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });
 
 // ---- Questions (the per-flow question chain) ----
 
-router.post("/guilds/:guildId/support-flows/:flowId/questions", requireAuth, requireGuildPermission, async (req, res) => {
+router.post("/guilds/:guildId/support-flows/:flowId/questions", requireAuth, requireGuildPermission, ownedByGuild("supportFlow", "flowId"), async (req, res) => {
   const { prompt, mode, choices } = req.body;
   const count = await prisma.supportQuestion.count({ where: { flowId: req.params.flowId } });
   const row = await prisma.supportQuestion.create({
@@ -63,23 +64,23 @@ router.post("/guilds/:guildId/support-flows/:flowId/questions", requireAuth, req
   res.status(201).json(row);
 });
 
-router.patch("/guilds/:guildId/support-flows/:flowId/questions/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/support-flows/:flowId/questions/:id", requireAuth, requireGuildPermission, ownedByGuild("supportFlow", "flowId"), async (req, res) => {
   const fields = ["prompt", "mode", "choices", "sortOrder"];
   const data: Record<string, unknown> = {};
   for (const f of fields) if (req.body[f] !== undefined) data[f] = req.body[f];
-  const row = await prisma.supportQuestion.update({ where: { id: req.params.id }, data });
+  const row = await prisma.supportQuestion.update({ where: { id: req.params.id, flowId: req.params.flowId }, data });
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/support-flows/:flowId/questions/:id", requireAuth, requireGuildPermission, async (req, res) => {
-  await prisma.supportQuestion.delete({ where: { id: req.params.id } });
+router.delete("/guilds/:guildId/support-flows/:flowId/questions/:id", requireAuth, requireGuildPermission, ownedByGuild("supportFlow", "flowId"), async (req, res) => {
+  await prisma.supportQuestion.delete({ where: { id: req.params.id, flowId: req.params.flowId } });
   res.status(204).send();
 });
 
 // Bulk reorder — the dashboard sends the full ordered id list after a drag.
-router.put("/guilds/:guildId/support-flows/:flowId/questions/order", requireAuth, requireGuildPermission, async (req, res) => {
+router.put("/guilds/:guildId/support-flows/:flowId/questions/order", requireAuth, requireGuildPermission, ownedByGuild("supportFlow", "flowId"), async (req, res) => {
   const ids: string[] = Array.isArray(req.body.ids) ? req.body.ids : [];
-  await prisma.$transaction(ids.map((id, i) => prisma.supportQuestion.update({ where: { id }, data: { sortOrder: i } })));
+  await prisma.$transaction(ids.map((id, i) => prisma.supportQuestion.update({ where: { id, flowId: req.params.flowId }, data: { sortOrder: i } })));
   res.status(204).send();
 });
 

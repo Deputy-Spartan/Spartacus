@@ -14,13 +14,12 @@ import { isSendableChannel } from "../../lib/channels";
 
 type ActionableInteraction = ButtonInteraction | AnySelectMenuInteraction;
 
+const ROLE_FAILED = "⚠️ I couldn't change that role. Drag my role above it.";
+const worked = (change: Promise<unknown>) => change.then(() => true, () => false);
+
 async function toggleRole(member: GuildMember, roleId: string): Promise<string> {
-  if (member.roles.cache.has(roleId)) {
-    await member.roles.remove(roleId).catch(() => null);
-    return "Role removed.";
-  }
-  await member.roles.add(roleId).catch(() => null);
-  return "Role added.";
+  if (member.roles.cache.has(roleId)) return (await worked(member.roles.remove(roleId))) ? "✅ Role removed." : ROLE_FAILED;
+  return (await worked(member.roles.add(roleId))) ? "✅ Role added." : ROLE_FAILED;
 }
 
 async function runAction(interaction: ActionableInteraction, action: EmbedActionConfig | undefined, targetMember: GuildMember) {
@@ -34,20 +33,17 @@ async function runAction(interaction: ActionableInteraction, action: EmbedAction
   switch (action.type) {
     case "give_role": {
       if (!action.roleId) return void (await interaction.reply({ content: "This action isn't fully configured (no role set).", ephemeral: true }));
-      await targetMember.roles.add(action.roleId).catch(() => null);
-      await interaction.reply({ content: "✅ Role added.", ephemeral });
+      await interaction.reply({ content: (await worked(targetMember.roles.add(action.roleId))) ? "✅ Role added." : ROLE_FAILED, ephemeral });
       return;
     }
     case "remove_role": {
       if (!action.roleId) return void (await interaction.reply({ content: "This action isn't fully configured (no role set).", ephemeral: true }));
-      await targetMember.roles.remove(action.roleId).catch(() => null);
-      await interaction.reply({ content: "✅ Role removed.", ephemeral });
+      await interaction.reply({ content: (await worked(targetMember.roles.remove(action.roleId))) ? "✅ Role removed." : ROLE_FAILED, ephemeral });
       return;
     }
     case "toggle_role": {
       if (!action.roleId) return void (await interaction.reply({ content: "This action isn't fully configured (no role set).", ephemeral: true }));
-      const message = await toggleRole(targetMember, action.roleId);
-      await interaction.reply({ content: `✅ ${message}`, ephemeral });
+      await interaction.reply({ content: await toggleRole(targetMember, action.roleId), ephemeral });
       return;
     }
     case "add_currency": {
@@ -124,8 +120,7 @@ export async function handleEmbedSelectAction(interaction: AnySelectMenuInteract
     if (matched) {
       if (!matched.action || matched.action.type === "none") {
         const ephemeral = matched.action?.ephemeral !== false;
-        const message = await toggleRole(invoker, roleId);
-        await interaction.reply({ content: `✅ ${message}`, ephemeral });
+        await interaction.reply({ content: await toggleRole(invoker, roleId), ephemeral });
       } else {
         await runAction(interaction, matched.action, invoker);
       }
@@ -138,8 +133,7 @@ export async function handleEmbedSelectAction(interaction: AnySelectMenuInteract
     // No curated list configured at all — every role picker's baseline
     // behavior is self-assign/unassign whatever gets picked.
     const ephemeral = config.defaultAction?.ephemeral !== false;
-    const message = await toggleRole(invoker, roleId);
-    await interaction.reply({ content: `✅ ${message}`, ephemeral });
+    await interaction.reply({ content: await toggleRole(invoker, roleId), ephemeral });
     return;
   }
 

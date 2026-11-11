@@ -5,6 +5,7 @@ import { logError } from "@spartacus/db";
 import { isModuleEnabled } from "../lib/moduleGate";
 
 const URL_PATTERN = /https?:\/\//i;
+const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 function shouldSkip(
   message: Message,
@@ -47,6 +48,9 @@ export function startAutoPurgeJob(client: Client) {
       const channel = await client.channels.fetch(config.channelId).catch(() => null);
       if (!channel || !channel.isTextBased() || channel.isDMBased() || !("bulkDelete" in channel)) continue;
 
+      // Stamped first so a slow run can't start again on the next tick.
+      await prisma.autoPurgeConfig.update({ where: { id: config.id }, data: { lastRunAt: new Date() } });
+
       let lastId: string | undefined;
       let keepGoing = true;
 
@@ -71,9 +75,8 @@ export function startAutoPurgeJob(client: Client) {
         }
 
         if (messages.size < 100) keepGoing = false; // reached the start of history
+        if (Date.now() - (messages.last()?.createdTimestamp ?? 0) >= FOURTEEN_DAYS_MS) keepGoing = false; // the rest can't be bulk-deleted
       }
-
-      await prisma.autoPurgeConfig.update({ where: { id: config.id }, data: { lastRunAt: new Date() } });
     }
   });
 }

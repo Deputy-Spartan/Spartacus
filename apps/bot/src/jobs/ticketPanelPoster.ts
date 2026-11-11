@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, StringSelectMenuBuilder } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { isModuleEnabled } from "../lib/moduleGate";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../lib/channels";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
@@ -14,6 +15,7 @@ export function startTicketPanelPosterJob(client: Client) {
     const pending = await prisma.ticketPanel.findMany({ where: { messageId: null, paused: false }, take: 20 });
 
     for (const panel of pending) {
+      if (!(await isModuleEnabled(panel.guildId, "TICKETS"))) continue;
       const channel = await client.channels.fetch(panel.channelId).catch(() => null);
       if (!isSendableChannel(channel)) continue;
 

@@ -7,7 +7,7 @@ import {
   Guild,
   Message,
 } from "discord.js";
-import { NAV_SECTIONS, slugifyModuleLabel, VOICE_MODULE_KEYS } from "@spartacus/shared";
+import { EXTRAS_CATEGORY, MODULE_LABELS, NAV_SECTIONS, slugifyModuleLabel, UNLISTED_MODULES, VOICE_MODULE_KEYS } from "@spartacus/shared";
 import { isOwner } from "../../lib/owner";
 
 // Scaffolds one category per dashboard sidebar section and one channel per
@@ -38,7 +38,7 @@ interface CategorySpec {
 // A few generic voice channels for testing features that need an actual
 // populated voice channel (LFG, voice activity) rather than one dedicated
 // to a single module.
-const EXTRA_VOICE_CATEGORY: CategorySpec = {
+export const EXTRA_VOICE_CATEGORY: CategorySpec = {
   name: "🔊 voice testing",
   channels: [
     { name: "General VC", type: "voice" },
@@ -47,18 +47,30 @@ const EXTRA_VOICE_CATEGORY: CategorySpec = {
   ],
 };
 
-function buildLayout(): CategorySpec[] {
+// A page whose features post in more than one place gets extra channels
+// beside its own. Question of the Day is a tab on the Quote of the Day page.
+export const EXTRA_PAGE_CHANNELS: Record<string, string[]> = {
+  "/quote-of-the-day": ["question-of-the-day"],
+};
+
+// Modules with no dashboard page (/rank, /trivia and so on) still get a
+// channel each, so there's somewhere to try them.
+const EXTRAS: CategorySpec = {
+  name: EXTRAS_CATEGORY,
+  channels: UNLISTED_MODULES.map(({ key }): ChannelSpec => ({ name: slugifyModuleLabel(MODULE_LABELS[key]), type: "text" })),
+};
+
+export function buildLayout(): CategorySpec[] {
   // Skip the top ungrouped items (Overview/Modules/Errors) and Owner Only —
   // neither represents a per-server feature worth a test channel.
   const layout = NAV_SECTIONS.filter((s) => s.section).map((section) => ({
     name: section.section as string,
-    channels: section.items.map(
-      (item): ChannelSpec => ({
-        name: slugifyModuleLabel(item.label),
-        type: item.moduleKey && VOICE_MODULE_KEYS.has(item.moduleKey) ? "voice" : "text",
-      })
-    ),
+    channels: section.items.flatMap((item): ChannelSpec[] => [
+      { name: slugifyModuleLabel(item.label), type: item.moduleKey && VOICE_MODULE_KEYS.has(item.moduleKey) ? "voice" : "text" },
+      ...(EXTRA_PAGE_CHANNELS[item.href] ?? []).map((name): ChannelSpec => ({ name, type: "text" })),
+    ]),
   }));
+  layout.push(EXTRAS);
   layout.push(EXTRA_VOICE_CATEGORY);
   return layout;
 }
@@ -69,7 +81,7 @@ function buildLayout(): CategorySpec[] {
 // category never matches its current spec by exact name, so the script
 // just builds a second one forever instead of recognizing it as the same
 // category.
-function normalizeCategoryName(name: string): string {
+export function normalizeCategoryName(name: string): string {
   return name
     .replace(/^[\p{Extended_Pictographic}‍️☀-➿]+\s*/u, "")
     .trim()
@@ -452,7 +464,7 @@ export async function runSetupTestServer(message: Message) {
     plan.staleChannelIds.length === 0 &&
     plan.duplicateChannelIds.length === 0
   ) {
-    await message.reply("✅ Already up to date — every dashboard feature has a correctly-placed channel, nothing stale.");
+    await message.reply("✅ Already up to date — every dashboard feature has a correctly-placed channel, nothing stale. Run `!setup-test-modules` to turn every module on and post it in its channel.");
     return;
   }
 
@@ -505,6 +517,7 @@ export async function handleSetupTestServerConfirm(interaction: ButtonInteractio
     `🗑️ Removed ${deletedChannels} channel(s)${deletedCategories > 0 ? ` and ${deletedCategories} categor${deletedCategories === 1 ? "y" : "ies"} (stale/duplicate)` : ""}.`,
   ];
   if (failures.length > 0) parts.push(`⚠️ Couldn't finish: ${failures.join(", ")} — check my Manage Channels permission.`);
+  else parts.push("Next: run `!setup-test-modules` to turn every module on and post it in its channel.");
   await interaction.update({ content: parts.join("\n"), components: [] });
 }
 

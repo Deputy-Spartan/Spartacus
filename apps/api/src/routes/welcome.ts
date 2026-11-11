@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma, prisma } from "@spartacus/db";
 import { requireAuth, type AuthedRequest } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
+import { ownedByGuild } from "../middleware/ownedByGuild";
 import { getBotClient } from "../lib/botClient";
 
 const router = Router();
@@ -103,7 +104,7 @@ router.post("/guilds/:guildId/welcome-greetings", requireAuth, requireGuildPermi
   res.status(201).json(row);
 });
 
-router.patch("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.patch("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuildPermission, ownedByGuild("welcomeGreeting"), async (req, res) => {
   const fields = ["text", "buttonLabel", "enabled", "sortOrder"];
   const data: Record<string, unknown> = {};
   for (const f of fields) if (req.body[f] !== undefined) data[f] = req.body[f];
@@ -111,7 +112,7 @@ router.patch("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuild
   res.json(row);
 });
 
-router.delete("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuildPermission, async (req, res) => {
+router.delete("/guilds/:guildId/welcome-greetings/:id", requireAuth, requireGuildPermission, ownedByGuild("welcomeGreeting"), async (req, res) => {
   await prisma.welcomeGreeting.delete({ where: { id: req.params.id } });
   res.status(204).send();
 });

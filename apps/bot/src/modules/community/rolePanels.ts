@@ -17,30 +17,34 @@ async function loadPanel(panelId: string): Promise<{ options: PanelOption[]; not
   return { options: (Array.isArray(panel.options) ? panel.options : []).map(normalizeOption), notifyMode: panel.notifyMode };
 }
 
-// PRIVATE = Discord's hidden "only you can see this" reply (it has its own
-// Dismiss link). DM and NONE still have to acknowledge the click, so they
-// defer silently first.
+// The click is acknowledged first (Discord gives three seconds), then the work
+// is done. PRIVATE = Discord's hidden "only you can see this" reply (it has its
+// own Dismiss link). DM and NONE clear that placeholder again.
 async function respond(interaction: ButtonInteraction | StringSelectMenuInteraction, mode: string, text: string, dmText?: string) {
   if (mode === "PRIVATE") {
-    await interaction.reply({ content: text, ephemeral: true, allowedMentions: { parse: [] } });
+    await interaction.editReply({ content: text, allowedMentions: { parse: [] } });
     return;
   }
-  await interaction.deferUpdate().catch(() => null);
+  await interaction.deleteReply().catch(() => null);
   if (mode === "DM") await interaction.user.send(`**${interaction.guild?.name}** — ${dmText ?? text}`).catch(() => null);
 }
 
 export async function handleRolePanelButton(interaction: ButtonInteraction, panelId: string, ref: string) {
   if (!interaction.guild || !interaction.member) return;
+  await interaction.deferReply({ ephemeral: true });
 
   const panel = await loadPanel(panelId);
   const option = panel ? findOption(panel.options, ref) : undefined;
   if (!option) {
-    await interaction.reply({ content: "This panel no longer exists.", ephemeral: true });
+    await interaction.editReply({ content: "This panel no longer exists." });
     return;
   }
 
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!member) return;
+  if (!member) {
+    await interaction.editReply({ content: "I couldn't find you in this server. Try again in a moment." });
+    return;
+  }
 
   const mode = panel!.notifyMode;
   try {
@@ -58,15 +62,19 @@ export async function handleRolePanelButton(interaction: ButtonInteraction, pane
 
 export async function handleRolePanelSelect(interaction: StringSelectMenuInteraction, panelId: string) {
   if (!interaction.guild) return;
+  await interaction.deferReply({ ephemeral: true });
 
   const panel = await loadPanel(panelId);
   if (!panel) {
-    await interaction.reply({ content: "This role panel no longer exists.", ephemeral: true });
+    await interaction.editReply({ content: "This role panel no longer exists." });
     return;
   }
 
   const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  if (!member) return;
+  if (!member) {
+    await interaction.editReply({ content: "I couldn't find you in this server. Try again in a moment." });
+    return;
+  }
 
   const { options, notifyMode } = panel;
   const selected = new Set(interaction.values.map((v) => findOption(options, v)).filter((o): o is PanelOption => !!o));

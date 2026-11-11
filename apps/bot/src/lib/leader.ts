@@ -21,6 +21,7 @@ const STALE_MS = 25_000;
 
 let leader = false;
 let loopStarted = false;
+let lastBeat = 0;
 
 export function isLeader() {
   return leader;
@@ -54,7 +55,14 @@ async function check() {
     if (!row) {
       await prisma.botLeader.create({ data: { id: ROW, instanceId: ID, heartbeatAt: new Date() } }).catch(() => null);
     } else if (row.instanceId === ID) {
-      await prisma.botLeader.update({ where: { id: ROW }, data: { heartbeatAt: new Date() } });
+      // Still the active copy: one read is enough, and the heartbeat only
+      // needs refreshing every few seconds (it goes stale after 25).
+      if (Date.now() - lastBeat > 8_000) {
+        await prisma.botLeader.update({ where: { id: ROW }, data: { heartbeatAt: new Date() } });
+        lastBeat = Date.now();
+      }
+      setLeader(true, "heartbeat");
+      return;
     } else if (Date.now() - row.heartbeatAt.getTime() > STALE_MS) {
       // Only take over if nobody else did in the meantime.
       await prisma.botLeader.updateMany({ where: { id: ROW, instanceId: row.instanceId }, data: { instanceId: ID, heartbeatAt: new Date() } });
@@ -85,9 +93,15 @@ export function startLeaderLoop() {
 // is skipped on a copy that isn't active, without touching each job file.
 type Schedule = typeof cron.schedule;
 const realSchedule: Schedule = cron.schedule.bind(cron);
+
+// About twenty jobs are set to run at the top of every minute. Starting them
+// all in the same second made every query wait in one queue (the database pool
+// is small), so each gets its own second instead.
+let minuteJobs = 0;
+const spread = (expression: string) => (expression.trim() === "* * * * *" ? `${(minuteJobs++ * 7) % 60} * * * * *` : expression);
 (cron as { schedule: Schedule }).schedule = ((expression: string, func: (...a: unknown[]) => unknown, options?: unknown) =>
   realSchedule(
-    expression,
+    spread(expression),
     ((...args: unknown[]) => (leader ? func(...args) : undefined)) as Parameters<Schedule>[1],
     options as Parameters<Schedule>[2],
   )) as Schedule;

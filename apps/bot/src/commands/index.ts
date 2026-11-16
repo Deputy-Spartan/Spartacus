@@ -39,6 +39,11 @@ import profile from "./leveling/profile";
 import levelroles from "./leveling/levelroles";
 import shop from "./economy/shop";
 import crates from "./economy/crates";
+import so from "./stream/so";
+import raidlist from "./stream/raidlist";
+import prestream from "./stream/prestream";
+import title from "./stream/title";
+import gamenight from "./stream/gamenight";
 
 export const commands = new Collection<string, CommandModule>();
 
@@ -82,6 +87,11 @@ for (const command of [
   levelroles,
   shop,
   crates,
+  so,
+  raidlist,
+  prestream,
+  title,
+  gamenight,
 ]) {
   commands.set(command.data.name, command);
 }

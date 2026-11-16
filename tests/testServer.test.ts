@@ -57,12 +57,12 @@ const OLD: Record<string, string[]> = {
   Moderation: ["Moderator", "Cases & Warnings", "Player Reports", "Weekly Staff Report", "Warn Escalation", "Appeals"],
   Security: ["AI Moderation", "Anti-Raid", "Anti-Nuke", "Server Backup", "Verification", "Rules", "Honeypot", "Perm Watch"],
   Community: ["Welcome", "Reaction Roles", "Sticky Messages", "Starboard", "Temp Channels", "AI Chat", "Birthdays", "Member Milestones", "Anonymous", "Event Scheduler", "LFG"],
-  Engagement: ["Embed Creator", "Announcements", "Quote of the Day", "Matchmaking", "Playing Now", "Giveaways", "Polls", "Going Live", "Stream Extras", "Custom Commands", "Weekly Recap", "Bump Reminder", "Suggestion Analytics", "Server Partnerships", "Counting Game"],
+  Engagement: ["Embed Creator", "Announcements", "Quote of the Day", "Matchmaking", "Playing Now", "Giveaways", "Polls", "Going Live", "Stream Extras", "Stream Growth", "Custom Commands", "Weekly Recap", "Bump Reminder", "Suggestion Analytics", "Server Partnerships", "Counting Game"],
   "Levelling & Economy": ["Economy Hub"],
   Support: ["Tickets", "Applications", "Support DM"],
   Utility: ["Role Manager", "Channel Locks", "Slow Mode", "Server Stat Channels", "Status Channel", "Server Config Templates", "Growth Analytics"],
 };
-const OLD_EXTRA: Record<string, string[]> = { "Quote of the Day": ["question-of-the-day"], "Stream Extras": ["stream-clips"] };
+const OLD_EXTRA: Record<string, string[]> = { "Quote of the Day": ["question-of-the-day"], "Stream Extras": ["stream-clips"], "Stream Growth": ["stream-raids", "game-nights"] };
 
 function oldLayout(): CategorySpec[] {
   const typeOf = new Map(layout.flatMap((c) => c.channels.map((ch) => [ch.name, ch.type] as const)));

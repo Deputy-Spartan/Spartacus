@@ -21,3 +21,4 @@ export * from "./playingNow";
 export * from "./frontPage";
 export * from "./commandBuilder";
 export * from "./streamExtras";
+export * from "./streamGrowth";

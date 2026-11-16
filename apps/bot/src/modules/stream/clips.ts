@@ -156,8 +156,9 @@ export async function postClipOfTheWeek(client: Client, force?: { guildId: strin
 // The vote button: one vote per person, and tapping again takes it back.
 export async function handleClipVote(interaction: ButtonInteraction) {
   const clipRowId = interaction.customId.slice(CLIP_VOTE_PREFIX.length);
-  if (!interaction.guildId || !(await isModuleEnabled(interaction.guildId, "STREAM_EXTRAS"))) {
-    await interaction.reply({ content: "⚠️ Stream Extras is turned off in this server.", ephemeral: true });
+  // Clips come from Stream Extras (Twitch) and from links posted with Stream Growth.
+  if (!interaction.guildId || !((await isModuleEnabled(interaction.guildId, "STREAM_EXTRAS")) || (await isModuleEnabled(interaction.guildId, "STREAM_GROWTH")))) {
+    await interaction.reply({ content: "⚠️ Clips are turned off in this server.", ephemeral: true });
     return;
   }
   const clip = await prisma.streamClip.findUnique({ where: { id: clipRowId } });

@@ -15,6 +15,7 @@ import { startEventReminderJob } from "./jobs/eventReminder";
 import { startEventSyncJob } from "./jobs/eventSync";
 import { startStreamPollerJob } from "./jobs/streamPoller";
 import { startStreamExtrasJobs } from "./jobs/streamExtras";
+import { startStreamGrowthJobs } from "./jobs/streamGrowth";
 import { startGiveawayEnderJob } from "./jobs/giveawayEnder";
 import { startGiveawayPosterJob } from "./jobs/giveawayPoster";
 import { startTicketPanelPosterJob } from "./jobs/ticketPanelPoster";
@@ -171,6 +172,11 @@ export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 export { checkStreamerNow, sendTestAlert } from "./modules/community/goLive";
 export { removeSlot as removeStreamSlot, updateSchedule } from "./modules/stream/schedule";
 export { postClipOfTheWeek } from "./modules/stream/clips";
+export { finishConnect, startConnect, disconnect as disconnectStreamAccount, setTitle as setStreamTitle, subscribeKickEvents, platformKeys as streamAccountKeys, redirectUri as streamRedirectUri, apiBase } from "./modules/stream/accounts";
+export { verifyKickSignature, handleKickEvent } from "./modules/stream/kickEvents";
+export { sendCountdown, forceBoard, pickViewerOfTheWeek, topViewers, refreshClipChannels } from "./modules/stream/growth";
+export { pollFriends, raidTargets } from "./modules/stream/friends";
+export { createRankRoles } from "./modules/stream/ranks";
 export { runStreamDeck, streamDeckFace, streamDeckOptions } from "./modules/utility/streamDeck";
 // Re-exported so apps/api's Verification settings save can post/repost the
 // panel immediately, same reasoning as postRulesGatePanel above.
@@ -267,6 +273,7 @@ export function startBot() {
     startStatusChannelPosterJob(c);
     startStreamPollerJob(c);
     startStreamExtrasJobs(c);
+    startStreamGrowthJobs(c);
     startGiveawayEnderJob(c);
     startGiveawayPosterJob(c);
     startTicketPanelPosterJob(c);

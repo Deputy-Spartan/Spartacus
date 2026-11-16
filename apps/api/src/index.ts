@@ -34,6 +34,7 @@ import welcomeRouter from "./routes/welcome";
 import moderationRouter from "./routes/moderation";
 import streamSubscriptionsRouter from "./routes/streamSubscriptions";
 import streamExtrasRouter from "./routes/streamExtras";
+import streamGrowthRouter, { kickWebhookRouter } from "./routes/streamGrowth";
 import discordMetaRouter from "./routes/discordMeta";
 import loggingRouter from "./routes/logging";
 import antiRaidRouter from "./routes/antiRaid";
@@ -125,6 +126,7 @@ app.use(
 );
 // Before express.json() — it verifies GitHub's signature against the raw body.
 app.use(githubWebhookRouter);
+app.use(kickWebhookRouter);
 // Default 100kb limit is too small for a base64-encoded avatar upload
 // (bot-config route) — Discord itself caps avatar files at 10MB, so match that.
 app.use(express.json({ limit: "10mb" }));
@@ -152,6 +154,7 @@ app.use(welcomeRouter);
 app.use(moderationRouter);
 app.use(streamSubscriptionsRouter);
 app.use(streamExtrasRouter);
+app.use(streamGrowthRouter);
 app.use(discordMetaRouter);
 app.use(loggingRouter);
 app.use(antiRaidRouter);

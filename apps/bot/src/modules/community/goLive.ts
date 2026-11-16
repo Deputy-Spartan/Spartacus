@@ -115,6 +115,8 @@ export async function announce(client: Client, sub: Sub, check: LiveCheck | null
   });
   await prisma.streamSubscription.update({ where: { id: sub.id }, data: { ...data, liveMessageId: posted?.id ?? null, lastNotifiedAt: now } });
   await setLiveRole(guild, sub, settings, true);
+  // Stream Growth: a fresh chat count and the follower total at the start.
+  await import("../stream/growth").then((m) => m.onStreamStart({ ...sub, ...data })).catch((e) => logError("bot", e, sub.guildId));
   return posted ? { ok: true } : { ok: false, error: "Discord wouldn't take the post." };
 }
 
@@ -137,6 +139,9 @@ export async function endStream(client: Client, sub: Sub) {
   const guild = client.guilds.cache.get(sub.guildId);
   await prisma.streamSubscription.update({ where: { id: sub.id }, data: { isLive: false, offlineStrikes: 0 } });
   if (guild) await setLiveRole(guild, sub, settings, false);
+  // Stream Growth: the recap and who to raid. Runs on its own so the alert
+  // edit below doesn't wait for it.
+  void import("../stream/growth").then((m) => m.onStreamEnd(client, sub)).catch((e) => logError("bot", e, sub.guildId));
   if (!sub.liveMessageId) return;
   const channel = await client.channels.fetch(sub.announceChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;

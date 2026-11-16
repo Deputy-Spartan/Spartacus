@@ -52,6 +52,7 @@ export const EXTRA_VOICE_CATEGORY: CategorySpec = {
 export const EXTRA_PAGE_CHANNELS: Record<string, string[]> = {
   "/quote-of-the-day": ["question-of-the-day"],
   "/stream-extras": ["stream-clips"],
+  "/stream-growth": ["stream-raids", "game-nights"],
 };
 
 // Modules with no dashboard page (/rank, /trivia and so on) still get a

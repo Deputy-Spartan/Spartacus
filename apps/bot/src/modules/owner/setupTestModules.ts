@@ -602,6 +602,37 @@ SEEDERS["/stream-extras"] = async ({ client, guild, channel, sibling }) => {
   if (!r.message.ok) throw new Error(r.message.error ?? "The schedule didn't post.");
 };
 
+// Countdowns, the live board, recaps, Viewer of the Week and clip links all
+// post here; friends go live in #stream-raids and game nights in #game-nights.
+SEEDERS["/stream-growth"] = async ({ client, guild, channel, sibling }) => {
+  let ping = guild.roles.cache.find((r) => r.name === "Stream Ping");
+  ping ??= await guild.roles.create({ name: "Stream Ping", mentionable: false, reason: "Test server: Stream Growth" });
+  const raids = sibling("stream-raids") ?? channel;
+  const games = sibling("game-nights") ?? channel;
+  const data = {
+    countdownEnabled: true,
+    countdownChannelId: channel.id,
+    pingRoleId: ping.id,
+    raidChannelId: raids.id,
+    boardChannelId: channel.id,
+    recapEnabled: true,
+    recapChannelId: channel.id,
+    recapLinkedOnly: false,
+    votwEnabled: true,
+    votwChannelId: channel.id,
+    gameNightChannelId: games.id,
+    clipSubmitChannelId: channel.id,
+  };
+  const config = await prisma.streamGrowthConfig.upsert({ where: { guildId: guild.id }, create: { guildId: guild.id, ...data }, update: { ...data, boardMessageId: null, boardHash: null } });
+  if (!(await prisma.streamFriend.count({ where: { guildId: guild.id } }))) await prisma.streamFriend.create({ data: { guildId: guild.id, platform: "kick", handle: "xqc", displayName: "xQc" } });
+  const growth = await import("../stream/growth");
+  await growth.refreshClipChannels();
+  const r = await growth.sendCountdown(client, config, { streamer: "Test Streamer", title: "Ranked grind", link: null, startsAt: new Date(Date.now() + 10 * MINUTE), minutes: 10 }, true);
+  if (!r.ok) throw new Error(r.error ?? "The countdown didn't post.");
+  const b = await growth.forceBoard(client, guild.id);
+  if (!b.ok) throw new Error(b.error ?? "The live board didn't post.");
+};
+
 SEEDERS["/role-manager"] = async ({ guild, channel, roles }) => {
   await prisma.roleManagerConfig.upsert({
     where: { guildId: guild.id },

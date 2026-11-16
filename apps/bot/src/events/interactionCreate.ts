@@ -63,6 +63,14 @@ async function route(interaction: Interaction) {
     return;
   }
 
+  // Stream Growth: stream pings, the /prestream checklist and game nights.
+  if (interaction.isButton() && interaction.customId.startsWith("sg:")) {
+    if (interaction.customId === "sg:ping") await (await import("../modules/stream/growth")).handlePingButton(interaction);
+    else if (interaction.customId.startsWith("sg:pre:")) await (await import("../commands/stream/prestream")).handlePrestreamButton(interaction);
+    else if (interaction.customId.startsWith("sg:gn:")) await (await import("../modules/stream/gameNight")).handleGameNightButton(interaction);
+    return;
+  }
+
   // /golive setup: the step-by-step Going Live wizard.
   if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) && interaction.customId.startsWith("glw:")) {
     const { handleGoLiveSetup } = await import("../modules/community/goLiveSetup");

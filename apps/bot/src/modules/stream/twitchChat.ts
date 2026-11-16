@@ -3,6 +3,7 @@ import { LINK_CODE_PATTERN } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isLeader } from "../../lib/leader";
+import { forgetChannel, forgetOldChatters, recordChat } from "../../lib/chatActivity";
 
 // Reads Twitch chat anonymously (the same way a viewer's browser does) for the
 // channels that are live right now, so viewers who linked their Twitch name can
@@ -19,18 +20,9 @@ let wanted = new Set<string>();
 const joined = new Set<string>();
 let retry = 0;
 let retryTimer: NodeJS.Timeout | null = null;
-// channel -> chatter -> when they last wrote
-const seen = new Map<string, Map<string, number>>();
 
 export function startTwitchChat(client: Client) {
   discord = client;
-}
-
-export function chattersSince(channel: string, sinceMs: number): string[] {
-  const m = seen.get(channel);
-  if (!m) return [];
-  const cutoff = Date.now() - sinceMs;
-  return [...m].filter(([, at]) => at >= cutoff).map(([user]) => user);
 }
 
 function send(line: string) {
@@ -91,7 +83,7 @@ function reconcile() {
   for (const c of [...joined]) if (!wanted.has(c)) {
     send(`PART #${c}`);
     joined.delete(c);
-    seen.delete(c);
+    forgetChannel("twitch", c);
   }
 }
 
@@ -100,14 +92,12 @@ export function setChatChannels(logins: string[]) {
   wanted = new Set(logins.map((l) => l.toLowerCase()).slice(0, MAX_CHANNELS));
   if (!wanted.size || !isLeader()) {
     disconnect();
-    seen.clear();
     return;
   }
   if (!ws) connect();
   else if (ws.readyState === 1) reconcile();
   // Forget chatters nobody will ask about again.
-  const old = Date.now() - 30 * 60_000;
-  for (const m of seen.values()) for (const [u, at] of m) if (at < old) m.delete(u);
+  forgetOldChatters(30 * 60_000);
 }
 
 function onLine(line: string) {
@@ -125,9 +115,7 @@ function onLine(line: string) {
   if (space < 0) return;
   const channel = rest.slice(0, space).toLowerCase();
   const text = rest.slice(space + 2);
-  let m = seen.get(channel);
-  if (!m) seen.set(channel, (m = new Map()));
-  m.set(user, Date.now());
+  recordChat("twitch", channel, user);
   const code = text.match(LINK_CODE_PATTERN);
   if (code) void verifyLink(user, code[0]);
 }

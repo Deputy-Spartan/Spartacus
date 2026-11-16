@@ -246,6 +246,67 @@ export interface StreamExtrasData {
   twitchStreamers: number;
   twitchKeys: boolean;
 }
+export interface StreamGrowthConfigRow {
+  guildId?: string;
+  countdownEnabled: boolean;
+  countdownChannelId?: string | null;
+  pingRoleId?: string | null;
+  countdownHour: boolean;
+  countdownSoon: boolean;
+  raidChannelId?: string | null;
+  friendAlerts: boolean;
+  raidListOnEnd: boolean;
+  boardChannelId?: string | null;
+  recapEnabled: boolean;
+  recapChannelId?: string | null;
+  recapLinkedOnly: boolean;
+  votwEnabled: boolean;
+  votwChannelId?: string | null;
+  votwRoleId?: string | null;
+  votwDay: number;
+  gameNightChannelId?: string | null;
+  gameNightRoleId?: string | null;
+  checklist: string[];
+  clipSubmitChannelId?: string | null;
+}
+export interface StreamFriendRow {
+  id: string;
+  platform: string;
+  handle: string;
+  displayName?: string | null;
+  isLive: boolean;
+  lastTitle?: string | null;
+  lastGame?: string | null;
+  lastViewers?: number | null;
+}
+export interface StreamAccountRow {
+  id: string;
+  platform: "twitch" | "kick";
+  login: string;
+  displayName?: string | null;
+  owner?: string | null;
+  mine: boolean;
+}
+export interface StreamGrowthData {
+  config: StreamGrowthConfigRow;
+  friends: StreamFriendRow[];
+  accounts: StreamAccountRow[];
+  scheduledStreams: number;
+  timezone: string;
+  gameNights: Array<{ id: string; game: string; startAt: string; host: string; players: number; teamSize: number }>;
+  topViewers: Array<{ userId: string; name: string | null; messages: number }>;
+  keys: { twitch: boolean; kick: boolean };
+  urls: { twitch: string; kick: string; kickWebhook: string };
+  ranks: { createdAt: string | null; icons: boolean | null; levelingOn: boolean };
+}
+export interface RankSetupResult {
+  created: string[];
+  reused: string[];
+  skippedLevels: string[];
+  icons: boolean;
+  promoted: number;
+  error?: string;
+}
 export interface LiveCheckResult {
   live?: boolean;
   title?: string | null;
@@ -2192,6 +2253,22 @@ export const api = {
   refreshStreamSchedule: (guildId: string) => request<{ ok: boolean; note: string | null }>(`/guilds/${guildId}/stream-extras/refresh-schedule`, { method: "POST" }),
   postClipOfTheWeek: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-extras/clip-of-the-week`, { method: "POST" }),
   deleteStreamLink: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-extras/links/${id}`, { method: "DELETE" }),
+
+  getStreamGrowth: (guildId: string) => request<StreamGrowthData>(`/guilds/${guildId}/stream-growth`),
+  saveStreamGrowth: (guildId: string, body: Partial<StreamGrowthConfigRow>) => request<{ config: StreamGrowthConfigRow }>(`/guilds/${guildId}/stream-growth`, { method: "PUT", body: JSON.stringify(body) }),
+  addStreamFriend: (guildId: string, body: { platform: string; handle: string; displayName?: string | null }) => request<{ friend: StreamFriendRow }>(`/guilds/${guildId}/stream-growth/friends`, { method: "POST", body: JSON.stringify(body) }),
+  deleteStreamFriend: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-growth/friends/${id}`, { method: "DELETE" }),
+  checkStreamFriends: (guildId: string) => request<{ friends: StreamFriendRow[] }>(`/guilds/${guildId}/stream-growth/friends/check`, { method: "POST" }),
+  connectStreamAccount: (guildId: string, platform: "twitch" | "kick") => request<{ url: string }>(`/guilds/${guildId}/stream-growth/connect/${platform}`, { method: "POST" }),
+  disconnectStreamAccount: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-growth/accounts/${id}`, { method: "DELETE" }),
+  resubscribeKick: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-growth/accounts/${id}/resubscribe`, { method: "POST" }),
+  setStreamTitle: (guildId: string, body: { title?: string | null; game?: string | null; accountIds?: string[] }) =>
+    request<{ results: Array<{ platform: string; login: string; ok: boolean; error?: string; game?: string | null }> }>(`/guilds/${guildId}/stream-growth/title`, { method: "POST", body: JSON.stringify(body) }),
+  testCountdown: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-growth/test-countdown`, { method: "POST" }),
+  refreshLiveBoard: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-growth/refresh-board`, { method: "POST" }),
+  testViewerOfTheWeek: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-growth/votw-test`, { method: "POST" }),
+  createRankRoles: (guildId: string) => request<RankSetupResult>(`/guilds/${guildId}/stream-growth/ranks`, { method: "POST" }),
+  cancelGameNight: (guildId: string, id: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-growth/game-nights/${id}/cancel`, { method: "POST" }),
 
   getStreamSubscriptions: (guildId: string) =>
     request<StreamSubscription[]>(`/guilds/${guildId}/stream-subscriptions`),

@@ -63,6 +63,7 @@ export const MODULE_KEYS = [
   "PROFILE_CARDS",
   "PLAYING_NOW",
   "STREAM_EXTRAS",
+  "STREAM_GROWTH",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -132,6 +133,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   QOTD: "Quote & Question of the Day",
   ROLE_MANAGER: "Role Manager",
   STREAM_EXTRAS: "Stream Extras",
+  STREAM_GROWTH: "Stream Growth",
 };
 
 export const SIGNUP_ROLES = [

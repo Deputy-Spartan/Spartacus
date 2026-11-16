@@ -184,6 +184,7 @@ enum ModuleKey {
   PROFILE_CARDS
   PLAYING_NOW
   STREAM_EXTRAS
+  STREAM_GROWTH
 }
 
 model GrowthSnapshot {
@@ -352,6 +353,8 @@ model StreamSubscription {
   offlineStrikes Int       @default(0) // offline checks in a row, so a blip doesn't end the stream
   lastError      String?
   alertOverrides Json? // this streamer's own alert look (message, title, text, color, button, images); empty parts use the server's
+  startFollowers Int? // follower total when this stream started (Twitch, with a connected account)
+  streamFollows  Int       @default(0) // follows counted during this stream (Kick webhooks)
 
   @@index([guildId])
 }
@@ -3243,6 +3246,8 @@ model StreamSlot {
   durationMin    Int       @default(120)
   discordEventId String?
   eventAt        DateTime? // the start the Discord event was made for
+  remindHourFor  DateTime? // the start the "live in 1 hour" post was sent for
+  remindSoonFor  DateTime? // the start the "live in 10 minutes" post was sent for
   createdAt      DateTime  @default(now())
 
   @@index([guildId])
@@ -3272,4 +3277,132 @@ model StreamRewardDay {
   coins   Int    @default(0)
 
   @@unique([guildId, userId, day])
+}
+
+// ---- Stream Growth: countdowns, friends & raids, live board, recaps,
+// Viewer of the Week, game nights, the pre-stream checklist, connected
+// streaming accounts and chat ranks ----
+
+model StreamGrowthConfig {
+  id                  String    @id @default(cuid())
+  guildId             String    @unique
+  // Countdown before each scheduled stream
+  countdownEnabled    Boolean   @default(false)
+  countdownChannelId  String?
+  pingRoleId          String? // the opt-in "Stream Ping" role
+  countdownHour       Boolean   @default(true)
+  countdownSoon       Boolean   @default(true)
+  // Friends & raids
+  raidChannelId       String?
+  friendAlerts        Boolean   @default(true) // post when a friend goes live
+  raidListOnEnd       Boolean   @default(true) // when your stream ends, list friends to raid
+  // Who's live board
+  boardChannelId      String?
+  boardMessageId      String?
+  boardHash           String?
+  // Stream recap
+  recapEnabled        Boolean   @default(false)
+  recapChannelId      String?
+  recapLinkedOnly     Boolean   @default(true) // only streamers linked to a Discord account
+  // Viewer of the Week
+  votwEnabled         Boolean   @default(false)
+  votwChannelId       String?
+  votwRoleId          String?
+  votwDay             Int       @default(1) // 0 = Sunday
+  votwLastWeek        String?
+  // Game nights
+  gameNightChannelId  String?
+  gameNightRoleId     String? // pinged when a game night is posted
+  // Pre-stream checklist
+  checklist           String[]  @default([])
+  // Viewers' clip links get a vote button here
+  clipSubmitChannelId String?
+  // Chat ranks
+  ranksCreatedAt      DateTime?
+}
+
+model StreamFriend {
+  id             String    @id @default(cuid())
+  guildId        String
+  platform       String // twitch | youtube | kick | tiktok
+  handle         String
+  displayName    String?
+  isLive         Boolean   @default(false)
+  offlineStrikes Int       @default(0)
+  liveStartedAt  DateTime?
+  lastTitle      String?
+  lastGame       String?
+  lastViewers    Int?
+  lastAvatar     String?
+  lastUrl        String?
+  alertMessageId String?
+  createdAt      DateTime  @default(now())
+
+  @@unique([guildId, platform, handle])
+  @@index([guildId])
+}
+
+// A streamer's own Twitch or Kick login, connected from the dashboard, so the
+// bot can change their title and game and count followers. Tokens are stored
+// encrypted.
+model StreamerAccount {
+  id            String    @id @default(cuid())
+  guildId       String
+  discordUserId String
+  platform      String // twitch | kick
+  platformId    String // their Twitch or Kick user id
+  login         String // channel name, lowercase
+  displayName   String?
+  accessToken   String
+  refreshToken  String?
+  expiresAt     DateTime?
+  scopes        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([guildId, platform, platformId])
+  @@index([platform, platformId])
+  @@index([guildId, discordUserId])
+}
+
+// Stream chat per viewer per day, for Viewer of the Week.
+model StreamViewerDay {
+  id       String @id @default(cuid())
+  guildId  String
+  userId   String
+  day      String // YYYY-MM-DD, UTC
+  messages Int    @default(0)
+
+  @@unique([guildId, userId, day])
+  @@index([guildId, day])
+}
+
+model GameNight {
+  id         String    @id @default(cuid())
+  guildId    String
+  channelId  String
+  messageId  String?
+  hostId     String
+  game       String
+  note       String?
+  startAt    DateTime
+  teamSize   Int       @default(0) // 0 = no teams
+  maxPlayers Int       @default(0) // 0 = no limit
+  status     String    @default("OPEN") // OPEN | TEAMS | DONE | CANCELED
+  remindedAt DateTime?
+  teams      Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([guildId, status])
+  @@index([status, startAt])
+}
+
+model GameNightPlayer {
+  id          String   @id @default(cuid())
+  gameNightId String
+  userId      String
+  joinedAt    DateTime @default(now())
+
+  @@unique([gameNightId, userId])
+  @@index([gameNightId])
 }

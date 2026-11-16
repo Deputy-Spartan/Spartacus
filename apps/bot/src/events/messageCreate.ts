@@ -114,6 +114,15 @@ export async function execute(message: Message) {
     countMessageActivity(message.guildId, message.channelId);
   }
 
+  // --- Stream Growth: Viewer of the Week counts Discord chat during streams,
+  // and clip links in the clips channel get a vote button. Both check memory
+  // first, so this costs nothing in servers that don't use them.
+  {
+    const growth = await import("../modules/stream/growth");
+    growth.countDiscordMessage(message);
+    await growth.handleClipSubmission(message).catch(() => null);
+  }
+
   // --- Counting game ---
   if (await isModuleEnabled(message.guildId, "COUNTING_GAME")) {
     await checkCountingMessage(message);

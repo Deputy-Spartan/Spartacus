@@ -5,7 +5,8 @@ import { isModuleEnabled } from "../../lib/moduleGate";
 import { addBalance, getConfig } from "../../lib/economy";
 import { awardXp } from "../leveling/xp";
 import { handleLevelUp } from "../leveling/levelUp";
-import { chattersSince, setChatChannels } from "./twitchChat";
+import { setChatChannels } from "./twitchChat";
+import { chattersSince } from "../../lib/chatActivity";
 
 // Viewer rewards: a member who linked their Twitch name earns coins and XP
 // for chatting in a followed streamer's live chat. Paid once per interval,
@@ -16,10 +17,15 @@ const TICK_MS = 5 * 60_000;
 
 // Which live Twitch channels to listen to, across every server that has
 // rewards on. Called after each live check and on each rewards tick.
+// Stream Growth's recaps and Viewer of the Week read the same chat.
 export async function syncChatChannels() {
-  const configs = await prisma.streamExtrasConfig.findMany({ where: { rewardsEnabled: true }, select: { guildId: true } });
+  const [configs, growth] = await Promise.all([
+    prisma.streamExtrasConfig.findMany({ where: { rewardsEnabled: true }, select: { guildId: true } }),
+    prisma.streamGrowthConfig.findMany({ where: { OR: [{ recapEnabled: true }, { votwEnabled: true }] }, select: { guildId: true } }),
+  ]);
   const guilds: string[] = [];
   for (const c of configs) if (await isModuleEnabled(c.guildId, "STREAM_EXTRAS")) guilds.push(c.guildId);
+  for (const c of growth) if (!guilds.includes(c.guildId) && (await isModuleEnabled(c.guildId, "STREAM_GROWTH"))) guilds.push(c.guildId);
   if (!guilds.length) return setChatChannels([]);
   const live = await prisma.streamSubscription.findMany({ where: { guildId: { in: guilds }, platform: "twitch", isLive: true }, select: { channelName: true } });
   setChatChannels([...new Set(live.map((s) => s.channelName.toLowerCase()))]);
@@ -33,16 +39,26 @@ export async function rewardTick(client: Client) {
     try {
       const guild = client.guilds.cache.get(config.guildId);
       if (!guild || !(await isModuleEnabled(config.guildId, "STREAM_EXTRAS"))) continue;
-      const live = await prisma.streamSubscription.findMany({ where: { guildId: config.guildId, platform: "twitch", isLive: true }, select: { channelName: true } });
+      const live = await prisma.streamSubscription.findMany({ where: { guildId: config.guildId, platform: { in: ["twitch", "kick"] }, isLive: true }, select: { platform: true, channelName: true } });
       if (!live.length) continue;
       // Who wrote in a live chat since the last tick (never the streamer in their own chat).
-      const chatters = new Set<string>();
+      const chatters = { twitch: new Set<string>(), kick: new Set<string>() };
       for (const s of live) {
         const login = s.channelName.toLowerCase();
-        for (const u of chattersSince(login, TICK_MS + 30_000)) if (u !== login) chatters.add(u);
+        const into = s.platform === "kick" ? chatters.kick : chatters.twitch;
+        for (const u of chattersSince(s.platform, login, TICK_MS + 30_000)) if (u !== login) into.add(u);
       }
-      if (!chatters.size) continue;
-      const links = await prisma.streamLink.findMany({ where: { guildId: config.guildId, verified: true, platform: "twitch", handle: { in: [...chatters] } } });
+      if (!chatters.twitch.size && !chatters.kick.size) continue;
+      const links = await prisma.streamLink.findMany({
+        where: {
+          guildId: config.guildId,
+          verified: true,
+          OR: [
+            { platform: "twitch", handle: { in: [...chatters.twitch] } },
+            { platform: "kick", handle: { in: [...chatters.kick] } },
+          ],
+        },
+      });
       if (!links.length) continue;
       const [coinsOn, levelsOn] = await Promise.all([isModuleEnabled(config.guildId, "ECONOMY"), isModuleEnabled(config.guildId, "LEVELING")]);
       const economy = coinsOn && config.rewardCoins > 0 ? await getConfig(config.guildId) : null;

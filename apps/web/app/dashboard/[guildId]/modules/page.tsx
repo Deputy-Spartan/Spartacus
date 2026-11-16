@@ -28,11 +28,14 @@ function ModulesContent({ guildId }: { guildId: string }) {
   const sectionFilter = useSearchParams().get("section");
   const groups = sectionFilter ? ALL_GROUPS.filter((s) => s.section === sectionFilter) : ALL_GROUPS;
 
-  // Which groups are open is remembered on this device.
+  // One group is open at a time; opening another closes it. Which one is
+  // remembered on this device.
   const [open, setOpen] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try {
-      setOpen(JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}") as Record<string, boolean>);
+      const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "{}") as Record<string, boolean>;
+      const first = Object.keys(saved).find((k) => saved[k]);
+      setOpen(first ? { [first]: true } : {});
     } catch {
       /* private mode */
     }
@@ -45,8 +48,14 @@ function ModulesContent({ guildId }: { guildId: string }) {
       /* private mode */
     }
   }
-  const names = [...ALL_GROUPS.map((s) => s.section as string), EXTRAS];
-  const allOpen = names.every((n) => open[n]);
+  const flip = (name: string, el?: HTMLElement) => {
+    const opening = !open[name];
+    remember(opening ? { [name]: true } : {});
+    // Closing the group above moves this one up the page, so keep it in view.
+    if (opening && el) requestAnimationFrame(() => {
+      if (el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  };
   const isOpen = (name: string) => !!sectionFilter || !!open[name];
 
   const toggle = (moduleKey: string, next: boolean) => void setModuleEnabled(guildId, moduleKey, next).catch(() => null);
@@ -58,20 +67,11 @@ function ModulesContent({ guildId }: { guildId: string }) {
           ← All groups
         </Link>
       )}
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+      <div className="mb-6">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold mb-1">{sectionFilter ?? "Modules"}</h1>
           <p className="text-slate-400">Switch features on or off. Open a group to see what&apos;s inside, and pin the pages you use most to the top of the sidebar.</p>
         </div>
-        {!sectionFilter && (
-          <button
-            type="button"
-            onClick={() => remember(allOpen ? {} : Object.fromEntries(names.map((n) => [n, true])))}
-            className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-500 hover:text-slate-300 border border-white/10 rounded-lg px-3 py-1.5 transition-colors"
-          >
-            {allOpen ? "Close all" : "Open all"}
-          </button>
-        )}
       </div>
       {groups.length === 0 && <p className="text-sm text-slate-500">No group matches &quot;{sectionFilter}&quot;.</p>}
 
@@ -86,7 +86,7 @@ function ModulesContent({ guildId }: { guildId: string }) {
             <NeonCard key={name} className="!p-0 overflow-hidden">
               <button
                 type="button"
-                onClick={() => !sectionFilter && remember({ ...open, [name]: !open[name] })}
+                onClick={(e) => !sectionFilter && flip(name, e.currentTarget)}
                 aria-expanded={shown}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-left"
               >
@@ -140,7 +140,7 @@ function ModulesContent({ guildId }: { guildId: string }) {
 
         {!sectionFilter && (
           <NeonCard className="!p-0 overflow-hidden">
-            <button type="button" onClick={() => remember({ ...open, [EXTRAS]: !open[EXTRAS] })} aria-expanded={isOpen(EXTRAS)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
+            <button type="button" onClick={(e) => flip(EXTRAS, e.currentTarget)} aria-expanded={isOpen(EXTRAS)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
               <AppIcon emoji="🧩" size={34} />
               <span className="flex-1 min-w-0">
                 <span className="block font-semibold truncate">{EXTRAS}</span>

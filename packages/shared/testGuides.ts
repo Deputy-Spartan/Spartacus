@@ -229,12 +229,19 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
     needs: "Twitch keys on the bot, and a live Twitch streamer, to see clips and chat rewards.",
   },
+  "/pre-stream": {
+    prepared: "The module is on with the starting checklist.",
+    tryIt: [
+      "Run /prestream and tap a few items. They turn green.",
+      "Add an item on the dashboard, then run /prestream again to see it.",
+      "Remove an item, or press Reset, and run /prestream again.",
+    ],
+  },
   "/stream-growth": {
     prepared: "Countdowns post here with a Stream Ping role, friends go live in #stream-raids, game nights go to #game-nights, the live board is posted here, and recaps and Viewer of the Week are on.",
     tryIt: [
       "Tap 🔔 on the countdown test post to get the Stream Ping role, and tap it again to drop it.",
       "Run /so with a streamer's name (try a Twitch or Kick name) to see a shoutout card.",
-      "Run /prestream and tick a few items off.",
       "Run /gamenight with a game and a time, join it with the button, then press Make teams.",
       "Add a friend on the dashboard's Friends tab and press Check now.",
       "Press Create rank roles on the Chat ranks tab and look at the new roles.",

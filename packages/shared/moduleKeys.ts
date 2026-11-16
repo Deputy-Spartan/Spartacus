@@ -64,6 +64,7 @@ export const MODULE_KEYS = [
   "PLAYING_NOW",
   "STREAM_EXTRAS",
   "STREAM_GROWTH",
+  "PRE_STREAM",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -134,6 +135,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   ROLE_MANAGER: "Role Manager",
   STREAM_EXTRAS: "Stream Extras",
   STREAM_GROWTH: "Stream Growth",
+  PRE_STREAM: "Pre-Stream Checklist",
 };
 
 export const SIGNUP_ROLES = [

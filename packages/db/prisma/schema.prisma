@@ -185,6 +185,7 @@ enum ModuleKey {
   PLAYING_NOW
   STREAM_EXTRAS
   STREAM_GROWTH
+  PRE_STREAM
 }
 
 model GrowthSnapshot {

@@ -23,7 +23,7 @@ async function statusLines(guildId: string, userId: string) {
   ]);
   const lines: string[] = [];
   lines.push(subs.length ? `🔴 Going Live alerts: ${subs.map((s) => `${platformInfo(s.platform).emoji} ${s.channelName}`).join(", ")}` : "⚠️ No channel linked for alerts. Run `/mystream link`.");
-  lines.push(accounts.length ? `🔑 Title updates: ${accounts.map((a) => `${platformInfo(a.platform).emoji} ${a.login}`).join(", ")} (use \`/title\`)` : "🔑 No Twitch or Kick connected, so `/title` can't change your title. Connect on the dashboard (Stream Growth → Accounts).");
+  lines.push(accounts.length ? `🔑 Title updates: ${accounts.map((a) => `${platformInfo(a.platform).emoji} ${a.login}`).join(", ")} (use \`/title\`)` : "🔑 No Twitch or Kick connected, so `/title` can't change your title. Connect on the dashboard (Streaming → Stream Growth → Accounts).");
   const tz = extras && isValidTimezone(extras.scheduleTimezone) ? extras.scheduleTimezone : "UTC";
   const mine = slots.filter((s) => s.userId === userId);
   const pool = mine.length ? mine : slots;
@@ -57,7 +57,7 @@ function view(list: string[], mask: number, status: string[]) {
 }
 
 const command: CommandModule = {
-  moduleKey: "STREAM_GROWTH",
+  moduleKey: "PRE_STREAM",
   data: new SlashCommandBuilder().setName("prestream").setDescription("Your checklist before going live").setDMPermission(false) as SlashCommandBuilder,
 
   async execute(interaction) {

@@ -48,6 +48,7 @@ export const ROUTE_LOADS: Record<string, Loader[]> = {
   "/sticky-messages": ["getStickyMessages"],
   "/stream-alerts": ["getStreamSubscriptions"],
   "/stream-extras": ["getStreamExtras"],
+  "/pre-stream": ["getStreamGrowth"],
   "/stream-growth": ["getStreamGrowth"],
   "/suggestion-analytics": ["getSuggestionAnalyticsSettings"],
   "/support-intake": ["getSupportFlows", "getSupportSettings"],

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CHAT_RANKS, CHECKLIST_MAX, DAY_NAMES, STREAM_GROWTH_DEFAULTS, platformInfo } from "@spartacus/shared";
+import { CHAT_RANKS, DAY_NAMES, STREAM_GROWTH_DEFAULTS, platformInfo } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
@@ -19,7 +19,7 @@ const hint = "text-xs text-slate-500";
 const button = "text-sm px-3 py-2 rounded-lg border border-white/10 text-slate-300 hover:text-white hover:border-white/30 transition-colors disabled:opacity-50";
 const warn = "text-xs text-amber-200";
 
-type Tab = "countdown" | "friends" | "board" | "votw" | "games" | "accounts" | "checklist" | "ranks" | "clips";
+type Tab = "countdown" | "friends" | "board" | "votw" | "games" | "accounts" | "ranks" | "clips";
 const TABS: Array<[Tab, string]> = [
   ["countdown", "⏰ Countdown"],
   ["friends", "🤝 Friends & raids"],
@@ -27,7 +27,6 @@ const TABS: Array<[Tab, string]> = [
   ["votw", "⭐ Viewer of the Week"],
   ["games", "🎮 Game nights"],
   ["accounts", "🔑 Accounts & title"],
-  ["checklist", "📋 Checklist"],
   ["ranks", "🎖️ Chat ranks"],
   ["clips", "🎬 Clip links"],
 ];
@@ -139,7 +138,6 @@ export default function StreamGrowthPage({ params }: { params: { guildId: string
         {tab === "votw" && <VotwTab guildId={guildId} config={config} update={update} data={data} />}
         {tab === "games" && <GamesTab guildId={guildId} config={config} update={update} data={data} reload={reload} />}
         {tab === "accounts" && <AccountsTab guildId={guildId} data={data} reload={reload} />}
-        {tab === "checklist" && <ChecklistTab config={config} update={update} />}
         {tab === "ranks" && <RanksTab guildId={guildId} data={data} reload={reload} />}
         {tab === "clips" && <ClipsTab guildId={guildId} config={config} update={update} />}
       </div>
@@ -518,41 +516,6 @@ function AccountsTab({ guildId, data, reload }: { guildId: string; data: StreamG
         </ol>
       </NeonCard>
     </>
-  );
-}
-
-// ---- Checklist ----
-function ChecklistTab({ config, update }: { config: StreamGrowthConfigRow; update: Update }) {
-  const list = config.checklist;
-  const set = (next: string[]) => update({ checklist: next.slice(0, CHECKLIST_MAX) });
-  const [item, setItem] = useState("");
-  return (
-    <NeonCard>
-      <Header title="📋 Pre-stream checklist" text="Run /prestream in Discord before you go live. It shows these to tick off, plus what the bot sees (linked channels, connected accounts, your next stream). Only you see it." />
-      <ul className="space-y-2">
-        {list.map((t, i) => (
-          <li key={`${i}-${t}`} className="flex items-center gap-2">
-            <span className={`${hint} w-5 text-right`}>{i + 1}.</span>
-            <input className={field} value={t} maxLength={60} onChange={(e) => set(list.map((x, j) => (j === i ? e.target.value : x)))} />
-            <button className="text-xs text-slate-400 hover:text-white" disabled={i === 0} onClick={() => set(list.map((x, j) => (j === i - 1 ? list[i] : j === i ? list[i - 1] : x)))}>
-              ↑
-            </button>
-            <button className="text-xs text-rose-300 hover:text-rose-200" onClick={() => set(list.filter((_, j) => j !== i))}>
-              ✕
-            </button>
-          </li>
-        ))}
-      </ul>
-      {list.length < CHECKLIST_MAX && (
-        <div className="flex gap-2 mt-3">
-          <input className={field} placeholder="Add an item" value={item} maxLength={60} onChange={(e) => setItem(e.target.value)} onKeyDown={(e) => e.key === "Enter" && item.trim() && (set([...list, item.trim()]), setItem(""))} />
-          <button className={button} onClick={() => item.trim() && (set([...list, item.trim()]), setItem(""))}>
-            Add
-          </button>
-        </div>
-      )}
-      <p className={`${hint} mt-2`}>Up to {CHECKLIST_MAX} items.</p>
-    </NeonCard>
   );
 }
 

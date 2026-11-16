@@ -19,12 +19,14 @@ export const STREAM_GROWTH_DEFAULTS = {
 
 // Used when a server hasn't written its own checklist.
 export const DEFAULT_CHECKLIST = [
-  "Stream title and game set",
-  "Alerts working (send a test)",
+  "Title and game set",
+  "Avatar showing in OBS",
   "Mic and game audio levels",
-  "Camera / avatar showing",
+  "Game voice chat off stream",
+  "Chat filters on",
+  "Alerts working (send a test)",
   "Starting Soon screen up",
-  "Clip tools running",
+  "Live on Kick and TikTok",
   "Phone on do not disturb",
   "Drink nearby",
 ];

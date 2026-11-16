@@ -72,11 +72,12 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     section: "Streaming",
     icon: "🔴",
-    description: "Going-live alerts, clips, the schedule, viewer rewards, raids, recaps and game nights.",
+    description: "Going-live alerts, clips, the schedule, viewer rewards, raids, recaps, game nights and your pre-stream checklist.",
     items: [
       { href: "/stream-alerts", label: "Going Live", icon: "🔴", moduleKey: "STREAM_ALERTS" },
       { href: "/stream-extras", label: "Stream Extras", icon: "🎬", moduleKey: "STREAM_EXTRAS" },
       { href: "/stream-growth", label: "Stream Growth", icon: "📣", moduleKey: "STREAM_GROWTH" },
+      { href: "/pre-stream", label: "Pre-Stream Checklist", icon: "📋", moduleKey: "PRE_STREAM" },
     ],
   },
   {

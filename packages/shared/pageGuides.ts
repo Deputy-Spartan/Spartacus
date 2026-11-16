@@ -424,9 +424,24 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Coins need the Economy module on and XP needs Leveling on.",
     ],
   },
+  "/pre-stream": {
+    title: "Pre-Stream Checklist",
+    purpose: "Your list of things to check before you go live. Run /prestream in Discord and tap each one as you do it.",
+    steps: [
+      "Add, change, move or remove items on this page. Up to 15.",
+      "Press Reset to start over from the starting list.",
+      "Turn the module on at the top of the page.",
+      "Before each stream, run /prestream in Discord and tap the items as you go.",
+    ],
+    members: ["/prestream shows the checklist. Only the person who runs it sees it."],
+    tips: [
+      "Below the list, /prestream also shows what the bot knows: your linked channels, connected accounts and your next scheduled stream.",
+      "Ticks aren't saved. Every /prestream starts fresh.",
+    ],
+  },
   "/stream-growth": {
     title: "Stream Growth",
-    purpose: "Help your streams grow: countdown pings, friends to raid and shout out, a who's-live board, a recap after each stream, Viewer of the Week, game nights, a pre-stream checklist, title updates and chat ranks.",
+    purpose: "Help your streams grow: countdown pings, friends to raid and shout out, a who's-live board, a recap after each stream, Viewer of the Week, game nights, title updates and chat ranks.",
     steps: [
       "Countdown: pick a channel and a Stream Ping role. Posts go out 1 hour and 10 minutes before each stream on your Stream Extras schedule, and members tap 🔔 to get the role.",
       "Friends & raids: add the streamers you're friends with. When one goes live it's posted in the raid channel, and when your stream ends you get a list of who to raid.",
@@ -439,7 +454,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Turn the module on at the top of the page.",
     ],
     members: [
-      "/so name gives a streamer a shoutout. /prestream shows your checklist. /title changes your title and game. /gamenight creates a game night. /link kick connects a Kick name for rewards.",
+      "/so name gives a streamer a shoutout. /title changes your title and game. /gamenight creates a game night. /link kick connects a Kick name for rewards.",
     ],
     tips: [
       "The countdown uses the schedule from Stream Extras, so add your streams there first.",

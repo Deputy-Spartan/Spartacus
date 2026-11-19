@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type QuickLinkGroup } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api } from "../../lib/api";
 import { useModules } from "../../lib/useModules";
@@ -11,6 +11,8 @@ import { usePinnedModules } from "../../lib/usePinnedModules";
 import { hoverPrefetch } from "../../lib/prefetch";
 import { AppIcon } from "../ui/AppIcon";
 import { useSetupStatus } from "../ui/SetupStatus";
+import { useNavLayout } from "../../lib/navLayout";
+import { NavEditor } from "./NavEditor";
 
 // NAV_SECTIONS/NAV_MODULE_KEYS/MODULE_KEY_TO_HREF/OWNER_NAV_SECTION now live
 // in packages/shared/navItems.ts — the bot's !setup-test-server scaffold
@@ -70,6 +72,9 @@ export function Sidebar({
   const modules = useModules(guildId);
   const setup = useSetupStatus(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
+  // The owner's own names, order and hidden pages (Edit Mode).
+  const layout = useNavLayout();
+  const [editing, setEditing] = useState(false);
 
   const baseSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
@@ -78,7 +83,10 @@ export function Sidebar({
 
   // Every pinnable item, in one flat list, so the Pinned group below can
   // look up an item's label/icon regardless of which category it lives in.
-  const allItems = useMemo(() => baseSections.flatMap((s) => s.items), [baseSections]);
+  const allItems = useMemo(
+    () => baseSections.flatMap((s) => s.items).map((i) => ({ ...i, label: layout.pageLabel(i.href, i.label) })),
+    [baseSections, layout]
+  );
 
   const pinnedItems = useMemo(() => allItems.filter((item) => isPinned(item.href)), [allItems, isPinned]);
 
@@ -90,19 +98,21 @@ export function Sidebar({
   // stays a regular expandable section.
   const categoryRows = useMemo(
     () =>
-      baseSections
-        .slice(1)
-        .filter((s) => s.section !== "Owner Only")
+      layout.sections
+        .filter((s) => !s.hidden)
         .map((s) => {
-          const landing = s.items.find((i) => i.moduleKey && modules?.[i.moduleKey]?.enabled) ?? s.items[0];
+          const shown = s.items.filter((i) => !i.hidden);
+          const pool = shown.length ? shown : s.items;
+          const landing = pool.find((i) => i.moduleKey && modules?.[i.moduleKey]?.enabled) ?? pool[0];
           return {
-            href: landing?.href ?? `/modules?section=${encodeURIComponent(s.section as string)}`,
-            label: s.section as string,
+            href: landing?.href ?? `/modules?section=${encodeURIComponent(s.key)}`,
+            label: s.label,
+            section: s.key,
             icon: s.icon ?? s.items[0]?.icon ?? "🧩",
             pages: s.items.map((i) => i.href),
           };
         }),
-    [baseSections, modules]
+    [layout.sections, modules]
   );
   const ownerSection = useMemo(() => baseSections.find((s) => s.section === "Owner Only"), [baseSections]);
 
@@ -118,12 +128,13 @@ export function Sidebar({
   // in the full per-page list (pinned items excluded from their category,
   // same as the unfiltered view) only while there's a query.
   const searchSections = useMemo(() => {
-    const rest = baseSections
-      .slice(1)
+    // Hidden pages and groups still show up here, so they're never lost.
+    const groups: Array<{ section: string | null; items: NavItem[] }> = layout.sections.map((s) => ({ section: s.label, items: s.items }));
+    const rest = [...groups, ...(ownerSection ? [ownerSection] : [])]
       .map((s) => ({ ...s, items: s.items.filter((item) => !isPinned(item.href)) }))
       .filter((s) => s.items.length > 0);
     return [baseSections[0], ...(pinnedItems.length > 0 ? [{ section: "Pinned", items: pinnedItems }] : []), ...rest];
-  }, [baseSections, pinnedItems, isPinned]);
+  }, [baseSections, layout.sections, ownerSection, pinnedItems, isPinned]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -170,7 +181,21 @@ export function Sidebar({
         <span className="spartacus-wave inline-block text-2xl font-bold">Spartacus</span>
       </div>
 
+      {editing ? (
+        <NavEditor onDone={() => setEditing(false)} />
+      ) : (
+      <>
       <div className="px-3 pb-3 shrink-0">
+        {layout.owner && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            title="Rename, reorder or hide groups and pages"
+            className="w-full mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-300 border border-amber-400/30 hover:bg-amber-400/10 rounded-lg py-1.5 transition-colors"
+          >
+            ✎ Edit menu
+          </button>
+        )}
         <div className="relative mb-2">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
           <input
@@ -221,7 +246,7 @@ export function Sidebar({
                         // list on the Modules page.
                         const rel = pathname.slice(`/dashboard/${guildId}`.length);
                         const pages = (cat as { pages?: string[] }).pages ?? [];
-                        const active = pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === cat.label);
+                        const active = pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === ((cat as { section?: string }).section ?? cat.label));
                         return (
                           <Link
                             key={rawHref}
@@ -338,6 +363,8 @@ export function Sidebar({
           <p className="px-3 text-xs text-slate-600">No modules match "{query}".</p>
         )}
       </nav>
+      </>
+      )}
       </aside>
     </>
   );

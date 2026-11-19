@@ -14,6 +14,10 @@ interface TextsContext {
 
 const Ctx = createContext<TextsContext>({ owner: false, texts: {}, save: async () => {} });
 
+// The saved wording and the owner's save, for things built on the same store
+// (the owner's menu layout in lib/navLayout.ts).
+export const useDashboardTexts = () => useContext(Ctx);
+
 export function DashboardTextProvider({ isOwner, children }: { isOwner: boolean; children: React.ReactNode }) {
   const [texts, setTexts] = useState<Record<string, string>>({});
 

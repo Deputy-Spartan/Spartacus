@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavLayout } from "../../lib/navLayout";
 import { DragList } from "../ui/DragList";
+import { useDashboardTexts } from "../ui/EditableText";
 
 // Edit Mode for the sidebar (owner only): rename, reorder and hide groups and
 // their pages. Every change saves straight away; see lib/navLayout.ts.
@@ -65,11 +66,39 @@ export function NavEditor({ onDone }: { onDone: () => void }) {
     }
   }
 
+  // Back up: everything you've changed (menu, wording, card layout) as one
+  // file. Restore: load that file back, after a confirm.
+  const T = useDashboardTexts();
+  const [restore, setRestore] = useState<{ texts?: Record<string, string>; when?: string; count?: number; error?: string } | null>(null);
+  function backUp() {
+    const data = { app: "spartacus-dashboard", version: 1, savedAt: new Date().toISOString(), texts: T.texts };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `spartacus-dashboard-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function pickBackup(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text()) as { app?: string; savedAt?: string; texts?: unknown };
+      const texts = data.texts;
+      if (data.app !== "spartacus-dashboard" || !texts || typeof texts !== "object" || Array.isArray(texts)) throw new Error();
+      const clean = Object.fromEntries(Object.entries(texts as Record<string, unknown>).filter(([, v]) => typeof v === "string")) as Record<string, string>;
+      setRestore({ texts: clean, when: data.savedAt ? new Date(data.savedAt).toLocaleString() : "an unknown date", count: Object.keys(clean).length });
+    } catch {
+      setRestore({ error: "That file isn't a Spartacus dashboard backup. Pick a file made with Back up." });
+    }
+  }
+
   return (
     <div data-edit-skip className="px-3 pb-6 space-y-3">
       <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100 space-y-2">
         <p>
-          <b>Edit Mode is on.</b> Here: type in a box to rename it, hold ⋮⋮ and drag to move it, 👁 hides it from the menu (search still finds it). On the page: tap any words to change them, or tap a box and drag ⋮⋮ Move. Everything saves by itself, and everyone with dashboard access sees it.
+          <b>Edit Mode is on.</b> Here: type in a box to rename it, hold ⋮⋮ and drag to move it, 👁 hides it from the menu (search still finds it). On the page: tap any words to change them, and drag cards to move them. Everything saves by itself, and everyone with dashboard access sees it. ↶ Undo steps back one change; Back up saves everything to a file.
         </p>
         <div className="flex items-center gap-2">
           <button type="button" onClick={onDone} className="rounded-md bg-amber-400 text-base-950 font-semibold px-3 py-1">
@@ -95,6 +124,53 @@ export function NavEditor({ onDone }: { onDone: () => void }) {
             {status === "error" && <span className="text-rose-400">Didn't save, try again</span>}
           </span>
         </div>
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-400/20">
+          <button
+            type="button"
+            onClick={() => run(T.undo())}
+            disabled={!T.canUndo}
+            title="Step back your last change (Ctrl+Z)"
+            className="rounded-md border border-amber-400/40 px-3 py-1 hover:bg-amber-400/10 disabled:opacity-40"
+          >
+            ↶ Undo
+          </button>
+          <button type="button" onClick={backUp} title="Save all your names, order and wording to a file" className="rounded-md border border-amber-400/40 px-3 py-1 hover:bg-amber-400/10">
+            ⤓ Back up
+          </button>
+          <label className="rounded-md border border-amber-400/40 px-3 py-1 hover:bg-amber-400/10 cursor-pointer" title="Load a backup file">
+            ⤒ Restore
+            <input type="file" accept="application/json,.json" className="sr-only" onChange={pickBackup} />
+          </label>
+        </div>
+        {restore && (
+          <div className="rounded-md bg-black/20 p-2 space-y-1.5">
+            {restore.error ? (
+              <p className="text-rose-300">{restore.error}</p>
+            ) : (
+              <>
+                <p>
+                  Restore the backup from <b>{restore.when}</b>? It replaces your current menu, wording and card layout ({restore.count} saved changes). You can Undo it.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = restore.texts;
+                      setRestore(null);
+                      if (t) run(T.replaceAll(t));
+                    }}
+                    className="rounded-md bg-amber-400 text-base-950 font-semibold px-3 py-1"
+                  >
+                    Restore it
+                  </button>
+                  <button type="button" onClick={() => setRestore(null)} className="rounded-md border border-amber-400/40 px-3 py-1">
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <DragList

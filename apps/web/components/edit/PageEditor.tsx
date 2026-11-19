@@ -90,6 +90,7 @@ function applyOrder(root: Element, orders: Record<string, number[]>) {
     if (!getComputedStyle(box).display.match(/flex|grid/)) {
       (box as HTMLElement).style.display = "flex";
       (box as HTMLElement).style.flexDirection = "column";
+      (box as HTMLElement).dataset.editFlex = "1";
     }
     kids.forEach((k, i) => {
       const pos = order.indexOf(i);
@@ -163,7 +164,7 @@ function textNodeAt(x: number, y: number, root: Element): Text | null {
 }
 
 export function PageEditor() {
-  const { owner, texts, save } = useDashboardTexts();
+  const { owner, texts, save, undo, canUndo } = useDashboardTexts();
   const { editing, setEditing } = useEditMode();
   const pathname = usePathname();
   const section = useSearchParams().get("section");
@@ -177,7 +178,27 @@ export function PageEditor() {
   // moment anything on it changes (new data, a tab switch), so the built-in
   // words never flash up first. A layout effect and an observer both run
   // before the browser paints.
+  const orderKeysRef = useRef<{ page: string; keys: string[] }>({ page: "", keys: [] });
   useLayoutEffect(() => {
+    // A box whose saved order was removed (Undo, Undo all) goes back to its
+    // built-in order.
+    const page = key;
+    const root0 = rootEl();
+    const now = Object.keys(edits.o ?? {});
+    if (root0 && orderKeysRef.current.page === page) {
+      for (const k of orderKeysRef.current.keys) {
+        if (now.includes(k)) continue;
+        const b = atPath(root0, k.split(".").filter(Boolean).map(Number)) as HTMLElement | null;
+        if (!b) continue;
+        if (b.dataset.editFlex) {
+          b.style.display = "";
+          b.style.flexDirection = "";
+          delete b.dataset.editFlex;
+        }
+        for (const ch of Array.from(b.children) as HTMLElement[]) ch.style.order = "";
+      }
+    }
+    orderKeysRef.current = { page, keys: now };
     const run = () => {
       const root = rootEl();
       if (!root) return;
@@ -191,7 +212,7 @@ export function PageEditor() {
     const obs = new MutationObserver(run);
     obs.observe(root, { subtree: true, childList: true, characterData: true });
     return () => obs.disconnect();
-  }, [edits, pathname, section]);
+  }, [edits, pathname, section, key]);
 
   const [status, setStatus] = useState<"" | "saving" | "saved" | "error">("");
   const persist = useCallback(
@@ -225,6 +246,20 @@ export function PageEditor() {
     setWord(null);
     setBox(null);
   }, [pathname, section]);
+
+  // Ctrl+Z (Cmd+Z on a Mac) steps back the last change while editing,
+  // except while typing in a box, where it undoes the typing instead.
+  useEffect(() => {
+    if (!editing || !owner) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+      if ((e.target as Element | null)?.closest?.("input, textarea, select, [contenteditable=true]")) return;
+      e.preventDefault();
+      void undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editing, owner, undo]);
 
   // Taps on the page select instead of clicking, while editing.
   useEffect(() => {
@@ -393,6 +428,7 @@ export function PageEditor() {
     if (!getComputedStyle(parent).display.match(/flex|grid/)) {
       parent.style.display = "flex";
       parent.style.flexDirection = "column";
+      parent.dataset.editFlex = "1";
     }
     const visual = () => [...kids].sort((a, b) => (Number(a.style.order) || 0) - (Number(b.style.order) || 0) || kids.indexOf(a) - kids.indexOf(b));
     let list = visual();
@@ -665,6 +701,15 @@ export function PageEditor() {
             {status === "saved" && <span className="text-emerald-400 font-semibold">✓ Saved</span>}
             {status === "error" && <span className="text-rose-400">Didn&apos;t save, try again</span>}
           </span>
+          <button
+            type="button"
+            onClick={() => void undo()}
+            disabled={!canUndo}
+            title="Step back your last change (Ctrl+Z)"
+            className="rounded-md border border-amber-400/40 px-3 py-1 hover:bg-amber-400/10 disabled:opacity-40"
+          >
+            ↶ Undo
+          </button>
           <button type="button" onClick={() => setEditing(false)} className="rounded-md bg-amber-400 text-base-950 font-semibold px-3 py-1">
             Done
           </button>

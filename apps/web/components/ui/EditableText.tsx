@@ -11,9 +11,20 @@ interface TextsContext {
   texts: Record<string, string>;
   ready: boolean; // the saved wording is known (from this device's copy or the server)
   save: (key: string, text: string) => Promise<void>;
+  undo: () => Promise<void>; // steps back the last change made on this visit
+  canUndo: boolean;
+  replaceAll: (saved: Record<string, string>) => Promise<void>;
 }
 
-const Ctx = createContext<TextsContext>({ owner: false, texts: {}, ready: true, save: async () => {} });
+const Ctx = createContext<TextsContext>({
+  owner: false,
+  texts: {},
+  ready: true,
+  save: async () => {},
+  undo: async () => {},
+  canUndo: false,
+  replaceAll: async () => {},
+});
 
 // The saved wording and the owner's save, for things built on the same store
 // (the owner's menu layout in lib/navLayout.ts, page edits in edit/PageEditor).
@@ -60,18 +71,51 @@ export function DashboardTextProvider({ isOwner, children }: { isOwner: boolean;
     return () => clearTimeout(t);
   }, []);
 
-  async function save(key: string, text: string) {
-    setTexts((prev) => {
-      const next = { ...prev };
-      if (text) next[key] = text;
-      else delete next[key];
-      writeCache(next);
-      return next;
-    });
+  // Every change made on this visit, oldest first, so Undo can step back one
+  // change at a time. Changes saved together (a reset, a restore) undo together.
+  const textsRef = useRef(texts);
+  textsRef.current = texts;
+  const historyRef = useRef<Array<{ key: string; prev: string; t: number }>>([]);
+  const [historyLen, setHistoryLen] = useState(0);
+
+  async function save(key: string, text: string, opts?: { undo?: boolean }) {
+    const prev = textsRef.current[key] ?? "";
+    if (prev === text) return;
+    if (!opts?.undo) {
+      historyRef.current = [...historyRef.current.slice(-199), { key, prev, t: Date.now() }];
+      setHistoryLen(historyRef.current.length);
+    }
+    const next = { ...textsRef.current };
+    if (text) next[key] = text;
+    else delete next[key];
+    textsRef.current = next; // so several saves in a row each see the one before
+    setTexts(next);
+    writeCache(next);
     await api.setDashboardText(key, text);
   }
 
-  return <Ctx.Provider value={{ owner: isOwner, texts, ready, save }}>{children}</Ctx.Provider>;
+  async function undo() {
+    const h = historyRef.current;
+    if (!h.length) return;
+    let i = h.length - 1;
+    const batch = [h[i]];
+    while (i > 0 && h[i].t - h[i - 1].t < 200) batch.push(h[--i]);
+    historyRef.current = h.slice(0, i);
+    setHistoryLen(historyRef.current.length);
+    // Newest first, so a key changed twice ends on its oldest value.
+    for (const e of batch) await save(e.key, e.prev, { undo: true });
+  }
+
+  // Puts back a saved copy of everything (Back up / Restore in Edit Mode):
+  // keys in the copy are set, keys it doesn't have go back to the built-in.
+  async function replaceAll(saved: Record<string, string>) {
+    const keys = new Set([...Object.keys(textsRef.current), ...Object.keys(saved)]);
+    await Promise.all([...keys].map((k) => save(k, typeof saved[k] === "string" ? saved[k] : "")));
+  }
+
+  return (
+    <Ctx.Provider value={{ owner: isOwner, texts, ready, save, undo, canUndo: historyLen > 0, replaceAll }}>{children}</Ctx.Provider>
+  );
 }
 
 // On a device that has never loaded the saved wording, keeps the dashboard

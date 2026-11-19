@@ -47,7 +47,7 @@ export function HubTabs({ guildId }: { guildId: string }) {
         {hub.icon && <AppIcon emoji={hub.icon} size={18} />}
         <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">{groupName}</span>
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3 sm:mx-0 sm:px-0 sm:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-2 overflow-x-auto pt-1 pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:flex-wrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const href = `${base}${item.href}`;
           const active = isActive(item.href);
@@ -61,8 +61,8 @@ export function HubTabs({ guildId }: { guildId: string }) {
               aria-current={active ? "page" : undefined}
               {...hoverPrefetch(guildId, href)}
               className={[
-                "shrink-0 flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm whitespace-nowrap transition-colors",
-                active ? "sp-hubtab-on border-transparent font-semibold" : "border-white/10 text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
+                "sp-metal shrink-0 flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm whitespace-nowrap",
+                active ? "is-active font-semibold" : "",
               ].join(" ")}
             >
               {enabled !== null && (

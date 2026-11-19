@@ -219,7 +219,7 @@
 .rank-2 { background: linear-gradient(135deg, #e3e7ed, #9aa3af); color: #1c1d20; }
 .rank-3 { background: linear-gradient(135deg, #e0a26a, #a9652e); color: #1c1d20; }
 html[data-theme="daylight"] .chart-grid { stroke: rgba(28, 29, 32, 0.08); }
-html[data-theme="daylight"] .sp-tabbar { background: rgba(255, 255, 255, 0.95); border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .sp-tabbar { background: rgba(226, 231, 238, 0.95); border-color: rgba(30, 45, 65, 0.12); }
 html[data-theme="glass"] .sp-tabbar { background: rgba(36, 37, 41, 0.7); }
 
 /* ---------- Studio: solid and bold, an accent bar on every card ---------- */
@@ -284,15 +284,15 @@ html[data-theme="glass"] .sp-login-card { background: rgba(36, 37, 41, 0.45); bo
    Anything inside a Discord preview (those use fixed bg-[#…] colors) is
    left alone so previews still look like Discord. */
 html[data-theme="daylight"] { color-scheme: light; }
-html[data-theme="daylight"] body { background: #eef1f5; color: #1c1d20; }
+html[data-theme="daylight"] body { background: #d5dce5; color: #1c1d20; }
 html[data-theme="daylight"] select,
-html[data-theme="daylight"] select option { background-color: #ffffff; color: #1c1d20; }
-html[data-theme="daylight"] :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #f6f8fa; }
-html[data-theme="daylight"] :is(.sp-shell, .sp-login) { background-color: #eef1f5 !important; }
-html[data-theme="daylight"] :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #ffffff; }
-html[data-theme="daylight"] :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #eef2f7; }
-html[data-theme="daylight"] .bg-base-700:not([class*="bg-[#"] *) { background-color: #d5dbe3; }
-html[data-theme="daylight"] :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #eef2f7; }
+html[data-theme="daylight"] select option { background-color: #eef1f5; color: #1c1d20; }
+html[data-theme="daylight"] :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #e3e8ee; }
+html[data-theme="daylight"] :is(.sp-shell, .sp-login) { background-color: #d5dce5 !important; }
+html[data-theme="daylight"] :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #e8ecf1; }
+html[data-theme="daylight"] :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #dce2ea; }
+html[data-theme="daylight"] .bg-base-700:not([class*="bg-[#"] *) { background-color: #c8d0da; }
+html[data-theme="daylight"] :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #dce2ea; }
 html[data-theme="daylight"] .text-slate-100:not([class*="bg-[#"] *) { color: #1c1d20; }
 html[data-theme="daylight"] .text-slate-200:not([class*="bg-[#"] *) { color: #23262b; }
 html[data-theme="daylight"] .text-slate-300:not([class*="bg-[#"] *) { color: #37393f; }
@@ -310,25 +310,25 @@ html[data-theme="daylight"] :is(.hover\:bg-white\/5, .hover\:bg-white\/10, .hove
 html[data-theme="daylight"] :is(input, textarea, select):not([class*="bg-[#"] *) { color: #1c1d20; }
 html[data-theme="daylight"] ::placeholder { color: #8a909b; }
 html[data-theme="daylight"] .neon-card {
-  background: #ffffff;
-  border-color: rgba(28, 29, 32, 0.1);
+  background: #e9edf2;
+  border-color: rgba(30, 45, 65, 0.13);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(28, 29, 32, 0.05), 0 4px 14px rgba(28, 29, 32, 0.04);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 html[data-theme="daylight"] .neon-card:hover { border-color: #7b99bc; box-shadow: 0 2px 4px rgba(28, 29, 32, 0.07), 0 14px 30px rgba(94, 127, 166, 0.15); }
-html[data-theme="daylight"] .sp-sidebar { background: #ffffff; border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .sp-sidebar { background: #e2e7ee; border-color: rgba(30, 45, 65, 0.12); }
 html[data-theme="daylight"] .sp-sidebar .bg-base-800.text-neon-blue { background: rgba(123, 153, 188, 0.18); color: #2f4a68; font-weight: 600; box-shadow: none; }
 html[data-theme="daylight"] .sp-hubtab-on { background: rgba(123, 153, 188, 0.18); color: #2f4a68; }
-html[data-theme="daylight"] .sp-header { background: rgba(255, 255, 255, 0.85); border-color: rgba(28, 29, 32, 0.08); }
+html[data-theme="daylight"] .sp-header { background: rgba(226, 231, 238, 0.9); border-color: rgba(30, 45, 65, 0.12); }
 html[data-theme="daylight"] .neon-button,
 html[data-theme="daylight"] .neon-button-sm { background: #5e7fa6; color: #fff; box-shadow: 0 1px 2px rgba(28, 29, 32, 0.15); }
 html[data-theme="daylight"] .neon-button:hover,
 html[data-theme="daylight"] .neon-button-sm:hover { background: #4f6e93; }
 html[data-theme="daylight"] .neon-toggle-on { background: #5e7fa6; }
 html[data-theme="daylight"] .spartacus-wave { background-image: linear-gradient(90deg, #3f5f86 0%, #3f5f86 35%, #7b99bc 50%, #3f5f86 65%, #3f5f86 100%); }
-html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgba(123, 153, 188, 0.22), transparent 65%), #e9edf2; color: #1c1d20; }
-html[data-theme="daylight"] .sp-login-card { background: #ffffff; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
+html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgba(123, 153, 188, 0.22), transparent 65%), #dce2ea; color: #1c1d20; }
+html[data-theme="daylight"] .sp-login-card { background: #e9edf2; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
 
 /* ---------------------------------------------------------------------------
    Hover on the cards you click to open something (the module cards on a
@@ -374,7 +374,7 @@ html[data-theme="glass"] .sp-card-link:hover .sp-card-open { color: #ffffff; }
 html[data-theme="daylight"] .sp-card-link:hover {
   transform: translateY(-3px);
   border-color: #7b99bc;
-  background: linear-gradient(180deg, rgba(123, 153, 188, 0.12), rgba(255, 255, 255, 0) 46%), #ffffff;
+  background: linear-gradient(180deg, rgba(47, 93, 148, 0.12), rgba(255, 255, 255, 0) 46%), #eef2f6;
   box-shadow: 0 2px 4px rgba(28, 29, 32, 0.06), 0 18px 36px rgba(94, 127, 166, 0.22);
 }
 html[data-theme="daylight"] .sp-card-link:hover .sp-card-icon { transform: scale(1.06); }
@@ -401,4 +401,57 @@ html[data-motion="reduce"] *::before,
 html[data-motion="reduce"] *::after {
   transition: none !important;
   animation: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Soft Metal: the menu buttons (sidebar groups and pages, and the tabs along
+   the top of each page). Brushed metal at rest, rises with a blue glow on
+   hover, presses in, and the open one stays pressed in. Each theme has its
+   own metal.
+   ------------------------------------------------------------------------- */
+:root {
+  --m-top: #3a3d44; --m-bot: #25272c; --m-light: rgba(255, 255, 255, 0.09); --m-hl: rgba(255, 255, 255, 0.06);
+  --m-dark: rgba(0, 0, 0, 0.55); --m-glow: rgba(123, 153, 188, 0.35); --m-ring: rgba(123, 153, 188, 0.45);
+  --m-text: #c9cdd4; --m-text-hi: #ffffff; --m-accent: #9cb6d4; --m-owner: #c4b5fd;
+}
+html[data-theme="glass"] {
+  --m-top: rgba(255, 255, 255, 0.2); --m-bot: rgba(255, 255, 255, 0.05); --m-light: rgba(255, 255, 255, 0.32); --m-hl: rgba(255, 255, 255, 0.16);
+  --m-dark: rgba(0, 0, 0, 0.4); --m-glow: rgba(140, 175, 215, 0.5); --m-ring: rgba(183, 205, 230, 0.5);
+  --m-text: #e1e7ef; --m-text-hi: #ffffff; --m-accent: #b7cde6; --m-owner: #d8ccff;
+}
+html[data-theme="daylight"] {
+  --m-top: #f4f6f9; --m-bot: #cdd5df; --m-light: rgba(255, 255, 255, 0.95); --m-hl: rgba(255, 255, 255, 0.85);
+  --m-dark: rgba(35, 55, 80, 0.3); --m-glow: rgba(47, 93, 148, 0.32); --m-ring: rgba(47, 93, 148, 0.45);
+  --m-text: #2b3038; --m-text-hi: #12161c; --m-accent: #2f5d94; --m-owner: #6d4fc2;
+}
+.sp-metal {
+  background: linear-gradient(180deg, var(--m-top), var(--m-bot));
+  box-shadow: inset 0 1px 0 var(--m-light), 0 1px 2px var(--m-dark);
+  color: var(--m-text);
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s, background 0.18s, color 0.16s, filter 0.16s;
+  -webkit-tap-highlight-color: transparent;
+}
+.sp-metal-owner { color: var(--m-owner); }
+.sp-metal:hover {
+  transform: translateY(-2px);
+  color: var(--m-text-hi);
+  filter: brightness(1.05);
+  box-shadow: inset 0 1px 0 var(--m-light), -4px -4px 10px var(--m-hl), 6px 6px 14px var(--m-dark), 0 0 18px var(--m-glow);
+}
+.sp-metal:active {
+  transform: translateY(1px);
+  filter: none;
+  box-shadow: inset 3px 3px 8px var(--m-dark), inset -3px -3px 8px var(--m-hl);
+}
+.sp-metal.is-active,
+.sp-metal.is-active:hover {
+  transform: translateY(1px);
+  filter: none;
+  background: linear-gradient(0deg, var(--m-top), var(--m-bot));
+  color: var(--m-accent);
+  box-shadow: inset 4px 4px 10px var(--m-dark), inset -3px -3px 8px var(--m-hl), inset 0 0 0 1px var(--m-ring), inset 0 0 14px var(--m-glow);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-metal { transition: box-shadow 0.18s, background 0.18s, color 0.16s; }
+  .sp-metal:hover, .sp-metal:active, .sp-metal.is-active { transform: none; }
 }

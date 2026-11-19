@@ -184,20 +184,11 @@ export function Sidebar({
         <Fragment key={`${sectionName ?? "top"}:${item.href}`}>
         <div
           className={[
-            "group relative flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
-            active
-              ? "bg-base-800 text-neon-blue shadow-glow-blue"
-              : sectionName === "Owner Only"
-                ? "text-purple-300 hover:text-purple-100 hover:bg-base-800/60"
-                : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
+            "sp-metal group relative flex items-center gap-1 rounded-xl pr-1.5 text-sm",
+            active ? "is-active" : "",
+            sectionName === "Owner Only" ? "sp-metal-owner" : "",
           ].join(" ")}
         >
-          <span
-            aria-hidden="true"
-            className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
-              active ? "h-5 opacity-100" : "h-0 opacity-0"
-            }`}
-          />
           <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className={`flex items-center gap-3 flex-1 min-w-0 px-3 ${small ? "py-1.5" : "py-2"}`}>
             <AppIcon emoji={item.icon} size={small ? 18 : 22} />
             <span className="flex-1 min-w-0 truncate">{item.label}</span>
@@ -323,7 +314,7 @@ export function Sidebar({
                 </button>
               )}
               {!isCollapsed && (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {section.section === "Categories"
                     ? section.items.map((cat) => {
                         // One button per group. It opens the group's page:
@@ -338,17 +329,8 @@ export function Sidebar({
                               href={groupHref}
                               onClick={onNavigate}
                               aria-current={active ? "page" : undefined}
-                              className={[
-                                "relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-left transition-colors",
-                                active ? "bg-base-800 text-neon-blue" : "text-slate-300 hover:text-slate-100 hover:bg-base-800/60",
-                              ].join(" ")}
+                              className={`sp-metal relative w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-left ${active ? "is-active" : ""}`}
                             >
-                              <span
-                                aria-hidden="true"
-                                className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
-                                  active ? "h-5 opacity-100" : "h-0 opacity-0"
-                                }`}
-                              />
                               <AppIcon emoji={c.icon} size={22} />
                               <span className="flex-1 min-w-0 truncate font-medium">{c.label}</span>
                               <span className="shrink-0 rounded-full bg-base-800 px-1.5 text-[10px] font-semibold text-slate-500">{c.items.length}</span>

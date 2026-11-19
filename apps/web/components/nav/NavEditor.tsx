@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavLayout } from "../../lib/navLayout";
 import { AppIcon } from "../ui/AppIcon";
+import { DragList } from "../ui/DragList";
 
 // Edit Mode for the sidebar (owner only): rename, reorder and hide groups and
 // their pages. Every change saves straight away; see lib/navLayout.ts.
@@ -40,6 +41,7 @@ function NameBox({ value, original, onCommit, label }: { value: string; original
   );
 }
 
+const grip = "shrink-0 w-7 h-8 flex items-center justify-center rounded-md text-amber-300 tracking-[-0.2em] select-none hover:bg-amber-400/10";
 const btn = "shrink-0 w-7 h-7 flex items-center justify-center rounded-md border border-white/10 text-[11px] text-slate-300 hover:bg-base-800 disabled:opacity-30 disabled:hover:bg-transparent";
 
 export function NavEditor({ onDone }: { onDone: () => void }) {
@@ -68,7 +70,7 @@ export function NavEditor({ onDone }: { onDone: () => void }) {
     <div className="px-3 pb-6 space-y-3">
       <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100 space-y-2">
         <p>
-          <b>Edit Mode.</b> Type in a box to rename it. Use ▲ ▼ to move things. Hide takes it out of the menu, but search still finds it. Changes save by
+          <b>Edit Mode.</b> Type in a box to rename it. Hold ⋮⋮ and drag to move things. Hide takes it out of the menu, but search still finds it. Changes save by
           themselves, and everyone with dashboard access sees your menu.
         </p>
         <div className="flex items-center gap-2">
@@ -97,23 +99,20 @@ export function NavEditor({ onDone }: { onDone: () => void }) {
         </div>
       </div>
 
-      <ul className="space-y-1.5">
-        {L.sections.map((s, si) => {
+      <DragList
+        className="space-y-1.5"
+        ids={L.sections.map((s) => s.key)}
+        itemLabel={(key) => L.sections.find((s) => s.key === key)?.label ?? key}
+        onReorder={(keys) => run(L.setGroupOrder(keys))}
+        renderItem={(key, handle) => {
+          const s = L.sections.find((x) => x.key === key);
+          if (!s) return null;
           const isOpen = open === s.key;
           return (
-            <li key={s.key} className={`rounded-lg border border-white/10 ${s.hidden ? "opacity-50" : ""}`}>
+            <div className={`rounded-lg border border-white/10 ${s.hidden ? "opacity-50" : ""}`}>
               <div className="flex items-center gap-1 p-1.5">
-                <button type="button" className={btn} disabled={si === 0} onClick={() => run(L.moveGroup(s.key, -1))} aria-label={`Move ${s.label} up`}>
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  disabled={si === L.sections.length - 1}
-                  onClick={() => run(L.moveGroup(s.key, 1))}
-                  aria-label={`Move ${s.label} down`}
-                >
-                  ▼
+                <button type="button" className={grip} {...handle}>
+                  ⋮⋮
                 </button>
                 {s.icon && <AppIcon emoji={s.icon} size={18} />}
                 <NameBox value={s.label} original={s.originalLabel} label={`Name of the ${s.originalLabel} group`} onCommit={(v) => run(L.renameGroup(s.key, v))} />
@@ -131,45 +130,38 @@ export function NavEditor({ onDone }: { onDone: () => void }) {
                 </button>
               </div>
               {isOpen && (
-                <ul className="border-t border-white/10 p-1.5 pl-4 space-y-1">
-                  {s.items.map((item, ii) => (
-                    <li key={item.href} className={`flex items-center gap-1 ${item.hidden ? "opacity-50" : ""}`}>
-                      <button
-                        type="button"
-                        className={btn}
-                        disabled={ii === 0}
-                        onClick={() => run(L.movePage(s.key, item.href, -1))}
-                        aria-label={`Move ${item.label} up`}
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className={btn}
-                        disabled={ii === s.items.length - 1}
-                        onClick={() => run(L.movePage(s.key, item.href, 1))}
-                        aria-label={`Move ${item.label} down`}
-                      >
-                        ▼
-                      </button>
-                      <AppIcon emoji={item.icon} size={16} />
-                      <NameBox
-                        value={item.label}
-                        original={item.originalLabel}
-                        label={`Name of the ${item.originalLabel} page`}
-                        onCommit={(v) => run(L.renamePage(item.href, item.originalLabel, v))}
-                      />
-                      <button type="button" className={`${btn} w-auto px-2`} onClick={() => run(L.togglePageHidden(item.href))}>
-                        {item.hidden ? "Show" : "Hide"}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <DragList
+                  className="border-t border-white/10 p-1.5 pl-3 space-y-1"
+                  ids={s.items.map((i) => i.href)}
+                  itemLabel={(href) => s.items.find((i) => i.href === href)?.label ?? href}
+                  onReorder={(hrefs) => run(L.setPageOrder(s.key, hrefs))}
+                  renderItem={(href, h) => {
+                    const item = s.items.find((i) => i.href === href);
+                    if (!item) return null;
+                    return (
+                      <div className={`flex items-center gap-1 ${item.hidden ? "opacity-50" : ""}`}>
+                        <button type="button" className={grip} {...h}>
+                          ⋮⋮
+                        </button>
+                        <AppIcon emoji={item.icon} size={16} />
+                        <NameBox
+                          value={item.label}
+                          original={item.originalLabel}
+                          label={`Name of the ${item.originalLabel} page`}
+                          onCommit={(v) => run(L.renamePage(item.href, item.originalLabel, v))}
+                        />
+                        <button type="button" className={`${btn} w-auto px-2`} onClick={() => run(L.togglePageHidden(item.href))}>
+                          {item.hidden ? "Show" : "Hide"}
+                        </button>
+                      </div>
+                    );
+                  }}
+                />
               )}
-            </li>
+            </div>
           );
-        })}
-      </ul>
+        }}
+      />
     </div>
   );
 }

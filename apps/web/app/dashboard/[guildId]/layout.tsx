@@ -115,7 +115,7 @@ export default function DashboardLayout({
               position:sticky on descendants (e.g. the Embed Creator's live
               preview column). "clip" prevents the horizontal overflow
               without that side effect. */}
-          <main className="p-3 sm:p-6 pb-24 md:pb-6 overflow-x-clip">
+          <main className="p-3 sm:p-6 pb-36 md:pb-6 overflow-x-clip">
             <HubTabs guildId={params.guildId} />
             <PageGuideButton guildId={params.guildId} />
             <PageGate>{children}</PageGate>

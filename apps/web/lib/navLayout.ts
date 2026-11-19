@@ -27,15 +27,6 @@ export interface LaidOutSection {
   items: LaidOutItem[];
 }
 
-function swap(ids: string[], id: string, dir: -1 | 1): string[] | null {
-  const i = ids.indexOf(id);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= ids.length) return null;
-  const next = [...ids];
-  [next[i], next[j]] = [next[j], next[i]];
-  return next;
-}
-
 export function useNavLayout() {
   const { owner, texts, save } = useDashboardTexts();
 
@@ -65,21 +56,18 @@ export function useNavLayout() {
   const pageLabel = useCallback((href: string, fallback: string) => texts[NAV_KEYS.pageLabel(href)] ?? fallback, [texts]);
   const groupLabel = useCallback((section: string) => texts[NAV_KEYS.groupLabel(section)] ?? section, [texts]);
 
-  const moveGroup = useCallback(
-    async (section: string, dir: -1 | 1) => {
-      const next = swap(sections.map((s) => groupSlug(s.key)), groupSlug(section), dir);
-      if (next) await save(NAV_KEYS.groupOrder, JSON.stringify(next));
+  // The whole new order, as the drag lists hand it over when you let go.
+  const setGroupOrder = useCallback(
+    async (sectionKeys: string[]) => {
+      await save(NAV_KEYS.groupOrder, JSON.stringify(sectionKeys.map(groupSlug)));
     },
-    [sections, save]
+    [save]
   );
-
-  const movePage = useCallback(
-    async (section: string, href: string, dir: -1 | 1) => {
-      const sec = sections.find((s) => s.key === section);
-      const next = sec && swap(sec.items.map((i) => i.href), href, dir);
-      if (next) await save(NAV_KEYS.pageOrder(section), JSON.stringify(next));
+  const setPageOrder = useCallback(
+    async (section: string, hrefs: string[]) => {
+      await save(NAV_KEYS.pageOrder(section), JSON.stringify(hrefs));
     },
-    [sections, save]
+    [save]
   );
 
   // Saving the built-in name again (or an empty box) goes back to it.
@@ -123,8 +111,8 @@ export function useNavLayout() {
     sections,
     pageLabel,
     groupLabel,
-    moveGroup,
-    movePage,
+    setGroupOrder,
+    setPageOrder,
     renameGroup,
     renamePage,
     toggleGroupHidden,

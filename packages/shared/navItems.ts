@@ -19,9 +19,10 @@ export interface NavSection {
   items: NavItem[];
 }
 
-// Each section is one group in the sidebar. Opening a group goes straight to
-// its first page, and the group's other pages sit beside it as tabs (see
-// components/nav/HubTabs.tsx), so related settings are one click apart.
+// Each section is one group in the sidebar. Tapping a group lists its pages
+// under it (one group open at a time), and the group's pages also sit as tabs
+// along the top of each of them (components/nav/HubTabs.tsx), so related
+// settings are one click apart.
 export const NAV_SECTIONS: NavSection[] = [
   {
     section: null,
@@ -32,9 +33,9 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    section: "Moderation",
+    section: "Safety",
     icon: "🛡️",
-    description: "Warn, mute and review members, and keep channels in order.",
+    description: "Moderation, plus protection from raids, nukes and risky permission changes.",
     items: [
       { href: "/moderation", label: "Moderator", icon: "🛡️", moduleKey: "MODERATION" },
       { href: "/cases", label: "Cases & Warnings", icon: "📁", moduleKey: "MODERATION" },
@@ -44,13 +45,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/mod-digest", label: "Weekly Staff Report", icon: "📋", moduleKey: "MOD_DIGEST" },
       { href: "/slow-mode", label: "Slow Mode", icon: "🐢", moduleKey: "SLOW_MODE" },
       { href: "/channel-locks", label: "Channel Locks", icon: "🔒", moduleKey: "CHANNEL_LOCKS" },
-    ],
-  },
-  {
-    section: "Protection",
-    icon: "🚨",
-    description: "Stop raids, nukes and risky permission changes before they spread.",
-    items: [
       { href: "/ai-moderation", label: "AI Moderation", icon: "🤖", moduleKey: "AI_MODERATION" },
       { href: "/anti-raid", label: "Anti-Raid", icon: "🚨", moduleKey: "ANTI_RAID" },
       { href: "/anti-nuke", label: "Anti-Nuke", icon: "💣", moduleKey: "ANTI_NUKE" },
@@ -60,13 +54,21 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    section: "Onboarding",
+    section: "Community",
     icon: "👋",
-    description: "Greet new members and get them through the door.",
+    description: "Welcomes, verification, roles, channels, tickets and applications.",
     items: [
       { href: "/welcome", label: "Welcome", icon: "👋", moduleKey: "WELCOME" },
       { href: "/verification", label: "Verification", icon: "✅", moduleKey: "VERIFICATION" },
       { href: "/rules-gate", label: "Rules", icon: "📜", moduleKey: "RULES_GATE" },
+      { href: "/role-manager", label: "Role Manager", icon: "⚙️", moduleKey: "ROLE_MANAGER" },
+      { href: "/reaction-roles", label: "Reaction Roles", icon: "🎭", moduleKey: "REACTION_ROLES" },
+      { href: "/temp-channels", label: "Temp Channels", icon: "🔊", moduleKey: "TEMP_CHANNELS" },
+      { href: "/server-templates", label: "Server Config Templates", icon: "🖥️", moduleKey: "SERVER_TEMPLATES" },
+      { href: "/partnerships", label: "Server Partnerships", icon: "🤝" }, // no module toggle of its own
+      { href: "/tickets", label: "Tickets", icon: "🎟️", moduleKey: "TICKETS" },
+      { href: "/applications", label: "Applications", icon: "📝", moduleKey: "APPLICATIONS" },
+      { href: "/support-intake", label: "Support DM", icon: "📨", moduleKey: "SUPPORT_INTAKE" },
     ],
   },
   {
@@ -81,23 +83,18 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    section: "Messaging",
-    icon: "📢",
-    description: "Announcements, daily posts, sticky messages and custom commands.",
+    section: "Fun & Rewards",
+    icon: "🎁",
+    description: "Giveaways, polls, games, events, coins and levels.",
     items: [
-      { href: "/announcements", label: "Announcements", icon: "📢", moduleKey: "ANNOUNCEMENTS" },
-      { href: "/quote-of-the-day", label: "Quote of the Day", icon: "💭", moduleKey: "QOTD" },
-      { href: "/sticky-messages", label: "Sticky Messages", icon: "📌", moduleKey: "STICKY_MESSAGES" },
-      { href: "/embed-creator", label: "Embed Creator", icon: "🧱", moduleKey: "EMBED_CREATOR" },
-      { href: "/commands", label: "Custom Commands", icon: "💬", moduleKey: "CUSTOM_COMMANDS" },
-      { href: "/bump-reminder", label: "Bump Reminder", icon: "⏰", moduleKey: "BUMP_REMINDER" },
-    ],
-  },
-  {
-    section: "Groups & Events",
-    icon: "⚔️",
-    description: "Event signups, matchmaking and finding people to play with.",
-    items: [
+      { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
+      { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
+      { href: "/economy-hub", label: "Economy Hub", icon: "💰", moduleKey: "ECONOMY" },
+      { href: "/starboard", label: "Starboard", icon: "⭐", moduleKey: "STARBOARD" },
+      { href: "/counting-game", label: "Counting Game", icon: "🔢", moduleKey: "COUNTING_GAME" },
+      { href: "/confessions", label: "Anonymous", icon: "🤫", moduleKey: "CONFESSIONS" },
+      { href: "/ai-chat", label: "AI Chat", icon: "💡", moduleKey: "AI_CHAT" },
+      { href: "/birthdays", label: "Birthdays", icon: "🎂", moduleKey: "BIRTHDAYS" },
       { href: "/events", label: "Event Scheduler", icon: "⚔️", moduleKey: "EVENTS" },
       { href: "/matches", label: "Matchmaking", icon: "👑", moduleKey: "MATCHES" },
       { href: "/lfg", label: "LFG", icon: "👥", moduleKey: "LFG" },
@@ -105,54 +102,16 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    section: "Fun & Engagement",
-    icon: "🎁",
-    description: "Giveaways, polls, starboard and community games.",
+    section: "Posts & Stats",
+    icon: "📢",
+    description: "Announcements, daily posts, custom commands, recaps and server stats.",
     items: [
-      { href: "/giveaways", label: "Giveaways", icon: "🎁", moduleKey: "GIVEAWAYS" },
-      { href: "/polls", label: "Polls", icon: "🗳️", moduleKey: "POLLS" },
-      { href: "/starboard", label: "Starboard", icon: "⭐", moduleKey: "STARBOARD" },
-      { href: "/counting-game", label: "Counting Game", icon: "🔢", moduleKey: "COUNTING_GAME" },
-      { href: "/confessions", label: "Anonymous", icon: "🤫", moduleKey: "CONFESSIONS" },
-      { href: "/ai-chat", label: "AI Chat", icon: "💡", moduleKey: "AI_CHAT" },
-      { href: "/birthdays", label: "Birthdays", icon: "🎂", moduleKey: "BIRTHDAYS" },
-    ],
-  },
-  {
-    section: "Levelling & Economy",
-    icon: "💰",
-    description: "Coins, levels, the shop and achievements.",
-    items: [
-      { href: "/economy-hub", label: "Economy Hub", icon: "💰", moduleKey: "ECONOMY" },
-    ],
-  },
-  {
-    section: "Roles & Channels",
-    icon: "🎭",
-    description: "Self-serve roles, temporary voice channels and server templates.",
-    items: [
-      { href: "/role-manager", label: "Role Manager", icon: "⚙️", moduleKey: "ROLE_MANAGER" },
-      { href: "/reaction-roles", label: "Reaction Roles", icon: "🎭", moduleKey: "REACTION_ROLES" },
-      { href: "/temp-channels", label: "Temp Channels", icon: "🔊", moduleKey: "TEMP_CHANNELS" },
-      { href: "/server-templates", label: "Server Config Templates", icon: "🖥️", moduleKey: "SERVER_TEMPLATES" },
-      { href: "/partnerships", label: "Server Partnerships", icon: "🤝" }, // no module toggle of its own
-    ],
-  },
-  {
-    section: "Support",
-    icon: "🎟️",
-    description: "Tickets, applications and help by DM.",
-    items: [
-      { href: "/tickets", label: "Tickets", icon: "🎟️", moduleKey: "TICKETS" },
-      { href: "/applications", label: "Applications", icon: "📝", moduleKey: "APPLICATIONS" },
-      { href: "/support-intake", label: "Support DM", icon: "📨", moduleKey: "SUPPORT_INTAKE" },
-    ],
-  },
-  {
-    section: "Insights",
-    icon: "📉",
-    description: "Weekly recaps, growth and live server stats.",
-    items: [
+      { href: "/announcements", label: "Announcements", icon: "📢", moduleKey: "ANNOUNCEMENTS" },
+      { href: "/quote-of-the-day", label: "Quote of the Day", icon: "💭", moduleKey: "QOTD" },
+      { href: "/sticky-messages", label: "Sticky Messages", icon: "📌", moduleKey: "STICKY_MESSAGES" },
+      { href: "/embed-creator", label: "Embed Creator", icon: "🧱", moduleKey: "EMBED_CREATOR" },
+      { href: "/commands", label: "Custom Commands", icon: "💬", moduleKey: "CUSTOM_COMMANDS" },
+      { href: "/bump-reminder", label: "Bump Reminder", icon: "⏰", moduleKey: "BUMP_REMINDER" },
       { href: "/weekly-recap", label: "Weekly Recap", icon: "📊", moduleKey: "WEEKLY_RECAP" },
       { href: "/growth-analytics", label: "Growth Analytics", icon: "📉", moduleKey: "GROWTH_ANALYTICS" },
       { href: "/suggestion-analytics", label: "Suggestion Analytics", icon: "📥", moduleKey: "SUGGESTION_ANALYTICS" },
@@ -166,7 +125,23 @@ export const NAV_SECTIONS: NavSection[] = [
 // Section names from before the pages were regrouped. !setup-test-server
 // moves their channels into the groups above and removes the emptied
 // categories, so a test server set up earlier ends up matching.
-export const RETIRED_NAV_SECTIONS = ["Security", "Community", "Engagement", "Utility"];
+export const RETIRED_NAV_SECTIONS = [
+  // the first regroup
+  "Security",
+  "Engagement",
+  "Utility",
+  // the 11 groups, folded into the 5 above
+  "Moderation",
+  "Protection",
+  "Onboarding",
+  "Messaging",
+  "Groups & Events",
+  "Fun & Engagement",
+  "Levelling & Economy",
+  "Roles & Channels",
+  "Support",
+  "Insights",
+];
 
 // The group a dashboard page belongs to, from its path under
 // /dashboard/:guildId ("/cases", or a deeper page like "/tickets/123").

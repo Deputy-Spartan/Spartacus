@@ -29,7 +29,7 @@ export function SaveStatus({ status, onSave }: { status: AutoSaveStatus; onSave?
         <div
           role="status"
           aria-live="polite"
-          className="save-bar fixed left-1/2 -translate-x-1/2 bottom-20 md:bottom-6 z-40 flex items-center gap-3 rounded-xl border border-white/10 bg-[#111214] px-4 py-2.5 text-sm text-white shadow-2xl shadow-black/50"
+          className="save-bar fixed left-1/2 -translate-x-1/2 bottom-32 md:bottom-6 z-40 flex items-center gap-3 rounded-xl border border-white/10 bg-[#111214] px-4 py-2.5 text-sm text-white shadow-2xl shadow-black/50"
         >
           {status === "saved" ? (
             <span className="text-emerald-400">

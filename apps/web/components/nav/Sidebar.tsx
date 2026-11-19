@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, navSectionForPath, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api } from "../../lib/api";
 import { useModules } from "../../lib/useModules";
@@ -75,6 +75,13 @@ export function Sidebar({
   // The owner's own names, order and hidden pages (Edit Mode).
   const layout = useNavLayout();
   const [editing, setEditing] = useState(false);
+  // The one group whose pages are listed, starting with the open page's group.
+  const relPath = pathname.slice(`/dashboard/${guildId}`.length);
+  const [openGroup, setOpenGroup] = useState<string | null>(() => navSectionForPath(relPath)?.section ?? null);
+  useEffect(() => {
+    const s = navSectionForPath(relPath)?.section;
+    if (s) setOpenGroup(s);
+  }, [relPath]);
 
   const baseSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
@@ -110,6 +117,7 @@ export function Sidebar({
             section: s.key,
             icon: s.icon ?? s.items[0]?.icon ?? "🧩",
             pages: s.items.map((i) => i.href),
+            items: shown,
           };
         }),
     [layout.sections, modules]
@@ -166,10 +174,94 @@ export function Sidebar({
     if (window.innerWidth < 768) onClose();
   }
 
+  // One page in the menu: its link, on/off dot and pin button.
+  function pageRow(item: NavItem, sectionName: string | null, small = false) {
+      const href = `/dashboard/${guildId}${item.href}`;
+      // The Modules link and a category link both ultimately
+      // point at /modules, differing only by ?section= — so
+      // Modules itself is only "active" with no section
+      // selected (i.e. the plain All Categories view).
+      const active = pathname === href && (item.href !== "/modules" || !activeSection);
+      const moduleKey = NAV_MODULE_KEYS[item.href];
+      const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
+      const pinned = isPinned(item.href);
+      const isQuick = item.href === "/quick-links" && sectionName === "Owner Only";
+      return (
+        <Fragment key={`${sectionName ?? "top"}:${item.href}`}>
+        <div
+          className={[
+            "group relative flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
+            active
+              ? "bg-base-800 text-neon-blue shadow-glow-blue"
+              : sectionName === "Owner Only"
+                ? "text-purple-300 hover:text-purple-100 hover:bg-base-800/60"
+                : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
+          ].join(" ")}
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
+              active ? "h-5 opacity-100" : "h-0 opacity-0"
+            }`}
+          />
+          <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className={`flex items-center gap-3 flex-1 min-w-0 px-3 ${small ? "py-1.5" : "py-2"}`}>
+            <AppIcon emoji={item.icon} size={small ? 18 : 22} />
+            <span className="flex-1 min-w-0 truncate">{item.label}</span>
+            {enabled !== null && (
+              <span
+                className={`h-2 w-2 rounded-full shrink-0 ${!enabled ? "bg-rose-500" : setup?.[moduleKey!]?.length ? "bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" : "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]"}`}
+                title={!enabled ? "Disabled" : setup?.[moduleKey!]?.length ? "Needs setup" : "Enabled"}
+              />
+            )}
+          </Link>
+          <button
+            onClick={() => togglePin(item.href)}
+            title={pinned ? "Unpin" : "Pin to top"}
+            className={[
+              "shrink-0 w-6 h-6 flex items-center justify-center rounded transition-opacity text-xs",
+              pinned ? "opacity-100 text-neon-blue" : "opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-50 text-slate-600 hover:text-slate-300",
+            ].join(" ")}
+          >
+            📌
+          </button>
+          {isQuick && pinnedQuick.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleQuick}
+              title={quickOpen ? "Hide links" : "Show links here"}
+              aria-expanded={quickOpen}
+              className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-[10px] text-slate-500 hover:text-slate-200"
+            >
+              {quickOpen ? "▾" : "▸"}
+            </button>
+          )}
+        </div>
+        {isQuick && quickOpen && pinnedQuick.length > 0 && (
+          <div className="ml-7 pl-2 border-l border-white/10 space-y-0.5">
+            {pinnedQuick.map((g) => (
+              <a
+                key={g.id}
+                href={quickLinkMain(g) as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-400 hover:text-slate-100 hover:bg-base-800/60"
+              >
+                <span>{g.icon.startsWith("<") ? "🔗" : g.icon}</span>
+                <span className="flex-1 min-w-0 truncate">{g.name}</span>
+                <span className="text-slate-600">↗</span>
+              </a>
+            ))}
+          </div>
+        )}
+        </Fragment>
+      );
+  }
+
   return (
     <>
       {open && <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={onClose} aria-hidden="true" />}
       <aside
+        data-drag-scroll
         className={[
           "sp-sidebar fixed left-0 top-0 h-screen w-64 sm:w-60 bg-base-900 border-r border-white/5 flex flex-col overflow-y-auto z-40",
           "transition-transform duration-200",
@@ -240,120 +332,43 @@ export function Sidebar({
                 <div className="space-y-1">
                   {section.section === "Categories"
                     ? section.items.map((cat) => {
-                        const rawHref = cat.href as string;
-                        const href = `/dashboard/${guildId}${rawHref}`;
-                        // Lit while any page of the group is open, or its
-                        // list on the Modules page.
+                        // Option 1: tapping a group lists its pages right
+                        // under it, one group open at a time.
+                        const c = cat as typeof cat & { section: string; pages: string[]; items: NavItem[] };
                         const rel = pathname.slice(`/dashboard/${guildId}`.length);
-                        const pages = (cat as { pages?: string[] }).pages ?? [];
-                        const active = pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === ((cat as { section?: string }).section ?? cat.label));
+                        const active = c.pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === c.section);
+                        const isOpen = openGroup === c.section;
                         return (
-                          <Link
-                            key={rawHref}
-                            href={href}
-                            onClick={onNavigate}
-                            {...hoverPrefetch(guildId, href)}
-                            className={[
-                              "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                              active
-                                ? "bg-base-800 text-neon-blue shadow-glow-blue"
-                                : (cat as { owner?: boolean }).owner
-                                  ? "text-purple-300 hover:text-purple-100 hover:bg-base-800/60"
-                                  : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
-                            ].join(" ")}
-                          >
-                            <span
-                              aria-hidden="true"
-                              className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
-                                active ? "h-5 opacity-100" : "h-0 opacity-0"
-                              }`}
-                            />
-                            <AppIcon emoji={cat.icon} size={22} />
-                            <span className="flex-1 min-w-0 truncate">{cat.label}</span>
-                          </Link>
+                          <div key={c.section}>
+                            <button
+                              type="button"
+                              onClick={() => setOpenGroup(isOpen ? null : c.section)}
+                              aria-expanded={isOpen}
+                              className={[
+                                "relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-left transition-colors",
+                                active ? "bg-base-800 text-neon-blue" : "text-slate-300 hover:text-slate-100 hover:bg-base-800/60",
+                              ].join(" ")}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
+                                  active ? "h-5 opacity-100" : "h-0 opacity-0"
+                                }`}
+                              />
+                              <AppIcon emoji={c.icon} size={22} />
+                              <span className="flex-1 min-w-0 truncate font-medium">{c.label}</span>
+                              <span className="shrink-0 rounded-full bg-base-800 px-1.5 text-[10px] font-semibold text-slate-500">{c.items.length}</span>
+                              <span className={`shrink-0 text-[10px] text-slate-500 transition-transform ${isOpen ? "" : "-rotate-90"}`}>▼</span>
+                            </button>
+                            {isOpen && (
+                              <div className="ml-5 mt-0.5 mb-1.5 pl-1.5 border-l border-white/10 space-y-0.5">
+                                {c.items.map((i) => pageRow(i, "Categories", true))}
+                              </div>
+                            )}
+                          </div>
                         );
                       })
-                    : section.items.map((item) => {
-                    const href = `/dashboard/${guildId}${item.href}`;
-                    // The Modules link and a category link both ultimately
-                    // point at /modules, differing only by ?section= — so
-                    // Modules itself is only "active" with no section
-                    // selected (i.e. the plain All Categories view).
-                    const active = pathname === href && (item.href !== "/modules" || !activeSection);
-                    const moduleKey = NAV_MODULE_KEYS[item.href];
-                    const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
-                    const pinned = isPinned(item.href);
-                    const isQuick = item.href === "/quick-links" && section.section === "Owner Only";
-                    return (
-                      <Fragment key={`${section.section ?? "top"}:${item.href}`}>
-                      <div
-                        className={[
-                          "group relative flex items-center gap-1 rounded-lg pr-1.5 text-sm transition-colors",
-                          active
-                            ? "bg-base-800 text-neon-blue shadow-glow-blue"
-                            : section.section === "Owner Only"
-                              ? "text-purple-300 hover:text-purple-100 hover:bg-base-800/60"
-                              : "text-slate-400 hover:text-slate-100 hover:bg-base-800/60",
-                        ].join(" ")}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-neon-blue transition-all duration-300 ease-out ${
-                            active ? "h-5 opacity-100" : "h-0 opacity-0"
-                          }`}
-                        />
-                        <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2">
-                          <AppIcon emoji={item.icon} size={22} />
-                          <span className="flex-1 min-w-0 truncate">{item.label}</span>
-                          {enabled !== null && (
-                            <span
-                              className={`h-2 w-2 rounded-full shrink-0 ${!enabled ? "bg-rose-500" : setup?.[moduleKey!]?.length ? "bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" : "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]"}`}
-                              title={!enabled ? "Disabled" : setup?.[moduleKey!]?.length ? "Needs setup" : "Enabled"}
-                            />
-                          )}
-                        </Link>
-                        <button
-                          onClick={() => togglePin(item.href)}
-                          title={pinned ? "Unpin" : "Pin to top"}
-                          className={[
-                            "shrink-0 w-6 h-6 flex items-center justify-center rounded transition-opacity text-xs",
-                            pinned ? "opacity-100 text-neon-blue" : "opacity-0 group-hover:opacity-100 text-slate-600 hover:text-slate-300",
-                          ].join(" ")}
-                        >
-                          📌
-                        </button>
-                        {isQuick && pinnedQuick.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={toggleQuick}
-                            title={quickOpen ? "Hide links" : "Show links here"}
-                            aria-expanded={quickOpen}
-                            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-[10px] text-slate-500 hover:text-slate-200"
-                          >
-                            {quickOpen ? "▾" : "▸"}
-                          </button>
-                        )}
-                      </div>
-                      {isQuick && quickOpen && pinnedQuick.length > 0 && (
-                        <div className="ml-7 pl-2 border-l border-white/10 space-y-0.5">
-                          {pinnedQuick.map((g) => (
-                            <a
-                              key={g.id}
-                              href={quickLinkMain(g) as string}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-slate-400 hover:text-slate-100 hover:bg-base-800/60"
-                            >
-                              <span>{g.icon.startsWith("<") ? "🔗" : g.icon}</span>
-                              <span className="flex-1 min-w-0 truncate">{g.name}</span>
-                              <span className="text-slate-600">↗</span>
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                      </Fragment>
-                    );
-                  })}
+                    : section.items.map((item) => pageRow(item, section.section))}
                 </div>
               )}
             </div>

@@ -81,10 +81,10 @@ test("every page has a guide and a test card", () => {
 });
 
 test("a page's path finds its group", () => {
-  assert.equal(navSectionForPath("/cases")?.section, "Moderation");
-  assert.equal(navSectionForPath("/tickets/123")?.section, "Support");
+  assert.equal(navSectionForPath("/cases")?.section, "Safety");
+  assert.equal(navSectionForPath("/tickets/123")?.section, "Community");
   assert.equal(navSectionForPath("/stream-extras")?.section, "Streaming");
-  assert.equal(navSectionForPath("/economy-hub")?.section, "Levelling & Economy");
+  assert.equal(navSectionForPath("/economy-hub")?.section, "Fun & Rewards");
   assert.equal(navSectionForPath("/economy"), null, "/economy must not match /economy-hub");
   assert.equal(navSectionForPath(""), null);
   assert.equal(navSectionForPath("/modules"), null);

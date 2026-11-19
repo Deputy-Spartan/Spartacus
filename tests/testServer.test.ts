@@ -84,9 +84,43 @@ test("a server set up under the old groups is moved over, with nothing lost", ()
   assert.deepEqual(plan.staleChannelLabels, [], "no channel should be deleted");
   assert.deepEqual(plan.duplicateChannelLabels, [], "no channel should be deleted as a duplicate");
   assert.ok(plan.channelsToReparent.length > 20, "channels should move into their new groups");
-  assert.deepEqual([...plan.duplicateCategoryLabels].sort(), ["Community", "Engagement", "Security", "Utility"], "the four old groups are removed once emptied");
+  assert.deepEqual([...plan.duplicateCategoryLabels].sort(), ["Engagement", "Levelling & Economy", "Moderation", "Security", "Support", "Utility"], "the old groups are removed once emptied");
   assert.deepEqual(plan.emptyCategoryIds, []);
-  for (const name of ["Protection", "Onboarding", "Streaming", "Messaging", "Insights"]) assert.ok(plan.categoriesToCreate.includes(name), `${name} should be created`);
-  // Moderation and Support keep their name, so they stay and are not recreated.
-  assert.ok(!plan.categoriesToCreate.includes("Moderation") && !plan.categoriesToCreate.includes("Support"));
+  for (const name of ["Safety", "Streaming", "Fun & Rewards", "Posts & Stats"]) assert.ok(plan.categoriesToCreate.includes(name), `${name} should be created`);
+  // Community keeps its name, so it stays and is not recreated.
+  assert.ok(!plan.categoriesToCreate.includes("Community"));
+});
+
+// The 11 groups from before they were folded into 5, by page name.
+const ELEVEN: Record<string, string[]> = {
+  Moderation: ["Moderator", "Cases & Warnings", "Player Reports", "Warn Escalation", "Appeals", "Weekly Staff Report", "Slow Mode", "Channel Locks"],
+  Protection: ["AI Moderation", "Anti-Raid", "Anti-Nuke", "Perm Watch", "Honeypot", "Server Backup"],
+  Onboarding: ["Welcome", "Verification", "Rules"],
+  Streaming: ["Going Live", "Stream Extras", "Stream Growth", "Pre-Stream Checklist"],
+  Messaging: ["Announcements", "Quote of the Day", "Sticky Messages", "Embed Creator", "Custom Commands", "Bump Reminder"],
+  "Groups & Events": ["Event Scheduler", "Matchmaking", "LFG", "Playing Now"],
+  "Fun & Engagement": ["Giveaways", "Polls", "Starboard", "Counting Game", "Anonymous", "AI Chat", "Birthdays"],
+  "Levelling & Economy": ["Economy Hub"],
+  "Roles & Channels": ["Role Manager", "Reaction Roles", "Temp Channels", "Server Config Templates", "Server Partnerships"],
+  Support: ["Tickets", "Applications", "Support DM"],
+  Insights: ["Weekly Recap", "Growth Analytics", "Suggestion Analytics", "Member Milestones", "Server Stat Channels", "Status Channel"],
+};
+
+test("a server set up under the 11 groups is moved into the 5, with nothing lost", () => {
+  const typeOf = new Map(layout.flatMap((c) => c.channels.map((ch) => [ch.name, ch.type] as const)));
+  const old: CategorySpec[] = [
+    ...Object.entries(ELEVEN).map(([name, labels]) => ({
+      name,
+      channels: labels.flatMap((label) => [slugifyModuleLabel(label), ...(OLD_EXTRA[label] ?? [])]).map((n) => ({ name: n, type: typeOf.get(n) ?? ("text" as const) })),
+    })),
+    ...layout.slice(-2),
+  ];
+  assert.equal(old.reduce((n, c) => n + c.channels.length, 0), layout.reduce((n, c) => n + c.channels.length, 0), "the 11 and the 5 should hold the same channels");
+
+  const plan = computePlan(fakeGuild(old), layout);
+  assert.equal(plan.channelsToCreate.length, 0, "every channel already exists, so none should be made");
+  assert.deepEqual(plan.staleChannelLabels, [], "no channel should be deleted");
+  assert.deepEqual(plan.duplicateChannelLabels, [], "no channel should be deleted as a duplicate");
+  assert.deepEqual([...plan.categoriesToCreate].sort(), ["Community", "Fun & Rewards", "Posts & Stats", "Safety"]);
+  assert.equal(plan.duplicateCategoryLabels.length, 10, "the 10 retired groups are removed once emptied");
 });

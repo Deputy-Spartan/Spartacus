@@ -1,6 +1,6 @@
 "use client";
 
-import { DashboardTextProvider } from "../../../components/ui/EditableText";
+import { DashboardTextProvider, WhenTextsReady } from "../../../components/ui/EditableText";
 import { rememberLastUser } from "../../../lib/lastUser";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -97,6 +97,7 @@ export default function DashboardLayout({
     <UserPrefsProvider>
     <DashboardTextProvider isOwner={isOwner}>
     <EditModeProvider>
+    <WhenTextsReady>
     <ConfirmProvider>
       <div className="sp-shell min-h-screen bg-base-950">
         <CommandPalette guildId={params.guildId} />
@@ -128,6 +129,7 @@ export default function DashboardLayout({
         <PageEditor />
       </div>
     </ConfirmProvider>
+    </WhenTextsReady>
     </EditModeProvider>
     </DashboardTextProvider>
     </UserPrefsProvider>

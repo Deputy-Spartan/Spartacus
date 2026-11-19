@@ -9,20 +9,55 @@ import { api } from "../../lib/api";
 interface TextsContext {
   owner: boolean;
   texts: Record<string, string>;
+  ready: boolean; // the saved wording is known (from this device's copy or the server)
   save: (key: string, text: string) => Promise<void>;
 }
 
-const Ctx = createContext<TextsContext>({ owner: false, texts: {}, save: async () => {} });
+const Ctx = createContext<TextsContext>({ owner: false, texts: {}, ready: true, save: async () => {} });
 
 // The saved wording and the owner's save, for things built on the same store
-// (the owner's menu layout in lib/navLayout.ts).
+// (the owner's menu layout in lib/navLayout.ts, page edits in edit/PageEditor).
 export const useDashboardTexts = () => useContext(Ctx);
 
+// A copy of the saved wording on this device, so a page opens with the
+// owner's words and layout straight away instead of flashing the built-in
+// ones while the server answers. The server's answer still replaces it.
+const CACHE = "spartacus:dashboard-texts";
+function readCache(): Record<string, string> | null {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(CACHE) ?? "null");
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, string>) : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(t: Record<string, string>) {
+  try {
+    localStorage.setItem(CACHE, JSON.stringify(t));
+  } catch {
+    /* private mode or full */
+  }
+}
+
 export function DashboardTextProvider({ isOwner, children }: { isOwner: boolean; children: React.ReactNode }) {
-  const [texts, setTexts] = useState<Record<string, string>>({});
+  // Only mounted in the browser (the dashboard waits for its access check
+  // first), so reading this device's copy here is safe.
+  const [cached] = useState(() => (typeof window === "undefined" ? null : readCache()));
+  const [texts, setTexts] = useState<Record<string, string>>(cached ?? {});
+  const [ready, setReady] = useState(!!cached);
 
   useEffect(() => {
-    api.getDashboardTexts().then(setTexts).catch(() => null);
+    api
+      .getDashboardTexts()
+      .then((t) => {
+        setTexts(t);
+        writeCache(t);
+      })
+      .catch(() => null)
+      .finally(() => setReady(true));
+    // Never keep the dashboard hidden for long if the server is slow.
+    const t = setTimeout(() => setReady(true), 2500);
+    return () => clearTimeout(t);
   }, []);
 
   async function save(key: string, text: string) {
@@ -30,12 +65,21 @@ export function DashboardTextProvider({ isOwner, children }: { isOwner: boolean;
       const next = { ...prev };
       if (text) next[key] = text;
       else delete next[key];
+      writeCache(next);
       return next;
     });
     await api.setDashboardText(key, text);
   }
 
-  return <Ctx.Provider value={{ owner: isOwner, texts, save }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ owner: isOwner, texts, ready, save }}>{children}</Ctx.Provider>;
+}
+
+// On a device that has never loaded the saved wording, keeps the dashboard
+// out of sight for the moment it takes to arrive, so the built-in words never
+// show first. Everywhere else this shows straight away.
+export function WhenTextsReady({ children }: { children: React.ReactNode }) {
+  const { ready } = useContext(Ctx);
+  return <div style={{ display: "contents", visibility: ready ? undefined : "hidden" }}>{children}</div>;
 }
 
 // `children` is the built-in wording, used until the owner saves their own.

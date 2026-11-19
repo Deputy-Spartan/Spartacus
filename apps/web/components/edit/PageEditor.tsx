@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useDashboardTexts } from "../ui/EditableText";
 import { useEditMode } from "../../lib/editMode";
@@ -173,29 +173,25 @@ export function PageEditor() {
   const editsRef = useRef(edits);
   editsRef.current = edits;
 
-  // Apply the saved words and order now, and again whenever the page changes.
-  useEffect(() => {
-    let frame = 0;
+  // Apply the saved words and order before the page is drawn, and again the
+  // moment anything on it changes (new data, a tab switch), so the built-in
+  // words never flash up first. A layout effect and an observer both run
+  // before the browser paints.
+  useLayoutEffect(() => {
     const run = () => {
-      frame = 0;
       const root = rootEl();
       if (!root) return;
       applyText(root, editsRef.current.t ?? {});
       applyOrder(root, editsRef.current.o ?? {});
     };
-    const later = () => {
-      if (!frame) frame = requestAnimationFrame(run);
-    };
     run();
+    const hasEdits = Object.keys(edits.t ?? {}).length > 0 || Object.keys(edits.o ?? {}).length > 0;
     const root = rootEl();
-    if (!root) return;
-    const obs = new MutationObserver(later);
+    if (!root || !hasEdits) return;
+    const obs = new MutationObserver(run);
     obs.observe(root, { subtree: true, childList: true, characterData: true });
-    return () => {
-      obs.disconnect();
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [edits, pathname]);
+    return () => obs.disconnect();
+  }, [edits, pathname, section]);
 
   const [status, setStatus] = useState<"" | "saving" | "saved" | "error">("");
   const persist = useCallback(

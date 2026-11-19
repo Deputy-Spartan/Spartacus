@@ -99,23 +99,47 @@ function applyOrder(root: Element, orders: Record<string, number[]>) {
 
 // The box a tap is in: the nearest thing big enough to be a card or section
 // that sits in a list of two or more siblings.
+// Prefers a box that's one of a set of look-alikes (a card among cards, a row
+// among rows) or sits in a grid, over a single line inside a card.
 function movableFrom(el: Element | null, root: Element): HTMLElement | null {
+  const first = movableStep(el, root);
+  for (let c = first; c; c = c.parentElement ? movableStep(c.parentElement, root) : null) {
+    const parent = c.parentElement;
+    if (!parent) break;
+    const alike = Array.from(parent.children).filter((s) => s !== c && s.tagName === c.tagName && s.className === c.className).length;
+    if (alike >= 1 || getComputedStyle(parent).display.includes("grid")) return c;
+  }
+  return first;
+}
+
+function movableStep(el: Element | null, root: Element): HTMLElement | null {
   while (el && el !== root) {
     const parent: HTMLElement | null = el.parentElement;
     if (!parent) return null;
     const r = el.getBoundingClientRect();
-    if (parent.children.length >= 2 && r.height >= 36 && r.width >= 80) return el as HTMLElement;
+    // Skip see-through layers laid over a card (like a card's full-size
+    // link): moving those changes nothing you can see.
+    const pos = getComputedStyle(el).position;
+    const inFlow = pos !== "absolute" && pos !== "fixed";
+    const flowSiblings = Array.from(parent.children).filter((c) => !/absolute|fixed/.test(getComputedStyle(c).position)).length;
+    if (inFlow && flowSiblings >= 2 && r.height >= 36 && r.width >= 80) return el as HTMLElement;
     el = parent;
   }
   return null;
 }
 
-function textNodeAt(x: number, y: number, target: Element): Text | null {
-  const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node } | null };
-  const hit = doc.caretPositionFromPoint?.(x, y)?.offsetNode ?? document.caretRangeFromPoint?.(x, y)?.startContainer;
-  if (hit && hit.nodeType === Node.TEXT_NODE && (hit.nodeValue ?? "").trim() && target.contains(hit)) return hit as Text;
-  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) if ((n.nodeValue ?? "").trim()) return n as Text;
+// The words under the finger, found by where text is drawn, so it still works
+// where a see-through link sits over the text (the group page cards).
+function textNodeAt(x: number, y: number, root: Element): Text | null {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    if (!(n.nodeValue ?? "").trim() || n.parentElement?.closest(SKIP)) continue;
+    range.selectNodeContents(n);
+    for (const r of Array.from(range.getClientRects())) {
+      if (x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2) return n;
+    }
+  }
   return null;
 }
 
@@ -197,7 +221,7 @@ export function PageEditor() {
       if (t.closest("input, textarea, select")) return;
       e.preventDefault();
       e.stopPropagation();
-      const node = textNodeAt(e.clientX, e.clientY, t);
+      const node = textNodeAt(e.clientX, e.clientY, root);
       if (node) {
         const now = (node.nodeValue ?? "").trim();
         const rec = applied.get(node);
@@ -205,7 +229,7 @@ export function PageEditor() {
         setWord({ node, orig });
         setDraft(now);
       } else setWord(null);
-      setBox(movableFrom(t, root));
+      setBox(movableFrom(node?.parentElement ?? t, root));
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
@@ -385,7 +409,7 @@ export function PageEditor() {
               type="button"
               onClick={() => {
                 const root = rootEl();
-                const up = box.parentElement && root ? movableFrom(box.parentElement, root) : null;
+                const up = box.parentElement && root ? movableStep(box.parentElement, root) : null;
                 if (up) setBox(up);
               }}
               className="rounded-md border border-amber-400/40 px-2.5 py-1 hover:bg-amber-400/10"

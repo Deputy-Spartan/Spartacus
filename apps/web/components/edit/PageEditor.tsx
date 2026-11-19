@@ -234,6 +234,13 @@ export function PageEditor() {
   useEffect(() => {
     if (!editing || !owner) return;
     function onClick(e: MouseEvent) {
+      // The click that ends a drag of a card isn't a tap on it.
+      if (suppressClick.current) {
+        suppressClick.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       const root = rootEl();
       const t = e.target as Element | null;
       if (!root || !t || !root.contains(t) || t.closest("[data-edit-skip]")) return;
@@ -359,7 +366,7 @@ export function PageEditor() {
   }
 
   // Dragging a box among its siblings.
-  function startDrag(e: React.PointerEvent, box: HTMLElement | null) {
+  function startDrag(e: { preventDefault: () => void }, box: HTMLElement | null) {
     const root = rootEl();
     if (!box || !root) return;
     const parent = box.parentElement;
@@ -416,6 +423,89 @@ export function PageEditor() {
     window.addEventListener("pointerup", end);
     window.addEventListener("pointercancel", end);
   }
+
+  // Grab a card itself to move it: with a mouse, press and drag; on a phone,
+  // press and hold for a moment, then drag (a quick swipe still scrolls).
+  const suppressClick = useRef(false);
+  const startDragRef = useRef(startDrag);
+  startDragRef.current = startDrag;
+  const editsL = edits.l;
+  useEffect(() => {
+    if (!editing || !owner) return;
+    const root = rootEl();
+    if (!root) return;
+    let pending: { card: HTMLElement; x: number; y: number; mouse: boolean; timer?: ReturnType<typeof setTimeout> } | null = null;
+    let dragging = false;
+    const isLockedCard = (card: HTMLElement) => {
+      const parent = card.parentElement;
+      const path = parent && pathOf(root, parent);
+      if (!parent || !path) return false;
+      return ((editsL ?? {})[path.join(".")] ?? []).includes(Array.prototype.indexOf.call(parent.children, card) as number);
+    };
+    const begin = () => {
+      if (!pending) return;
+      const card = pending.card;
+      clearTimeout(pending.timer);
+      pending = null;
+      if (isLockedCard(card)) return;
+      dragging = true;
+      setBox(card);
+      startDragRef.current({ preventDefault: () => {} }, card);
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t || e.button !== 0 || t.closest("[data-edit-skip], input, textarea, select")) return;
+      const card = cardsRef.current.find((c) => c.contains(t));
+      if (!card) return;
+      pending = { card, x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse" };
+      if (!pending.mouse) pending.timer = setTimeout(begin, 350);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!pending) return;
+      const far = Math.hypot(e.clientX - pending.x, e.clientY - pending.y);
+      if (pending.mouse && far > 6) begin();
+      else if (!pending.mouse && far > 10) {
+        clearTimeout(pending.timer); // a swipe: let the page scroll
+        pending = null;
+      }
+    };
+    const onUp = () => {
+      if (pending) clearTimeout(pending.timer);
+      pending = null;
+      if (dragging) {
+        dragging = false;
+        suppressClick.current = true;
+        setTimeout(() => (suppressClick.current = false), 400);
+      }
+    };
+    // Once a held card is being dragged, the page mustn't scroll under it.
+    const onTouchMove = (e: TouchEvent) => {
+      if (dragging) e.preventDefault();
+    };
+    const noMenu = (e: Event) => {
+      if (cardsRef.current.some((c) => c.contains(e.target as Node))) e.preventDefault();
+    };
+    root.style.userSelect = "none";
+    root.style.setProperty("-webkit-user-select", "none");
+    root.style.setProperty("-webkit-touch-callout", "none");
+    document.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("contextmenu", noMenu);
+    return () => {
+      root.style.userSelect = "";
+      root.style.removeProperty("-webkit-user-select");
+      root.style.removeProperty("-webkit-touch-callout");
+      document.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      document.removeEventListener("touchmove", onTouchMove, { capture: false } as EventListenerOptions);
+      document.removeEventListener("contextmenu", noMenu);
+    };
+  }, [editing, owner, editsL]);
 
   const [armReset, setArmReset] = useState(false);
   function resetPage() {
@@ -533,7 +623,7 @@ export function PageEditor() {
             Done
           </button>
         </div>
-        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Drag a card by its ⋮⋮ Move button, or tap 🔓 Lock to keep it where it is. For other boxes, tap the box first.</p>}
+        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Drag a card to move it (on a phone, hold it first), or tap 🔓 Lock to keep it where it is. For other boxes, tap the box first.</p>}
         {word && (
           <div className="space-y-1.5">
             <textarea

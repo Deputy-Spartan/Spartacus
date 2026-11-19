@@ -435,6 +435,7 @@ export async function setChannelName(channelId: string, name: string): Promise<{
 
 export interface GuildCounts {
   memberCount: number;
+  onlineCount: number; // members online right now (Discord's estimate)
   boostCount: number;
 }
 
@@ -446,8 +447,8 @@ export async function getGuildCounts(guildId: string): Promise<GuildCounts | nul
     headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
   });
   if (!res.ok) return null;
-  const data = (await res.json()) as { approximate_member_count?: number; premium_subscription_count?: number };
-  return { memberCount: data.approximate_member_count ?? 0, boostCount: data.premium_subscription_count ?? 0 };
+  const data = (await res.json()) as { approximate_member_count?: number; approximate_presence_count?: number; premium_subscription_count?: number };
+  return { memberCount: data.approximate_member_count ?? 0, onlineCount: data.approximate_presence_count ?? 0, boostCount: data.premium_subscription_count ?? 0 };
 }
 
 export interface AppCommandOption {

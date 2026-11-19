@@ -1813,6 +1813,13 @@ export interface CurrentUser {
 
 export type DashboardTheme = "studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk";
 
+export interface LiveStrip {
+  memberCount: number | null;
+  onlineCount: number | null;
+  memberChange: number | null; // since about a day ago
+  liveNow: Array<{ name: string; platform: string; friend: boolean }>;
+}
+
 export interface UserPrefs {
   theme: DashboardTheme;
   accent: string | null; // #rrggbb, or null for the theme's own
@@ -2173,6 +2180,7 @@ export const api = {
   deleteStatusChannel: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/status-channels/${id}`, { method: "DELETE" }),
 
+  getLiveStrip: (guildId: string) => request<LiveStrip>(`/guilds/${guildId}/live-strip`),
   getGrowthSnapshots: (guildId: string) => request<GrowthSnapshotRow[]>(`/guilds/${guildId}/growth-snapshots`),
 
   cloneModules: (guildId: string, sourceGuildId: string) =>

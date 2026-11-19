@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { PAGE_GUIDES } from "@spartacus/shared";
 import { NeonCard } from "../ui/NeonCard";
@@ -29,12 +30,25 @@ export function GroupCards({ guildId, section }: { guildId: string; section: str
   const setup = useSetupStatus(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
   const group = sections.find((s) => s.key === section);
+  // "Turn all on/off" asks for a second tap before it changes every module.
+  const [arm, setArm] = useState<"on" | "off" | null>(null);
+  const [busy, setBusy] = useState(false);
 
   if (!group) return <p className="text-sm text-slate-500">No group called &quot;{section}&quot;.</p>;
 
   const items = group.items.filter((i) => !i.hidden);
   const gated = items.filter((i) => i.moduleKey);
   const on = gated.filter((i) => state?.[i.moduleKey!]?.enabled).length;
+  // Each module once (two pages can share one, like Moderator and Cases).
+  const keys = [...new Set(gated.map((i) => i.moduleKey!))];
+  async function setAll(enabled: boolean) {
+    setBusy(true);
+    try {
+      await Promise.all(keys.map((k) => setModuleEnabled(guildId, k, enabled).catch(() => null)));
+    } finally {
+      setBusy(false);
+    }
+  }
   const slug = (href: string) => href.replace(/^\//, "").replace(/[^a-z0-9._-]/gi, "-");
 
   return (
@@ -46,7 +60,36 @@ export function GroupCards({ guildId, section }: { guildId: string; section: str
           <p className="text-slate-400 text-sm">
             {group.description && <EditableText id={`group.${slug(group.key)}`}>{group.description}</EditableText>}
           </p>
-          <p className="text-xs text-slate-500 mt-1">{state ? `${on} of ${gated.length} on` : "Loading…"}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <p className="text-xs text-slate-500">{state ? `${on} of ${gated.length} on` : "Loading…"}</p>
+            {state && keys.length > 1 && (
+              <>
+                {(["on", "off"] as const).map((to) => {
+                  const armed = arm === to;
+                  const allThere = to === "on" ? on === gated.length : on === 0;
+                  return (
+                    <button
+                      key={to}
+                      type="button"
+                      disabled={allThere || busy}
+                      onClick={() => {
+                        if (!armed) return setArm(to);
+                        setArm(null);
+                        void setAll(to === "on");
+                      }}
+                      onBlur={() => armed && setArm(null)}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold disabled:opacity-40 ${
+                        armed ? "border-amber-400 text-amber-300" : "border-white/10 text-slate-300 hover:border-neon-blue/60"
+                      }`}
+                    >
+                      {armed ? `Tap again to turn all ${to}` : `Turn all ${to}`}
+                    </button>
+                  );
+                })}
+                {busy && <span className="text-xs text-slate-500">Saving…</span>}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

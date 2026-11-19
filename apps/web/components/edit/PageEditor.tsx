@@ -282,7 +282,8 @@ export function PageEditor() {
       for (const el of Array.from(document.querySelectorAll<HTMLElement>("[data-edit-pad]"))) {
         if (keep.includes(el)) continue;
         const was = el.dataset.editPad;
-        el.style.paddingBottom = was === "-" ? "" : (was ?? "");
+        el.style.removeProperty("padding-bottom");
+        if (was && was !== "-") el.style.paddingBottom = was;
         delete el.dataset.editPad;
       }
     };
@@ -293,7 +294,9 @@ export function PageEditor() {
       for (const c of found) {
         if (c.dataset.editPad) continue;
         c.dataset.editPad = c.style.paddingBottom || "-";
-        c.style.paddingBottom = `${parseFloat(getComputedStyle(c).paddingBottom) + 40}px`;
+        // "important", because some cards set their padding as important
+        // (Tailwind's !p-4) and a plain value would be ignored.
+        c.style.setProperty("padding-bottom", `${parseFloat(getComputedStyle(c).paddingBottom) + 44}px`, "important");
       }
       setCards(found);
     };
@@ -576,8 +579,8 @@ export function PageEditor() {
           >
             {/* The edit strip, in the room added along the card's bottom. */}
             <div
-              className={`absolute inset-x-0 bottom-0 h-10 flex items-center justify-between gap-2 px-3 rounded-b-[10px] border-t border-dashed pointer-events-auto ${
-                locked ? "border-sky-400/40 bg-sky-400/10" : "border-amber-400/25 bg-amber-400/[0.06]"
+              className={`absolute inset-x-0 bottom-0 h-10 flex items-center justify-between gap-2 px-3 rounded-b-[10px] border-t border-dashed pointer-events-auto bg-transparent ${
+                locked ? "border-sky-400/40" : "border-amber-400/25"
               }`}
             >
               {locked ? (

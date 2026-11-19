@@ -1,31 +1,33 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { api, clearToken, type AccessStatus, type CurrentUser, type DashboardTheme } from "../../../../lib/api";
-import { THEMES, useUserPrefs } from "../../../../lib/userPrefs";
+import { ACCENTS, THEMES, useUserPrefs } from "../../../../lib/userPrefs";
 
 type Tab = "profile" | "account";
 
 // A small picture of each theme, drawn with the theme's own look.
+const PREVIEW: Record<DashboardTheme, { bg: string; side: string; card: React.CSSProperties }> = {
+  studio: { bg: "#1c1d20", side: "#242529", card: { background: "linear-gradient(90deg,#5e7fa6,#7b99bc,#94a3b8) top/100% 3px no-repeat, #2a2c31", border: "1px solid #37393f" } },
+  glass: {
+    bg: "radial-gradient(120px 80px at 15% 10%, rgba(123,153,188,.45), transparent 70%), radial-gradient(120px 90px at 100% 100%, rgba(94,127,166,.5), transparent 70%), #1c1d20",
+    side: "rgba(255,255,255,.08)",
+    card: { background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)" },
+  },
+  daylight: { bg: "#b9c2cd", side: "#c8d0d9", card: { background: "#d0d7df", border: "1px solid rgba(25,40,60,.16)", boxShadow: "0 2px 6px rgba(25,40,60,.12)" } },
+  steel: { bg: "#0b0c0e", side: "#121316", card: { background: "#15171a", border: "1px solid #262930", boxShadow: "0 0 10px rgba(74,149,255,.25)" } },
+  midnight: { bg: "#000000", side: "#07080c", card: { background: "#0b0d13", border: "1px solid #1a1e2a", boxShadow: "0 0 10px rgba(79,209,255,.22)" } },
+  dusk: { bg: "#1d1a24", side: "#24202d", card: { background: "#2a2534", border: "1px solid #3b3448", boxShadow: "0 0 10px rgba(185,162,255,.2)" } },
+};
 function ThemePreview({ id }: { id: DashboardTheme }) {
-  const bg =
-    id === "glass"
-      ? "radial-gradient(120px 80px at 15% 10%, rgba(123,153,188,.45), transparent 70%), radial-gradient(120px 90px at 100% 100%, rgba(94,127,166,.5), transparent 70%), #1c1d20"
-      : id === "daylight"
-        ? "#eef1f5"
-        : "#1c1d20";
-  const card =
-    id === "glass"
-      ? { background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.16)", borderRadius: 8 }
-      : id === "daylight"
-        ? { background: "#ffffff", border: "1px solid rgba(28,29,32,.1)", borderRadius: 8, boxShadow: "0 2px 6px rgba(28,29,32,.08)" }
-        : { background: "linear-gradient(90deg,#5e7fa6,#7b99bc,#94a3b8) top/100% 3px no-repeat, #2a2c31", border: "1px solid #37393f", borderRadius: 8 };
+  const p = PREVIEW[id];
+  const card = { ...p.card, borderRadius: 8 };
   return (
-    <div className="h-20 rounded-lg overflow-hidden p-2 flex gap-1.5" style={{ background: bg }} aria-hidden="true">
-      <div className="w-6 rounded" style={{ background: id === "glass" ? "rgba(255,255,255,.08)" : id === "daylight" ? "#ffffff" : "#242529" }} />
+    <div className="h-20 rounded-lg overflow-hidden p-2 flex gap-1.5" style={{ background: p.bg }} aria-hidden="true">
+      <div className="w-6 rounded" style={{ background: p.side }} />
       <div className="flex-1 grid grid-cols-2 gap-1.5">
         <div style={card} />
         <div style={card} />
@@ -51,6 +53,7 @@ function AccountPageInner() {
   }, []);
   useEffect(() => setName(prefs.displayName ?? ""), [prefs.displayName]);
 
+  const accentTimer = useRef<ReturnType<typeof setTimeout>>();
   async function run(patch: Parameters<typeof save>[0], done: string) {
     const err = await save(patch);
     setNote(err ? { ok: false, text: err } : { ok: true, text: done });
@@ -130,7 +133,7 @@ function AccountPageInner() {
             <p className={label} id="theme">
               Theme
             </p>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
               {THEMES.map((t) => (
                 <button
                   key={t.id}
@@ -146,6 +149,55 @@ function AccountPageInner() {
                   <p className="text-xs text-slate-500">{t.blurb}</p>
                 </button>
               ))}
+            </div>
+            <div className="mt-5 pt-4 border-t border-white/5">
+              <p className="text-sm font-medium">Accent color</p>
+              <p className="text-xs text-slate-500 mb-3">The glow and highlight color on buttons, cards and the menu. Leave it on Theme to use each theme&apos;s own.</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => run({ accent: null }, "✅ Using the theme's own accent color")}
+                  aria-pressed={!prefs.accent}
+                  className={["h-9 px-3 rounded-full border text-xs font-semibold", !prefs.accent ? "border-neon-blue/80 text-neon-blue" : "border-white/10 text-slate-400 hover:border-white/25"].join(" ")}
+                >
+                  Theme
+                </button>
+                {ACCENTS.map((a) => (
+                  <button
+                    key={a.hex}
+                    type="button"
+                    onClick={() => run({ accent: a.hex }, `✅ Accent color: ${a.name}`)}
+                    aria-pressed={prefs.accent === a.hex}
+                    aria-label={a.name}
+                    title={a.name}
+                    className={["h-9 w-9 rounded-full border-2 transition-transform hover:scale-110", prefs.accent === a.hex ? "border-white scale-110" : "border-transparent"].join(" ")}
+                    style={{ background: a.hex, boxShadow: prefs.accent === a.hex ? `0 0 12px ${a.hex}` : undefined }}
+                  />
+                ))}
+                <label className="h-9 px-3 rounded-full border border-white/10 text-xs font-semibold text-slate-400 hover:border-white/25 flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="color"
+                    key={prefs.accent ?? prefs.theme}
+                    defaultValue={prefs.accent ?? THEMES.find((t) => t.id === prefs.theme)?.accent ?? "#7b99bc"}
+                    onChange={(e) => {
+                      // Saves once you stop moving the picker, not on every step.
+                      const v = e.target.value;
+                      clearTimeout(accentTimer.current);
+                      accentTimer.current = setTimeout(() => run({ accent: v }, "✅ Accent color saved"), 400);
+                    }}
+                    className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                    aria-label="Pick any color"
+                  />
+                  Any color
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-white/5">
+              <div>
+                <p className="text-sm font-medium">Compact mode</p>
+                <p className="text-xs text-slate-500">Smaller text, buttons and cards, so more fits on the screen.</p>
+              </div>
+              <ToggleSwitch enabled={prefs.compact} onChange={(v) => run({ compact: v }, v ? "✅ Compact mode on" : "✅ Compact mode off")} label="Compact mode" />
             </div>
             <div className="flex items-center justify-between gap-3 mt-5 pt-4 border-t border-white/5">
               <div>

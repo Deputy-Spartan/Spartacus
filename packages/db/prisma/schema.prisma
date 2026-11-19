@@ -2250,7 +2250,9 @@ model SupportSettings {
 // them, saved to their account so it follows them to every device.
 model DashboardUserPrefs {
   userId       String   @id
-  theme        String   @default("studio") // studio | glass | daylight
+  theme        String   @default("studio") // studio | glass | daylight | steel | midnight | dusk
+  accent       String? // the person's own accent color (#rrggbb); null = the theme's own
+  compact      Boolean  @default(false) // smaller text and spacing so more fits
   reduceMotion Boolean  @default(false)
   displayName  String?
   updatedAt    DateTime @default(now()) @updatedAt

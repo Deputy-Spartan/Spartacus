@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The accent color every highlight uses, as "r g b". Each theme can set its
+   own below; a person's own pick (Account settings) is set on <html> and
+   wins over both. */
+:root { --accent-rgb: 123 153 188; --accent2-rgb: 94 127 166; }
+
 @layer base {
   /* Tells the browser to use its dark native widget rendering everywhere —
      select dropdown popups, checkboxes, radios, date/time pickers — instead
@@ -18,7 +23,7 @@
   select,
   input,
   textarea {
-    accent-color: #7b99bc;
+    accent-color: rgb(var(--accent-rgb));
   }
 
   /* Belt-and-suspenders for the <select> popup list specifically — the
@@ -40,7 +45,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(123, 153, 188, 0.3) transparent;
+    scrollbar-color: rgb(var(--accent-rgb) / 0.3) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -53,12 +58,12 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: rgba(123, 153, 188, 0.3);
+    background-color: rgb(var(--accent-rgb) / 0.3);
     border-radius: 9999px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(123, 153, 188, 0.5);
+    background-color: rgb(var(--accent-rgb) / 0.5);
   }
 
 }
@@ -95,7 +100,7 @@
     border-radius: 9999px;
     background: linear-gradient(
       to right,
-      #7b99bc var(--slider-fill, 0%),
+      rgb(var(--accent-rgb)) var(--slider-fill, 0%),
       rgba(255, 255, 255, 0.08) var(--slider-fill, 0%)
     );
     cursor: pointer;
@@ -109,15 +114,15 @@
     height: 16px;
     border-radius: 9999px;
     background: #ededef;
-    border: 2px solid #7b99bc;
-    box-shadow: 0 0 8px rgba(123, 153, 188, 0.8);
+    border: 2px solid rgb(var(--accent-rgb));
+    box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.8);
     cursor: pointer;
     transition: transform 150ms ease, box-shadow 150ms ease;
   }
 
   .neon-slider::-webkit-slider-thumb:hover {
     transform: scale(1.15);
-    box-shadow: 0 0 12px rgba(123, 153, 188, 1);
+    box-shadow: 0 0 12px rgb(var(--accent-rgb) / 1);
   }
 
   .neon-slider:active::-webkit-slider-thumb {
@@ -133,7 +138,7 @@
   .neon-slider::-moz-range-progress {
     height: 6px;
     border-radius: 9999px;
-    background: #7b99bc;
+    background: rgb(var(--accent-rgb));
   }
 
   .neon-slider::-moz-range-thumb {
@@ -141,8 +146,8 @@
     height: 16px;
     border-radius: 9999px;
     background: #ededef;
-    border: 2px solid #7b99bc;
-    box-shadow: 0 0 8px rgba(123, 153, 188, 0.8);
+    border: 2px solid rgb(var(--accent-rgb));
+    box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.8);
     cursor: pointer;
     transition: transform 150ms ease, box-shadow 150ms ease;
   }
@@ -154,11 +159,11 @@
   .spartacus-wave {
     background-image: linear-gradient(
       90deg,
-      #7b99bc 0%,
-      #7b99bc 35%,
+      rgb(var(--accent-rgb)) 0%,
+      rgb(var(--accent-rgb)) 35%,
       #ffffff 50%,
-      #7b99bc 65%,
-      #7b99bc 100%
+      rgb(var(--accent-rgb)) 65%,
+      rgb(var(--accent-rgb)) 100%
     );
     background-size: 300% 100%;
     background-position: 100% 0;
@@ -193,14 +198,14 @@
 /* ---------------------------------------------------------------------------
    Dashboard themes (Account settings → Theme), saved per person:
    Studio (default), Glass and Daylight. Same colors in all three:
-   #1C1D20 #242529 #2C2E33 #37393F and the steel blues #7B99BC #5E7FA6 #94A3B8.
+   #1C1D20 #242529 #2C2E33 #37393F and the steel blues rgb(var(--accent-rgb)) rgb(var(--accent2-rgb)) #94A3B8.
    Cards never get transform, filter or backdrop-filter: those would make the
    fixed-position pop-ups inside some cards (cropper, embed editors) jump.
    ------------------------------------------------------------------------- */
 
 /* The open tab in a group (components/nav/HubTabs.tsx). Each theme below gives
    it the same look as that theme's open sidebar row. */
-.sp-hubtab-on { background: #2c2e33; color: #7b99bc; }
+.sp-hubtab-on { background: #2c2e33; color: rgb(var(--accent-rgb)); }
 
 /* App-style icon tiles (components/ui/AppIcon.tsx). */
 .app-tile {
@@ -219,31 +224,31 @@
 .rank-2 { background: linear-gradient(135deg, #e3e7ed, #9aa3af); color: #1c1d20; }
 .rank-3 { background: linear-gradient(135deg, #e0a26a, #a9652e); color: #1c1d20; }
 html[data-theme="daylight"] .chart-grid { stroke: rgba(28, 29, 32, 0.08); }
-html[data-theme="daylight"] .sp-tabbar { background: rgba(226, 231, 238, 0.95); border-color: rgba(30, 45, 65, 0.12); }
+html[data-theme="daylight"] .sp-tabbar { background: rgba(200, 208, 217, 0.96); border-color: rgba(25, 40, 60, 0.16); }
 html[data-theme="glass"] .sp-tabbar { background: rgba(36, 37, 41, 0.7); }
 
 /* ---------- Studio: solid and bold, an accent bar on every card ---------- */
 html[data-theme="studio"] .neon-card {
   border-color: #37393f;
   border-radius: 14px;
-  background: linear-gradient(90deg, #5e7fa6, #7b99bc, #94a3b8) top left / 100% 3px no-repeat, #2a2c31;
+  background: linear-gradient(90deg, rgb(var(--accent2-rgb)), rgb(var(--accent-rgb)), #94a3b8) top left / 100% 3px no-repeat, #2a2c31;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 html[data-theme="studio"] .neon-card:hover { border-color: #4a4d55; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4); }
 html[data-theme="studio"] .sp-sidebar { background: #242529; border-color: #37393f; }
-html[data-theme="studio"] .sp-sidebar .bg-base-800.text-neon-blue { background: #7b99bc; color: #10151c; font-weight: 600; box-shadow: none; }
-html[data-theme="studio"] .sp-hubtab-on { background: #7b99bc; color: #10151c; }
+html[data-theme="studio"] .sp-sidebar .bg-base-800.text-neon-blue { background: rgb(var(--accent-rgb)); color: #10151c; font-weight: 600; box-shadow: none; }
+html[data-theme="studio"] .sp-hubtab-on { background: rgb(var(--accent-rgb)); color: #10151c; }
 html[data-theme="studio"] .neon-button,
-html[data-theme="studio"] .neon-button-sm { background: #7b99bc; color: #10151c; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); transition: background-color 0.15s; }
+html[data-theme="studio"] .neon-button-sm { background: rgb(var(--accent-rgb)); color: #10151c; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); transition: background-color 0.15s; }
 html[data-theme="studio"] .neon-button:hover,
-html[data-theme="studio"] .neon-button-sm:hover { background: #94b0cf; }
+html[data-theme="studio"] .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 80%, #fff); }
 
 /* ---------- Glass: a colorful glow behind frosted panels ---------- */
 html[data-theme="glass"] body {
   background:
-    radial-gradient(900px 620px at 6% 0%, rgba(123, 153, 188, 0.42), transparent 62%),
-    radial-gradient(860px 680px at 100% 100%, rgba(94, 127, 166, 0.5), transparent 62%),
+    radial-gradient(900px 620px at 6% 0%, rgb(var(--accent-rgb) / 0.42), transparent 62%),
+    radial-gradient(860px 680px at 100% 100%, rgb(var(--accent2-rgb) / 0.5), transparent 62%),
     radial-gradient(620px 460px at 65% 25%, rgba(148, 163, 184, 0.24), transparent 62%),
     #1c1d20;
   background-attachment: fixed;
@@ -275,7 +280,7 @@ html[data-theme="glass"] .sp-sidebar .bg-base-800 { background: rgba(255, 255, 2
 html[data-theme="glass"] .sp-hubtab-on { background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2); }
 html[data-theme="glass"] .sp-header { background: rgba(28, 29, 32, 0.35); border-color: rgba(255, 255, 255, 0.12); }
 html[data-theme="glass"] .neon-button,
-html[data-theme="glass"] .neon-button-sm { border-radius: 9999px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 18px rgba(94, 127, 166, 0.4); }
+html[data-theme="glass"] .neon-button-sm { border-radius: 9999px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 6px 18px rgb(var(--accent2-rgb) / 0.4); }
 html[data-theme="glass"] .sp-hero { background: rgba(255, 255, 255, 0.03); border-right: 1px solid rgba(255, 255, 255, 0.1); }
 html[data-theme="glass"] .sp-login-card { background: rgba(36, 37, 41, 0.45); border-color: rgba(255, 255, 255, 0.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 20px 60px rgba(0, 0, 0, 0.45); backdrop-filter: blur(22px) saturate(150%); -webkit-backdrop-filter: blur(22px) saturate(150%); }
 
@@ -284,23 +289,23 @@ html[data-theme="glass"] .sp-login-card { background: rgba(36, 37, 41, 0.45); bo
    Anything inside a Discord preview (those use fixed bg-[#…] colors) is
    left alone so previews still look like Discord. */
 html[data-theme="daylight"] { color-scheme: light; }
-html[data-theme="daylight"] body { background: #d5dce5; color: #1c1d20; }
+html[data-theme="daylight"] body { background: #b9c2cd; color: #1c1d20; }
 html[data-theme="daylight"] select,
-html[data-theme="daylight"] select option { background-color: #eef1f5; color: #1c1d20; }
-html[data-theme="daylight"] :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #e3e8ee; }
-html[data-theme="daylight"] :is(.sp-shell, .sp-login) { background-color: #d5dce5 !important; }
-html[data-theme="daylight"] :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #e8ecf1; }
-html[data-theme="daylight"] :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #dce2ea; }
-html[data-theme="daylight"] .bg-base-700:not([class*="bg-[#"] *) { background-color: #c8d0da; }
-html[data-theme="daylight"] :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #dce2ea; }
+html[data-theme="daylight"] select option { background-color: #d6dce4; color: #1c1d20; }
+html[data-theme="daylight"] :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #d3dae2; }
+html[data-theme="daylight"] :is(.sp-shell, .sp-login) { background-color: #b9c2cd !important; }
+html[data-theme="daylight"] :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #d0d7df; }
+html[data-theme="daylight"] :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #c4ccd6; }
+html[data-theme="daylight"] .bg-base-700:not([class*="bg-[#"] *) { background-color: #b3bdc9; }
+html[data-theme="daylight"] :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #c4ccd6; }
 html[data-theme="daylight"] .text-slate-100:not([class*="bg-[#"] *) { color: #1c1d20; }
 html[data-theme="daylight"] .text-slate-200:not([class*="bg-[#"] *) { color: #23262b; }
 html[data-theme="daylight"] .text-slate-300:not([class*="bg-[#"] *) { color: #37393f; }
-html[data-theme="daylight"] .text-slate-400:not([class*="bg-[#"] *) { color: #4b515c; }
-html[data-theme="daylight"] .text-slate-500:not([class*="bg-[#"] *) { color: #5f6673; }
-html[data-theme="daylight"] .text-slate-600:not([class*="bg-[#"] *) { color: #7a808b; }
+html[data-theme="daylight"] .text-slate-400:not([class*="bg-[#"] *) { color: #3f4550; }
+html[data-theme="daylight"] .text-slate-500:not([class*="bg-[#"] *) { color: #4c5360; }
+html[data-theme="daylight"] .text-slate-600:not([class*="bg-[#"] *) { color: #626975; }
 html[data-theme="daylight"] :is(.hover\:text-slate-100, .hover\:text-slate-200, .hover\:text-slate-300):hover:not([class*="bg-[#"] *) { color: #1c1d20; }
-html[data-theme="daylight"] .text-neon-blue:not([class*="bg-[#"] *) { color: #3f5f86; }
+html[data-theme="daylight"] .text-neon-blue:not([class*="bg-[#"] *) { color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); }
 html[data-theme="daylight"] :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/\[0\.07\]):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.1); }
 html[data-theme="daylight"] :is(.border-white\/20, .border-white\/30):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.18); }
 html[data-theme="daylight"] :is(.hover\:border-white\/15, .hover\:border-white\/20, .hover\:border-white\/25):hover:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.25); }
@@ -308,27 +313,27 @@ html[data-theme="daylight"] :is(.divide-white\/5) > * + *:not([class*="bg-[#"] *
 html[data-theme="daylight"] :is(.bg-white\/5, .bg-white\/10, .bg-white\/\[0\.03\], .bg-white\/\[0\.06\], .bg-black\/20, .bg-black\/10):not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.04); }
 html[data-theme="daylight"] :is(.hover\:bg-white\/5, .hover\:bg-white\/10, .hover\:bg-white\/\[0\.06\], .hover\:bg-white\/\[0\.07\]):hover:not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.06); }
 html[data-theme="daylight"] :is(input, textarea, select):not([class*="bg-[#"] *) { color: #1c1d20; }
-html[data-theme="daylight"] ::placeholder { color: #8a909b; }
+html[data-theme="daylight"] ::placeholder { color: #6b727e; }
 html[data-theme="daylight"] .neon-card {
-  background: #e9edf2;
-  border-color: rgba(30, 45, 65, 0.13);
+  background: #d0d7df;
+  border-color: rgba(25, 40, 60, 0.16);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(28, 29, 32, 0.05), 0 4px 14px rgba(28, 29, 32, 0.04);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-html[data-theme="daylight"] .neon-card:hover { border-color: #7b99bc; box-shadow: 0 2px 4px rgba(28, 29, 32, 0.07), 0 14px 30px rgba(94, 127, 166, 0.15); }
-html[data-theme="daylight"] .sp-sidebar { background: #e2e7ee; border-color: rgba(30, 45, 65, 0.12); }
-html[data-theme="daylight"] .sp-sidebar .bg-base-800.text-neon-blue { background: rgba(123, 153, 188, 0.18); color: #2f4a68; font-weight: 600; box-shadow: none; }
-html[data-theme="daylight"] .sp-hubtab-on { background: rgba(123, 153, 188, 0.18); color: #2f4a68; }
-html[data-theme="daylight"] .sp-header { background: rgba(226, 231, 238, 0.9); border-color: rgba(30, 45, 65, 0.12); }
+html[data-theme="daylight"] .neon-card:hover { border-color: rgb(var(--accent-rgb)); box-shadow: 0 2px 4px rgba(28, 29, 32, 0.07), 0 14px 30px rgb(var(--accent2-rgb) / 0.15); }
+html[data-theme="daylight"] .sp-sidebar { background: #c8d0d9; border-color: rgba(25, 40, 60, 0.16); }
+html[data-theme="daylight"] .sp-sidebar .bg-base-800.text-neon-blue { background: rgb(var(--accent-rgb) / 0.18); color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); font-weight: 600; box-shadow: none; }
+html[data-theme="daylight"] .sp-hubtab-on { background: rgb(var(--accent-rgb) / 0.18); color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); }
+html[data-theme="daylight"] .sp-header { background: rgba(200, 208, 217, 0.92); border-color: rgba(25, 40, 60, 0.16); }
 html[data-theme="daylight"] .neon-button,
-html[data-theme="daylight"] .neon-button-sm { background: #5e7fa6; color: #fff; box-shadow: 0 1px 2px rgba(28, 29, 32, 0.15); }
+html[data-theme="daylight"] .neon-button-sm { background: rgb(var(--accent2-rgb)); color: #fff; box-shadow: 0 1px 2px rgba(28, 29, 32, 0.15); }
 html[data-theme="daylight"] .neon-button:hover,
-html[data-theme="daylight"] .neon-button-sm:hover { background: #4f6e93; }
-html[data-theme="daylight"] .neon-toggle-on { background: #5e7fa6; }
-html[data-theme="daylight"] .spartacus-wave { background-image: linear-gradient(90deg, #3f5f86 0%, #3f5f86 35%, #7b99bc 50%, #3f5f86 65%, #3f5f86 100%); }
-html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgba(123, 153, 188, 0.22), transparent 65%), #dce2ea; color: #1c1d20; }
-html[data-theme="daylight"] .sp-login-card { background: #e9edf2; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
+html[data-theme="daylight"] .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 70%, #000); }
+html[data-theme="daylight"] .neon-toggle-on { background: rgb(var(--accent2-rgb)); }
+html[data-theme="daylight"] .spartacus-wave { background-image: linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 0%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 35%, rgb(var(--accent-rgb)) 50%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 65%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 100%); }
+html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgb(var(--accent-rgb) / 0.22), transparent 65%), #c4ccd6; color: #1c1d20; }
+html[data-theme="daylight"] .sp-login-card { background: #d0d7df; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
 
 /* ---------------------------------------------------------------------------
    Hover on the cards you click to open something (the module cards on a
@@ -347,15 +352,15 @@ html .neon-card.sp-card-link {
 .sp-card-link:hover .sp-card-open { transform: translateX(4px); }
 
 /* Studio (also the look with no theme picked) */
-html:not([data-theme="glass"]):not([data-theme="daylight"]) .sp-card-link:hover {
+html:is(:not([data-theme]), [data-theme="studio"]) .sp-card-link:hover {
   transform: translateY(-3px);
-  border-color: #5e7fa6;
+  border-color: rgb(var(--accent2-rgb));
   background:
-    linear-gradient(90deg, #7b99bc, #a9c1dc, #cbd5e1) top left / 100% 4px no-repeat,
+    linear-gradient(90deg, rgb(var(--accent-rgb)), color-mix(in srgb, rgb(var(--accent-rgb)) 65%, #fff), #cbd5e1) top left / 100% 4px no-repeat,
     #2e3036;
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(123, 153, 188, 0.25);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgb(var(--accent-rgb) / 0.25);
 }
-html:not([data-theme="glass"]):not([data-theme="daylight"]) .sp-card-link:hover .sp-card-icon { transform: scale(1.08); }
+html:is(:not([data-theme]), [data-theme="studio"]) .sp-card-link:hover .sp-card-icon { transform: scale(1.08); }
 
 /* Glass */
 html[data-theme="glass"] .sp-card-link:hover {
@@ -363,9 +368,9 @@ html[data-theme="glass"] .sp-card-link:hover {
   border-color: rgba(255, 255, 255, 0.42);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    0 0 0 1px rgba(123, 153, 188, 0.25),
+    0 0 0 1px rgb(var(--accent-rgb) / 0.25),
     0 22px 50px rgba(0, 0, 0, 0.4),
-    0 0 46px rgba(123, 153, 188, 0.35);
+    0 0 46px rgb(var(--accent-rgb) / 0.35);
 }
 html[data-theme="glass"] .sp-card-link:hover .sp-card-icon { transform: translateY(-2px) rotate(-4deg); }
 html[data-theme="glass"] .sp-card-link:hover .sp-card-open { color: #ffffff; }
@@ -373,9 +378,9 @@ html[data-theme="glass"] .sp-card-link:hover .sp-card-open { color: #ffffff; }
 /* Daylight */
 html[data-theme="daylight"] .sp-card-link:hover {
   transform: translateY(-3px);
-  border-color: #7b99bc;
-  background: linear-gradient(180deg, rgba(47, 93, 148, 0.12), rgba(255, 255, 255, 0) 46%), #eef2f6;
-  box-shadow: 0 2px 4px rgba(28, 29, 32, 0.06), 0 18px 36px rgba(94, 127, 166, 0.22);
+  border-color: rgb(var(--accent-rgb));
+  background: linear-gradient(180deg, rgb(var(--accent2-rgb) / 0.12), rgba(255, 255, 255, 0) 46%), #d8dee5;
+  box-shadow: 0 2px 4px rgba(28, 29, 32, 0.06), 0 18px 36px rgb(var(--accent2-rgb) / 0.22);
 }
 html[data-theme="daylight"] .sp-card-link:hover .sp-card-icon { transform: scale(1.06); }
 
@@ -411,18 +416,18 @@ html[data-motion="reduce"] *::after {
    ------------------------------------------------------------------------- */
 :root {
   --m-top: #3a3d44; --m-bot: #25272c; --m-light: rgba(255, 255, 255, 0.09); --m-hl: rgba(255, 255, 255, 0.06);
-  --m-dark: rgba(0, 0, 0, 0.55); --m-glow: rgba(123, 153, 188, 0.35); --m-ring: rgba(123, 153, 188, 0.45);
-  --m-text: #c9cdd4; --m-text-hi: #ffffff; --m-accent: #9cb6d4; --m-owner: #c4b5fd;
+  --m-dark: rgba(0, 0, 0, 0.55); --m-glow: rgb(var(--accent-rgb) / 0.35); --m-ring: rgb(var(--accent-rgb) / 0.45);
+  --m-text: #c9cdd4; --m-text-hi: #ffffff; --m-accent: color-mix(in srgb, rgb(var(--accent-rgb)) 80%, #fff); --m-owner: #c4b5fd;
 }
 html[data-theme="glass"] {
   --m-top: rgba(255, 255, 255, 0.2); --m-bot: rgba(255, 255, 255, 0.05); --m-light: rgba(255, 255, 255, 0.32); --m-hl: rgba(255, 255, 255, 0.16);
-  --m-dark: rgba(0, 0, 0, 0.4); --m-glow: rgba(140, 175, 215, 0.5); --m-ring: rgba(183, 205, 230, 0.5);
-  --m-text: #e1e7ef; --m-text-hi: #ffffff; --m-accent: #b7cde6; --m-owner: #d8ccff;
+  --m-dark: rgba(0, 0, 0, 0.4); --m-glow: rgb(var(--accent-rgb) / 0.5); --m-ring: rgb(var(--accent-rgb) / 0.55);
+  --m-text: #e1e7ef; --m-text-hi: #ffffff; --m-accent: color-mix(in srgb, rgb(var(--accent-rgb)) 65%, #fff); --m-owner: #d8ccff;
 }
 html[data-theme="daylight"] {
-  --m-top: #f4f6f9; --m-bot: #cdd5df; --m-light: rgba(255, 255, 255, 0.95); --m-hl: rgba(255, 255, 255, 0.85);
-  --m-dark: rgba(35, 55, 80, 0.3); --m-glow: rgba(47, 93, 148, 0.32); --m-ring: rgba(47, 93, 148, 0.45);
-  --m-text: #2b3038; --m-text-hi: #12161c; --m-accent: #2f5d94; --m-owner: #6d4fc2;
+  --m-top: #dde3e9; --m-bot: #b3bdc9; --m-light: rgba(255, 255, 255, 0.75); --m-hl: rgba(255, 255, 255, 0.55);
+  --m-dark: rgba(25, 40, 60, 0.34); --m-glow: rgb(var(--accent2-rgb) / 0.32); --m-ring: rgb(var(--accent2-rgb) / 0.45);
+  --m-text: #2b3038; --m-text-hi: #12161c; --m-accent: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); --m-owner: #6d4fc2;
 }
 .sp-metal {
   background: linear-gradient(180deg, var(--m-top), var(--m-bot));
@@ -455,3 +460,66 @@ html[data-theme="daylight"] {
   .sp-metal { transition: box-shadow 0.18s, background 0.18s, color 0.16s; }
   .sp-metal:hover, .sp-metal:active, .sp-metal.is-active { transform: none; }
 }
+/* ---------------------------------------------------------------------------
+   Steel, Midnight and Dusk: three dark themes built from the same rules, each
+   with its own colors (--t-*), metal (--m-*) and accent.
+   - Steel: near-black, brushed steel and electric blue, to match the S logo.
+   - Midnight: true black for OLED phone screens, with a cool cyan glow.
+   - Dusk: soft purple-gray, calm for late nights.
+   ------------------------------------------------------------------------- */
+html[data-theme="steel"] {
+  --accent-rgb: 74 149 255; --accent2-rgb: 47 110 210;
+  --t-page: #0b0c0e; --t-950: #0f1012; --t-900: #121316; --t-800: #1a1c20; --t-700: #26292f;
+  --t-card: #15171a; --t-card-hi: #1b1e22; --t-line: #262930; --t-side: #111214; --t-header: rgba(11, 12, 14, 0.88);
+  --m-top: #34373e; --m-bot: #1c1e22; --m-light: rgba(255, 255, 255, 0.09); --m-hl: rgba(255, 255, 255, 0.05); --m-dark: rgba(0, 0, 0, 0.6);
+}
+html[data-theme="midnight"] {
+  --accent-rgb: 79 209 255; --accent2-rgb: 40 150 200;
+  --t-page: #000000; --t-950: #05060a; --t-900: #07080c; --t-800: #0f121a; --t-700: #1a1e2a;
+  --t-card: #0b0d13; --t-card-hi: #11141c; --t-line: #1a1e2a; --t-side: #05060a; --t-header: rgba(0, 0, 0, 0.88);
+  --m-top: #1b2030; --m-bot: #0b0e16; --m-light: rgba(255, 255, 255, 0.07); --m-hl: rgba(255, 255, 255, 0.03); --m-dark: rgba(0, 0, 0, 0.7);
+}
+html[data-theme="dusk"] {
+  --accent-rgb: 185 162 255; --accent2-rgb: 140 115 220;
+  --t-page: #1d1a24; --t-950: #1a1720; --t-900: #24202d; --t-800: #2e2939; --t-700: #3b3448;
+  --t-card: #2a2534; --t-card-hi: #312b3d; --t-line: #3b3448; --t-side: #211d29; --t-header: rgba(29, 26, 36, 0.88);
+  --m-top: #3d3550; --m-bot: #272233; --m-light: rgba(255, 255, 255, 0.09); --m-hl: rgba(255, 255, 255, 0.05); --m-dark: rgba(0, 0, 0, 0.5); --m-text: #d8d1e6;
+}
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) body { background: var(--t-page); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.sp-shell, .sp-login) { background-color: var(--t-page) !important; }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) select,
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) select option { background-color: var(--t-900); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: var(--t-950); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: var(--t-900); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: var(--t-800); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: var(--t-800); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .bg-base-700:not([class*="bg-[#"] *) { background-color: var(--t-700); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 40%), var(--t-card);
+  border-color: var(--t-line);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-card:hover { border-color: rgb(var(--accent-rgb) / 0.45); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 22px rgb(var(--accent-rgb) / 0.16); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-sidebar { background: var(--t-side); border-color: var(--t-line); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-header { background: var(--t-header); border-color: var(--t-line); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-tabbar { background: var(--t-header); border-color: var(--t-line); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-hubtab-on { background: var(--t-800); color: rgb(var(--accent-rgb)); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button,
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button-sm { background: rgb(var(--accent-rgb)); color: #0a0c10; font-weight: 700; box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35); transition: background-color 0.15s, box-shadow 0.15s; }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button:hover,
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 85%, #fff); box-shadow: 0 0 24px rgb(var(--accent-rgb) / 0.5); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-card-link:hover {
+  transform: translateY(-3px);
+  border-color: rgb(var(--accent-rgb) / 0.7);
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.08), transparent 45%), var(--t-card-hi);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 30px rgb(var(--accent-rgb) / 0.28);
+}
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-card-link:hover .sp-card-icon { transform: scale(1.07); }
+/* Midnight's glow is a little stronger, since it sits on pure black. */
+html[data-theme="midnight"] .sp-card-link:hover { box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.35), 0 0 40px rgb(var(--accent-rgb) / 0.35); }
+
+/* Account settings → Compact mode: everything a step smaller (the dashboard
+   is sized in rem), so more fits on the screen. */
+html[data-density="compact"] { font-size: 14px; }

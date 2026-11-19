@@ -12,10 +12,13 @@ const config: Config = {
           800: "#2C2E33",
           700: "#37393F",
         },
+        // The accent color comes from CSS variables (set per theme in
+        // globals.css, or the person's own pick), so one setting recolors
+        // every highlight. "r g b" form keeps opacity classes working.
         neon: {
-          blue: "#7B99BC",
+          blue: "rgb(var(--accent-rgb, 123 153 188) / <alpha-value>)",
           purple: "#94A3B8",
-          cyan: "#5E7FA6",
+          cyan: "rgb(var(--accent2-rgb, 94 127 166) / <alpha-value>)",
         },
       },
       fontFamily: {
@@ -27,10 +30,13 @@ const config: Config = {
         "glow-purple": "none",
       },
       backgroundImage: {
-        "neon-gradient": "linear-gradient(135deg, #7B99BC 0%, #5E7FA6 100%)",
+        "neon-gradient": "linear-gradient(135deg, rgb(var(--accent-rgb, 123 153 188)) 0%, rgb(var(--accent2-rgb, 94 127 166)) 100%)",
       },
       borderColor: {
-        "neon-blue": "rgba(123, 153, 188, 0.35)",
+        // A plain border-neon-blue is the accent at 35%, as it always was;
+        // border-neon-blue/50 and the like still pick their own strength.
+        "neon-blue": (({ opacityValue }: { opacityValue?: string }) =>
+          `rgb(var(--accent-rgb, 123 153 188) / ${opacityValue === undefined || opacityValue === "1" || opacityValue.startsWith("var(") ? "0.35" : opacityValue})`) as unknown as string,
       },
     },
   },

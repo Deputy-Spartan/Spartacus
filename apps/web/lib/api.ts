@@ -1811,10 +1811,12 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
-export type DashboardTheme = "studio" | "glass" | "daylight";
+export type DashboardTheme = "studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk";
 
 export interface UserPrefs {
   theme: DashboardTheme;
+  accent: string | null; // #rrggbb, or null for the theme's own
+  compact: boolean;
   reduceMotion: boolean;
   displayName: string | null;
 }

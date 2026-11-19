@@ -10,6 +10,7 @@ import { AppIcon } from "../../../../components/ui/AppIcon";
 import { SetupBadge, setupState, useSetupStatus } from "../../../../components/ui/SetupStatus";
 import { setModuleEnabled, useModules } from "../../../../lib/useModules";
 import { usePinnedModules } from "../../../../lib/usePinnedModules";
+import { GroupCards } from "../../../../components/nav/GroupCards";
 
 // Every group from the sidebar, each one a card that opens to show its pages
 // as one-line rows: name, status, pin and on/off switch. Closed, a group
@@ -171,10 +172,17 @@ function ModulesContent({ guildId }: { guildId: string }) {
   );
 }
 
+// A group's button in the sidebar links here with ?section=, which shows that
+// group's page of cards instead of the list of every group.
+function ModulesOrGroup({ guildId }: { guildId: string }) {
+  const section = useSearchParams().get("section");
+  return section ? <GroupCards guildId={guildId} section={section} /> : <ModulesContent guildId={guildId} />;
+}
+
 export default function ModulesPage({ params }: { params: { guildId: string } }) {
   return (
     <Suspense fallback={<p className="text-slate-500 text-sm">Loading…</p>}>
-      <ModulesContent guildId={params.guildId} />
+      <ModulesOrGroup guildId={params.guildId} />
     </Suspense>
   );
 }

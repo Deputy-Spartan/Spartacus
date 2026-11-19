@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, navSectionForPath, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api } from "../../lib/api";
 import { useModules } from "../../lib/useModules";
@@ -75,13 +75,6 @@ export function Sidebar({
   // The owner's own names, order and hidden pages (Edit Mode).
   const layout = useNavLayout();
   const [editing, setEditing] = useState(false);
-  // The one group whose pages are listed, starting with the open page's group.
-  const relPath = pathname.slice(`/dashboard/${guildId}`.length);
-  const [openGroup, setOpenGroup] = useState<string | null>(() => navSectionForPath(relPath)?.section ?? null);
-  useEffect(() => {
-    const s = navSectionForPath(relPath)?.section;
-    if (s) setOpenGroup(s);
-  }, [relPath]);
 
   const baseSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
@@ -332,18 +325,18 @@ export function Sidebar({
                 <div className="space-y-1">
                   {section.section === "Categories"
                     ? section.items.map((cat) => {
-                        // Option 1: tapping a group lists its pages right
-                        // under it, one group open at a time.
+                        // One button per group. It opens the group's page:
+                        // a card for each of its modules (modules/page.tsx).
                         const c = cat as typeof cat & { section: string; pages: string[]; items: NavItem[] };
                         const rel = pathname.slice(`/dashboard/${guildId}`.length);
                         const active = c.pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === c.section);
-                        const isOpen = openGroup === c.section;
+                        const groupHref = `/dashboard/${guildId}/modules?section=${encodeURIComponent(c.section)}`;
                         return (
                           <div key={c.section}>
-                            <button
-                              type="button"
-                              onClick={() => setOpenGroup(isOpen ? null : c.section)}
-                              aria-expanded={isOpen}
+                            <Link
+                              href={groupHref}
+                              onClick={onNavigate}
+                              aria-current={active ? "page" : undefined}
                               className={[
                                 "relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-left transition-colors",
                                 active ? "bg-base-800 text-neon-blue" : "text-slate-300 hover:text-slate-100 hover:bg-base-800/60",
@@ -358,13 +351,7 @@ export function Sidebar({
                               <AppIcon emoji={c.icon} size={22} />
                               <span className="flex-1 min-w-0 truncate font-medium">{c.label}</span>
                               <span className="shrink-0 rounded-full bg-base-800 px-1.5 text-[10px] font-semibold text-slate-500">{c.items.length}</span>
-                              <span className={`shrink-0 text-[10px] text-slate-500 transition-transform ${isOpen ? "" : "-rotate-90"}`}>▼</span>
-                            </button>
-                            {isOpen && (
-                              <div className="ml-5 mt-0.5 mb-1.5 pl-1.5 border-l border-white/10 space-y-0.5">
-                                {c.items.map((i) => pageRow(i, "Categories", true))}
-                              </div>
-                            )}
+                            </Link>
                           </div>
                         );
                       })

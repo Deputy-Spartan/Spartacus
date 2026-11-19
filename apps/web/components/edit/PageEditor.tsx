@@ -23,6 +23,7 @@ import { useEditMode } from "../../lib/editMode";
 interface PageEdits {
   t?: Record<string, string>; // built-in words → the owner's words
   o?: Record<string, number[]>; // box path → its children, in the owner's order
+  l?: Record<string, number[]>; // box path → its children that are locked in place
 }
 
 const SKIP = "[data-edit-skip], input, textarea, select, script, style, svg";
@@ -182,7 +183,7 @@ export function PageEditor() {
   const persist = useCallback(
     async (next: PageEdits) => {
       setStatus("saving");
-      const empty = !Object.keys(next.t ?? {}).length && !Object.keys(next.o ?? {}).length;
+      const empty = !Object.keys(next.t ?? {}).length && !Object.keys(next.o ?? {}).length && !Object.keys(next.l ?? {}).length;
       try {
         await save(key, empty ? "" : JSON.stringify(next));
         setStatus("saved");
@@ -235,17 +236,59 @@ export function PageEditor() {
     return () => document.removeEventListener("click", onClick, true);
   }, [editing, owner]);
 
-  // Keep the outline and handle on the selected box as the page scrolls.
+  // Keep the outline and handle on the selected box, and the 🔒 on every
+  // locked box, as the page scrolls. Only while editing.
+  const [lockRects, setLockRects] = useState<DOMRect[]>([]);
   useEffect(() => {
-    if (!box) return setRect(null);
+    if (!editing || !owner) {
+      setRect(null);
+      setLockRects([]);
+      return;
+    }
     let f = 0;
     const tick = () => {
-      setRect(box.isConnected ? box.getBoundingClientRect() : null);
+      setRect(box && box.isConnected ? box.getBoundingClientRect() : null);
+      const root = rootEl();
+      const rects: DOMRect[] = [];
+      if (root) {
+        for (const [k, idxs] of Object.entries(editsRef.current.l ?? {})) {
+          const parent = atPath(root, k.split(".").filter(Boolean).map(Number));
+          for (const i of idxs) {
+            const c = parent?.children[i];
+            if (c) rects.push(c.getBoundingClientRect());
+          }
+        }
+      }
+      setLockRects((prev) =>
+        prev.length === rects.length && prev.every((p, i) => p.left === rects[i].left && p.top === rects[i].top) ? prev : rects
+      );
       f = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(f);
-  }, [box]);
+  }, [box, editing, owner]);
+
+  // Where the selected box sits, for locking it.
+  const boxSpot = (() => {
+    const root = typeof document !== "undefined" ? rootEl() : null;
+    const parent = box?.parentElement;
+    if (!box || !root || !parent) return null;
+    const path = pathOf(root, parent);
+    if (!path) return null;
+    const key = path.join(".");
+    const idx = Array.prototype.indexOf.call(parent.children, box) as number;
+    return { key, idx, locked: ((edits.l ?? {})[key] ?? []).includes(idx) };
+  })();
+  function toggleLock() {
+    if (!boxSpot) return;
+    const l = { ...(edits.l ?? {}) };
+    const cur = new Set(l[boxSpot.key] ?? []);
+    if (boxSpot.locked) cur.delete(boxSpot.idx);
+    else cur.add(boxSpot.idx);
+    if (cur.size) l[boxSpot.key] = [...cur];
+    else delete l[boxSpot.key];
+    void persist({ ...edits, l });
+  }
 
   function commitWords() {
     if (!word) return;
@@ -279,13 +322,18 @@ export function PageEditor() {
     const visual = () => [...kids].sort((a, b) => (Number(a.style.order) || 0) - (Number(b.style.order) || 0) || kids.indexOf(a) - kids.indexOf(b));
     let list = visual();
     list.forEach((k, i) => (k.style.order = String(i)));
+    // Locked boxes keep their spot; the others flow around them.
+    const pkey = pathOf(root, parent)?.join(".") ?? "";
+    const lockedIdx = new Set((edits.l ?? {})[pkey] ?? []);
+    const isLocked = (k: HTMLElement) => lockedIdx.has(kids.indexOf(k));
+    if (isLocked(box)) return;
 
     const move = (ev: PointerEvent) => {
       ev.preventDefault();
       let best: HTMLElement | null = null;
       let bestD = Infinity;
       for (const k of list) {
-        if (k === box) continue;
+        if (k === box || isLocked(k)) continue;
         const r = k.getBoundingClientRect();
         const d = Math.hypot(ev.clientX - (r.left + r.width / 2), ev.clientY - (r.top + r.height / 2));
         if (d < bestD) {
@@ -296,9 +344,11 @@ export function PageEditor() {
       const me = box.getBoundingClientRect();
       const meD = Math.hypot(ev.clientX - (me.left + me.width / 2), ev.clientY - (me.top + me.height / 2));
       if (!best || meD <= bestD) return;
-      const to = list.indexOf(best);
-      list = list.filter((k) => k !== box);
-      list.splice(to, 0, box);
+      let free = list.filter((k) => !isLocked(k));
+      const to = free.indexOf(best);
+      free = free.filter((k) => k !== box);
+      free.splice(to, 0, box);
+      list = list.map((k) => (isLocked(k) ? k : (free.shift() as HTMLElement)));
       list.forEach((k, i) => (k.style.order = String(i)));
     };
     const end = () => {
@@ -346,18 +396,43 @@ export function PageEditor() {
           style={{ left: rect.left - 3, top: rect.top - 3, width: rect.width + 6, height: rect.height + 6 }}
         />
       )}
-      {rect && box && (
-        <button
-          type="button"
+      {/* A 🔒 on every locked box, only while editing. */}
+      {lockRects.map((r, i) => (
+        <span
+          key={i}
           data-edit-skip
-          onPointerDown={startDrag}
-          style={{ left: Math.max(4, rect.left - 14), top: Math.max(4, rect.top - 14), touchAction: "none" }}
-          className="fixed z-50 h-9 px-2.5 rounded-full bg-amber-400 text-base-950 text-sm font-bold shadow-lg cursor-grab active:cursor-grabbing"
-          aria-label="Drag to move this box"
-          title="Drag to move this box"
+          aria-hidden="true"
+          className="fixed z-40 pointer-events-none rounded-lg ring-1 ring-sky-300/50"
+          style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
         >
-          ⋮⋮ Move
-        </button>
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-sky-400 text-base-950 text-xs px-1.5 py-0.5 font-bold shadow">🔒</span>
+        </span>
+      ))}
+      {rect && box && (
+        <div data-edit-skip className="fixed z-50 flex gap-1.5" style={{ left: Math.max(4, rect.left - 14), top: Math.max(4, rect.top - 14) }}>
+          {!boxSpot?.locked && (
+            <button
+              type="button"
+              onPointerDown={startDrag}
+              style={{ touchAction: "none" }}
+              className="h-9 px-2.5 rounded-full bg-amber-400 text-base-950 text-sm font-bold shadow-lg cursor-grab active:cursor-grabbing"
+              aria-label="Drag to move this box"
+              title="Drag to move this box"
+            >
+              ⋮⋮ Move
+            </button>
+          )}
+          {boxSpot && (
+            <button
+              type="button"
+              onClick={toggleLock}
+              className={`h-9 px-2.5 rounded-full text-sm font-bold shadow-lg ${boxSpot.locked ? "bg-sky-400 text-base-950" : "bg-base-900 text-sky-300 border border-sky-400/50"}`}
+              title={boxSpot.locked ? "Unlock so it can move again" : "Lock it here, so moving other boxes doesn't shift it"}
+            >
+              {boxSpot.locked ? "🔒 Locked" : "🔓 Lock"}
+            </button>
+          )}
+        </div>
       )}
 
       <div
@@ -375,7 +450,7 @@ export function PageEditor() {
             Done
           </button>
         </div>
-        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Tap a box, then drag ⋮⋮ Move to put it somewhere else.</p>}
+        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Tap a box, then drag ⋮⋮ Move to put it somewhere else, or tap 🔓 Lock to keep it where it is.</p>}
         {word && (
           <div className="space-y-1.5">
             <textarea
@@ -417,7 +492,7 @@ export function PageEditor() {
               Pick the bigger box
             </button>
           )}
-          {(edits.t || edits.o) && (
+          {(edits.t || edits.o || edits.l) && (
             <button type="button" onClick={resetPage} onBlur={() => setArmReset(false)} className="ml-auto rounded-md border border-amber-400/40 px-2.5 py-1 hover:bg-amber-400/10">
               {armReset ? "Tap again to undo all" : "Undo all changes on this page"}
             </button>

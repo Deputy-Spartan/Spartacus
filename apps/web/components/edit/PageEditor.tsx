@@ -309,7 +309,7 @@ export function PageEditor() {
           const parent = atPath(root, k.split(".").filter(Boolean).map(Number));
           for (const i of idxs) {
             const c = parent?.children[i];
-            if (c) rects.push(c.getBoundingClientRect());
+            if (c && !cardsRef.current.includes(c as HTMLElement)) rects.push(c.getBoundingClientRect());
           }
         }
       }
@@ -530,83 +530,89 @@ export function PageEditor() {
 
   return (
     <>
-      {rect && (
-        <div
-          data-edit-skip
-          className="fixed z-40 pointer-events-none rounded-lg ring-2 ring-amber-400/80"
-          style={{ left: rect.left - 3, top: rect.top - 3, width: rect.width + 6, height: rect.height + 6 }}
-        />
-      )}
-      {/* A 🔒 on every locked box, only while editing. */}
-      {lockRects.map((r, i) => (
-        <span
-          key={i}
-          data-edit-skip
-          aria-hidden="true"
-          className="fixed z-40 pointer-events-none rounded-lg ring-1 ring-sky-300/50"
-          style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
-        >
-        </span>
-      ))}
-      {/* Move and Lock on every card, without tapping it first. */}
+      {/* Every card while editing: a dashed outline (solid blue when locked),
+          and one small lock button tucked into its bottom-right corner. The
+          card itself is what you drag. */}
       {cards.map((card, i) => {
         const r = cardRects[i];
-        if (!r || card === box || r.bottom < 0 || r.top > window.innerHeight) return null;
+        if (!r || r.bottom < 0 || r.top > window.innerHeight) return null;
         const spot = spotOf(card);
+        const locked = !!spot?.locked;
+        const selected = card === box;
         return (
-          <div key={i} data-edit-skip className="fixed z-40 flex gap-1" style={{ left: r.left + 8, top: Math.max(2, r.top - 13) }}>
-            {!spot?.locked && (
+          <div
+            key={i}
+            data-edit-skip
+            className={`fixed z-40 pointer-events-none rounded-xl border-2 ${
+              selected ? "border-amber-400" : locked ? "border-sky-400/70" : "border-dashed border-amber-400/30"
+            }`}
+            style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
+          >
+            <div className="absolute right-2 bottom-2 flex items-center gap-1 pointer-events-auto">
+              {!locked && (
+                <span className="h-7 px-2 flex items-center rounded-md bg-[#1f1c14] border border-amber-400/30 text-[11px] font-semibold text-amber-200/80 pointer-events-none">
+                  ⠿ Drag
+                </span>
+              )}
               <button
                 type="button"
-                onPointerDown={(e) => {
-                  setBox(card);
-                  startDrag(e, card);
-                }}
-                style={{ touchAction: "none" }}
-                className="h-7 px-2 rounded-full bg-amber-400 text-base-950 text-xs font-bold shadow cursor-grab active:cursor-grabbing"
-                aria-label="Drag to move this card"
-                title="Drag to move this card"
+                onClick={() => toggleLock(card)}
+                className={`h-7 w-7 flex items-center justify-center rounded-md text-sm border ${
+                  locked ? "bg-sky-400 border-sky-300 text-base-950" : "bg-[#1f1c14] border-amber-400/30 hover:border-sky-400/60"
+                }`}
+                title={locked ? "Locked here. Tap to unlock" : "Lock it here, so moving other cards doesn't shift it"}
+                aria-label={locked ? "Unlock this card" : "Lock this card in place"}
               >
-                ⋮⋮ Move
+                {locked ? "🔒" : "🔓"}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => toggleLock(card)}
-              className={`h-7 px-2 rounded-full text-xs font-bold shadow ${spot?.locked ? "bg-sky-400 text-base-950" : "bg-base-900 text-sky-300 border border-sky-400/50"}`}
-              title={spot?.locked ? "Unlock so it can move again" : "Lock it here, so moving other cards doesn't shift it"}
-            >
-              {spot?.locked ? "🔒 Locked" : "🔓 Lock"}
-            </button>
+            </div>
           </div>
         );
       })}
-      {rect && box && (
-        <div data-edit-skip className="fixed z-50 flex gap-1.5" style={{ left: Math.max(4, rect.left - 14), top: Math.max(4, rect.top - 14) }}>
-          {!boxSpot?.locked && (
-            <button
-              type="button"
-              onPointerDown={(e) => startDrag(e, box)}
-              style={{ touchAction: "none" }}
-              className="h-9 px-2.5 rounded-full bg-amber-400 text-base-950 text-sm font-bold shadow-lg cursor-grab active:cursor-grabbing"
-              aria-label="Drag to move this box"
-              title="Drag to move this box"
-            >
-              ⋮⋮ Move
-            </button>
-          )}
-          {boxSpot && (
-            <button
-              type="button"
-              onClick={() => toggleLock(box)}
-              className={`h-9 px-2.5 rounded-full text-sm font-bold shadow-lg ${boxSpot.locked ? "bg-sky-400 text-base-950" : "bg-base-900 text-sky-300 border border-sky-400/50"}`}
-              title={boxSpot.locked ? "Unlock so it can move again" : "Lock it here, so moving other boxes doesn't shift it"}
-            >
-              {boxSpot.locked ? "🔒 Locked" : "🔓 Lock"}
-            </button>
-          )}
-        </div>
+
+      {/* Any other box you tap (a section, a row): an outline and a small bar
+          above it to move or lock it. */}
+      {rect && box && !cards.includes(box) && (
+        <>
+          <div data-edit-skip className="fixed z-40 pointer-events-none rounded-xl border-2 border-amber-400" style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }} />
+          <div
+            data-edit-skip
+            className="fixed z-50 flex items-center gap-1 rounded-lg border border-amber-400/40 bg-[#1f1c14] p-1 shadow-lg"
+            style={{ left: rect.left + 8, top: Math.max(4, rect.top - 40) }}
+          >
+            {!boxSpot?.locked && (
+              <button
+                type="button"
+                onPointerDown={(e) => startDrag(e, box)}
+                style={{ touchAction: "none" }}
+                className="h-7 px-2 rounded-md text-xs font-semibold text-amber-200 hover:bg-amber-400/10 cursor-grab active:cursor-grabbing"
+                aria-label="Drag to move this box"
+              >
+                ⠿ Drag to move
+              </button>
+            )}
+            {boxSpot && (
+              <button
+                type="button"
+                onClick={() => toggleLock(box)}
+                className={`h-7 px-2 rounded-md text-xs font-semibold ${boxSpot.locked ? "bg-sky-400 text-base-950" : "text-sky-300 hover:bg-sky-400/10"}`}
+              >
+                {boxSpot.locked ? "🔒 Locked" : "🔓 Lock"}
+              </button>
+            )}
+          </div>
+        </>
       )}
+      {/* Other locked boxes (not cards) keep a thin blue outline. */}
+      {lockRects.map((r, i) => (
+        <span
+          key={`l${i}`}
+          data-edit-skip
+          aria-hidden="true"
+          className="fixed z-30 pointer-events-none rounded-xl border-2 border-sky-400/60"
+          style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
+        />
+      ))}
 
       <div
         data-edit-skip
@@ -623,7 +629,7 @@ export function PageEditor() {
             Done
           </button>
         </div>
-        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Drag a card to move it (on a phone, hold it first), or tap 🔓 Lock to keep it where it is. For other boxes, tap the box first.</p>}
+        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Drag a card to move it (on a phone, hold it first). Tap 🔓 on a card to lock it in place. To move something that isn't a card, tap it first.</p>}
         {word && (
           <div className="space-y-1.5">
             <textarea

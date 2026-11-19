@@ -57,11 +57,11 @@ export function GroupCards({ guildId, section }: { guildId: string; section: str
           const enabled = moduleKey ? (state?.[moduleKey]?.enabled ?? false) : null;
           const pinned = isPinned(item.href);
           return (
-            <NeonCard key={item.href} className="relative !p-4 flex flex-col gap-2 hover:border-neon-blue/40 transition-colors">
+            <NeonCard key={item.href} className="sp-card-link relative !p-4 flex flex-col gap-2">
               {/* The whole card opens the page; the switch, pin and pencil sit above this link. */}
               <Link href={href} className="absolute inset-0 rounded-[inherit]" aria-label={`Open ${item.label}`} />
               <div className="relative flex items-center gap-3 pointer-events-none">
-                <AppIcon emoji={item.icon} size={30} />
+                <AppIcon emoji={item.icon} size={30} className="sp-card-icon" />
                 <span className="flex-1 min-w-0 font-semibold truncate">{item.label}</span>
                 <button
                   type="button"
@@ -83,7 +83,7 @@ export function GroupCards({ guildId, section }: { guildId: string; section: str
               </p>
               <div className="relative mt-auto flex items-center justify-between gap-2 pointer-events-none">
                 {enabled !== null ? <SetupBadge state={setupState(enabled, setup?.[moduleKey!])} count={setup?.[moduleKey!]?.length ?? 0} /> : <span className="text-xs text-slate-600">Always on</span>}
-                <span className="text-xs font-semibold text-neon-blue">Open ›</span>
+                <span className="sp-card-open text-xs font-semibold text-neon-blue">Open ›</span>
               </div>
             </NeonCard>
           );

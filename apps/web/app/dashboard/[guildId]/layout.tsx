@@ -18,6 +18,7 @@ import { PhoneTabBar } from "../../../components/nav/PhoneTabBar";
 import { HubTabs } from "../../../components/nav/HubTabs";
 import { EditModeProvider } from "../../../lib/editMode";
 import { PageEditor } from "../../../components/edit/PageEditor";
+import { NavGestures } from "../../../components/nav/NavGestures";
 
 export default function DashboardLayout({
   children,
@@ -127,6 +128,7 @@ export default function DashboardLayout({
         </div>
         <PhoneTabBar guildId={params.guildId} />
         <PageEditor />
+        <NavGestures guildId={params.guildId} />
       </div>
     </ConfirmProvider>
     </WhenTextsReady>

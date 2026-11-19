@@ -13,6 +13,7 @@ import { AppIcon } from "../ui/AppIcon";
 import { useSetupStatus } from "../ui/SetupStatus";
 import { useNavLayout } from "../../lib/navLayout";
 import { NavEditor } from "./NavEditor";
+import { useEditMode } from "../../lib/editMode";
 
 // NAV_SECTIONS/NAV_MODULE_KEYS/MODULE_KEY_TO_HREF/OWNER_NAV_SECTION now live
 // in packages/shared/navItems.ts — the bot's !setup-test-server scaffold
@@ -74,7 +75,7 @@ export function Sidebar({
   const { isPinned, togglePin } = usePinnedModules(guildId);
   // The owner's own names, order and hidden pages (Edit Mode).
   const layout = useNavLayout();
-  const [editing, setEditing] = useState(false);
+  const { editing, setEditing } = useEditMode();
 
   const baseSections = useMemo(
     () => (isOwner ? [...NAV_SECTIONS, OWNER_NAV_SECTION] : NAV_SECTIONS),
@@ -275,10 +276,10 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            title="Rename, reorder or hide groups and pages"
+            title="Change the words and layout of the menu and every page"
             className="w-full mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold text-amber-300 border border-amber-400/30 hover:bg-amber-400/10 rounded-lg py-1.5 transition-colors"
           >
-            ✎ Edit menu
+            ✎ Edit dashboard
           </button>
         )}
         <div className="relative mb-2">

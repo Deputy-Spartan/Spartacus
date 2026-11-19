@@ -16,6 +16,8 @@ import { preloadGuild } from "../../../lib/prefetch";
 import { UserPrefsProvider } from "../../../lib/userPrefs";
 import { PhoneTabBar } from "../../../components/nav/PhoneTabBar";
 import { HubTabs } from "../../../components/nav/HubTabs";
+import { EditModeProvider } from "../../../lib/editMode";
+import { PageEditor } from "../../../components/edit/PageEditor";
 
 export default function DashboardLayout({
   children,
@@ -94,6 +96,7 @@ export default function DashboardLayout({
   return (
     <UserPrefsProvider>
     <DashboardTextProvider isOwner={isOwner}>
+    <EditModeProvider>
     <ConfirmProvider>
       <div className="sp-shell min-h-screen bg-base-950">
         <CommandPalette guildId={params.guildId} />
@@ -115,15 +118,17 @@ export default function DashboardLayout({
               position:sticky on descendants (e.g. the Embed Creator's live
               preview column). "clip" prevents the horizontal overflow
               without that side effect. */}
-          <main className="p-3 sm:p-6 pb-36 md:pb-6 overflow-x-clip">
+          <main data-edit-root className="p-3 sm:p-6 pb-36 md:pb-6 overflow-x-clip">
             <HubTabs guildId={params.guildId} />
             <PageGuideButton guildId={params.guildId} />
             <PageGate>{children}</PageGate>
           </main>
         </div>
         <PhoneTabBar guildId={params.guildId} />
+        <PageEditor />
       </div>
     </ConfirmProvider>
+    </EditModeProvider>
     </DashboardTextProvider>
     </UserPrefsProvider>
   );

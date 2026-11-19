@@ -18,7 +18,9 @@ router.get("/dashboard-texts", requireAuthOnly, async (_req, res) => {
 router.put("/dashboard-texts/:key", requireAuthOnly, requireOwner, async (req: AuthedRequest, res) => {
   const { key } = req.params;
   if (!KEY.test(key)) return res.status(400).json({ error: "Bad text key" });
-  const text = String(req.body?.text ?? "").trim().slice(0, 2000);
+  // Menu layout and whole-page edits (nav.*, edit.*) are JSON and can be longer.
+  const max = /^(nav|edit)\./.test(key) ? 50000 : 2000;
+  const text = String(req.body?.text ?? "").trim().slice(0, max);
   if (!text) {
     await prisma.dashboardText.deleteMany({ where: { key } });
     return res.json({ key, text: null });

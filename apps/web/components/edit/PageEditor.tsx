@@ -1,0 +1,405 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useDashboardTexts } from "../ui/EditableText";
+import { useEditMode } from "../../lib/editMode";
+
+// Edit Mode for every page, without each page needing its own edit code.
+//
+// Words: the owner taps any words on a page and types new ones. The change is
+// stored as "these words → those words" for that page, and applied to the
+// page's text whenever it renders, so it survives reloads and data updates.
+//
+// Moving: the owner taps a box (a card, a section, a row) and drags it. The
+// new order is applied with CSS `order`, so React's own tree is never moved
+// around underneath it. Boxes inside a plain stacked section are lined up
+// with flexbox first so they can be reordered too.
+//
+// Everything is saved per page as one DashboardText row ("edit.page.*"), so
+// everyone sees it, on every device. Only <main> is edited; the menu has its
+// own editor in the sidebar.
+
+interface PageEdits {
+  t?: Record<string, string>; // built-in words → the owner's words
+  o?: Record<string, number[]>; // box path → its children, in the owner's order
+}
+
+const SKIP = "[data-edit-skip], input, textarea, select, script, style, svg";
+const rootEl = () => document.querySelector<HTMLElement>("main[data-edit-root]");
+
+function pageKey(rel: string, section: string | null): string {
+  const raw = `${rel || "home"}${section ? `-${section}` : ""}`;
+  return `edit.page.${raw.replace(/^\/+/, "").replace(/[^a-z0-9._-]/gi, "-").slice(0, 100)}`;
+}
+
+function parse(raw: string | undefined): PageEdits {
+  if (!raw) return {};
+  try {
+    const v = JSON.parse(raw) as PageEdits;
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+function pathOf(root: Element, el: Element): number[] | null {
+  const p: number[] = [];
+  let cur: Element | null = el;
+  while (cur && cur !== root) {
+    const parent: Element | null = cur.parentElement;
+    if (!parent) return null;
+    p.unshift(Array.prototype.indexOf.call(parent.children, cur));
+    cur = parent;
+  }
+  return cur === root ? p : null;
+}
+function atPath(root: Element, path: number[]): Element | null {
+  let el: Element | null = root;
+  for (const i of path) el = el?.children[i] ?? null;
+  return el;
+}
+
+// Remembers which text nodes we rewrote, and from what, so a reset or a new
+// wording can find the built-in words again.
+const applied = new WeakMap<Text, { orig: string; shown: string }>();
+
+function applyText(root: Element, map: Record<string, string>) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    if (n.parentElement?.closest(SKIP)) continue;
+    const raw = n.nodeValue ?? "";
+    const now = raw.trim();
+    if (!now) continue;
+    const rec = applied.get(n);
+    const base = rec && rec.shown === now ? rec.orig : now;
+    const want = map[base];
+    const target = want ?? base;
+    if (target !== now) n.nodeValue = raw.replace(now, target);
+    if (want !== undefined) applied.set(n, { orig: base, shown: want });
+    else applied.delete(n);
+  }
+}
+
+function applyOrder(root: Element, orders: Record<string, number[]>) {
+  for (const [key, order] of Object.entries(orders)) {
+    const box = atPath(root, key.split(".").filter(Boolean).map(Number));
+    if (!box) continue;
+    const kids = Array.from(box.children) as HTMLElement[];
+    if (!getComputedStyle(box).display.match(/flex|grid/)) {
+      (box as HTMLElement).style.display = "flex";
+      (box as HTMLElement).style.flexDirection = "column";
+    }
+    kids.forEach((k, i) => {
+      const pos = order.indexOf(i);
+      k.style.order = String(pos >= 0 ? pos : order.length + i);
+    });
+  }
+}
+
+// The box a tap is in: the nearest thing big enough to be a card or section
+// that sits in a list of two or more siblings.
+function movableFrom(el: Element | null, root: Element): HTMLElement | null {
+  while (el && el !== root) {
+    const parent: HTMLElement | null = el.parentElement;
+    if (!parent) return null;
+    const r = el.getBoundingClientRect();
+    if (parent.children.length >= 2 && r.height >= 36 && r.width >= 80) return el as HTMLElement;
+    el = parent;
+  }
+  return null;
+}
+
+function textNodeAt(x: number, y: number, target: Element): Text | null {
+  const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node } | null };
+  const hit = doc.caretPositionFromPoint?.(x, y)?.offsetNode ?? document.caretRangeFromPoint?.(x, y)?.startContainer;
+  if (hit && hit.nodeType === Node.TEXT_NODE && (hit.nodeValue ?? "").trim() && target.contains(hit)) return hit as Text;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) if ((n.nodeValue ?? "").trim()) return n as Text;
+  return null;
+}
+
+export function PageEditor() {
+  const { owner, texts, save } = useDashboardTexts();
+  const { editing, setEditing } = useEditMode();
+  const pathname = usePathname();
+  const section = useSearchParams().get("section");
+  const rel = pathname.replace(/^\/dashboard\/[^/]+/, "");
+  const key = pageKey(rel, section);
+  const edits = useMemo(() => parse(texts[key]), [texts, key]);
+  const editsRef = useRef(edits);
+  editsRef.current = edits;
+
+  // Apply the saved words and order now, and again whenever the page changes.
+  useEffect(() => {
+    let frame = 0;
+    const run = () => {
+      frame = 0;
+      const root = rootEl();
+      if (!root) return;
+      applyText(root, editsRef.current.t ?? {});
+      applyOrder(root, editsRef.current.o ?? {});
+    };
+    const later = () => {
+      if (!frame) frame = requestAnimationFrame(run);
+    };
+    run();
+    const root = rootEl();
+    if (!root) return;
+    const obs = new MutationObserver(later);
+    obs.observe(root, { subtree: true, childList: true, characterData: true });
+    return () => {
+      obs.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [edits, pathname]);
+
+  const [status, setStatus] = useState<"" | "saving" | "saved" | "error">("");
+  const persist = useCallback(
+    async (next: PageEdits) => {
+      setStatus("saving");
+      const empty = !Object.keys(next.t ?? {}).length && !Object.keys(next.o ?? {}).length;
+      try {
+        await save(key, empty ? "" : JSON.stringify(next));
+        setStatus("saved");
+        setTimeout(() => setStatus((s) => (s === "saved" ? "" : s)), 1800);
+      } catch {
+        setStatus("error");
+      }
+    },
+    [key, save]
+  );
+
+  // What's selected: the words tapped, and the box they're in.
+  const [word, setWord] = useState<{ node: Text; orig: string } | null>(null);
+  const [draft, setDraft] = useState("");
+  const [box, setBox] = useState<HTMLElement | null>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setWord(null);
+      setBox(null);
+    }
+  }, [editing]);
+  useEffect(() => {
+    setWord(null);
+    setBox(null);
+  }, [pathname, section]);
+
+  // Taps on the page select instead of clicking, while editing.
+  useEffect(() => {
+    if (!editing || !owner) return;
+    function onClick(e: MouseEvent) {
+      const root = rootEl();
+      const t = e.target as Element | null;
+      if (!root || !t || !root.contains(t) || t.closest("[data-edit-skip]")) return;
+      if (t.closest("input, textarea, select")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const node = textNodeAt(e.clientX, e.clientY, t);
+      if (node) {
+        const now = (node.nodeValue ?? "").trim();
+        const rec = applied.get(node);
+        const orig = rec && rec.shown === now ? rec.orig : now;
+        setWord({ node, orig });
+        setDraft(now);
+      } else setWord(null);
+      setBox(movableFrom(t, root));
+    }
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [editing, owner]);
+
+  // Keep the outline and handle on the selected box as the page scrolls.
+  useEffect(() => {
+    if (!box) return setRect(null);
+    let f = 0;
+    const tick = () => {
+      setRect(box.isConnected ? box.getBoundingClientRect() : null);
+      f = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(f);
+  }, [box]);
+
+  function commitWords() {
+    if (!word) return;
+    const v = draft.replace(/\s+/g, " ").trim();
+    const t = { ...(edits.t ?? {}) };
+    if (!v || v === word.orig) delete t[word.orig];
+    else t[word.orig] = v.slice(0, 500);
+    if ((edits.t ?? {})[word.orig] === t[word.orig]) return;
+    void persist({ ...edits, t });
+  }
+  function resetWords() {
+    if (!word) return;
+    setDraft(word.orig);
+    const t = { ...(edits.t ?? {}) };
+    delete t[word.orig];
+    void persist({ ...edits, t });
+  }
+
+  // Dragging a box among its siblings.
+  function startDrag(e: React.PointerEvent) {
+    const root = rootEl();
+    if (!box || !root) return;
+    const parent = box.parentElement;
+    if (!parent) return;
+    e.preventDefault();
+    const kids = Array.from(parent.children) as HTMLElement[];
+    if (!getComputedStyle(parent).display.match(/flex|grid/)) {
+      parent.style.display = "flex";
+      parent.style.flexDirection = "column";
+    }
+    const visual = () => [...kids].sort((a, b) => (Number(a.style.order) || 0) - (Number(b.style.order) || 0) || kids.indexOf(a) - kids.indexOf(b));
+    let list = visual();
+    list.forEach((k, i) => (k.style.order = String(i)));
+
+    const move = (ev: PointerEvent) => {
+      ev.preventDefault();
+      let best: HTMLElement | null = null;
+      let bestD = Infinity;
+      for (const k of list) {
+        if (k === box) continue;
+        const r = k.getBoundingClientRect();
+        const d = Math.hypot(ev.clientX - (r.left + r.width / 2), ev.clientY - (r.top + r.height / 2));
+        if (d < bestD) {
+          bestD = d;
+          best = k;
+        }
+      }
+      const me = box.getBoundingClientRect();
+      const meD = Math.hypot(ev.clientX - (me.left + me.width / 2), ev.clientY - (me.top + me.height / 2));
+      if (!best || meD <= bestD) return;
+      const to = list.indexOf(best);
+      list = list.filter((k) => k !== box);
+      list.splice(to, 0, box);
+      list.forEach((k, i) => (k.style.order = String(i)));
+    };
+    const end = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      const path = pathOf(root, parent);
+      if (!path) return;
+      const order = list.map((k) => kids.indexOf(k));
+      const o = { ...(edits.o ?? {}), [path.join(".")]: order };
+      void persist({ ...edits, o });
+    };
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  }
+
+  const [armReset, setArmReset] = useState(false);
+  function resetPage() {
+    if (!armReset) return setArmReset(true);
+    setArmReset(false);
+    const root = rootEl();
+    if (root) {
+      for (const k of Object.keys(edits.o ?? {})) {
+        const b = atPath(root, k.split(".").filter(Boolean).map(Number)) as HTMLElement | null;
+        if (!b) continue;
+        b.style.display = "";
+        b.style.flexDirection = "";
+        for (const c of Array.from(b.children) as HTMLElement[]) c.style.order = "";
+      }
+    }
+    setWord(null);
+    setBox(null);
+    void persist({});
+  }
+
+  if (!owner || !editing) return null;
+
+  return (
+    <>
+      {rect && (
+        <div
+          data-edit-skip
+          className="fixed z-40 pointer-events-none rounded-lg ring-2 ring-amber-400/80"
+          style={{ left: rect.left - 3, top: rect.top - 3, width: rect.width + 6, height: rect.height + 6 }}
+        />
+      )}
+      {rect && box && (
+        <button
+          type="button"
+          data-edit-skip
+          onPointerDown={startDrag}
+          style={{ left: Math.max(4, rect.left - 14), top: Math.max(4, rect.top - 14), touchAction: "none" }}
+          className="fixed z-50 h-9 px-2.5 rounded-full bg-amber-400 text-base-950 text-sm font-bold shadow-lg cursor-grab active:cursor-grabbing"
+          aria-label="Drag to move this box"
+          title="Drag to move this box"
+        >
+          ⋮⋮ Move
+        </button>
+      )}
+
+      <div
+        data-edit-skip
+        className="fixed z-50 left-2 right-2 md:left-auto md:right-4 md:w-[26rem] bottom-[calc(7.5rem+env(safe-area-inset-bottom))] md:bottom-4 rounded-xl border border-amber-400/40 bg-[#1f1c14] text-amber-50 shadow-2xl p-3 space-y-2 text-sm"
+      >
+        <div className="flex items-center gap-2">
+          <b className="text-amber-300">Editing this page</b>
+          <span role="status" className="ml-auto text-xs">
+            {status === "saving" && <span className="text-slate-400">Saving…</span>}
+            {status === "saved" && <span className="text-emerald-400 font-semibold">✓ Saved</span>}
+            {status === "error" && <span className="text-rose-400">Didn&apos;t save, try again</span>}
+          </span>
+          <button type="button" onClick={() => setEditing(false)} className="rounded-md bg-amber-400 text-base-950 font-semibold px-3 py-1">
+            Done
+          </button>
+        </div>
+        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Tap a box, then drag ⋮⋮ Move to put it somewhere else.</p>}
+        {word && (
+          <div className="space-y-1.5">
+            <textarea
+              value={draft}
+              rows={2}
+              maxLength={500}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitWords}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  (e.target as HTMLTextAreaElement).blur();
+                }
+              }}
+              aria-label="New words"
+              className="block w-full resize-none rounded-md border border-amber-400/40 bg-black/30 px-2 py-1.5 text-slate-100 focus:outline-none focus:border-amber-400"
+            />
+            <div className="flex flex-wrap items-center gap-2 text-xs text-amber-100/70">
+              <span>Saves when you tap away or press Enter.</span>
+              {draft.trim() !== word.orig && (
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={resetWords} className="underline hover:text-amber-300">
+                  Back to &ldquo;{word.orig.length > 30 ? `${word.orig.slice(0, 30)}…` : word.orig}&rdquo;
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {box && (
+            <button
+              type="button"
+              onClick={() => {
+                const root = rootEl();
+                const up = box.parentElement && root ? movableFrom(box.parentElement, root) : null;
+                if (up) setBox(up);
+              }}
+              className="rounded-md border border-amber-400/40 px-2.5 py-1 hover:bg-amber-400/10"
+            >
+              Pick the bigger box
+            </button>
+          )}
+          {(edits.t || edits.o) && (
+            <button type="button" onClick={resetPage} onBlur={() => setArmReset(false)} className="ml-auto rounded-md border border-amber-400/40 px-2.5 py-1 hover:bg-amber-400/10">
+              {armReset ? "Tap again to undo all" : "Undo all changes on this page"}
+            </button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

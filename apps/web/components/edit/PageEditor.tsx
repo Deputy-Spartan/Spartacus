@@ -276,9 +276,26 @@ export function PageEditor() {
       return;
     }
     let t: ReturnType<typeof setTimeout> | undefined;
+    // Each card gets a strip of room along its bottom for the edit controls,
+    // so they never cover what's on the card. Put back when editing ends.
+    const restore = (keep: HTMLElement[] = []) => {
+      for (const el of Array.from(document.querySelectorAll<HTMLElement>("[data-edit-pad]"))) {
+        if (keep.includes(el)) continue;
+        const was = el.dataset.editPad;
+        el.style.paddingBottom = was === "-" ? "" : (was ?? "");
+        delete el.dataset.editPad;
+      }
+    };
     const scan = () => {
       const root = rootEl();
-      setCards(root ? findCards(root) : []);
+      const found = root ? findCards(root) : [];
+      restore(found);
+      for (const c of found) {
+        if (c.dataset.editPad) continue;
+        c.dataset.editPad = c.style.paddingBottom || "-";
+        c.style.paddingBottom = `${parseFloat(getComputedStyle(c).paddingBottom) + 40}px`;
+      }
+      setCards(found);
     };
     scan();
     const root = rootEl();
@@ -291,6 +308,7 @@ export function PageEditor() {
     return () => {
       obs.disconnect();
       clearTimeout(t);
+      restore();
     };
   }, [editing, owner, pathname, section]);
   useEffect(() => {
@@ -458,6 +476,7 @@ export function PageEditor() {
       const card = cardsRef.current.find((c) => c.contains(t));
       if (!card) return;
       pending = { card, x: e.clientX, y: e.clientY, mouse: e.pointerType === "mouse" };
+      if (pending.mouse) e.preventDefault(); // no text selection or link drag
       if (!pending.mouse) pending.timer = setTimeout(begin, 350);
     };
     const onMove = (e: PointerEvent) => {
@@ -482,6 +501,12 @@ export function PageEditor() {
     const onTouchMove = (e: TouchEvent) => {
       if (dragging) e.preventDefault();
     };
+    // Pressing on a card's link and moving starts the browser's own "drag this
+    // link" instead, which cancels ours. Not while editing.
+    const noNativeDrag = (e: DragEvent) => {
+      if (root.contains(e.target as Node)) e.preventDefault();
+    };
+    document.addEventListener("dragstart", noNativeDrag, true);
     const noMenu = (e: Event) => {
       if (cardsRef.current.some((c) => c.contains(e.target as Node))) e.preventDefault();
     };
@@ -504,6 +529,7 @@ export function PageEditor() {
       window.removeEventListener("pointercancel", onUp);
       document.removeEventListener("touchmove", onTouchMove, { capture: false } as EventListenerOptions);
       document.removeEventListener("contextmenu", noMenu);
+      document.removeEventListener("dragstart", noNativeDrag, true);
     };
   }, [editing, owner, editsL]);
 
@@ -548,22 +574,37 @@ export function PageEditor() {
             }`}
             style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
           >
-            <div className="absolute right-2 bottom-2 flex items-center gap-1 pointer-events-auto">
-              {!locked && (
-                <span className="h-7 px-2 flex items-center rounded-md bg-[#1f1c14] border border-amber-400/30 text-[11px] font-semibold text-amber-200/80 pointer-events-none">
-                  ⠿ Drag
-                </span>
+            {/* The edit strip, in the room added along the card's bottom. */}
+            <div
+              className={`absolute inset-x-0 bottom-0 h-10 flex items-center justify-between gap-2 px-3 rounded-b-[10px] border-t border-dashed pointer-events-auto ${
+                locked ? "border-sky-400/40 bg-sky-400/10" : "border-amber-400/25 bg-amber-400/[0.06]"
+              }`}
+            >
+              {locked ? (
+                <span className="text-xs font-semibold text-sky-300">🔒 Locked in place</span>
+              ) : (
+                <button
+                  type="button"
+                  onPointerDown={(e) => {
+                    setBox(card);
+                    startDrag(e, card);
+                  }}
+                  style={{ touchAction: "none" }}
+                  className="h-7 px-2 -ml-1 rounded-md text-xs font-semibold text-amber-200 hover:bg-amber-400/10 cursor-grab active:cursor-grabbing"
+                  aria-label="Drag to move this card"
+                >
+                  ⠿ Drag to move
+                </button>
               )}
               <button
                 type="button"
                 onClick={() => toggleLock(card)}
-                className={`h-7 w-7 flex items-center justify-center rounded-md text-sm border ${
-                  locked ? "bg-sky-400 border-sky-300 text-base-950" : "bg-[#1f1c14] border-amber-400/30 hover:border-sky-400/60"
+                className={`h-7 px-2.5 rounded-md text-xs font-semibold border ${
+                  locked ? "border-sky-400/50 text-sky-200 hover:bg-sky-400/15" : "border-white/10 text-slate-300 hover:border-sky-400/50 hover:text-sky-200"
                 }`}
-                title={locked ? "Locked here. Tap to unlock" : "Lock it here, so moving other cards doesn't shift it"}
-                aria-label={locked ? "Unlock this card" : "Lock this card in place"}
+                title={locked ? "Let this card move again" : "Keep this card here when others move"}
               >
-                {locked ? "🔒" : "🔓"}
+                {locked ? "Unlock" : "🔓 Lock"}
               </button>
             </div>
           </div>

@@ -129,6 +129,24 @@ function movableStep(el: Element | null, root: Element): HTMLElement | null {
   return null;
 }
 
+// Every card on the page: the boxes laid out in a grid. While editing, each
+// one gets its own Move and Lock buttons, so nothing has to be found first.
+function findCards(root: Element): HTMLElement[] {
+  const out: HTMLElement[] = [];
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>("*"))) {
+    if (el.closest(SKIP)) continue;
+    if (!getComputedStyle(el).display.includes("grid")) continue;
+    const kids = (Array.from(el.children) as HTMLElement[]).filter((k) => !/absolute|fixed/.test(getComputedStyle(k).position));
+    if (kids.length < 2) continue;
+    for (const k of kids) {
+      const r = k.getBoundingClientRect();
+      if (r.width >= 120 && r.height >= 48) out.push(k);
+    }
+    if (out.length > 150) break;
+  }
+  return out;
+}
+
 // The words under the finger, found by where text is drawn, so it still works
 // where a see-through link sits over the text (the group page cards).
 function textNodeAt(x: number, y: number, root: Element): Text | null {
@@ -239,6 +257,35 @@ export function PageEditor() {
   // Keep the outline and handle on the selected box, and the 🔒 on every
   // locked box, as the page scrolls. Only while editing.
   const [lockRects, setLockRects] = useState<DOMRect[]>([]);
+  const [cards, setCards] = useState<HTMLElement[]>([]);
+  const [cardRects, setCardRects] = useState<DOMRect[]>([]);
+  const cardsRef = useRef<HTMLElement[]>([]);
+  cardsRef.current = cards;
+
+  // Find the cards when editing starts, and again when the page changes.
+  useEffect(() => {
+    if (!editing || !owner) {
+      setCards([]);
+      return;
+    }
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const scan = () => {
+      const root = rootEl();
+      setCards(root ? findCards(root) : []);
+    };
+    scan();
+    const root = rootEl();
+    if (!root) return;
+    const obs = new MutationObserver(() => {
+      clearTimeout(t);
+      t = setTimeout(scan, 400);
+    });
+    obs.observe(root, { subtree: true, childList: true });
+    return () => {
+      obs.disconnect();
+      clearTimeout(t);
+    };
+  }, [editing, owner, pathname, section]);
   useEffect(() => {
     if (!editing || !owner) {
       setRect(null);
@@ -262,24 +309,28 @@ export function PageEditor() {
       setLockRects((prev) =>
         prev.length === rects.length && prev.every((p, i) => p.left === rects[i].left && p.top === rects[i].top) ? prev : rects
       );
+      const cr = cardsRef.current.map((c) => c.getBoundingClientRect());
+      setCardRects((prev) => (prev.length === cr.length && prev.every((p, i) => p.left === cr[i].left && p.top === cr[i].top) ? prev : cr));
       f = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(f);
   }, [box, editing, owner]);
 
-  // Where the selected box sits, for locking it.
-  const boxSpot = (() => {
+  // Where a box sits, for locking it.
+  function spotOf(el: HTMLElement | null) {
     const root = typeof document !== "undefined" ? rootEl() : null;
-    const parent = box?.parentElement;
-    if (!box || !root || !parent) return null;
+    const parent = el?.parentElement;
+    if (!el || !root || !parent) return null;
     const path = pathOf(root, parent);
     if (!path) return null;
     const key = path.join(".");
-    const idx = Array.prototype.indexOf.call(parent.children, box) as number;
+    const idx = Array.prototype.indexOf.call(parent.children, el) as number;
     return { key, idx, locked: ((edits.l ?? {})[key] ?? []).includes(idx) };
-  })();
-  function toggleLock() {
+  }
+  const boxSpot = spotOf(box);
+  function toggleLock(el: HTMLElement | null) {
+    const boxSpot = spotOf(el);
     if (!boxSpot) return;
     const l = { ...(edits.l ?? {}) };
     const cur = new Set(l[boxSpot.key] ?? []);
@@ -308,7 +359,7 @@ export function PageEditor() {
   }
 
   // Dragging a box among its siblings.
-  function startDrag(e: React.PointerEvent) {
+  function startDrag(e: React.PointerEvent, box: HTMLElement | null) {
     const root = rootEl();
     if (!box || !root) return;
     const parent = box.parentElement;
@@ -405,15 +456,47 @@ export function PageEditor() {
           className="fixed z-40 pointer-events-none rounded-lg ring-1 ring-sky-300/50"
           style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
         >
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-sky-400 text-base-950 text-xs px-1.5 py-0.5 font-bold shadow">🔒</span>
         </span>
       ))}
+      {/* Move and Lock on every card, without tapping it first. */}
+      {cards.map((card, i) => {
+        const r = cardRects[i];
+        if (!r || card === box || r.bottom < 0 || r.top > window.innerHeight) return null;
+        const spot = spotOf(card);
+        return (
+          <div key={i} data-edit-skip className="fixed z-40 flex gap-1" style={{ left: r.left + 8, top: Math.max(2, r.top - 13) }}>
+            {!spot?.locked && (
+              <button
+                type="button"
+                onPointerDown={(e) => {
+                  setBox(card);
+                  startDrag(e, card);
+                }}
+                style={{ touchAction: "none" }}
+                className="h-7 px-2 rounded-full bg-amber-400 text-base-950 text-xs font-bold shadow cursor-grab active:cursor-grabbing"
+                aria-label="Drag to move this card"
+                title="Drag to move this card"
+              >
+                ⋮⋮ Move
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => toggleLock(card)}
+              className={`h-7 px-2 rounded-full text-xs font-bold shadow ${spot?.locked ? "bg-sky-400 text-base-950" : "bg-base-900 text-sky-300 border border-sky-400/50"}`}
+              title={spot?.locked ? "Unlock so it can move again" : "Lock it here, so moving other cards doesn't shift it"}
+            >
+              {spot?.locked ? "🔒 Locked" : "🔓 Lock"}
+            </button>
+          </div>
+        );
+      })}
       {rect && box && (
         <div data-edit-skip className="fixed z-50 flex gap-1.5" style={{ left: Math.max(4, rect.left - 14), top: Math.max(4, rect.top - 14) }}>
           {!boxSpot?.locked && (
             <button
               type="button"
-              onPointerDown={startDrag}
+              onPointerDown={(e) => startDrag(e, box)}
               style={{ touchAction: "none" }}
               className="h-9 px-2.5 rounded-full bg-amber-400 text-base-950 text-sm font-bold shadow-lg cursor-grab active:cursor-grabbing"
               aria-label="Drag to move this box"
@@ -425,7 +508,7 @@ export function PageEditor() {
           {boxSpot && (
             <button
               type="button"
-              onClick={toggleLock}
+              onClick={() => toggleLock(box)}
               className={`h-9 px-2.5 rounded-full text-sm font-bold shadow-lg ${boxSpot.locked ? "bg-sky-400 text-base-950" : "bg-base-900 text-sky-300 border border-sky-400/50"}`}
               title={boxSpot.locked ? "Unlock so it can move again" : "Lock it here, so moving other boxes doesn't shift it"}
             >
@@ -450,7 +533,7 @@ export function PageEditor() {
             Done
           </button>
         </div>
-        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Tap a box, then drag ⋮⋮ Move to put it somewhere else, or tap 🔓 Lock to keep it where it is.</p>}
+        {!word && !box && <p className="text-amber-100/80">Tap any words to change them. Drag a card by its ⋮⋮ Move button, or tap 🔓 Lock to keep it where it is. For other boxes, tap the box first.</p>}
         {word && (
           <div className="space-y-1.5">
             <textarea

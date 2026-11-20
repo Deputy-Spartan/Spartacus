@@ -42,6 +42,8 @@ export function charCount(s: string | undefined | null): number {
 }
 
 function isValidUrl(url: string, allowed: string[]): boolean {
+  // A module placeholder that fills in with a link when it posts, like {avatar}.
+  if (/^\{[a-z_]+\}$/i.test(url.trim())) return true;
   try {
     return allowed.includes(new URL(url).protocol);
   } catch {

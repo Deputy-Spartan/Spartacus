@@ -22,7 +22,8 @@ async function buildPayload(panel: PanelWithOptions): Promise<Pick<MessageCreate
   // (the bot still reacts with every emoji below); its own buttons are
   // dropped since reaction panels carry no components.
   const savedEmbed = await resolveSavedEmbed(panel.savedEmbedId);
-  const savedPayload = savedEmbed ? await buildSavedEmbedPayload(panel.guildId, savedEmbed) : null;
+  // {options} is the "emoji — @Role" list, so a designed embed can still show it.
+  const savedPayload = savedEmbed ? await buildSavedEmbedPayload(panel.guildId, savedEmbed, { "{options}": listing }) : null;
 
   return savedPayload
     ? { content: savedPayload.content, embeds: savedPayload.embeds }

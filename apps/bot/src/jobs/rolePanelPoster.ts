@@ -26,7 +26,7 @@ async function buildPayload(client: Client, panel: RolePanel) {
   // below are always required.
   const savedEmbed = await resolveSavedEmbed(panel.savedEmbedId);
   const embeds = savedEmbed
-    ? (await buildSavedEmbedPayload(panel.guildId, savedEmbed)).embeds ?? []
+    ? (await buildSavedEmbedPayload(panel.guildId, savedEmbed, { "{options}": listing })).embeds ?? []
     : [
         applyEmbedExtra(
           new EmbedBuilder()

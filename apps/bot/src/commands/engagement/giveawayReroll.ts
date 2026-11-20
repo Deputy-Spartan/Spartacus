@@ -1,3 +1,4 @@
+import { giveawayTokens } from "../../lib/giveawayTokens";
 import { EmbedBuilder, PermissionFlagsBits, SlashCommandBuilder, type BaseMessageOptions } from "discord.js";
 import type { CommandModule } from "../types";
 import { prisma } from "../../lib/prisma";
@@ -55,7 +56,7 @@ const command: CommandModule = {
       const saved = await resolveSavedEmbed(giveaway.savedEmbedId);
       let payload: BaseMessageOptions;
       if (saved) {
-        const built = await buildSavedEmbedPayload(giveaway.guildId, saved);
+        const built = await buildSavedEmbedPayload(giveaway.guildId, saved, giveawayTokens(giveaway));
         const line = winners.length > 0 ? `🔁 New winner(s): ${winners.map((w) => `<@${w}>`).join(", ")}!` : "No valid entries — no winner could be selected.";
         payload = { ...built, content: [built.content, line].filter(Boolean).join("\n") };
       } else {

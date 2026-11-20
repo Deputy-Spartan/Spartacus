@@ -8,12 +8,9 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { api, type RulesGateSettingsRow, type RulesGateAgreementRow, type RulesGateSectionRow, type EmbedCreatorPresetRow } from "../../../../lib/api";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
-import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
+import { api, type RulesGateSettingsRow, type RulesGateAgreementRow, type RulesGateSectionRow } from "../../../../lib/api";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from "../../../../components/ui/DiscordPreview";
-import { checkDiscordLimits } from "../../../../lib/discordLimits";
-import Link from "next/link";
 
 type Tab = "settings" | "activity";
 
@@ -189,48 +186,19 @@ function SettingsTab({
           // at full width instead of squeezing into a narrow column.
           // Back/Next live in the left column with the settings card so they
           // stay next to the step instead of dropping below a tall preview.
-          <div className="flex flex-col xl:flex-row gap-5 items-start">
-            <div className="w-full max-w-xl xl:w-[420px] xl:flex-none">
-              <NeonCard>
-                <p className="text-xs text-slate-500 mb-4">
-                  Build the full rules message (title, images, links, multiple fields — even multiple embeds) in the{" "}
-                  <Link href={`/dashboard/${guildId}/embed-creator`} className="text-neon-blue hover:underline">
-                    Embed Creator
-                  </Link>
-                  , then pick it here. Saving posts (or reposts) it right away.
-                </p>
-                <SavedEmbedPicker guildId={guildId} value={settings?.savedEmbedId ?? null} onChange={(id) => update({ savedEmbedId: id })} />
-
-                {!settings?.savedEmbedId && (
-                  <div className="mt-5 pt-5 border-t border-white/5">
-                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Default Embed Title</label>
-                    <input
-                      type="text"
-                      value={settings?.defaultEmbedTitle ?? ""}
-                      onChange={(e) => update({ defaultEmbedTitle: e.target.value || null })}
-                      placeholder={DEFAULT_EMBED_TITLE}
-                      className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50"
-                    />
-                    <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Default Embed Description</label>
-                    <textarea
-                      value={settings?.defaultEmbedDescription ?? ""}
-                      onChange={(e) => update({ defaultEmbedDescription: e.target.value || null })}
-                      placeholder={DEFAULT_EMBED_DESCRIPTION}
-                      rows={2}
-                      className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-                    />
-                    <p className="text-xs text-slate-600 mt-1">
-                      What gets posted when no saved embed is selected above — pick a saved embed instead for full control (images, links,
-                      fields).
-                    </p>
-                  </div>
-                )}
-              </NeonCard>
-              {stepNav}
-            </div>
-            <div className="w-full max-w-xl xl:max-w-[640px] xl:flex-1 xl:min-w-0 xl:sticky xl:top-5">
-              <EmbedPreviewBlock guildId={guildId} settings={settings} />
-            </div>
+          <div>
+            <ModuleMessage
+              guildId={guildId}
+              title="Rules message"
+              description="Posted in the rules channel. The I Agree button (and any section buttons) are added under it. Changes update the posted message."
+              ownerKey="rulesGate:message"
+              savedEmbedId={settings?.savedEmbedId ?? null}
+              onSavedEmbedChange={(id) => update({ savedEmbedId: id })}
+              seed={() => designFrom({ title: settings?.defaultEmbedTitle || DEFAULT_EMBED_TITLE, description: settings?.defaultEmbedDescription || DEFAULT_EMBED_DESCRIPTION, color: "#3B82F6" })}
+              moduleButtons={["✅ I Agree", ...(settings?.declineEnabled ? ["❌ I Don't Agree"] : [])]}
+              reservedRows={2}
+            />
+            <div className="max-w-xl">{stepNav}</div>
           </div>
         )}
 
@@ -332,87 +300,6 @@ function StepNav({ step, lastStep, setStep }: { step: number; lastStep: number; 
         <span className="text-xs text-emerald-400">✓ That's every step — you're all set.</span>
       )}
     </div>
-  );
-}
-
-function EmbedPreviewBlock({ guildId, settings }: { guildId: string; settings: RulesGateSettingsRow | null }) {
-  const savedEmbedId = settings?.savedEmbedId ?? null;
-  const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
-  const [sections, setSections] = useState<RulesGateSectionRow[]>([]);
-
-  useEffect(() => {
-    api.getEmbedCreatorPresets(guildId).then(setPresets);
-    api.getRulesGateSections(guildId).then(setSections).catch(() => null);
-  }, [guildId]);
-
-  // The rows apps/bot/src/jobs/rulesGatePoster.ts adds under the embed.
-  const gateRows = (
-    <>
-      <DiscordButtonRow>
-        <DiscordButton label="✅ I Agree" style="success" />
-        {settings?.declineEnabled && <DiscordButton label="❌ I Don't Agree" style="danger" />}
-      </DiscordButtonRow>
-      {sections.length > 0 && (
-        <DiscordButtonRow>
-          {sections.slice(0, 4).map((s) => (
-            <DiscordButton key={s.id} label={s.label} />
-          ))}
-        </DiscordButtonRow>
-      )}
-    </>
-  );
-
-  if (!savedEmbedId) {
-    return (
-      <NeonCard>
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
-        <DiscordMessage>
-          <DiscordEmbed
-            color={0x3b82f6}
-            title={settings?.defaultEmbedTitle || "📜 Server Rules"}
-            description={settings?.defaultEmbedDescription || "Click the button below to confirm you've read and agree to the rules."}
-          />
-          {gateRows}
-        </DiscordMessage>
-      </NeonCard>
-    );
-  }
-  const preset = presets.find((p) => p.id === savedEmbedId);
-  if (!preset) return null;
-  const limits = checkDiscordLimits(preset.data);
-  // The gate appends its own Agree row (plus a Sections row), so the saved
-  // embed's rows need to leave room under Discord's 5-row cap.
-  const savedRows = preset.data.components.filter((r) => r.type).length;
-  const rowProblem = savedRows + 2 > 5 ? `This embed has ${savedRows} button rows — the Rules panel needs up to 2 more for its own buttons, and Discord allows 5 total.` : null;
-
-  return (
-    <NeonCard>
-      {(limits.hasErrors || rowProblem) && (
-        <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3">
-          <p className="text-xs font-semibold text-rose-300 mb-1">⛔ Discord will reject this — the rules won't post until it's fixed:</p>
-          <ul className="space-y-0.5">
-            {limits.issues
-              .filter((i) => i.level === "error")
-              .map((i) => i.message)
-              .concat(rowProblem ? [rowProblem] : [])
-              .map((m, idx) => (
-                <li key={idx} className="text-xs text-rose-300">• {m}</li>
-              ))}
-          </ul>
-        </div>
-      )}
-      <div className="flex items-center justify-between mb-2.5">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preview</label>
-        <Link href={`/dashboard/${guildId}/embed-creator`} className="text-[11px] text-neon-blue hover:underline">
-          Edit in Embed Creator
-        </Link>
-      </div>
-      {/* Capped to the viewport and scrolls inside itself, so a long
-          multi-embed rules message never runs off the bottom of the screen. */}
-      <div className="bg-base-950 border border-white/10 rounded-lg p-3 max-h-[70vh] xl:max-h-[calc(100vh-8rem)] overflow-y-auto">
-        <EmbedCreatorPreview guildId={guildId} state={preset.data} extra={gateRows} />
-      </div>
-    </NeonCard>
   );
 }
 

@@ -7,13 +7,10 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { api, type BirthdayConfigRow, type BirthdayRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import { SendTestButton } from "../../../../components/ui/SendTestButton";
-import { DiscordMessage } from "../../../../components/ui/DiscordPreview";
-import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
@@ -23,8 +20,9 @@ const BIRTHDAY_TOKENS = [{ token: "{user}", description: "Mentions everyone whos
 
 export default function BirthdaysPage({ params }: { params: { guildId: string } }) {
   const confirm = useConfirm();
-  const messageRef = useRef<HTMLTextAreaElement>(null);
   const [config, setConfig] = useState<BirthdayConfigRow | null>(null);
+  const configRef = useRef(config);
+  configRef.current = config;
   const [birthdays, setBirthdays] = useState<BirthdayRow[]>([]);
   const { displayName } = useMemberNames(params.guildId, birthdays.map((b) => b.userId));
 
@@ -66,18 +64,6 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Ping Role (optional)</label>
           <RoleSelect guildId={params.guildId} value={config.pingRoleId} onChange={(id) => persist({ ...config, pingRoleId: id })} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Fallback Message</label>
-          <textarea
-            ref={messageRef}
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-            rows={2}
-            value={config.embedMessage ?? ""}
-            onChange={(e) => persist({ ...config, embedMessage: e.target.value })}
-          />
-          <PlaceholderExamples items={BIRTHDAY_TOKENS} inputRef={messageRef} value={config.embedMessage ?? ""} onChange={(v) => persist({ ...config, embedMessage: v })} />
-          <p className="text-xs text-slate-600 -mt-2 mb-4">Sent as plain text when no saved embed is picked below.</p>
-
-          <SavedEmbedPicker guildId={params.guildId} value={config.savedEmbedId ?? null} onChange={(id) => persist({ ...config, savedEmbedId: id })} />
         </NeonCard>
 
         <NeonCard>
@@ -104,26 +90,24 @@ export default function BirthdaysPage({ params }: { params: { guildId: string } 
         </NeonCard>
       </div>
 
+      <div className="mt-6">
+        <ModuleMessage
+          guildId={params.guildId}
+          title="Birthday post"
+          description="Posted in the announcement channel on a member's birthday. The ping role goes in front of it."
+          ownerKey="birthdays:post"
+          savedEmbedId={config.savedEmbedId ?? null}
+          onSavedEmbedChange={(id) => configRef.current && void persist({ ...configRef.current, savedEmbedId: id })}
+          seed={() => designFrom({ content: config.embedMessage || "Everyone wish {user} a happy birthday! 🎉" })}
+          tokens={BIRTHDAY_TOKENS}
+          tokenValues={{ "{user}": "<@0>" }}
+        >
+          <SendTestButton onSend={() => api.sendBirthdayTest(params.guildId)} disabled={!config.channelId} successMessage="Sent — check the announcement channel." />
+        </ModuleMessage>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start mt-4">
         <NeonCard>
-          <div className="mb-3">
-            {/* Same text as apps/bot/src/jobs/birthdayAnnouncer.ts */}
-            {config.savedEmbedId ? (
-              <SavedEmbedPreview guildId={params.guildId} savedEmbedId={config.savedEmbedId} />
-            ) : (
-              <DiscordMessage
-                content={`${config.pingRoleId ? `<@&${config.pingRoleId}> ` : ""}${(config.embedMessage || "Everyone wish {user} a happy birthday! 🎉").replace(/{user}/g, "<@0>")}`}
-              />
-            )}
-          </div>
-
-          <div className="mb-4">
-            <SendTestButton
-              onSend={() => api.sendBirthdayTest(params.guildId)}
-              disabled={!config.channelId}
-              successMessage="Sent — check the announcement channel."
-            />
-          </div>
 
           <p className="font-medium mb-3">Saved Birthdays ({birthdays.length})</p>
           {birthdays.length === 0 ? (

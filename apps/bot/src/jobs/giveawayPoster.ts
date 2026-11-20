@@ -1,3 +1,4 @@
+import { giveawayTokens } from "../lib/giveawayTokens";
 import cron from "node-cron";
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, type BaseMessageOptions } from "discord.js";
 import { prisma } from "../lib/prisma";
@@ -34,7 +35,7 @@ export function startGiveawayPosterJob(client: Client) {
       );
 
       if (saved) {
-        const built = await buildSavedEmbedPayload(giveaway.guildId, saved);
+        const built = await buildSavedEmbedPayload(giveaway.guildId, saved, giveawayTokens(giveaway));
         payload = { ...built, components: [...(built.components ?? []).slice(0, 4), row] };
       } else {
         const embed = new EmbedBuilder()

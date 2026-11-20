@@ -116,6 +116,7 @@ export interface WelcomeConfig {
   buttons: StickyButton[];
   embedExtra?: EmbedExtra;
   savedEmbedId?: string | null;
+  goodbyeSavedEmbedId?: string | null;
 }
 
 export interface WelcomeGreetingRow {
@@ -2231,6 +2232,16 @@ export const api = {
     request<EmbedCreatorPresetRow>(`/guilds/${guildId}/embed-creator/presets`, { method: "POST", body: JSON.stringify({ name, data }) }),
   deleteEmbedCreatorPreset: (guildId: string, id: string) =>
     request(`/guilds/${guildId}/embed-creator/presets/${id}`, { method: "DELETE" }),
+  getEmbedCreatorPreset: (guildId: string, id: string) => request<EmbedCreatorPresetRow>(`/guilds/${guildId}/embed-creator/presets/${id}`),
+  // A module's own embed ("Build here"), and whichever one it points at now.
+  getModuleEmbed: (guildId: string, key: string, current: string | null) =>
+    request<{ own: EmbedCreatorPresetRow | null; current: (EmbedCreatorPresetRow & { ownerKey: string | null }) | null }>(
+      `/guilds/${guildId}/module-embeds?key=${encodeURIComponent(key)}${current ? `&current=${encodeURIComponent(current)}` : ""}`
+    ),
+  saveModuleEmbed: (guildId: string, key: string, data: Pick<EmbedCreatorState, "content" | "embeds" | "components">, id?: string) =>
+    request<EmbedCreatorPresetRow>(`/guilds/${guildId}/module-embeds`, { method: "PUT", body: JSON.stringify({ key, data, id }) }),
+  copyModuleEmbedToLibrary: (guildId: string, name: string, data: Pick<EmbedCreatorState, "content" | "embeds" | "components">) =>
+    request<EmbedCreatorPresetRow>(`/guilds/${guildId}/module-embeds/to-library`, { method: "POST", body: JSON.stringify({ name, data }) }),
   sendEmbedCreatorMessage: (guildId: string, input: EmbedCreatorSendInput) =>
     request<{ id: string }>(`/guilds/${guildId}/embed-creator/send`, { method: "POST", body: JSON.stringify(input) }),
   fetchEmbedCreatorMessage: (guildId: string, messageLink: string, webhookUrl?: string) =>

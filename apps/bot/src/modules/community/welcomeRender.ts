@@ -18,6 +18,8 @@ export async function buildWelcomePayload(guild: Guild, config: WelcomeConfig, m
     .replace("{server}", tokens["{server}"]);
 
   const saved = await resolveSavedEmbed(config.savedEmbedId);
+  // {message} is the greeting text (a random greeting, or the Welcome Message),
+  // so a designed embed keeps Random Greetings working.
   const payload = await buildStickyPayload(
     {
       content: config.embedEnabled ? "" : text,
@@ -28,7 +30,7 @@ export async function buildWelcomePayload(guild: Guild, config: WelcomeConfig, m
       buttons: config.buttons,
       embedExtra: config.embedExtra,
     },
-    { thumbnailUrl: member.user.displayAvatarURL(), savedEmbed: saved, guildId: guild.id, tokens }
+    { thumbnailUrl: member.user.displayAvatarURL(), savedEmbed: saved, guildId: guild.id, tokens: { ...tokens, "{message}": text, "{avatar}": member.user.displayAvatarURL() } }
   );
 
   // Discord never delivers a ping notification for a mention that only
@@ -59,7 +61,8 @@ export async function buildGoodbyePayload(guild: Guild, config: WelcomeConfig, m
   const tokens = { "{user}": asMention ? `<@${member.id}>` : member.user.username, "{server}": guild.name };
   const text = (config.goodbyeText ?? "{user} has left {server}.").replace("{user}", tokens["{user}"]).replace("{server}", tokens["{server}"]);
 
-  const saved = await resolveSavedEmbed(config.savedEmbedId);
+  // The goodbye has its own embed now; before that it shared the welcome's.
+  const saved = await resolveSavedEmbed(config.goodbyeSavedEmbedId);
   const payload = await buildStickyPayload(
     {
       content: config.embedEnabled ? "" : text,
@@ -70,7 +73,7 @@ export async function buildGoodbyePayload(guild: Guild, config: WelcomeConfig, m
       buttons: config.buttons,
       embedExtra: config.embedExtra,
     },
-    { savedEmbed: saved, guildId: guild.id, tokens }
+    { savedEmbed: saved, guildId: guild.id, tokens: { ...tokens, "{message}": text } }
   );
 
   if (asMention && !payload.content?.includes(tokens["{user}"])) {

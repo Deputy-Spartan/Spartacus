@@ -17,14 +17,11 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { FormError } from "../../../../components/ui/FormError";
-import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { MessageDesigner, TokenChips, toCreatorState, withTokens, type DesignedMessage } from "../../../../components/embedCreator/MessageDesigner";
-import { EmbedCreatorPreview } from "../../../../components/embedCreator/EmbedCreatorPreview";
-import { DiscordLimitsCard } from "../../../../components/embedCreator/DiscordLimitsCard";
-import { checkDiscordLimits } from "../../../../lib/discordLimits";
+import { type DesignedMessage } from "../../../../components/embedCreator/MessageDesigner";
+import { ModuleMessage } from "../../../../components/embedCreator/ModuleMessage";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { useMemberNames } from "../../../../lib/useMemberNames";
-import { api, type EmbedCreatorPresetRow, type HoneypotConfig, type HoneypotStatsRow } from "../../../../lib/api";
+import { api, type HoneypotConfig, type HoneypotStatsRow } from "../../../../lib/api";
 
 type Tab = "settings" | "message" | "stats";
 
@@ -43,12 +40,10 @@ function StatTile({ label, value, hint }: { label: string; value: number; hint?:
 
 export default function HoneypotPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
-  const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("settings");
   const [config, setConfig] = useState<HoneypotConfig | null>(null);
   const [message, setMessage] = useState<DesignedMessage | null>(null);
   const [stats, setStats] = useState<HoneypotStatsRow | null>(null);
-  const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
   const [messageError, setMessageError] = useState<string | null>(null);
   const { displayName } = useMemberNames(guildId, stats?.recent.map((r) => r.userId) ?? []);
 
@@ -57,7 +52,6 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
       setConfig(c);
       setMessage(c.creatorData ?? (defaultHoneypotMessage() as unknown as DesignedMessage));
     });
-    api.getEmbedCreatorPresets(guildId).then(setPresets);
   }, [guildId]);
 
   // The numbers keep counting while the page is open.
@@ -88,15 +82,6 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
   const info = HONEYPOT_ACTION_INFO[config.action];
   const numbers = stats ?? { server: 0, week: 0, global: 0, servers: 0 };
 
-  async function resetMessage() {
-    if (!(await confirm("Replace this message with the default honeypot design? Your current text, embeds and buttons will be lost.", { confirmLabel: "Use Default" }))) return;
-    setMessage(defaultHoneypotMessage() as unknown as DesignedMessage);
-    patch({ savedEmbedId: null });
-  }
-
-  const savedPreset = config.savedEmbedId ? presets.find((p) => p.id === config.savedEmbedId) ?? null : null;
-  const state = savedPreset ? { ...toCreatorState(message), ...savedPreset.data } : toCreatorState(message);
-  const limits = checkDiscordLimits(state);
   const tabClass = (t: Tab) =>
     ["px-4 py-2 text-sm border-b-2 transition-colors whitespace-nowrap shrink-0", tab === t ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300"].join(" ");
 
@@ -180,8 +165,8 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
       )}
 
       {tab === "message" && (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-5 items-start">
-          <div className="min-w-0">
+        <div>
+          <div className="min-w-0 max-w-3xl">
             <NeonCard className="mb-4">
               <div className="flex items-center justify-between gap-4 pb-3 mb-3 border-b border-white/5">
                 <div>
@@ -224,41 +209,30 @@ export default function HoneypotPage({ params }: { params: { guildId: string } }
               <FormError message={messageError} />
             </NeonCard>
 
-            <TokenChips tokens={HONEYPOT_TOKENS} note="The numbers update on the posted message by themselves." />
-
-            <MessageDesigner
-              guildId={guildId}
-              value={message}
-              onChange={setMessage}
-              savedEmbedId={config.savedEmbedId}
-              onSavedEmbedChange={(id) => patch({ savedEmbedId: id })}
-              onReset={resetMessage}
-              savedEmbedNote="The counter and stats buttons are still added under it."
-            >
-              <div className="flex items-center mt-4">
-                <button type="button" onClick={() => save()} className="neon-button">
-                  Save
-                </button>
-                <SaveStatus status={status} />
-              </div>
-            </MessageDesigner>
           </div>
 
-          <div className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
-            <NeonCard>
-              <p className="font-medium mb-3">Live Preview</p>
-              <EmbedCreatorPreview guildId={guildId} state={withTokens(state, honeypotTokenValues(config.action, numbers, "Your Server"))} />
-              {(config.showCounter || config.showStatsButton) && (
-                <div className="flex flex-wrap gap-2 mt-2 rounded-lg bg-[#313338] px-4 py-3">
-                  {config.showCounter && <span className="rounded bg-[#4e5058]/60 text-[#dbdee1]/70 text-sm px-3 py-1.5">{honeypotCounterLabel(config.action, config.counterScope, numbers)}</span>}
-                  {config.showStatsButton && <span className="rounded bg-[#4e5058] text-white text-sm px-3 py-1.5">📊 Honeypot Stats</span>}
-                </div>
-              )}
-              {savedPreset && <p className="text-xs text-slate-500 mt-2">Showing the saved embed "{savedPreset.name}". That's what will post.</p>}
-              <p className="text-xs text-slate-600 mt-2">{config.messageEnabled ? (config.messageId ? "This message is live in the channel and updates when you save." : "This posts to the channel when you save.") : "Turn the message on above to post this."}</p>
-            </NeonCard>
-            <DiscordLimitsCard report={limits} />
-          </div>
+          <ModuleMessage
+            guildId={guildId}
+            title="Channel message"
+            description={config.messageEnabled ? (config.messageId ? "Live in the channel. It updates when you save." : "Posts to the channel when you save.") : "Turn the message on above to post this."}
+            ownerKey="honeypot:message"
+            savedEmbedId={config.savedEmbedId}
+            onSavedEmbedChange={(id) => patch({ savedEmbedId: id })}
+            seed={() => defaultHoneypotMessage() as unknown as DesignedMessage}
+            inline={{ value: message, onChange: setMessage }}
+            tokens={HONEYPOT_TOKENS}
+            tokenValues={honeypotTokenValues(config.action, numbers, "Your Server")}
+            note="The numbers update on the posted message by themselves."
+            moduleButtons={[
+              ...(config.showCounter ? [honeypotCounterLabel(config.action, config.counterScope, numbers)] : []),
+              ...(config.showStatsButton ? ["📊 Honeypot Stats"] : []),
+            ]}
+          >
+            <button type="button" onClick={() => save()} className="neon-button">
+              Save
+            </button>
+            <SaveStatus status={status} />
+          </ModuleMessage>
         </div>
       )}
 

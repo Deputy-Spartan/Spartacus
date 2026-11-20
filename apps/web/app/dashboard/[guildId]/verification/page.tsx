@@ -9,9 +9,8 @@ import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { Required } from "../../../../components/ui/Required";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
-import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
-import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from "../../../../components/ui/DiscordPreview";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
+import { DiscordButton, DiscordButtonRow, DiscordMessage } from "../../../../components/ui/DiscordPreview";
 import { api, type VerificationConfig, type VerificationLogRow } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
@@ -208,50 +207,24 @@ function ChannelRoleStep({ guildId, config, update }: { guildId: string; config:
   );
 }
 
-function PanelPreview({ guildId, config }: { guildId: string; config: VerificationConfig }) {
-  const custom = !!config.buttonLabel?.trim();
-  const button = <DiscordButton label={config.buttonLabel?.trim() || D.buttonLabel} emoji={custom ? config.buttonEmoji : config.buttonEmoji || D.buttonEmoji} style="success" />;
-  if (config.savedEmbedId) {
-    return (
-      <div className="space-y-2">
-        <SavedEmbedPreview guildId={guildId} savedEmbedId={config.savedEmbedId} />
-        <DiscordButtonRow>{button}</DiscordButtonRow>
-        <p className={hint}>The Verify button is added under your saved embed.</p>
-      </div>
-    );
-  }
-  return (
-    <DiscordMessage>
-      <DiscordEmbed color={config.embedColor || D.color} title={config.defaultEmbedTitle || D.title} description={config.defaultEmbedDescription || D.description} />
-      <DiscordButtonRow>{button}</DiscordButtonRow>
-    </DiscordMessage>
-  );
-}
-
 function MessageStep({ guildId, config, update }: { guildId: string; config: VerificationConfig; update: Update }) {
+  const custom = !!config.buttonLabel?.trim();
+  const button = `${(custom ? config.buttonEmoji : config.buttonEmoji || D.buttonEmoji) ?? ""} ${config.buttonLabel?.trim() || D.buttonLabel}`.trim();
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-      <NeonCard>
-        <SavedEmbedPicker guildId={guildId} value={config.savedEmbedId} onChange={(id) => update({ savedEmbedId: id })} />
-        {!config.savedEmbedId && (
-          <>
-            <label className={label}>Embed Title</label>
-            <input className={field} value={config.defaultEmbedTitle ?? ""} placeholder={D.title} maxLength={256} onChange={(e) => update({ defaultEmbedTitle: e.target.value })} />
-            <label className={`${label} mt-4`}>Embed Description</label>
-            <textarea
-              className={`${field} min-h-24`}
-              value={config.defaultEmbedDescription ?? ""}
-              placeholder={D.description}
-              onChange={(e) => update({ defaultEmbedDescription: e.target.value })}
-            />
-            <label className={`${label} mt-4`}>Embed Color</label>
-            <div className="flex items-center gap-2">
-              <input type="color" className="h-9 w-12 rounded bg-transparent" value={config.embedColor || D.color} onChange={(e) => update({ embedColor: e.target.value })} />
-              <input className={`${field} max-w-32 font-mono`} value={config.embedColor ?? ""} placeholder={D.color} onChange={(e) => update({ embedColor: e.target.value })} />
-            </div>
-          </>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/5">
+    <div>
+      <ModuleMessage
+        guildId={guildId}
+        title="Verify panel"
+        description="Posted in the panel channel. The Verify button is added under it."
+        ownerKey="verification:panel"
+        savedEmbedId={config.savedEmbedId}
+        onSavedEmbedChange={(id) => update({ savedEmbedId: id })}
+        seed={() => designFrom({ title: config.defaultEmbedTitle || D.title, description: config.defaultEmbedDescription || D.description, color: config.embedColor || D.color })}
+        moduleButtons={[button]}
+      />
+      <NeonCard className="max-w-xl">
+        <p className="font-medium mb-3">The Verify button</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={label}>Button Text</label>
             <input className={field} value={config.buttonLabel ?? ""} placeholder={D.buttonLabel} maxLength={80} onChange={(e) => update({ buttonLabel: e.target.value })} />
@@ -261,11 +234,7 @@ function MessageStep({ guildId, config, update }: { guildId: string; config: Ver
             <EmojiPicker guildId={guildId} popover value={config.buttonEmoji ?? ""} onChange={(v) => update({ buttonEmoji: v })} placeholder={D.buttonEmoji} />
           </div>
         </div>
-        <p className={`${hint} mt-3`}>Changes repost the panel in Discord a moment after you stop typing.</p>
-      </NeonCard>
-      <NeonCard>
-        <p className={label}>Preview</p>
-        <PanelPreview guildId={guildId} config={config} />
+        <p className={`${hint} mt-3`}>Changes update the panel in Discord a moment after you stop typing.</p>
       </NeonCard>
     </div>
   );

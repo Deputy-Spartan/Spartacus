@@ -11,7 +11,7 @@ import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExampl
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import {
   api,
@@ -165,6 +165,8 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [supportRoleId, setSupportRoleId] = useState<string | null>(null);
   const [buttonLabel, setButtonLabel] = useState("Open a Ticket");
   const [savedEmbedId, setSavedEmbedId] = useState<string | null>(null);
+  // Names this panel's own embed; a new panel gets a temporary one until it's saved.
+  const [formKey, setFormKey] = useState("new");
 
   function refresh() {
     api.getTicketPanels(guildId).then(setPanels);
@@ -195,6 +197,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
 
   function openCreate() {
     resetForm();
+    setFormKey(`new-${Date.now().toString(36)}`);
     setError(null);
     setShowForm(true);
   }
@@ -209,6 +212,7 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
     setSupportRoleId(panel.supportRoleId);
     setButtonLabel(panel.buttonLabel);
     setSavedEmbedId(panel.savedEmbedId);
+    setFormKey(panel.id);
     setError(null);
     setShowForm(true);
   }
@@ -275,17 +279,22 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Panel Name</label>
           <input className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4" value={name} onChange={(e) => setName(e.target.value)} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Description</label>
-          <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Shown in the panel embed."
+          <ModuleMessage
+            key={formKey}
+            guildId={guildId}
+            title="Panel message"
+            description="The embed on the panel. The open-ticket buttons or dropdown are added under it."
+            ownerKey={`ticketPanel:${formKey}`}
+            savedEmbedId={savedEmbedId}
+            onSavedEmbedChange={setSavedEmbedId}
+            seed={() => designFrom({ title: name || "Support", description: description || "Click below to open a ticket.", color: "#3B82F6" })}
+            moduleButtons={
+              layout === "DROPDOWN" || typeIds.length === 0
+                ? [layout === "DROPDOWN" && typeIds.length ? "Select a ticket type… ▾" : buttonLabel]
+                : types.filter((t) => typeIds.includes(t.id)).map((t) => `${t.emoji ? `${t.emoji} ` : ""}${t.name}`)
+            }
+            embedsOnly
           />
-
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed (overrides name/description above)</label>
-          <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={setSavedEmbedId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Post In Channel

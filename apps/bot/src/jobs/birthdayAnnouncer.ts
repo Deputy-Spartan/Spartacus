@@ -22,8 +22,10 @@ export async function postBirthdayAnnouncement(client: Client, config: BirthdayC
 
   const ping = config.pingRoleId ? `<@&${config.pingRoleId}> ` : "";
   const saved = await resolveSavedEmbed(config.savedEmbedId);
-  const sent = saved
-    ? await channel.send({ ...(await buildSavedEmbedPayload(config.guildId, saved, { "{user}": mentions })), content: `${prefix}${ping}🎂 ${mentions}` }).catch((err) => {
+  const built = saved ? await buildSavedEmbedPayload(config.guildId, saved, { "{user}": mentions }) : null;
+  // The message's own text when it has some (with the ping in front), otherwise the birthday mentions.
+  const sent = built
+    ? await channel.send({ ...built, content: `${prefix}${ping}${built.content || `🎂 ${mentions}`}` }).catch((err) => {
         logError("bot", err, config.guildId);
         return null;
       })

@@ -11,8 +11,8 @@ export function SavedEmbedPreview({ guildId, savedEmbedId, content }: { guildId:
 
   useEffect(() => {
     api
-      .getEmbedCreatorPresets(guildId)
-      .then((rows) => setPreset(rows.find((p) => p.id === savedEmbedId) ?? null))
+      .getEmbedCreatorPreset(guildId, savedEmbedId)
+      .then(setPreset)
       .catch(() => setPreset(null));
   }, [guildId, savedEmbedId]);
 

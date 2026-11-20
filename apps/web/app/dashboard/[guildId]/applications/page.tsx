@@ -10,7 +10,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import {
   api,
@@ -142,6 +142,8 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
   const [layout, setLayout] = useState<ApplicationPanelLayout>("BUTTONS");
   const [typeIds, setTypeIds] = useState<string[]>([]);
   const [savedEmbedId, setSavedEmbedId] = useState<string | null>(null);
+  // Names this panel's own embed; a new panel gets a temporary one until it's saved.
+  const [formKey, setFormKey] = useState("new");
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -171,11 +173,13 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
 
   function openCreate() {
     resetForm();
+    setFormKey(`new-${Date.now().toString(36)}`);
     setError(null);
     setShowForm(true);
   }
 
   function openEdit(panel: ApplicationPanelRow) {
+    setFormKey(panel.id);
     setEditingId(panel.id);
     setName(panel.name);
     setChannelId(panel.channelId);
@@ -246,17 +250,22 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Panel Name</label>
           <input className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4" value={name} onChange={(e) => setName(e.target.value)} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Description</label>
-          <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Shown in the panel embed."
+          <ModuleMessage
+            key={formKey}
+            guildId={guildId}
+            title="Panel message"
+            description="The embed on the panel. The apply buttons or dropdown are added under it."
+            ownerKey={`applicationPanel:${formKey}`}
+            savedEmbedId={savedEmbedId}
+            onSavedEmbedChange={setSavedEmbedId}
+            seed={() => designFrom({ title: name || "Applications", description: description || "Click below to apply.", color: "#4C8DFF" })}
+            moduleButtons={
+              layout === "DROPDOWN"
+                ? ["Select an application type… ▾"]
+                : types.filter((t) => typeIds.includes(t.id)).map((t) => `${t.emoji ? `${t.emoji} ` : ""}${t.name}`)
+            }
+            embedsOnly
           />
-
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a Saved Embed (overrides name/description above)</label>
-          <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={setSavedEmbedId} />
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
             Post In Channel

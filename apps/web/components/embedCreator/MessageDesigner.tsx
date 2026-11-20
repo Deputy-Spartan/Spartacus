@@ -46,6 +46,11 @@ export function withTokens(state: EmbedCreatorState, tokens: Record<string, stri
       title: fill(em.title, tokens),
       description: fill(em.description, tokens),
       footerText: fill(em.footerText, tokens),
+      // image links can be a placeholder too, like {avatar}
+      authorIconUrl: fill(em.authorIconUrl, tokens),
+      thumbnailUrl: fill(em.thumbnailUrl, tokens),
+      imageUrl: fill(em.imageUrl, tokens),
+      footerIconUrl: fill(em.footerIconUrl, tokens),
       fields: em.fields.map((f) => ({ ...f, name: fill(f.name, tokens) ?? "", value: fill(f.value, tokens) ?? "" })),
     })),
     components: state.components.map((row) => ({
@@ -101,12 +106,17 @@ interface MessageDesignerProps {
   savedEmbedNote?: string;
   // Rendered at the bottom of the last card, e.g. a Save button.
   children?: React.ReactNode;
+  // ModuleMessage shows the saved-embed choice as its own switch instead.
+  hideSavedPicker?: boolean;
+  // Some panels (tickets, applications, role panels) only post the embeds,
+  // with the module's own buttons under them, so text and rows are hidden.
+  embedsOnly?: boolean;
 }
 
 // The Embed Creator's editor, for a module that designs its own message:
 // message text, up to 10 embeds (reorder by arrows or dragging), up to 5 rows
 // of buttons and select menus, or a saved embed in place of all of it.
-export function MessageDesigner({ guildId, value, onChange, savedEmbedId, onSavedEmbedChange, onReset, savedEmbedNote, children }: MessageDesignerProps) {
+export function MessageDesigner({ guildId, value, onChange, savedEmbedId, onSavedEmbedChange, onReset, savedEmbedNote, children, hideSavedPicker, embedsOnly }: MessageDesignerProps) {
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
   const patch = (next: Partial<DesignedMessage>) => onChange({ ...value, ...next });
@@ -131,6 +141,7 @@ export function MessageDesigner({ guildId, value, onChange, savedEmbedId, onSave
 
   return (
     <>
+      {!embedsOnly && (
       <NeonCard className="mb-4">
         <div className="flex items-center justify-between mb-3">
           <p className="font-medium">Message</p>
@@ -145,6 +156,7 @@ export function MessageDesigner({ guildId, value, onChange, savedEmbedId, onSave
           placeholder="Optional text above the embed(s)"
         />
       </NeonCard>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <p className="font-medium text-sm">Embeds ({value.embeds.length}/10)</p>
@@ -193,6 +205,7 @@ export function MessageDesigner({ guildId, value, onChange, savedEmbedId, onSave
         + Add Embed
       </button>
 
+      {!embedsOnly && (<>
       <p className="font-medium text-sm mb-3">Buttons &amp; Select Menus ({value.components.length}/5 rows)</p>
       {value.components.map((row, i) => (
         <ComponentRowEditor
@@ -207,13 +220,18 @@ export function MessageDesigner({ guildId, value, onChange, savedEmbedId, onSave
       <button type="button" onClick={() => value.components.length < 5 && patch({ components: [...value.components, emptyRow()] })} disabled={value.components.length >= 5} className={dashedButton}>
         + Add Row
       </button>
+      </>)}
 
-      <NeonCard>
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a saved embed instead (optional)</label>
-        <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={onSavedEmbedChange} />
-        <p className="text-xs text-slate-600 mt-2">Picking one posts that saved embed in place of everything built above. {savedEmbedNote}</p>
-        {children}
-      </NeonCard>
+      {hideSavedPicker ? (
+        children
+      ) : (
+        <NeonCard>
+          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Use a saved embed instead (optional)</label>
+          <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={onSavedEmbedChange} />
+          <p className="text-xs text-slate-600 mt-2">Picking one posts that saved embed in place of everything built above. {savedEmbedNote}</p>
+          {children}
+        </NeonCard>
+      )}
     </>
   );
 }

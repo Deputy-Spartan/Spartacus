@@ -56,6 +56,17 @@ export async function syncPresetUsage(guildId: string, presetId: string): Promis
   for (const a of await prisma.announcement.findMany({ where })) {
     targets.push({ label: "Announcement", channelId: a.channelId, messageId: a.messageId! });
   }
+  // One-per-server panels that keep their posted message's id.
+  for (const s of await prisma.rulesGateSettings.findMany({ where })) {
+    if (s.channelId) targets.push({ label: "Rules message", channelId: s.channelId, messageId: s.messageId! });
+  }
+  const panelWhere = { guildId, savedEmbedId: presetId, panelMessageId: { not: null } } as const;
+  for (const v of await prisma.verificationConfig.findMany({ where: panelWhere })) {
+    if (v.panelChannelId) targets.push({ label: "Verify panel", channelId: v.panelChannelId, messageId: v.panelMessageId! });
+  }
+  for (const r of await prisma.playerReportSettings.findMany({ where: panelWhere })) {
+    if (r.panelChannelId) targets.push({ label: "Report panel", channelId: r.panelChannelId, messageId: r.panelMessageId! });
+  }
 
   for (const t of targets) {
     const r = await editChannelMessage(t.channelId, t.messageId, edit);

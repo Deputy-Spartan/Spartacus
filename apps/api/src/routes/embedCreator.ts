@@ -44,14 +44,75 @@ async function recordLastSent(guildId: string, presetId: string | undefined, fie
   });
 }
 
+// The library: embeds people saved themselves. A module's own embed (built
+// with "Build here" on that module's page) has an ownerKey and stays out.
 router.get("/guilds/:guildId/embed-creator/presets", requireAuth, requireGuildPermission, async (req, res) => {
-  const rows = await prisma.embedCreatorPreset.findMany({ where: { guildId: req.params.guildId }, orderBy: { name: "asc" } });
+  const rows = await prisma.embedCreatorPreset.findMany({ where: { guildId: req.params.guildId, ownerKey: null }, orderBy: { name: "asc" } });
   res.json(rows);
+});
+
+// One saved embed by id, library or module-owned (for previews).
+router.get("/guilds/:guildId/embed-creator/presets/:id", requireAuth, requireGuildPermission, async (req, res) => {
+  const row = await prisma.embedCreatorPreset.findUnique({ where: { id: req.params.id } });
+  if (!row || row.guildId !== req.params.guildId) return res.status(404).json({ error: "That saved embed was deleted." });
+  res.json(row);
+});
+
+// ---- A module's own embed ("Build here") ----
+// key looks like "welcome:join" or "ticketPanel:<id>".
+const OWNER_KEY = /^[a-z0-9][a-z0-9:._-]{0,119}$/i;
+
+// The module's own embed, plus whichever embed the module points at now
+// (`current`), so the page knows if it's using its own or a library one.
+router.get("/guilds/:guildId/module-embeds", requireAuth, requireGuildPermission, async (req, res) => {
+  const key = String(req.query.key ?? "");
+  const currentId = req.query.current ? String(req.query.current) : null;
+  if (!OWNER_KEY.test(key)) return res.status(400).json({ error: "Bad key." });
+  const guildId = req.params.guildId;
+  let own = await prisma.embedCreatorPreset.findUnique({ where: { guildId_ownerKey: { guildId, ownerKey: key } } });
+  const current = currentId ? await prisma.embedCreatorPreset.findUnique({ where: { id: currentId } }) : null;
+  // A row made before it had an id (a new panel, say) keeps the embed it was built with.
+  if (!own && current && current.guildId === guildId && current.ownerKey) own = current;
+  res.json({ own, current: current && current.guildId === guildId ? current : null });
+});
+
+router.put("/guilds/:guildId/module-embeds", requireAuth, requireGuildPermission, async (req, res) => {
+  const { key, data, id } = req.body as { key?: string; data?: unknown; id?: string };
+  const guildId = req.params.guildId;
+  if (!key || !OWNER_KEY.test(key)) return res.status(400).json({ error: "Bad key." });
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "Nothing to save." });
+  if (JSON.stringify(data).length > 200_000) return res.status(400).json({ error: "That message is too big to save." });
+
+  // Editing the embed found through `current` (see above) keeps its own key.
+  const existing = id ? await prisma.embedCreatorPreset.findUnique({ where: { id } }) : null;
+  const row =
+    existing && existing.guildId === guildId && existing.ownerKey
+      ? await prisma.embedCreatorPreset.update({ where: { id: existing.id }, data: { data: data as object } })
+      : await prisma.embedCreatorPreset.upsert({
+          where: { guildId_ownerKey: { guildId, ownerKey: key } },
+          create: { guildId, ownerKey: key, name: `module:${key}`, data: data as object },
+          update: { data: data as object },
+        });
+  const sync = await syncPresetUsage(guildId, row.id).catch(() => ({ updated: 0, failed: 0, places: [] as string[], failures: [] as string[] }));
+  res.json({ ...row, sync });
+});
+
+// "Save this to my library": copies a module's embed into the library under a free name.
+router.post("/guilds/:guildId/module-embeds/to-library", requireAuth, requireGuildPermission, async (req, res) => {
+  const { name, data } = req.body as { name?: string; data?: unknown };
+  const guildId = req.params.guildId;
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "Nothing to save." });
+  const base = (name ?? "").trim().slice(0, 90) || "Module embed";
+  let free = base;
+  for (let n = 2; await prisma.embedCreatorPreset.findUnique({ where: { guildId_name: { guildId, name: free } } }); n++) free = `${base} (${n})`;
+  const row = await prisma.embedCreatorPreset.create({ data: { guildId, name: free, data: data as object } });
+  res.status(201).json(row);
 });
 
 router.post("/guilds/:guildId/embed-creator/presets", requireAuth, requireGuildPermission, async (req, res) => {
   const { name, data } = req.body as { name: string; data: unknown };
   if (!name || !name.trim()) return res.status(400).json({ error: "Preset name is required." });
+  if (/^module:/i.test(name.trim())) return res.status(400).json({ error: "Names can't start with “module:”. Pick another name." });
 
   const row = await prisma.embedCreatorPreset.upsert({
     where: { guildId_name: { guildId: req.params.guildId, name: name.trim() } },

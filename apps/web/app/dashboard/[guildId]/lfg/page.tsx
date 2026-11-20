@@ -1,14 +1,12 @@
 "use client";
 
-import { DiscordEmbed, DiscordMessage, extraEmbedProps } from "../../../../components/ui/DiscordPreview";
-import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useEffect, useRef, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { MessageSegmentBuilder, type SegmentToken } from "../../../../components/ui/MessageSegmentBuilder";
 import { Required } from "../../../../components/ui/Required";
@@ -61,10 +59,12 @@ const EMPTY: LfgCommandInput = {
 // passes in.
 function LfgFields({
   guildId,
+  ownKey,
   value,
   onChange,
 }: {
   guildId: string;
+  ownKey: string;
   value: LfgCommandInput;
   onChange: (patch: Partial<LfgCommandInput>) => void;
 }) {
@@ -75,8 +75,8 @@ function LfgFields({
   }, [guildId]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
-      <div className="min-w-0">
+    <div>
+      <div className="min-w-0 max-w-3xl">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <div>
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -123,27 +123,6 @@ function LfgFields({
         <ToggleSwitch enabled={!!value.enabled} onChange={(v) => onChange({ enabled: v })} />
       </div>
 
-      <SavedEmbedPicker guildId={guildId} value={value.savedEmbedId ?? null} onChange={(id) => onChange({ savedEmbedId: id })} />
-
-      <div className="mb-4">
-        <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Announcement Message</label>
-        <p className="text-xs text-slate-600 mb-2">
-          Build the line from blocks — reorder with the arrows, toggle a block off to drop it, or edit the text ones. Posted as plain text, then
-          followed by a real invite link to the voice channel, which Discord automatically turns into its own native card with a "Join Voice" button.
-          Used when no saved embed is selected above.
-        </p>
-        <MessageSegmentBuilder value={value.message ?? ""} onChange={(next) => onChange({ message: next })} tokens={MESSAGE_SEGMENT_TOKENS} />
-        <details className="mt-2">
-          <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">What each block means</summary>
-          <ul className="mt-1.5 space-y-1">
-            {MESSAGE_TOKEN_DOCS.map((t) => (
-              <li key={t.token} className="text-xs text-slate-600">
-                <code className="text-neon-blue">{t.token}</code> — {t.description}
-              </li>
-            ))}
-          </ul>
-        </details>
-      </div>
 
       <div className="mb-4">
         <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -175,82 +154,31 @@ function LfgFields({
       </div>
       </div>
 
-      <div className="lg:sticky lg:top-4">
-        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Live preview
-        </p>
-        <LfgPreview value={value} guildId={guildId} />
-        <p className="text-xs text-slate-600 mt-2">
-          Shows a stand-in member list and channel — the real announcement uses whoever's actually in the sender's voice channel when they run the
-          command.
-        </p>
-      </div>
+      <ModuleMessage
+        key={ownKey}
+        guildId={guildId}
+        title="Announcement"
+        description="Posted when someone runs the command. Pings go above it, and the voice channel's Join card follows it."
+        ownerKey={`lfg:${ownKey}`}
+        savedEmbedId={value.savedEmbedId ?? null}
+        onSavedEmbedChange={(id) => onChange({ savedEmbedId: id })}
+        seed={() =>
+          value.mode === "embed"
+            ? designFrom({ title: value.embedTitle, description: value.embedDescription, color: value.embedColor || "#7B99BC", extra: value.embedExtra })
+            : designFrom({ content: value.message || "Join {members} in {voiceName}" })
+        }
+        tokens={MESSAGE_TOKEN_DOCS}
+        tokenValues={{
+          "{user}": "<@1>",
+          "{voice}": "🔊 Squad 1 (<#9>)",
+          "{voiceName}": "[🔊 Squad 1](https://discord.com)",
+          "{members}": "<@2> + <@3>",
+          "{roleTag}": value.roleId ? ` <-- <@&${value.roleId}>` : "",
+          "{message}": "```\nem+ good coms chill\n```",
+        }}
+        note="Playlists with their own message still use it."
+      />
     </div>
-  );
-}
-
-// Built with the same rules as buildAnnouncement in apps/bot/src/modules/community/lfg.ts,
-// using a stand-in voice channel and members.
-const PREVIEW_MEMBERS = ["BustyBunz", "TT3ouls627-UBI", "Diego the Virgin"];
-const PREVIEW_VOICE_NAME = "[R28] Em | Chill";
-const PREVIEW_NOTE = "em+ good coms chill";
-const SAMPLE_NAMES = {
-  users: Object.fromEntries([["1", "You"], ...PREVIEW_MEMBERS.map((n, i) => [String(i + 2), n])]),
-  channels: { "9": { name: PREVIEW_VOICE_NAME, voice: true } },
-};
-
-function LfgPreview({ value, guildId }: { value: LfgCommandInput; guildId: string }) {
-  const jump = `https://discord.com/channels/${guildId}/9`;
-  const tokens: Record<string, string> = {
-    user: "<@1>",
-    voice: `${PREVIEW_VOICE_NAME} (<#9>)`,
-    voiceName: `[${PREVIEW_VOICE_NAME}](${jump})`,
-    members: PREVIEW_MEMBERS.map((_, i) => `<@${i + 2}>`).join(" + "),
-    roleTag: value.roleId ? ` <-- <@&${value.roleId}>` : "",
-    message: PREVIEW_NOTE,
-  };
-  const fill = (t: string, msg = tokens.message) => t.replace(/\{(user|voiceName|voice|members|roleTag|message)\}/g, (_m, k: string) => (k === "message" ? msg : tokens[k]));
-  // Embeds don't ping, so embed and saved-embed posts put the pings above.
-  const ping = [value.roleId ? `<@&${value.roleId}>` : "", value.includeSender !== false ? "<@1>" : ""].filter(Boolean).join(" ");
-  // A channel link on its own line is what Discord turns into the voice card.
-  const voiceLine = "<#9>";
-  const card = (
-    <div className="max-w-[432px] bg-[#2b2d31] rounded-lg p-3 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f0b232] to-[#c77b1f] flex items-center justify-center text-lg shrink-0">🔊</div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[#f2f3f5] text-sm font-semibold truncate">{PREVIEW_VOICE_NAME}</p>
-        <p className="text-[#949ba4] text-xs truncate">in your server</p>
-      </div>
-      <span className="shrink-0 bg-[#248046] text-white text-sm font-medium px-4 h-8 inline-flex items-center rounded-lg">Join Voice</span>
-    </div>
-  );
-
-  if (value.savedEmbedId) {
-    return <SavedEmbedPreview guildId={guildId} savedEmbedId={value.savedEmbedId} content={[ping, voiceLine].filter(Boolean).join("\n")} />;
-  }
-  if (value.mode === "embed") {
-    return (
-      <DiscordMessage content={[ping, voiceLine].filter(Boolean).join("\n")} names={SAMPLE_NAMES}>
-        <DiscordEmbed
-          names={SAMPLE_NAMES}
-          color={value.embedColor || "#7B99BC"}
-          title={value.embedTitle ? fill(value.embedTitle) : null}
-          description={value.embedDescription ? fill(value.embedDescription) : null}
-          {...extraEmbedProps(value.embedExtra ?? undefined)}
-        />
-        {card}
-      </DiscordMessage>
-    );
-  }
-  const template = value.message || "Join {members} in {voiceName}";
-  const fenced = "```\n" + PREVIEW_NOTE + "\n```";
-  let text = fill(template, fenced);
-  if (!template.includes("{message}")) text = [text, fenced].join("\n");
-  return (
-    <DiscordMessage content={[text, voiceLine].join("\n")} names={SAMPLE_NAMES}>
-      {card}
-    </DiscordMessage>
   );
 }
 
@@ -409,6 +337,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
   const [form, setForm] = useState<LfgCommandInput>(EMPTY);
   const [draft, setDraft] = useState<LfgCommandInput>(EMPTY);
   const [draftKey, setDraftKey] = useState(0); // bumped on every fresh draft so the message builder's blocks reset too
+  const [stamp] = useState(() => Date.now().toString(36)); // keeps each new command's own embed separate
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -569,7 +498,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
 
                 {editingId === row.id && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <LfgFields key={editingId} guildId={guildId} value={form} onChange={(patch) => setForm({ ...form, ...patch })} />
+                    <LfgFields key={editingId} guildId={guildId} ownKey={editingId} value={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
                     <button onClick={saveEdit} disabled={saving} className="neon-button disabled:opacity-50 mb-4">
                       {saving ? "Saving…" : "Save Changes"}
                     </button>
@@ -585,7 +514,7 @@ export default function LfgPage({ params }: { params: { guildId: string } }) {
       {tab === "create" && (
         <NeonCard>
           <p className="font-medium mb-3">New LFG Command</p>
-          <LfgFields key={draftKey} guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+          <LfgFields key={draftKey} guildId={guildId} ownKey={`new-${stamp}-${draftKey}`} value={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
           <button onClick={createCommand} disabled={creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Command"}
           </button>

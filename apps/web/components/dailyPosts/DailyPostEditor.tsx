@@ -19,10 +19,7 @@ import { SaveStatus } from "../ui/SaveStatus";
 import { SendTestButton } from "../ui/SendTestButton";
 import { FormError } from "../ui/FormError";
 import { useConfirm } from "../ui/ConfirmDialog";
-import { MessageDesigner, TokenChips, toCreatorState, withTokens } from "../embedCreator/MessageDesigner";
-import { EmbedCreatorPreview } from "../embedCreator/EmbedCreatorPreview";
-import { DiscordLimitsCard } from "../embedCreator/DiscordLimitsCard";
-import { checkDiscordLimits } from "../../lib/discordLimits";
+import { ModuleMessage } from "../embedCreator/ModuleMessage";
 import { allTimeZones, browserTimeZone, timeZoneLabel } from "../../lib/timeZones";
 import { useAutoSave } from "../../lib/useAutoSave";
 import {
@@ -93,7 +90,6 @@ export function DailyPostEditor({ guildId, kind }: { guildId: string; kind: Dail
   const [message, setMessage] = useState<DailyPostCreatorData | null>(null);
   const [entries, setEntries] = useState<DailyPostEntryRow[]>([]);
   const [builtInCount, setBuiltInCount] = useState(0);
-  const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
 
   const [newText, setNewText] = useState("");
   const [newAuthor, setNewAuthor] = useState("");
@@ -112,7 +108,6 @@ export function DailyPostEditor({ guildId, kind }: { guildId: string; kind: Dail
       setEntries(feed.entries);
       setBuiltInCount(feed.builtInCount);
     });
-    api.getEmbedCreatorPresets(guildId).then(setPresets);
   }, [guildId, kind]);
 
   const saveValue = useMemo(() => (config && message ? { ...config, creatorData: message } : null), [config, message]);
@@ -127,12 +122,6 @@ export function DailyPostEditor({ guildId, kind }: { guildId: string; kind: Dail
   if (!config || !message) return <p className="text-slate-400">Loading…</p>;
 
   const patch = (next: Partial<DailyPostConfigRow>) => setConfig({ ...config, ...next });
-
-  async function resetMessage() {
-    if (!(await confirm(`Replace this message with the default ${label} design? Your current text, embeds and buttons will be lost.`, { confirmLabel: "Use Default" }))) return;
-    setMessage(defaultDailyPostMessage(kind) as unknown as DailyPostCreatorData);
-    patch({ savedEmbedId: null });
-  }
 
   // ---- the list ----
   async function addEntries() {
@@ -180,10 +169,6 @@ export function DailyPostEditor({ guildId, kind }: { guildId: string; kind: Dail
     }
   }
 
-  const savedPreset = config.savedEmbedId ? presets.find((p) => p.id === config.savedEmbedId) ?? null : null;
-  const state = savedPreset ? { ...toCreatorState(message), ...savedPreset.data } : toCreatorState(message);
-  const limits = checkDiscordLimits(state);
-
   const sample: DailyPostItem = entries[0] ?? (config.useBuiltIn ? builtInDailyPosts(kind)[0] : null) ?? { text: isQuote ? "Your quote shows here." : "Your question shows here.", author: "Author" };
   const sampleTokens = dailyPostTokenValues(kind, sample, { date: zonedClock(config.timeZone).longDate, number: config.postCount + 1, server: "Your Server" });
   const unusedCustom = entries.filter((e) => !e.usedAt).length;
@@ -191,8 +176,8 @@ export function DailyPostEditor({ guildId, kind }: { guildId: string; kind: Dail
 
   return (
     <div>
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-5 items-start">
-        <div className="min-w-0">
+      <div>
+        <div className="min-w-0 max-w-3xl">
           <NeonCard className="mb-4">
             <div className="flex items-center justify-between gap-4 pb-3 mb-4 border-b border-white/5">
               <div>
@@ -264,49 +249,32 @@ export function DailyPostEditor({ guildId, kind }: { guildId: string; kind: Dail
             </div>
           </NeonCard>
 
-          <TokenChips tokens={tokens} note={isQuote ? "{quote} is replaced with the day's quote." : "{question} is replaced with the day's question."} />
-
-          <MessageDesigner
-            guildId={guildId}
-            value={message}
-            onChange={setMessage}
-            savedEmbedId={config.savedEmbedId}
-            onSavedEmbedChange={(id) => patch({ savedEmbedId: id })}
-            onReset={resetMessage}
-            savedEmbedNote={`Placeholders like ${isQuote ? "{quote}" : "{question}"} work inside it too.`}
-          >
-            <div className="flex items-center mt-4">
-              <button type="button" onClick={() => save()} className="neon-button">
-                Save
-              </button>
-              <SaveStatus status={status} />
-            </div>
-          </MessageDesigner>
-        </div>
-
-        <div className="min-w-0 space-y-4 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
-          <NeonCard>
-            <p className="font-medium mb-3">Live Preview</p>
-            <EmbedCreatorPreview guildId={guildId} state={withTokens(state, sampleTokens)} />
-            {savedPreset && <p className="text-xs text-slate-500 mt-2">Showing the saved embed "{savedPreset.name}". That's what will post.</p>}
-            <p className="text-xs text-slate-600 mt-2">The preview fills in an example {noun}. Each day's post uses the next one from your list.</p>
-
-            <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-              <SendTestButton onSend={() => send(true)} disabled={!config.channelId || nothingToPost || limits.hasErrors} successMessage="Sent. Check the channel." />
-              <SendTestButton
-                onSend={() => send(false)}
-                disabled={!config.channelId || nothingToPost || limits.hasErrors}
-                label="Post Now"
-                successMessage="Posted. It counts as today's post."
-              />
-              <p className="text-xs text-slate-600">
-                Send Test posts a marked example and doesn't use up a {noun}. Post Now sends the real thing and counts as today's post, so the schedule won't send another one today.
-              </p>
-            </div>
-          </NeonCard>
-          <DiscordLimitsCard report={limits} />
         </div>
       </div>
+
+      <ModuleMessage
+        guildId={guildId}
+        title={`${label} post`}
+        description={`The preview fills in an example ${noun}. Each day's post uses the next one from your list.`}
+        ownerKey={`dailyPost:${kind}`}
+        savedEmbedId={config.savedEmbedId}
+        onSavedEmbedChange={(id) => patch({ savedEmbedId: id })}
+        seed={() => defaultDailyPostMessage(kind) as unknown as DailyPostCreatorData}
+        inline={{ value: message, onChange: setMessage }}
+        tokens={tokens}
+        tokenValues={sampleTokens}
+        note={isQuote ? "{quote} is replaced with the day's quote." : "{question} is replaced with the day's question."}
+      >
+        <button type="button" onClick={() => save()} className="neon-button">
+          Save
+        </button>
+        <SaveStatus status={status} />
+        <SendTestButton onSend={() => send(true)} disabled={!config.channelId || nothingToPost} successMessage="Sent. Check the channel." />
+        <SendTestButton onSend={() => send(false)} disabled={!config.channelId || nothingToPost} label="Post Now" successMessage="Posted. It counts as today's post." />
+        <p className="text-xs text-slate-600 w-full">
+          Send Test posts a marked example and doesn&apos;t use up a {noun}. Post Now sends the real thing and counts as today&apos;s post, so the schedule won&apos;t send another one today.
+        </p>
+      </ModuleMessage>
 
       <NeonCard className="mt-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-1">

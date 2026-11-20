@@ -97,19 +97,24 @@ function hasAction(action?: EmbedActionConfig): boolean {
 // instead of its own inline embed fields.
 export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedData, tokens?: Record<string, string>): Promise<BaseMessageOptions> {
   const t = (s: string | undefined) => (s && tokens ? applyTokens(s, tokens) : s);
+  // Image links can be a placeholder too, like {avatar}; anything that isn't a web link after that is left out.
+  const u = (s: string | undefined) => {
+    const v = t(s)?.trim();
+    return v && /^https?:\/\//i.test(v) ? v : undefined;
+  };
 
   const embeds = (data.embeds || [])
     .map((em) => {
       const hasContent = em.title || em.description || (em.fields && em.fields.length) || em.imageUrl || em.thumbnailUrl || em.authorName;
       if (!hasContent) return null;
       const embed = new EmbedBuilder();
-      if (em.authorName) embed.setAuthor({ name: t(em.authorName)!, iconURL: em.authorIconUrl || undefined, url: em.authorUrl || undefined });
+      if (em.authorName) embed.setAuthor({ name: t(em.authorName)!.slice(0, 256), iconURL: u(em.authorIconUrl), url: u(em.authorUrl) });
       if (em.title) embed.setTitle(t(em.title)!.slice(0, 256));
-      if (em.titleUrl) embed.setURL(em.titleUrl);
+      if (u(em.titleUrl)) embed.setURL(u(em.titleUrl)!);
       if (em.description) embed.setDescription(t(em.description)!.slice(0, 4096));
       if (em.color) embed.setColor(em.color as `#${string}`);
-      if (em.thumbnailUrl) embed.setThumbnail(em.thumbnailUrl);
-      if (em.imageUrl) embed.setImage(em.imageUrl);
+      if (u(em.thumbnailUrl)) embed.setThumbnail(u(em.thumbnailUrl)!);
+      if (u(em.imageUrl)) embed.setImage(u(em.imageUrl)!);
       if (em.fields && em.fields.length) {
         embed.addFields(
           em.fields
@@ -118,7 +123,7 @@ export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedDa
             .map((f) => ({ name: (t(f.name) || "​").slice(0, 256), value: (t(f.value) || "​").slice(0, 1024), inline: !!f.inline }))
         );
       }
-      if (em.footerText || em.footerIconUrl) embed.setFooter({ text: (t(em.footerText) || "​").slice(0, 2048), iconURL: em.footerIconUrl || undefined });
+      if (em.footerText || em.footerIconUrl) embed.setFooter({ text: (t(em.footerText) || "​").slice(0, 2048), iconURL: u(em.footerIconUrl) });
       if (em.timestamp) embed.setTimestamp(new Date());
       return embed;
     })

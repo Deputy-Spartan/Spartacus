@@ -8,6 +8,9 @@ interface SavedEmbedPickerProps {
   guildId: string;
   value: string | null;
   onChange: (presetId: string | null) => void;
+  // Inside ModuleMessage: no divider above it, and "none" means the module's own message.
+  bare?: boolean;
+  noneLabel?: string;
 }
 
 // Dropped into any feature that can post an embed (Welcome, Announcements,
@@ -16,7 +19,7 @@ interface SavedEmbedPickerProps {
 // Creator library instead of building its own embed. "+ Create new" opens a
 // quick single-embed builder right here in a dialog rather than navigating
 // away, so building and picking one stays a single, fluid flow.
-export function SavedEmbedPicker({ guildId, value, onChange }: SavedEmbedPickerProps) {
+export function SavedEmbedPicker({ guildId, value, onChange, bare, noneLabel }: SavedEmbedPickerProps) {
   const [presets, setPresets] = useState<EmbedCreatorPresetRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -26,9 +29,9 @@ export function SavedEmbedPicker({ guildId, value, onChange }: SavedEmbedPickerP
   useEffect(refresh, [guildId]);
 
   return (
-    <div className="mt-5 pt-5 border-t border-white/5">
+    <div className={bare ? "" : "mt-5 pt-5 border-t border-white/5"}>
       <div className="flex items-center justify-between mb-2.5">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Use a Saved Embed</label>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{bare ? "Saved embed" : "Use a Saved Embed"}</label>
         <button type="button" onClick={() => setModalOpen(true)} className="text-[11px] text-neon-blue hover:underline">
           + Create new
         </button>
@@ -38,7 +41,7 @@ export function SavedEmbedPicker({ guildId, value, onChange }: SavedEmbedPickerP
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
       >
-        <option value="">None — use the fields below</option>
+        <option value="">{noneLabel ?? "None — use the fields below"}</option>
         {presets.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -54,7 +57,7 @@ export function SavedEmbedPicker({ guildId, value, onChange }: SavedEmbedPickerP
           and it'll show up here.
         </p>
       ) : (
-        value && <p className="text-xs text-slate-600 mt-2">This overrides the fields below with the saved embed's content when sent.</p>
+        value && !bare && <p className="text-xs text-slate-600 mt-2">This overrides the fields below with the saved embed's content when sent.</p>
       )}
 
       {modalOpen && (

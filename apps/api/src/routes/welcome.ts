@@ -34,7 +34,8 @@ router.get("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
 });
 
 router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, leaveChannelId, pingAboveEmbed, welcomeText, goodbyeText, embedColor, embedEnabled, embedTitle, buttons, embedExtra, savedEmbedId } = req.body as {
+  const { channelId, leaveChannelId, pingAboveEmbed, welcomeText, goodbyeText, embedColor, embedEnabled, embedTitle, buttons, embedExtra, savedEmbedId, goodbyeSavedEmbedId } = req.body as {
+    goodbyeSavedEmbedId?: string | null;
     channelId?: string;
     leaveChannelId?: string | null;
     pingAboveEmbed?: boolean;
@@ -60,6 +61,7 @@ router.put("/guilds/:guildId/welcome", requireAuth, requireGuildPermission, asyn
     buttons: sanitizeButtons(buttons),
     embedExtra: embedExtra ?? Prisma.JsonNull,
     savedEmbedId: savedEmbedId || null,
+    goodbyeSavedEmbedId: goodbyeSavedEmbedId || null,
   };
 
   const config = await prisma.welcomeConfig.upsert({

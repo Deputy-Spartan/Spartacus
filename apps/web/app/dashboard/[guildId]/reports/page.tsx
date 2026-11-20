@@ -7,7 +7,7 @@ import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type ReportSettingsRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
@@ -124,7 +124,25 @@ function ReportPanelCard({ guildId }: { guildId: string }) {
         kind="text"
         placeholder="Off — slash command only"
       />
-      <SavedEmbedPicker guildId={guildId} value={settings.savedEmbedId} onChange={(id) => patch({ savedEmbedId: id })} />
+      <div className="mt-2">
+        <ModuleMessage
+          guildId={guildId}
+          title="Report panel"
+          description="Posted in the panel channel. The 🚩 Report a Player button is added under it."
+          ownerKey="reports:panel"
+          savedEmbedId={settings.savedEmbedId}
+          onSavedEmbedChange={(id) => void patch({ savedEmbedId: id })}
+          seed={() =>
+            designFrom({
+              title: "🚩 Report a Player",
+              description:
+                "Having an issue with another member? Click below to report it privately to staff. A private ticket channel gets opened just for your report — only you and staff ever know it exists.",
+              color: "#E74C3C",
+            })
+          }
+          moduleButtons={["🚩 Report a Player"]}
+        />
+      </div>
     </NeonCard>
   );
 }

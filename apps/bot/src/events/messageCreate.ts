@@ -181,7 +181,18 @@ export async function execute(message: Message) {
             buttons: command.buttons,
             embedExtra: command.embedExtra,
           },
-          { savedEmbed: saved, guildId: message.guildId! }
+          {
+            savedEmbed: saved,
+            guildId: message.guildId!,
+            // Placeholders a built or saved embed can use.
+            tokens: {
+              "{user}": `<@${message.author.id}>`,
+              "{server}": message.guild?.name ?? "",
+              "{channel}": `<#${message.channelId}>`,
+              "{message}": command.response,
+              "{avatar}": message.author.displayAvatarURL(),
+            },
+          }
         )
       );
     }

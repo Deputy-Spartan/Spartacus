@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NeonCard } from "../ui/NeonCard";
-import { StickyPreview } from "../ui/StickyPreview";
-import { SavedEmbedPreview } from "../embedCreator/SavedEmbedPreview";
-import { SavedEmbedPicker } from "../embedCreator/SavedEmbedPicker";
+import { ModuleMessage, designFrom } from "../embedCreator/ModuleMessage";
 import { useConfirm } from "../ui/ConfirmDialog";
 import { Required } from "../ui/Required";
 import { FormError } from "../ui/FormError";
@@ -33,11 +31,13 @@ function CommandFields({
   value,
   onChange,
   editing,
+  ownKey,
 }: {
   guildId: string;
   value: CommandForm;
   onChange: (patch: Partial<CommandForm>) => void;
   editing: boolean;
+  ownKey: string;
 }) {
   return (
     <>
@@ -54,36 +54,27 @@ function CommandFields({
       />
       {editing && <p className="text-xs text-slate-600 -mt-3 mb-4">Trigger can't be changed once created.</p>}
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-        Response
-        <Required />
-      </label>
-      <textarea
-        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 min-h-20"
-        placeholder="Response text…"
-        value={value.response}
-        onChange={(e) => onChange({ response: e.target.value })}
+      <ModuleMessage
+        key={ownKey}
+        guildId={guildId}
+        title="Reply"
+        description="Posted when someone types the trigger."
+        ownerKey={`command:${ownKey}`}
+        savedEmbedId={value.savedEmbedId ?? null}
+        onSavedEmbedChange={(id) => onChange({ savedEmbedId: id })}
+        seed={() =>
+          value.embedEnabled
+            ? designFrom({ title: value.embedTitle, description: value.response, color: value.embedColor, extra: value.embedExtra, links: value.buttons })
+            : designFrom({ content: value.response, links: value.buttons })
+        }
+        tokens={[
+          { token: "{user}", description: "Mentions whoever used it" },
+          { token: "{server}", description: "Your server's name" },
+          { token: "{channel}", description: "The channel it was used in" },
+          { token: "{avatar}", description: "Their profile picture, for an image link" },
+        ]}
+        tokenValues={{ "{user}": "<@0>", "{server}": "Your Server", "{channel}": "#general", "{avatar}": "https://cdn.discordapp.com/embed/avatars/0.png" }}
       />
-
-      <SavedEmbedPicker guildId={guildId} value={value.savedEmbedId ?? null} onChange={(id) => onChange({ savedEmbedId: id })} />
-
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
-      <div className="mb-4">
-        {/* Same message as apps/bot/src/events/messageCreate.ts sends for the command. */}
-        {value.savedEmbedId ? (
-          <SavedEmbedPreview guildId={guildId} savedEmbedId={value.savedEmbedId} />
-        ) : (
-          <StickyPreview
-            content={value.embedEnabled ? "" : value.response}
-            embedEnabled={!!value.embedEnabled}
-            embedTitle={value.embedTitle ?? ""}
-            embedDescription={value.response}
-            embedColor={value.embedColor ?? "#5865F2"}
-            buttons={value.buttons ?? []}
-            embedExtra={value.embedExtra ?? {}}
-          />
-        )}
-      </div>
     </>
   );
 }
@@ -96,6 +87,8 @@ export function TextTriggers({ guildId }: { guildId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CommandForm>(EMPTY_FORM);
   const [draft, setDraft] = useState<CommandForm>(EMPTY_FORM);
+  // Names a new command's own embed until it's saved.
+  const [draftKey, setDraftKey] = useState(() => `new-${Date.now().toString(36)}`);
   const [error, setError] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -111,8 +104,8 @@ export function TextTriggers({ guildId }: { guildId: string }) {
   }
 
   async function saveEdit() {
-    if (!form.trigger || !form.response) {
-      setError("Enter a trigger and a response before saving.");
+    if (!form.trigger || (!form.response && !form.savedEmbedId)) {
+      setError("Enter a trigger and build the reply before saving.");
       return;
     }
     if (!editingId) return;
@@ -132,8 +125,8 @@ export function TextTriggers({ guildId }: { guildId: string }) {
   }
 
   async function createCommand() {
-    if (!draft.trigger || !draft.response) {
-      setCreateError("Enter a trigger and a response before saving.");
+    if (!draft.trigger || (!draft.response && !draft.savedEmbedId)) {
+      setCreateError("Enter a trigger and build the reply before saving.");
       return;
     }
     setCreateError(null);
@@ -148,6 +141,7 @@ export function TextTriggers({ guildId }: { guildId: string }) {
     };
     await api.addCommand(guildId, draft.trigger.replace(/^!/, ""), body);
     setDraft(EMPTY_FORM);
+    setDraftKey(`new-${Date.now().toString(36)}`);
     setTab("active");
     refresh();
   }
@@ -218,7 +212,7 @@ export function TextTriggers({ guildId }: { guildId: string }) {
 
                 {editingId === c.id && (
                   <div className="mt-4 pt-4 border-t border-white/5">
-                    <CommandFields guildId={guildId} value={form} onChange={(patch) => setForm({ ...form, ...patch })} editing />
+                    <CommandFields guildId={guildId} value={form} onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} editing ownKey={c.id} />
                     <button onClick={saveEdit} className="neon-button">
                       Save Changes
                     </button>
@@ -233,7 +227,7 @@ export function TextTriggers({ guildId }: { guildId: string }) {
       {tab === "create" && (
         <NeonCard>
           <p className="font-medium mb-3">New Command</p>
-          <CommandFields guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} editing={false} />
+          <CommandFields guildId={guildId} value={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} editing={false} ownKey={draftKey} />
           <button onClick={createCommand} className="neon-button">
             Create Command
           </button>

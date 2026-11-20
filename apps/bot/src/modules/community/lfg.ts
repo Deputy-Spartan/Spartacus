@@ -74,11 +74,21 @@ async function buildAnnouncement(cfg: LfgCommand, eff: EffectiveLfg, senderMenti
   // below doesn't need this since its own content carries real mentions.
   const ping = buildLfgPingLine(eff, senderMention);
 
-  if (cfg.savedEmbedId) {
+  // A playlist with its own message keeps using that plain line.
+  const playlistMessage = eff.message !== cfg.message;
+  if (cfg.savedEmbedId && !playlistMessage) {
     const saved = await resolveSavedEmbed(cfg.savedEmbedId);
     if (saved) {
-      const payload = await buildSavedEmbedPayload(cfg.guildId, saved);
-      return { content: [ping, payload.content].filter(Boolean).join(" "), embeds: payload.embeds };
+      const fenced = note ? "```\n" + note + "\n```" : "";
+      const payload = await buildSavedEmbedPayload(cfg.guildId, saved, {
+        "{user}": tokens.user,
+        "{voice}": tokens.voice,
+        "{voiceName}": tokens.voiceName,
+        "{members}": tokens.members,
+        "{roleTag}": tokens.roleTag,
+        "{message}": fenced,
+      });
+      return { content: [ping, payload.content].filter(Boolean).join(" "), embeds: payload.embeds, components: payload.components };
     }
   }
 

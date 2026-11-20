@@ -1,14 +1,12 @@
 "use client";
 
-import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage, DiscordSelect, extraEmbedProps } from "../../../../components/ui/DiscordPreview";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
-import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -24,7 +22,6 @@ import {
   type NotifyMode,
 } from "../../../../lib/api";
 
-const COLOR_PRESETS = ["#00E5FF", "#5865F2", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1"];
 
 type PageTab = "panels" | "join-roles";
 type Layout = "REACTIONS" | "BUTTONS" | "DROPDOWN";
@@ -61,9 +58,12 @@ interface PanelDraft {
   embedExtra: EmbedExtra;
   notifyMode: NotifyMode;
   options: PanelOption[];
+  savedEmbedId: string | null;
+  // Names this panel's own embed; a new panel gets a temporary one until it's saved.
+  ownKey: string;
 }
 
-const EMPTY_DRAFT: PanelDraft = {
+const emptyDraft = (): PanelDraft => ({
   name: "",
   description: "",
   channelId: null,
@@ -73,7 +73,9 @@ const EMPTY_DRAFT: PanelDraft = {
   embedExtra: EMPTY_EMBED_EXTRA,
   notifyMode: "PRIVATE",
   options: [],
-};
+  savedEmbedId: null,
+  ownKey: `new-${Date.now().toString(36)}`,
+});
 
 export default function ReactionRolesPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
@@ -129,6 +131,8 @@ function draftFromReactionPanel(p: ReactionRolePanelRow): PanelDraft {
     embedColor: p.embedColor ?? "#5865F2",
     embedExtra: p.embedExtra ?? EMPTY_EMBED_EXTRA,
     notifyMode: p.notifyMode ?? "PRIVATE",
+    savedEmbedId: p.savedEmbedId ?? null,
+    ownKey: p.id,
     options: p.options.map((o) => ({
       emoji: o.emoji,
       label: "",
@@ -149,6 +153,8 @@ function draftFromRolePanel(p: RolePanelRow): PanelDraft {
     embedColor: p.embedColor ?? "#5865F2",
     embedExtra: p.embedExtra ?? EMPTY_EMBED_EXTRA,
     notifyMode: p.notifyMode ?? "PRIVATE",
+    savedEmbedId: p.savedEmbedId ?? null,
+    ownKey: p.id,
     options: p.options.map((o) => ({
       emoji: o.emoji ?? "",
       label: o.label,
@@ -255,7 +261,8 @@ function PanelFields({
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,1fr)] gap-6 items-start">
+    <div>
+      <div className="max-w-3xl">
       <div className="min-w-0">
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
         Panel Name
@@ -276,48 +283,6 @@ function PanelFields({
         value={draft.description}
         onChange={(e) => onChange({ description: e.target.value })}
       />
-
-      <div className="flex items-center justify-between mb-3 rounded-lg border border-white/10 bg-base-950 px-3 py-2.5">
-        <div>
-          <p className="text-sm font-medium">Build an Embed</p>
-          <p className="text-xs text-slate-500">Wraps the name/description above in a colored embed card instead of a plain message.</p>
-        </div>
-        <ToggleSwitch enabled={draft.embedEnabled} onChange={(v) => onChange({ embedEnabled: v })} label="Build an embed" />
-      </div>
-
-      {draft.embedEnabled && (
-        <>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
-          <div className="flex items-center gap-2 mb-2">
-            <input
-              type="color"
-              className="h-9 w-11 rounded-lg border border-white/10 bg-base-950 cursor-pointer shrink-0"
-              value={draft.embedColor}
-              onChange={(e) => onChange({ embedColor: e.target.value })}
-            />
-            <input
-              className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-              value={draft.embedColor}
-              onChange={(e) => onChange({ embedColor: e.target.value })}
-            />
-          </div>
-          <div className="flex gap-1.5 mb-4">
-            {COLOR_PRESETS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                title={c}
-                onClick={() => onChange({ embedColor: c })}
-                className="w-[18px] h-[18px] rounded border border-white/10 hover:scale-110 transition-transform"
-                style={{ background: c }}
-              />
-            ))}
-          </div>
-
-          <EmbedExtraFields guildId={guildId} value={draft.embedExtra} onChange={(v) => onChange({ embedExtra: v })} />
-          <div className="mb-1" />
-        </>
-      )}
 
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
         Post In Channel
@@ -435,75 +400,70 @@ function PanelFields({
         </button>
       </div>
       </div>
-
-      <div className="min-w-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
-        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2 flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          Live preview
-        </p>
-        <RolePanelPreview draft={draft} roles={roles} channels={channels} />
       </div>
+
+      <PanelMessage guildId={guildId} draft={draft} onChange={onChange} roles={roles} channels={channels} />
     </div>
   );
 }
 
-// Mimics Discord's own dark theme (not the dashboard's neon theme) so what
-// you see here is what actually shows up in Discord. Button/Dropdown
-// layouts always post as an embed regardless of the toggle (same as the
-// bot's own poster jobs) — only Reactions can be plain content.
-function RolePanelPreview({ draft, roles, channels }: { draft: PanelDraft; roles: DiscordRoleOption[]; channels: DiscordChannelOption[] }) {
+// The panel's message, in the shared editor. {options} is the "emoji — @Role"
+// list the bot writes (apps/bot/src/jobs/reactionRolePoster.ts and rolePanelPoster.ts).
+function PanelMessage({
+  guildId,
+  draft,
+  onChange,
+  roles,
+  channels,
+}: {
+  guildId: string;
+  draft: PanelDraft;
+  onChange: (patch: Partial<PanelDraft>) => void;
+  roles: DiscordRoleOption[];
+  channels: DiscordChannelOption[];
+}) {
   const reactions = draft.layout === "REACTIONS";
-
-  // Mirrors the bot (apps/bot/src/jobs/rolePanelPoster.ts): an unlabeled
-  // button is named after the first role/channel it gives, minus any
-  // leading emoji in that name so it doesn't repeat the button's own.
-  const buttonLabel = (o: PanelOption) => {
-    if (o.label) return o.label;
-    const name = (o.roleIds[0] && roles.find((r) => r.id === o.roleIds[0])?.name) || (o.channelIds[0] && channels.find((c) => c.id === o.channelIds[0])?.name) || "";
-    return name.replace(/^[^\p{L}\p{N}]+/u, "").trim();
-  };
   const gives = (o: PanelOption) => [...o.roleIds.map((r) => `<@&${r}>`), ...o.channelIds.map((c) => `<#${c}>`)].join(", ") || "(nothing)";
-
-  // The same text the bot posts: reactionRolePoster.ts for reactions,
-  // rolePanelPoster.ts for buttons and dropdowns.
   const listing = reactions
     ? draft.options.map((o) => `${o.emoji || "❓"} — ${gives(o)}${o.note.trim() ? `\n-# ${o.note.trim()}` : ""}`).join("\n")
     : draft.options.map((o) => `${[o.emoji, o.label && `**${o.label}**`].filter(Boolean).join(" ") || "•"} — ${gives(o)}${o.note.trim() ? `\n-# ${o.note.trim()}` : ""}`).join("\n");
-  const description = [draft.description || (reactions ? "React below to get a role." : "Click below to pick your roles."), "", listing].join("\n");
-  const title = draft.name || (reactions ? "Pick your roles" : "");
-  const asEmbed = !reactions || draft.embedEnabled;
-  const color = reactions ? draft.embedColor || "#5865F2" : draft.embedEnabled && draft.embedColor ? draft.embedColor : "#3b82f6";
-  const hasAnything = draft.name || draft.description || draft.options.length > 0;
-
+  const name = (o: PanelOption) =>
+    o.label || ((o.roleIds[0] && roles.find((r) => r.id === o.roleIds[0])?.name) || (o.channelIds[0] && channels.find((c) => c.id === o.channelIds[0])?.name) || "Option");
+  // What the panel looked like before anything was built here.
+  const seed = () => {
+    const text = `${draft.description || (reactions ? "React below to get a role." : "Click below to pick your roles.")}\n\n{options}`;
+    if (reactions && !draft.embedEnabled) return designFrom({ content: [draft.name, text].filter(Boolean).join("\n\n") });
+    return designFrom({
+      title: draft.name || (reactions ? "Pick your roles" : ""),
+      description: text,
+      color: reactions ? draft.embedColor || "#5865F2" : draft.embedEnabled && draft.embedColor ? draft.embedColor : "#3B82F6",
+      extra: draft.embedEnabled ? draft.embedExtra : null,
+    });
+  };
   return (
-    <DiscordMessage content={asEmbed ? null : [draft.name, description].filter(Boolean).join("\n\n")}>
-      {!hasAnything && <p className="text-[#949ba4] text-sm italic">Nothing to preview yet.</p>}
-      {asEmbed && hasAnything && <DiscordEmbed color={color} title={title} description={description} {...extraEmbedProps(draft.embedEnabled ? draft.embedExtra : undefined)} />}
-
-      {reactions && draft.options.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {draft.options.map((o, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-[#2b2d31] px-1.5 py-0.5 text-sm text-[#dbdee1]">
-              <DiscordEmoji value={o.emoji || "❓"} size={16} />
-              <span className="text-xs font-semibold">1</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {draft.layout === "BUTTONS" &&
-        Array.from({ length: Math.ceil(Math.min(draft.options.length, 25) / 5) }, (_, r) => (
-          <DiscordButtonRow key={r}>
-            {draft.options.slice(r * 5, r * 5 + 5).map((o, i) => (
-              <DiscordButton key={i} emoji={o.emoji} label={buttonLabel(o) || (o.emoji ? "" : "Option")} />
-            ))}
-          </DiscordButtonRow>
-        ))}
-
-      {draft.layout === "DROPDOWN" && draft.options.length > 0 && (
-        <DiscordSelect placeholder="Select your roles…" options={draft.options.slice(0, 25).map((o) => ({ label: o.label || "Option", emoji: o.emoji, description: o.note.trim() ? o.note.trim().slice(0, 100) : null }))} />
-      )}
-    </DiscordMessage>
+    <div className="mt-6">
+      <ModuleMessage
+        key={draft.ownKey}
+        guildId={guildId}
+        title="Panel message"
+        description={reactions ? "The message members react to. The bot adds every emoji as a reaction." : "The embed on the panel. The role buttons or dropdown are added under it."}
+        ownerKey={`rolePanel:${draft.ownKey}`}
+        savedEmbedId={draft.savedEmbedId}
+        onSavedEmbedChange={(id) => onChange({ savedEmbedId: id })}
+        seed={seed}
+        tokens={[{ token: "{options}", description: "The list of options and what each one gives" }]}
+        tokenValues={{ "{options}": listing || "(add options above)" }}
+        moduleButtons={
+          reactions
+            ? draft.options.map((o) => `${o.emoji || "❓"} 1`)
+            : draft.layout === "DROPDOWN"
+            ? ["Select your roles… ▾"]
+            : draft.options.slice(0, 5).map((o) => `${o.emoji ? `${o.emoji} ` : ""}${name(o)}`)
+        }
+        reservedRows={reactions ? 0 : draft.layout === "DROPDOWN" ? 1 : Math.max(1, Math.ceil(Math.min(draft.options.length, 25) / 5))}
+        embedsOnly={!reactions}
+      />
+    </div>
   );
 }
 
@@ -514,9 +474,9 @@ function PanelsTab({ guildId }: { guildId: string }) {
   const [rolePanels, setRolePanels] = useState<RolePanelRow[]>([]);
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
   const [editing, setEditing] = useState<{ source: "reaction" | "panel"; id: string } | null>(null);
-  const [form, setForm] = useState<PanelDraft>(EMPTY_DRAFT);
+  const [form, setForm] = useState<PanelDraft>(emptyDraft);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<PanelDraft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<PanelDraft>(emptyDraft);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "pending" | "ok" | "warn"; text: string } | null>(null);
@@ -597,9 +557,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
   }
 
   function toApiPayload(d: PanelDraft) {
-    // savedEmbedId is always cleared on save — the inline builder above
-    // replaces it as the message source, so any legacy saved-embed link on
-    // an older panel is dropped the next time it's edited.
+    // savedEmbedId is the panel's message: its own built embed, or one from the library.
     if (d.layout === "REACTIONS") {
       return {
         channelId: d.channelId ?? "",
@@ -608,7 +566,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
         embedEnabled: d.embedEnabled,
         embedColor: d.embedColor,
         embedExtra: d.embedExtra,
-        savedEmbedId: null,
+        savedEmbedId: d.savedEmbedId,
         notifyMode: d.notifyMode,
         options: d.options.map((o) => ({ emoji: o.emoji, roleIds: o.roleIds, channelIds: o.channelIds, note: o.note.trim() || undefined })),
       };
@@ -621,7 +579,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
       embedEnabled: d.embedEnabled,
       embedColor: d.embedColor,
       embedExtra: d.embedExtra,
-      savedEmbedId: null,
+      savedEmbedId: d.savedEmbedId,
       notifyMode: d.notifyMode,
       options: d.options.map((o) => ({ label: o.label, emoji: o.emoji || undefined, roleIds: o.roleIds, channelIds: o.channelIds, note: o.note.trim() || undefined })),
     };
@@ -685,7 +643,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
       const source = draft.layout === "REACTIONS" ? "reaction" : "panel";
       const created: { id: string } =
         source === "reaction" ? await api.addReactionRolePanel(guildId, payload as never) : await api.addRolePanel(guildId, payload as never);
-      setDraft(EMPTY_DRAFT);
+      setDraft(emptyDraft());
       setTab("active");
       refresh();
       void watchPosting(source, created.id, "Posted");
@@ -738,7 +696,7 @@ function PanelsTab({ guildId }: { guildId: string }) {
         </button>
         <button
           onClick={() => {
-            setDraft(EMPTY_DRAFT);
+            setDraft(emptyDraft());
             setCreateError(null);
             setTab("create");
           }}

@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { StickyPreview } from "../../../../components/ui/StickyPreview";
-import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
-import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
-import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
-import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -42,6 +38,7 @@ function StickyFields({
   channelId,
   onChannelChange,
   channelLocked,
+  ownKey,
   form,
   onChange,
 }: {
@@ -49,11 +46,10 @@ function StickyFields({
   channelId: string | null;
   onChannelChange: (id: string | null) => void;
   channelLocked: boolean;
+  ownKey: string;
   form: StickyMessageInput;
   onChange: (patch: Partial<StickyMessageInput>) => void;
 }) {
-  const contentRef = useRef<HTMLTextAreaElement>(null);
-
   return (
     <>
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -79,41 +75,27 @@ function StickyFields({
       />
       <p className="text-xs text-slate-600 mt-1 mb-4">Only shows here in the list. It's never posted in Discord.</p>
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
-        Message{" "}
-        {form.savedEmbedId && <span className="normal-case tracking-normal text-slate-600">(optional with a saved embed)</span>}
-      </label>
-      <MarkdownToolbar guildId={guildId} textareaRef={contentRef} value={form.content} onChange={(v) => onChange({ content: v })} />
-      <textarea
-        ref={contentRef}
-        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4 min-h-20"
-        value={form.content}
-        onChange={(e) => onChange({ content: e.target.value })}
+      <ModuleMessage
+        key={ownKey}
+        guildId={guildId}
+        title="Sticky message"
+        description="Reposted at the bottom of the channel after new messages."
+        ownerKey={`sticky:${ownKey}`}
+        savedEmbedId={form.savedEmbedId ?? null}
+        onSavedEmbedChange={(id) => onChange({ savedEmbedId: id })}
+        seed={() =>
+          form.embedEnabled
+            ? designFrom({
+                content: form.content,
+                title: form.embedTitle,
+                description: form.embedDescription,
+                color: form.embedColor,
+                extra: form.embedExtra,
+                links: form.buttons,
+              })
+            : designFrom({ content: form.content, links: form.buttons })
+        }
       />
-
-      <div className="mb-4">
-        <ButtonsEditor guildId={guildId} buttons={form.buttons} onChange={(next) => onChange({ buttons: next })} />
-      </div>
-
-      <SavedEmbedPicker guildId={guildId} value={form.savedEmbedId ?? null} onChange={(id) => onChange({ savedEmbedId: id })} />
-
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Preview</label>
-      <div className="mb-4">
-        {/* Same message as apps/bot/src/lib/stickyRender.ts posts. */}
-        {form.savedEmbedId ? (
-          <SavedEmbedPreview guildId={guildId} savedEmbedId={form.savedEmbedId} />
-        ) : (
-          <StickyPreview
-            content={form.content}
-            embedEnabled={!!form.embedEnabled}
-            embedTitle={form.embedTitle ?? ""}
-            embedDescription={form.embedDescription ?? ""}
-            embedColor={form.embedColor ?? "#5865F2"}
-            buttons={form.buttons}
-            embedExtra={form.embedExtra ?? {}}
-          />
-        )}
-      </div>
     </>
   );
 }
@@ -129,6 +111,8 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
 
   const [draftChannelId, setDraftChannelId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StickyMessageInput>(EMPTY_FORM);
+  // Names a new sticky's own embed until it's saved.
+  const [draftKey, setDraftKey] = useState(() => `new-${Date.now().toString(36)}`);
   const [createError, setCreateError] = useState<string | null>(null);
 
   function refresh() {
@@ -154,6 +138,7 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
   function resetDraft() {
     setDraftChannelId(null);
     setDraft(EMPTY_FORM);
+    setDraftKey(`new-${Date.now().toString(36)}`);
     setCreateError(null);
   }
 
@@ -293,8 +278,9 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
                       channelId={channelId}
                       onChannelChange={setChannelId}
                       channelLocked
+                      ownKey={r.id}
                       form={form}
-                      onChange={(patch) => setForm({ ...form, ...patch })}
+                      onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
                     />
                     <button onClick={saveEdit} className="neon-button">
                       Save Changes
@@ -315,8 +301,9 @@ export default function StickyMessagesPage({ params }: { params: { guildId: stri
             channelId={draftChannelId}
             onChannelChange={setDraftChannelId}
             channelLocked={false}
+            ownKey={draftKey}
             form={draft}
-            onChange={(patch) => setDraft({ ...draft, ...patch })}
+            onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
           />
           <button onClick={create} className="neon-button">
             Set Sticky

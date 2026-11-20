@@ -3445,7 +3445,9 @@ model CommandListSettings {
   includeStaff  Boolean  @default(true)
   includeCustom Boolean  @default(true) // the server's own /commands and !triggers
   onlyEnabled   Boolean  @default(true) // leave out commands from modules that are off
-  messageIds    Json     @default("[]") // the posted messages, top to bottom
+  messageIds    Json     @default("[]") // the posted messages, top to bottom: [{ key, id, hash }], one per category
+  staffChannelId  String? // staff-only commands go here (a channel only staff can see); unset = in the main list
+  staffMessageIds Json    @default("[]") // the staff list's messages, same shape
   hash          String?
   updatedAt     DateTime @updatedAt
 }

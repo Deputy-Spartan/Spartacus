@@ -66,7 +66,8 @@ export function CommandListPost({ guildId }: { guildId: string }) {
       <NeonCard>
         <p className="font-medium mb-1">📢 Command list post</p>
         <p className={`${hint} mb-4`}>
-          Posts every command in a channel. Each one is a tappable Discord command: tapping it (on PC or phone) puts it straight into the message box, ready to send.
+          Posts every command in a channel, one post per category (Moderation, Community, Streaming…). Each command is tappable: tapping it (on PC or phone) puts it
+          straight into the message box, ready to send. When a command is added or removed, only its category&apos;s post is edited.
         </p>
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="min-w-0">
@@ -82,18 +83,27 @@ export function CommandListPost({ guildId }: { guildId: string }) {
                 </button>
               ))}
             </div>
-            <p className={`${hint} mt-1`}>{s.style === "EMBED" ? "One tidy card, usually one message." : "Headings and lists. A long list takes a few messages (2,000 characters each)."}</p>
+            <p className={`${hint} mt-1`}>{s.style === "EMBED" ? "A colored card per category." : "A heading and list per category."}</p>
           </div>
+        </div>
+        <div className="mt-4 rounded-lg border border-white/10 bg-base-950/60 p-3">
+          <label className={label}>🔒 Staff commands go in</label>
+          <ChannelSelect guildId={guildId} value={s.staffChannelId} onChange={(id) => save({ staffChannelId: id || null })} kind="text" placeholder="The main list (marked STAFF)" />
+          <p className={hint}>
+            {s.staffChannelId
+              ? "Staff commands are left out of the main list and posted here instead, one post per category. Make sure only staff can see this channel."
+              : "Pick a channel only staff can see to give staff commands their own list. Leave it empty to show them in the main list."}
+          </p>
         </div>
         <div className="mt-4">
           {row("Update by itself", "When a command is added, changed or removed (or a module is turned on or off), the posted list is edited to match. No new posts.", "autoUpdate")}
-          {row("Include staff commands", "Ban, kick, purge and other staff-only commands, marked STAFF.", "includeStaff")}
+          {!s.staffChannelId && row("Include staff commands", "Ban, kick, purge and other staff-only commands, marked STAFF.", "includeStaff")}
           {row("Include your custom commands", "The /commands and !triggers made on this page.", "includeCustom")}
           {row("Only modules that are on", "Leave out commands from modules you've turned off.", "onlyEnabled")}
         </div>
         <div className="flex flex-wrap items-center gap-3 mt-4">
-          <button className="neon-button" disabled={busy || !s.channelId} onClick={postNow}>
-            {busy ? "Working…" : s.posted ? "Update the list now" : "Post the list"}
+          <button className="neon-button" disabled={busy || (!s.channelId && !s.staffChannelId)} onClick={postNow}>
+            {busy ? "Working…" : s.posted || s.staffPosted ? "Update the lists now" : "Post the list"}
           </button>
           {msg && <span className={`text-xs ${msg.ok ? "text-emerald-400" : "text-rose-400"}`}>{msg.text}</span>}
         </div>

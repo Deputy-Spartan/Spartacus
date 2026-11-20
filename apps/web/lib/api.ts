@@ -218,6 +218,8 @@ export interface StreamExtrasConfigRow {
 }
 export interface CommandListSettingsRow {
   channelId: string | null;
+  staffChannelId: string | null; // staff commands go here (a staff-only channel); null = in the main list
+  staffPosted: boolean;
   style: "EMBED" | "PLAIN";
   autoUpdate: boolean;
   includeStaff: boolean;

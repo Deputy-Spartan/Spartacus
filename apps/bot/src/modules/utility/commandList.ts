@@ -1,4 +1,4 @@
-import { EmbedBuilder, type BaseMessageOptions, type Client, type Guild } from "discord.js";
+import { EmbedBuilder, type BaseMessageOptions, type Client, type Guild, type Message } from "discord.js";
 import { createHash } from "node:crypto";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
@@ -174,7 +174,32 @@ const hashOf = (p: BaseMessageOptions) => createHash("sha1").update(JSON.stringi
 // Keeps one channel's posts matching `posts`: only the posts that changed are
 // edited. When categories are added or removed (so the order changes), the
 // posts are cleared and posted fresh, top to bottom.
+// A command list post made by Spartacus (embed or plain style).
+function isListPost(m: Message, botId: string) {
+  if (m.author.id !== botId) return false;
+  if (m.embeds.some((e) => e.footer?.text?.endsWith("updates by itself"))) return true;
+  const c = m.content ?? "";
+  return /^(\*\*📜 Spartacus commands\*\*|\*\*🔒 Staff commands\*\*|### )/.test(c) && (c.includes("</") || c.includes("Nothing to show yet"));
+}
+
+// Removes stray list posts in the channel that aren't being tracked (left over
+// from two updates running at once, e.g. during a deploy), so the list never shows twice.
+async function clearStrays(client: Client, channelId: string, keep: Posted[]) {
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel || !("messages" in channel) || !client.user) return;
+  const ids = new Set(keep.map((p) => p.id));
+  const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+  if (!recent) return;
+  for (const m of recent.values()) if (!ids.has(m.id) && isListPost(m, client.user.id)) await m.delete().catch(() => null);
+}
+
 export async function syncChannel(client: Client, guildId: string, channelId: string, posts: Array<{ key: string; payload: BaseMessageOptions }>, before: Posted[], force: boolean): Promise<{ ok: boolean; posted: Posted[]; error?: string }> {
+  const r = await syncChannelPosts(client, guildId, channelId, posts, before, force);
+  if (r.ok) await clearStrays(client, channelId, r.posted).catch(() => null);
+  return r;
+}
+
+async function syncChannelPosts(client: Client, guildId: string, channelId: string, posts: Array<{ key: string; payload: BaseMessageOptions }>, before: Posted[], force: boolean): Promise<{ ok: boolean; posted: Posted[]; error?: string }> {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!isSendableChannel(channel) || !("messages" in channel)) return { ok: false, posted: before, error: "Spartacus can't post in that channel." };
   const sameLayout = before.length === posts.length && before.every((p, i) => p.key === posts[i].key);
@@ -319,6 +344,7 @@ async function refreshOnce(client: Client, guildId: string, force: boolean, edit
     if (plan.has(ch) || !posted.length) continue;
     const channel = await client.channels.fetch(ch).catch(() => null);
     if (channel && "messages" in channel) for (const p of posted) await channel.messages.fetch(p.id).then((m) => m.delete()).catch(() => null);
+    await clearStrays(client, ch, []).catch(() => null);
   }
   await prisma.commandListSettings.update({ where: { guildId }, data: { channelPosts: after as never, messageIds: [], staffMessageIds: [] } });
   return error ? { ok: false, error } : { ok: true };

@@ -192,6 +192,7 @@ export interface StreamAlertSettingsRow {
   endedTitle?: string | null;
   endedDescription?: string | null;
   endedColor?: string | null;
+  savedEmbedId?: string | null; // Use a saved embed instead of the alert designed in steps 2-4
   updateWhileLive?: boolean;
   endAction?: "EDIT" | "DELETE" | "KEEP";
   cooldownMinutes?: number;

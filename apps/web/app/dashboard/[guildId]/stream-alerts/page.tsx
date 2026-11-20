@@ -17,6 +17,8 @@ import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from ".
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { api, type LiveCheckResult, type RoleManagerMember, type StreamAlertSettingsRow, type StreamSubscription } from "../../../../lib/api";
 import type { EmbedExtra } from "../../../../lib/embedExtra";
+import { SavedEmbedPicker } from "../../../../components/embedCreator/SavedEmbedPicker";
+import { SavedEmbedPreview } from "../../../../components/embedCreator/SavedEmbedPreview";
 
 const label = "text-xs uppercase tracking-wide text-slate-500 block mb-2";
 const field = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
@@ -377,7 +379,50 @@ function AddStreamer({ guildId, keys, onAdded, hasChannel }: { guildId: string; 
 
 // ---- Settings ----
 
-function SettingsTab({ guildId, settings, update }: { guildId: string; settings: StreamAlertSettingsRow; update: (p: Partial<StreamAlertSettingsRow>) => void }) {
+// The same Build here / Use a saved embed switch every module has. Going
+// Live's "Build here" is its own designer (steps 2-4, with per-streamer looks
+// and live updates), so the switch lives here instead of in ModuleMessage.
+function AlertSource({
+  guildId,
+  useSaved,
+  savedEmbedId,
+  onMode,
+  onPick,
+}: {
+  guildId: string;
+  useSaved: boolean;
+  savedEmbedId: string | null;
+  onMode: (saved: boolean) => void;
+  onPick: (id: string | null) => void;
+}) {
+  const tab = (saved: boolean, text: string) => (
+    <button type="button" aria-pressed={useSaved === saved} onClick={() => onMode(saved)} className={`sp-metal px-3.5 py-2 rounded-lg text-sm font-semibold ${useSaved === saved ? "is-active" : ""}`}>
+      {text}
+    </button>
+  );
+  return (
+    <div className="mt-5 pt-4 border-t border-white/5">
+      <p className={label}>Alert message</p>
+      <div className="flex flex-wrap gap-1.5 p-1 rounded-xl border border-white/10 bg-base-950/60 w-fit mb-3" role="group" aria-label="How to make the alert">
+        {tab(false, "🧱 Build here")}
+        {tab(true, "📚 Use a saved embed")}
+      </div>
+      {useSaved ? (
+        <>
+          <SavedEmbedPicker guildId={guildId} value={savedEmbedId} onChange={onPick} bare noneLabel="Pick one…" />
+          <p className={`${hint} mt-2`}>
+            Steps 2–4 are hidden while this is on. Placeholders like {"{name}"}, {"{title}"} and {"{url}"} still work inside it, and the Watch button is still added.
+            {!savedEmbedId && " Until you pick one, the alert you built keeps posting."} The stream-ended summary keeps its own look (step 6).
+          </p>
+        </>
+      ) : (
+        <p className={hint}>Steps 2–4 design the alert. Each streamer can have their own look on the Active tab.</p>
+      )}
+    </div>
+  );
+}
+
+function SettingsTab({ guildId, settings, update }:{ guildId: string; settings: StreamAlertSettingsRow; update: (p: Partial<StreamAlertSettingsRow>) => void }) {
   const [step, setStep] = useState(0);
   const [previewPlatform, setPreviewPlatform] = useState<LivePlatform>("twitch");
   const contentRef = useRef<HTMLTextAreaElement>(null);
@@ -388,6 +433,9 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
   const endedDescRef = useRef<HTMLTextAreaElement>(null);
   const last = STEPS.length - 1;
   const showEnded = step === 5 && (settings.endAction ?? "EDIT") === "EDIT";
+  // Build here = steps 2-4 below; Use a saved embed = one from the library instead.
+  const [useSaved, setUseSaved] = useState(!!settings.savedEmbedId);
+  const hidden = useSaved && step >= 1 && step <= 3;
 
   const info = {
     name: "BustyBunz",
@@ -441,9 +489,22 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
                 <label className={label}>Ping Role (optional)</label>
                 <RoleSelect guildId={guildId} value={settings.pingRoleId ?? null} onChange={(id) => update({ pingRoleId: id || null })} placeholder="No ping" />
                 <p className={`${hint} mt-1`}>It only pings if {"{role}"} is in the message text (step 2). The default already has it.</p>
+                <AlertSource
+                  guildId={guildId}
+                  useSaved={useSaved}
+                  savedEmbedId={settings.savedEmbedId ?? null}
+                  onMode={(on) => {
+                    setUseSaved(on);
+                    if (!on) update({ savedEmbedId: null });
+                  }}
+                  onPick={(id) => update({ savedEmbedId: id })}
+                />
               </>
             )}
-            {step === 1 && (
+            {hidden && (
+              <p className={hint}>This step is hidden while the alert uses a saved embed. Switch back to Build here on step 1.</p>
+            )}
+            {step === 1 && !hidden && (
               <>
                 <label className={label}>Message Text</label>
                 <MarkdownToolbar guildId={guildId} textareaRef={contentRef} value={settings.contentTemplate ?? ""} onChange={(v) => update({ contentTemplate: v })} />
@@ -452,7 +513,7 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
                 <p className={hint}>Shown above the embed. Leave it empty to use the default. The 😀 button adds emojis.</p>
               </>
             )}
-            {step === 2 && (
+            {step === 2 && !hidden && (
               <>
                 <label className={label}>Embed Title</label>
                 <input ref={titleRef} className={field} value={settings.embedTitle ?? ""} placeholder={GO_LIVE_DEFAULTS.title} onChange={(e) => update({ embedTitle: e.target.value })} maxLength={256} />
@@ -498,7 +559,7 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
                 <p className={`${hint} mt-2`}>Extras replace the matching default part (author, images, footer) and add fields. Placeholders work in them too.</p>
               </>
             )}
-            {step === 3 && (
+            {step === 3 && !hidden && (
               <>
                 <label className={label}>Button Text</label>
                 <input ref={buttonRef} className={field} value={settings.buttonLabel ?? ""} placeholder={GO_LIVE_DEFAULTS.button} onChange={(e) => update({ buttonLabel: e.target.value })} maxLength={80} />
@@ -606,7 +667,7 @@ function SettingsTab({ guildId, settings, update }: { guildId: string; settings:
             </div>
           </div>
           {showEnded && <p className="text-xs text-slate-400 mb-2">⚫ After the stream ends</p>}
-          <AlertPreview settings={settings} info={info} ended={showEnded ? { peak: 312, durationMs: 8_100_000 } : undefined} />
+          {useSaved && settings.savedEmbedId && !showEnded ? <SavedEmbedPreview guildId={guildId} savedEmbedId={settings.savedEmbedId} /> : <AlertPreview settings={settings} info={info} ended={showEnded ? { peak: 312, durationMs: 8_100_000 } : undefined} />}
           <p className={`${hint} mt-3`}>Sample streamer. In Discord the image is their live stream and their avatar shows in the corner. Streamers with their own look (Active → Edit) use that instead.</p>
         </NeonCard>
       </div>

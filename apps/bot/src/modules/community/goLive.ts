@@ -1,6 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Client, EmbedBuilder, type BaseMessageOptions, type Guild } from "discord.js";
 import type { StreamAlertSettings, StreamSubscription } from "@prisma/client";
-import { buildGoLiveMessage, fillGoLiveExtra, platformInfo, withStreamerOverrides, type LiveInfo, type LivePlatform } from "@spartacus/shared";
+import { buildGoLiveMessage, fillGoLive, fillGoLiveExtra, platformInfo, withStreamerOverrides, type LiveInfo, type LivePlatform } from "@spartacus/shared";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 import { prisma } from "../../lib/prisma";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
@@ -65,6 +66,27 @@ export function discordPayload(settings: Partial<StreamAlertSettings>, info: Liv
   };
 }
 
+// The live alert as it's sent: a library embed when one is picked (with the
+// stream's details as placeholders and the Watch button under it), otherwise
+// the alert designed in the dashboard's steps. The ended summary keeps its own look.
+export async function goLivePayload(settings: Partial<StreamAlertSettings>, info: LiveInfo): Promise<BaseMessageOptions> {
+  const design = await resolveSavedEmbed(settings.savedEmbedId);
+  if (!design || !settings.guildId) return discordPayload(settings, info);
+  const fallback = discordPayload(settings, info);
+  const tokens: Record<string, string> = Object.fromEntries(
+    ["{name}", "{user}", "{platform}", "{title}", "{game}", "{viewers}", "{url}", "{role}"].map((k) => [k, fillGoLive(k, info)])
+  );
+  tokens["{avatar}"] = info.avatar ?? "";
+  tokens["{thumbnail}"] = info.thumbnail ?? "";
+  const built = await buildSavedEmbedPayload(settings.guildId, design, tokens);
+  return {
+    content: built.content || undefined,
+    embeds: built.embeds,
+    components: [...(built.components ?? []).slice(0, 4), ...(fallback.components ?? [])],
+    allowedMentions: fallback.allowedMentions,
+  };
+}
+
 async function setLiveRole(guild: Guild, sub: Sub, settings: Partial<StreamAlertSettings>, on: boolean) {
   if (!settings.liveRoleId || !sub.discordUserId) return;
   const member = await guild.members.fetch(sub.discordUserId).catch(() => null);
@@ -101,7 +123,7 @@ export async function announce(client: Client, sub: Sub, check: LiveCheck | null
   if (recent) {
     const old = await channel.messages.fetch(sub.liveMessageId!).catch(() => null);
     if (old) {
-      await old.edit(discordPayload(settings, info)).catch(() => null);
+      await old.edit(await goLivePayload(settings, info)).catch(() => null);
       await prisma.streamSubscription.update({ where: { id: sub.id }, data: { ...data, liveStartedAt: sub.liveStartedAt ?? data.liveStartedAt } });
       await setLiveRole(guild, sub, settings, true);
       return { ok: true };
@@ -109,7 +131,7 @@ export async function announce(client: Client, sub: Sub, check: LiveCheck | null
   }
   // During a deploy two copies of the bot run for a moment; only one posts.
   if (!(await claimEvent(`golive:${sub.id}:${Math.floor(now.getTime() / 600_000)}`).catch(() => true))) return { ok: true };
-  const posted = await channel.send(discordPayload(settings, info)).catch((err) => {
+  const posted = await channel.send(await goLivePayload(settings, info)).catch((err) => {
     logError("bot", err, sub.guildId);
     return null;
   });
@@ -131,7 +153,7 @@ async function refresh(client: Client, sub: Sub, check: LiveCheck) {
   const channel = await client.channels.fetch(sub.announceChannelId).catch(() => null);
   if (!isSendableChannel(channel)) return;
   const msg = await channel.messages.fetch(sub.liveMessageId).catch(() => null);
-  if (msg) await msg.edit({ ...discordPayload(settings, infoOf(sub, check, settings)), content: undefined }).catch(() => null);
+  if (msg) await msg.edit({ ...(await goLivePayload(settings, infoOf(sub, check, settings))), content: undefined }).catch(() => null);
 }
 
 export async function endStream(client: Client, sub: Sub) {
@@ -246,7 +268,7 @@ export async function sendTestAlert(client: Client, id: string) {
   const channel = await client.channels.fetch(sub.announceChannelId || settings.defaultChannelId || "").catch(() => null);
   if (!isSendableChannel(channel)) return { ok: false, error: "Spartacus can't post in the alert channel." };
   const info = infoOf(sub, { live: true, title: sub.lastTitle || "Test stream: ranked grind", game: sub.lastGame || "Rainbow Six Siege", viewers: 42 }, settings);
-  const payload = discordPayload(settings, info);
+  const payload = await goLivePayload(settings, info);
   // A test never pings anyone.
   const sent = await channel.send({ ...payload, content: `🧪 **Test alert** (no ping)\n${payload.content ?? ""}`.trim(), allowedMentions: { parse: [] } }).catch(() => null);
   return sent ? { ok: true } : { ok: false, error: "Discord wouldn't take the post." };

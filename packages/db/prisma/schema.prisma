@@ -384,6 +384,7 @@ model StreamAlertSettings {
   endedTitle       String? // the summary when the stream ends ({duration}, {peak} work here)
   endedDescription String?
   endedColor       String?
+  savedEmbedId     String? // a library embed used instead of the alert designed above; unset = the designed alert
 }
 
 model MemberXp {

@@ -37,6 +37,7 @@ router.put("/guilds/:guildId/stream-alert-settings", requireAuth, requireGuildPe
   for (const k of ["defaultChannelId", "pingRoleId", "liveRoleId", "selfServeRoleId"]) if (k in b) data[k] = id(b[k]);
   for (const k of ["contentTemplate", "embedTitle", "embedDescription", "buttonLabel", "buttonEmoji", "endedTitle", "endedDescription"]) if (k in b) data[k] = text(b[k], k === "buttonEmoji" ? 100 : 2000);
   if ("endedColor" in b) data.endedColor = typeof b.endedColor === "string" && /^#[0-9a-f]{6}$/i.test(b.endedColor) ? b.endedColor : null;
+  if ("savedEmbedId" in b) data.savedEmbedId = typeof b.savedEmbedId === "string" && b.savedEmbedId ? b.savedEmbedId.slice(0, 40) : null;
   if ("embedExtra" in b) data.embedExtra = b.embedExtra && typeof b.embedExtra === "object" ? (b.embedExtra as object) : Prisma.JsonNull;
   if ("embedColor" in b) data.embedColor = typeof b.embedColor === "string" && /^#[0-9a-f]{6}$/i.test(b.embedColor) ? b.embedColor : null;
   for (const k of ["showThumbnail", "updateWhileLive", "showGame", "showViewers"]) if (typeof b[k] === "boolean") data[k] = b[k];

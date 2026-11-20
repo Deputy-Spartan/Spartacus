@@ -35,7 +35,7 @@ export function CommandListPost({ guildId }: { guildId: string }) {
     try {
       const r = await api.saveCommandList(guildId, patch);
       setS(r);
-      setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: r.posted ? "✓ Saved. Discord matches." : "✓ Saved." });
+      setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: r.pending ? "✓ Saved. Discord is updating (safe to leave this page)." : r.posted ? "✓ Saved. Discord matches." : "✓ Saved." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't save." });
     } finally {
@@ -47,8 +47,9 @@ export function CommandListPost({ guildId }: { guildId: string }) {
     setBusy(true);
     setMsg(null);
     try {
-      setS(await api.postCommandList(guildId));
-      setMsg({ ok: true, text: "✓ Posted. Everything is up to date." });
+      const r = await api.postCommandList(guildId);
+      setS(r);
+      setMsg({ ok: true, text: r.pending ? "✓ Started. Discord is updating (safe to leave this page)." : "✓ Posted. Everything is up to date." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Couldn't post the list." });
     } finally {

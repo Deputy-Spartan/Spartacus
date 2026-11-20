@@ -271,7 +271,32 @@ export async function commandListSections(client: Client, guildId: string) {
 
 // Posts every channel's list, or edits whatever changed. A channel that no
 // longer has anything (a section moved or turned off) has its posts removed.
-export async function refreshCommandList(client: Client, guildId: string, force = false): Promise<{ ok: boolean; error?: string }> {
+// One run per server at a time: quick taps on the dashboard queue up and the
+// last one wins, instead of several runs posting over each other.
+const running = new Map<string, Promise<{ ok: boolean; error?: string }>>();
+const queued = new Map<string, { force: boolean; editAll: boolean }>();
+export function refreshCommandList(client: Client, guildId: string, force = false, editAll = force): Promise<{ ok: boolean; error?: string }> {
+  const now = running.get(guildId);
+  if (now) {
+    const q = queued.get(guildId);
+    queued.set(guildId, { force: force || !!q?.force, editAll: editAll || !!q?.editAll });
+    return now.then(() => running.get(guildId) ?? { ok: true });
+  }
+  const run = refreshOnce(client, guildId, force, editAll)
+    .catch((e: Error) => ({ ok: false, error: e.message }))
+    .finally(() => {
+      running.delete(guildId);
+      const next = queued.get(guildId);
+      queued.delete(guildId);
+      if (next) void refreshCommandList(client, guildId, next.force, next.editAll);
+    });
+  running.set(guildId, run);
+  return run;
+}
+
+// force: run even when "Update by itself" is off. editAll: re-edit every card,
+// not just the changed ones (only the Post button needs this).
+async function refreshOnce(client: Client, guildId: string, force: boolean, editAll: boolean): Promise<{ ok: boolean; error?: string }> {
   const settings = await prisma.commandListSettings.findUnique({ where: { guildId } });
   if (!settings) return { ok: false, error: "Pick a channel for the list first." };
   const before = postedByChannel(settings);
@@ -286,7 +311,7 @@ export async function refreshCommandList(client: Client, guildId: string, force 
   const after: ChannelPosts = {};
   for (const [ch, groups] of plan) {
     const audience: ListAudience = ch === settings.staffChannelId && ch !== settings.channelId ? "staff" : "everyone";
-    const r = await syncChannel(client, guildId, ch, commandListPosts(groups, settings.style, audience), before[ch] ?? [], force);
+    const r = await syncChannel(client, guildId, ch, commandListPosts(groups, settings.style, audience), before[ch] ?? [], editAll);
     after[ch] = r.posted;
     if (!r.ok) error ??= r.error;
   }

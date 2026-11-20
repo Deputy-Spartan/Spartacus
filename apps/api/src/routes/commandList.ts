@@ -38,11 +38,15 @@ async function view(guildId: string, row: Row) {
   return { ...base, sectionList };
 }
 
-async function post(guildId: string, force: boolean) {
+// waitMs: how long the page waits for Discord. Past that the work carries on
+// in the background and the page is told it's still updating ("pending").
+async function post(guildId: string, force: boolean, editAll = force, waitMs = 0) {
   const client = getBotClient();
   if (!client) return "The bot isn't connected right now. Try again in a moment.";
   const { refreshCommandList } = await import("@spartacus/bot");
-  const r = await refreshCommandList(client, guildId, force).catch((e: Error) => ({ ok: false, error: e.message }));
+  const work = refreshCommandList(client, guildId, force, editAll).catch((e: Error) => ({ ok: false, error: e.message }));
+  const r = waitMs ? await Promise.race([work, new Promise<"pending">((ok) => setTimeout(() => ok("pending"), waitMs))]) : await work;
+  if (r === "pending") return "pending";
   return r.ok ? null : (r.error ?? "Couldn't post the list.");
 }
 
@@ -86,14 +90,17 @@ router.put(P, requireAuth, requireGuildPermission, async (req, res) => {
   // A new place, style or section setup always posts (old posts are removed by the bot); other changes follow "Update by itself".
   const moved = ["channelId", "staffChannelId", "style", "sections", "includeStaff"].some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify((before as Record<string, unknown> | null)?.[k] ?? null));
   const changed = Object.keys(data).some((k) => k !== "autoUpdate");
-  const error = changed ? await post(guildId, moved) : null;
-  res.json({ ...(await view(guildId, await prisma.commandListSettings.findUnique({ where: { guildId } }))), error: row.channelId || moved ? error : null });
+  // Only changed cards are edited; moved ones are reposted. The page waits a few seconds at most.
+  const result = changed ? await post(guildId, moved, false, 4000) : null;
+  const pending = result === "pending";
+  const error = pending ? null : result;
+  res.json({ ...(await view(guildId, await prisma.commandListSettings.findUnique({ where: { guildId } }))), pending, error: row.channelId || moved ? error : null });
 });
 
 router.post(`${P}/post`, requireAuth, requireGuildPermission, async (req, res) => {
-  const error = await post(req.params.guildId, true);
-  if (error) return res.status(400).json({ error });
-  res.json(await view(req.params.guildId, await prisma.commandListSettings.findUnique({ where: { guildId: req.params.guildId } })));
+  const result = await post(req.params.guildId, true, true, 8000);
+  if (result && result !== "pending") return res.status(400).json({ error: result });
+  res.json({ pending: result === "pending", ...await view(req.params.guildId, await prisma.commandListSettings.findUnique({ where: { guildId: req.params.guildId } })) });
 });
 
 // Any change to the server's own commands or module switches updates the lists

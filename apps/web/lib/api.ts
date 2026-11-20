@@ -959,6 +959,8 @@ export interface TempChannelLobbyRow {
   controlsChannelId: string | null;
   guideButton: boolean;
   panelGuide: string | null;
+  panelEmbedId?: string | null;
+  guideEmbedId?: string | null;
   gameChoices: TempGameChoice[];
 }
 
@@ -1251,6 +1253,7 @@ export interface TicketTypeRow {
   categoryId: string | null;
   staffRoleIds: string[];
   openMessage: string | null;
+  savedEmbedId?: string | null;
   modalFields: TicketModalField[];
   autoCloseHours: number | null;
   slaMinutes: number | null;

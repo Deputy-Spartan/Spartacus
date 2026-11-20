@@ -11,7 +11,7 @@ const router = Router();
 
 const FIELDS = [
   "name", "lobbyChannelId", "categoryId", "nameFormat", "userLimit", "bitrate", "deleteAfterEmptySec", "pairTextChannel", "hideTextFromNonMembers",
-  "joinToCreate", "gamePicker", "gameCategories", "gameChoices", "panelChannelId", "panelTitle", "panelText", "panelColor", "guideButton", "panelGuide", "controlsWhere", "controlsChannelId",
+  "joinToCreate", "gamePicker", "gameCategories", "gameChoices", "panelChannelId", "panelTitle", "panelText", "panelColor", "guideButton", "panelGuide", "panelEmbedId", "guideEmbedId", "controlsWhere", "controlsChannelId",
 ] as const;
 
 // Only known fields, each cleaned up.
@@ -22,7 +22,7 @@ function lobbyData(body: Record<string, unknown>) {
     const v = body[k];
     if (k === "gameChoices") data[k] = cleanTempGameChoices(v) as unknown as Prisma.InputJsonValue;
     else if (k === "joinToCreate" || k === "gamePicker" || k === "gameCategories" || k === "pairTextChannel" || k === "hideTextFromNonMembers" || k === "guideButton") data[k] = v === true;
-    else if (k === "categoryId" || k === "panelChannelId" || k === "controlsChannelId") data[k] = v || null;
+    else if (k === "categoryId" || k === "panelChannelId" || k === "controlsChannelId" || k === "panelEmbedId" || k === "guideEmbedId") data[k] = v || null;
     else if (k === "lobbyChannelId") data[k] = String(v ?? "");
     else if (k === "controlsWhere") data[k] = v === "THREAD" ? "THREAD" : "VOICE";
     else if (k === "panelTitle") data[k] = String(v).slice(0, 256);

@@ -12,7 +12,7 @@ import { BLUEPRINT_GAMES, DEFAULT_BLUEPRINT_GAMES, MAX_TEMP_GAMES, SERVER_EMOJI,
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { EditableText } from "../../../../components/ui/EditableText";
-import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage, DiscordSelect } from "../../../../components/ui/DiscordPreview";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useDiscordNames } from "../../../../components/ui/DiscordMarkdown";
 
 type Tab = "active" | "create";
@@ -241,78 +241,6 @@ const BITRATES: Array<{ kbps: number; note: string }> = [
 const field = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
 const hex = (n: number | undefined) => "#" + (n ?? 0x5865f2).toString(16).padStart(6, "0");
 
-// What the panel looks like in Discord (apps/bot/src/modules/community/tempChannelPanel.ts).
-function PanelPreview({ value }: { value: Partial<TempChannelLobbyRow> }) {
-  const games = value.gamePicker ? value.gameChoices ?? [] : [];
-  const join = value.joinToCreate !== false && value.lobbyChannelId ? `<#${value.lobbyChannelId}>` : "the Create a Squad voice channel";
-  const text = (value.panelText ?? "").replace(/{lobby}/g, join);
-  const help = value.guideButton !== false ? <DiscordButton label="How it works" emoji="❓" /> : null;
-  return (
-    <DiscordMessage>
-      <DiscordEmbed color={value.panelColor ?? 0x5865f2} title={value.panelTitle || "🔊 Create a Squad"} description={text} />
-      {games.length ? (
-        <>
-          <DiscordSelect
-            placeholder="🎮 Pick your game to make a squad channel"
-            options={games.map((g) => ({ label: g.label || "…", emoji: g.emoji, description: g.userLimit ? `${g.userLimit}-player limit` : null }))}
-          />
-          {help && <DiscordButtonRow>{help}</DiscordButtonRow>}
-        </>
-      ) : (
-        <DiscordButtonRow>
-          <DiscordButton label="Create a Squad" emoji="➕" style="primary" />
-          {help}
-        </DiscordButtonRow>
-      )}
-    </DiscordMessage>
-  );
-}
-
-// Step 6: the private guide behind the How it works buttons.
-function GuideFields({ guildId, value, onChange, lobbyName }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void; lobbyName: string }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const text = value.panelGuide ?? TEMP_GUIDE_DEFAULT;
-  const names = useDiscordNames(guildId);
-  // Same swaps as apps/bot/src/modules/community/tempChannelGuide.ts.
-  const link = (id: string | null | undefined, fallback: string) => {
-    const ch = id ? names?.channels[id] : undefined;
-    return ch ? `[${ch.voice ? "🔊 " : "#"}${ch.name}](https://discord.com/channels/${guildId}/${id})` : fallback;
-  };
-  const preview = text
-    .replace(/{lobby}/g, link(value.joinToCreate !== false ? value.lobbyChannelId : null, "the Create a Squad voice channel"))
-    .replace(/{panel}/g, link(value.panelChannelId, "the Create a Squad panel"))
-    .replace(
-      /{controls}/g,
-      value.controlsWhere === "THREAD" && value.controlsChannelId
-        ? `your private squad thread in ${link(value.controlsChannelId, "the squad threads channel")}, which only you are added to`
-        : "your voice channel's chat (the 💬 next to the channel name)",
-    )
-    .replace(/<#(\d+)>/g, (m, id) => link(id, m));
-  return (
-    <>
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs uppercase tracking-wide text-slate-500">Guide Text</label>
-          {value.panelGuide != null && (
-            <button type="button" onClick={() => onChange({ panelGuide: null })} className="text-xs text-slate-500 hover:text-neon-blue">
-              Reset to the built-in guide
-            </button>
-          )}
-        </div>
-        <MarkdownToolbar guildId={guildId} textareaRef={ref} value={text} onChange={(next) => onChange({ panelGuide: next })} />
-        <textarea ref={ref} rows={12} className={field + " font-mono text-xs"} maxLength={4000} value={text} onChange={(e) => onChange({ panelGuide: e.target.value })} />
-        <p className="text-[11px] text-slate-500 mt-1">
-          {"{lobby}"} links the Lobby Voice Channel and {"{panel}"} links the panel's channel. Edit it to match your setup, for example if you don't use
-          the panel or game categories.
-        </p>
-      </div>
-      <DiscordMessage ephemeral>
-        <DiscordEmbed color={value.panelColor ?? 0x5865f2} title="❓ How Squad Channels Work" description={preview} />
-      </DiscordMessage>
-    </>
-  );
-}
-
 // Where each squad's Lock, Rename and Limit buttons are posted.
 function ControlsWhere({ guildId, value, onChange }: { guildId: string; value: Partial<TempChannelLobbyRow>; onChange: (patch: Partial<TempChannelLobbyRow>) => void }) {
   const thread = value.controlsWhere === "THREAD";
@@ -373,11 +301,14 @@ function LobbyFields({
   value,
   onChange,
   lobbyName,
+  ownKey,
 }: {
   guildId: string;
   value: Partial<TempChannelLobbyRow>;
   onChange: (patch: Partial<TempChannelLobbyRow>) => void;
   lobbyName: string;
+  // Names this lobby's own panel and guide embeds.
+  ownKey: string;
 }) {
   // The panel's switch stays on while a channel is still being picked.
   const [panelOn, setPanelOn] = useState(!!value.panelChannelId);
@@ -486,28 +417,24 @@ function LobbyFields({
         </div>
         {value.panelChannelId && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_7rem] gap-4">
-              <div>
-                <label className={label}>Title</label>
-                <input className={field} maxLength={256} value={value.panelTitle ?? ""} onChange={(e) => onChange({ panelTitle: e.target.value })} />
-              </div>
-              <div>
-                <label className={label}>Color</label>
-                <input
-                  type="color"
-                  className="h-[42px] w-full rounded-lg border border-white/10 bg-base-950 p-1"
-                  value={hex(value.panelColor)}
-                  onChange={(e) => onChange({ panelColor: parseInt(e.target.value.slice(1), 16) })}
-                />
-              </div>
-            </div>
-            <div>
-              <label className={label}>Description</label>
-              <textarea rows={4} className={field} maxLength={4000} value={value.panelText ?? ""} onChange={(e) => onChange({ panelText: e.target.value })} />
-              <p className="text-[11px] text-slate-500 mt-1">{"{lobby}"} links the Lobby Voice Channel from step 1, when Join to Create is on.</p>
-            </div>
-            <PanelPreview value={value} />
-            <p className="text-[11px] text-slate-500">Click the dropdown in the preview to see the game list.</p>
+            <ModuleMessage
+              key={`panel-${ownKey}`}
+              guildId={guildId}
+              title="Panel message"
+              description="The embed on the panel. The game menu (or Create a Squad button) and How it works are added under it. Changes update the posted panel."
+              ownerKey={`tempPanel:${ownKey}`}
+              savedEmbedId={value.panelEmbedId ?? null}
+              onSavedEmbedChange={(id) => onChange({ panelEmbedId: id })}
+              seed={() => designFrom({ title: value.panelTitle || "🔊 Create a Squad", description: value.panelText ?? "", color: hex(value.panelColor) })}
+              tokens={[{ token: "{lobby}", description: "Links the Lobby Voice Channel from step 1, when Join to Create is on" }]}
+              tokenValues={{ "{lobby}": value.joinToCreate !== false && value.lobbyChannelId ? `<#${value.lobbyChannelId}>` : "the Create a Squad voice channel" }}
+              moduleButtons={[
+                value.gamePicker && (value.gameChoices ?? []).length ? "🎮 Pick your game to make a squad channel ▾" : "➕ Create a Squad",
+                ...(value.guideButton !== false ? ["❓ How it works"] : []),
+              ]}
+              reservedRows={value.gamePicker && (value.gameChoices ?? []).length ? 2 : 1}
+              embedsOnly
+            />
             <p className="text-[11px] text-slate-500">
               {value.gamePicker && (value.gameChoices ?? []).length
                 ? "The dropdown lists the games from step 4."
@@ -527,7 +454,27 @@ function LobbyFields({
         on={value.guideButton !== false}
         onToggle={(guideButton) => onChange({ guideButton })}
       >
-        <GuideFields guildId={guildId} value={value} onChange={onChange} lobbyName={lobbyName} />
+        <ModuleMessage
+          key={`guide-${ownKey}`}
+          guildId={guildId}
+          title="Guide message"
+          description="Shown privately when someone taps ❓ How it works."
+          ownerKey={`tempGuide:${ownKey}`}
+          savedEmbedId={value.guideEmbedId ?? null}
+          onSavedEmbedChange={(id) => onChange({ guideEmbedId: id })}
+          seed={() => designFrom({ title: "❓ How Squad Channels Work", description: value.panelGuide ?? TEMP_GUIDE_DEFAULT, color: hex(value.panelColor) })}
+          tokens={[
+            { token: "{lobby}", description: "Links the Lobby Voice Channel" },
+            { token: "{panel}", description: "Links the panel's channel" },
+            { token: "{controls}", description: "Where each squad's buttons are" },
+          ]}
+          tokenValues={{
+            "{lobby}": lobbyName ? `🔊 ${lobbyName}` : "the Create a Squad voice channel",
+            "{panel}": value.panelChannelId ? `<#${value.panelChannelId}>` : "the Create a Squad panel",
+            "{controls}": value.controlsWhere === "THREAD" ? "your private squad thread, which only you are added to" : "your voice channel's chat (the 💬 next to the channel name)",
+          }}
+          embedsOnly
+        />
       </Step>
     </div>
   );
@@ -542,6 +489,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<TempChannelLobbyRow>>(EMPTY);
+  const [draftKey] = useState(() => `new-${Date.now().toString(36)}`); // names a new lobby's own embeds
   const [creating, setCreating] = useState(false);
 
   function refresh() {
@@ -666,7 +614,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
                         onChange={(e) => updateLobby(l.id, { name: e.target.value })}
                       />
                     </div>
-                    <LobbyFields guildId={guildId} value={l} onChange={(patch) => updateLobby(l.id, patch)} lobbyName={channelLabel(l.lobbyChannelId).replace(/^.*\/ #|^#/, "")} />
+                    <LobbyFields guildId={guildId} ownKey={l.id} value={l} onChange={(patch) => updateLobby(l.id, patch)} lobbyName={channelLabel(l.lobbyChannelId).replace(/^.*\/ #|^#/, "")} />
                   </div>
                 )}
               </NeonCard>
@@ -686,7 +634,7 @@ export default function TempChannelsPage({ params }: { params: { guildId: string
             />
           </div>
           <div className="space-y-4 mb-4">
-            <LobbyFields guildId={guildId} value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} lobbyName={channelLabel(draft.lobbyChannelId ?? null).replace(/^.*\/ #|^#/, "")} />
+            <LobbyFields guildId={guildId} ownKey={draftKey} value={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} lobbyName={channelLabel(draft.lobbyChannelId ?? null).replace(/^.*\/ #|^#/, "")} />
           </div>
           <button onClick={createLobby} disabled={!canCreate || creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Lobby"}

@@ -15,6 +15,7 @@ import {
 import { prisma } from "../../lib/prisma";
 import type { TicketPanel, TicketSettings, TicketType } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 
 // Discord channel names are lowercase-and-dashes only, so tokens get
 // substituted before that normalization runs.
@@ -133,10 +134,21 @@ export async function handleOpenTicket(
 
   const pingRoles = [...new Set([...(supportRoleId ? [supportRoleId] : []), ...staffRoleIds])];
   const openMessage = type?.openMessage || "Thanks for opening a ticket. Describe your issue and a staff member will be with you shortly.";
-  await channel.send({
-    content: `${pingRoles.map((r) => `<@&${r}>`).join(" ")} <@${interaction.user.id}> — ${openMessage}`,
-    components: [controlRow(ticket.id)],
-  });
+  const pings = `${pingRoles.map((r) => `<@&${r}>`).join(" ")} <@${interaction.user.id}>`;
+  // A message built in the dashboard (or a library embed); the pings go in
+  // front of it and the Claim/Close buttons under it.
+  const saved = await resolveSavedEmbed(type?.savedEmbedId);
+  if (saved) {
+    const built = await buildSavedEmbedPayload(interaction.guild.id, saved, {
+      "{user}": `<@${interaction.user.id}>`,
+      "{type}": type?.name ?? "Support",
+      "{number}": String(ticketNumber),
+      "{server}": interaction.guild.name,
+    });
+    await channel.send({ ...built, content: [pings, built.content].filter(Boolean).join(" "), components: [...(built.components ?? []).slice(0, 4), controlRow(ticket.id)] });
+  } else {
+    await channel.send({ content: `${pings} — ${openMessage}`, components: [controlRow(ticket.id)] });
+  }
 
   if (settings?.logChannelId) {
     const logChannel = await interaction.guild.channels.fetch(settings.logChannelId).catch(() => null);

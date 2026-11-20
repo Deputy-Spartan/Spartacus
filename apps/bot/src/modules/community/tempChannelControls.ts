@@ -17,7 +17,7 @@ import { logError } from "@spartacus/db";
 import { SERVER_EMOJI, SERVER_EMOJI_LOOSE, cleanTempGameChoices, type TempGameChoice } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { moveToGameCategory, nextTempName } from "./tempGameCategories";
-import { tempGuideEmbed } from "./tempChannelGuide";
+import { tempGuideEmbeds } from "./tempChannelGuide";
 
 // A server emoji the server doesn't have (deleted, or its code typed by hand)
 // can't show, so it's found again by name or left off.
@@ -136,7 +136,7 @@ export async function handleTempChannelControl(interaction: ButtonInteraction | 
       const instance = await prisma.tempChannelInstance.findFirst({ where: { channelId } });
       const lobby = instance && (await prisma.tempChannelLobby.findUnique({ where: { id: instance.lobbyId } }));
       if (!lobby || !interaction.guild) return void (await interaction.reply({ content: "This squad channel is gone.", ephemeral: true }));
-      return void (await interaction.reply({ embeds: [tempGuideEmbed(interaction.guild, lobby)], ephemeral: true }));
+      return void (await interaction.reply({ embeds: await tempGuideEmbeds(interaction.guild, lobby), ephemeral: true }));
     }
 
     const channel = await ownedChannel(interaction, channelId);

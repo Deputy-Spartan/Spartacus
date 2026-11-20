@@ -16,7 +16,8 @@ import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { menuOption } from "./tempChannelControls";
 import { createSquad, scheduleEmptyCheck } from "./tempChannels";
-import { tempGuideEmbed } from "./tempChannelGuide";
+import { tempGuideEmbeds } from "./tempChannelGuide";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 
 // The text channel way to make a squad: an embed with a game dropdown (or one
 // button when the lobby has no games). Picking makes the voice channel, named
@@ -25,12 +26,16 @@ import { tempGuideEmbed } from "./tempChannelGuide";
 // Someone who isn't in voice gets this long to join their new channel.
 const JOIN_WINDOW_SEC = 120;
 
-export function tempPanelPayload(lobby: TempChannelLobby, guild?: Guild | null) {
+export async function tempPanelPayload(lobby: TempChannelLobby, guild?: Guild | null) {
   const games = lobby.gamePicker ? cleanTempGameChoices(lobby.gameChoices) : [];
   const join = lobby.joinToCreate && lobby.lobbyChannelId ? `<#${lobby.lobbyChannelId}>` : "the Create a Squad voice channel";
   const text = (lobby.panelText || "").replace(/{lobby}/g, join);
   const embed = new EmbedBuilder().setColor(lobby.panelColor).setTitle(lobby.panelTitle || "🔊 Create a Squad");
   if (text) embed.setDescription(text.slice(0, 4000));
+  // The panel's embed built in the dashboard (or a library embed); its own buttons stay.
+  const saved = await resolveSavedEmbed(lobby.panelEmbedId);
+  const built = saved ? await buildSavedEmbedPayload(lobby.guildId, saved, { "{lobby}": join }) : null;
+  const embeds = built?.embeds?.length ? built.embeds : [embed];
   const help = lobby.guideButton ? [new ButtonBuilder().setCustomId(`tvcp:${lobby.id}:help`).setLabel("How it works").setEmoji("❓").setStyle(ButtonStyle.Secondary)] : [];
   const rows = games.length
     ? [
@@ -45,7 +50,7 @@ export function tempPanelPayload(lobby: TempChannelLobby, guild?: Guild | null) 
           ...help,
         ),
       ];
-  return { embeds: [embed], components: rows, allowedMentions: { parse: [] } };
+  return { embeds, components: rows, allowedMentions: { parse: [] } };
 }
 
 // Posts the panel, or edits it in place when it's still there.
@@ -54,7 +59,7 @@ export async function syncTempPanel(client: Client, lobbyId: string) {
   if (!lobby?.panelChannelId) return;
   const channel = await client.channels.fetch(lobby.panelChannelId).catch(() => null);
   if (!channel?.isTextBased() || !("send" in channel)) return;
-  const payload = tempPanelPayload(lobby, "guild" in channel ? channel.guild : null);
+  const payload = await tempPanelPayload(lobby, "guild" in channel ? channel.guild : null);
   if (lobby.panelMessageId) {
     const message = await channel.messages.fetch(lobby.panelMessageId).catch(() => null);
     if (message) return void (await message.edit(payload));
@@ -81,14 +86,14 @@ export async function handleTempPanel(interaction: StringSelectMenuInteraction |
   try {
     const lobby = await prisma.tempChannelLobby.findUnique({ where: { id: lobbyId } });
     if (!guild || !lobby || lobby.guildId !== guild.id) return void (await interaction.reply({ content: "This panel isn't set up anymore.", ephemeral: true }));
-    if (action === "help") return void (await interaction.reply({ embeds: [tempGuideEmbed(guild, lobby)], ephemeral: true }));
+    if (action === "help") return void (await interaction.reply({ embeds: await tempGuideEmbeds(guild, lobby), ephemeral: true }));
     if (!(await isModuleEnabled(guild.id, "TEMP_CHANNELS"))) return void (await interaction.reply({ content: "⚠️ Temp Channels is turned off for this server.", ephemeral: true }));
 
     const game = interaction.isStringSelectMenu() ? cleanTempGameChoices(lobby.gameChoices)[Number(interaction.values[0])] : undefined;
     if (interaction.isStringSelectMenu() && !game) return void (await interaction.reply({ content: "That game was removed. Pick another one.", ephemeral: true }));
     await interaction.deferReply({ ephemeral: true });
     // Redraw the panel so the dropdown clears and the same game can be picked again.
-    await interaction.message.edit(tempPanelPayload(lobby, guild)).catch(() => null);
+    await interaction.message.edit(await tempPanelPayload(lobby, guild)).catch(() => null);
 
     const member = await guild.members.fetch(interaction.user.id);
     // One squad at a time from the panel.

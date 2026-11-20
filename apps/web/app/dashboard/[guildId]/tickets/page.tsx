@@ -434,6 +434,8 @@ function TypesTab({ guildId }: { guildId: string }) {
   const [panels, setPanels] = useState<TicketPanelRow[]>([]);
   const [editing, setEditing] = useState<Partial<TicketTypeRow> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Names a new type's own message embed until it's saved.
+  const [typeKey, setTypeKey] = useState("new");
 
   function refresh() {
     api.getTicketTypes(guildId).then(setTypes);
@@ -476,7 +478,7 @@ function TypesTab({ guildId }: { guildId: string }) {
           Ticket types define what happens when a panel button is clicked — which staff role gets pinged, which category it opens in, the message members
           see, auto-close, SLA, and more.
         </p>
-        <button onClick={() => { setError(null); setEditing({ ...EMPTY_TYPE }); }} className="neon-button-sm shrink-0">
+        <button onClick={() => { setError(null); setTypeKey(`new-${Date.now().toString(36)}`); setEditing({ ...EMPTY_TYPE }); }} className="neon-button-sm shrink-0">
           + New type
         </button>
       </div>
@@ -524,13 +526,23 @@ function TypesTab({ guildId }: { guildId: string }) {
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Staff Roles Pinged</label>
           <MultiRolePicker guildId={guildId} value={editing.staffRoleIds ?? []} onChange={(ids) => setEditing({ ...editing, staffRoleIds: ids })} />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Open Message</label>
-          <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-            rows={2}
-            value={editing.openMessage ?? ""}
-            onChange={(e) => setEditing({ ...editing, openMessage: e.target.value })}
-            placeholder="Thanks for opening a ticket. Describe your issue and a staff member will be with you shortly."
+          <ModuleMessage
+            key={editing.id ?? typeKey}
+            guildId={guildId}
+            title="Ticket opened message"
+            description="The first message in a new ticket. The staff and member pings go in front of it, and Claim / Close under it."
+            ownerKey={`ticketType:${editing.id ?? typeKey}`}
+            savedEmbedId={editing.savedEmbedId ?? null}
+            onSavedEmbedChange={(id) => setEditing((e) => (e ? { ...e, savedEmbedId: id } : e))}
+            seed={() => designFrom({ content: editing.openMessage || "Thanks for opening a ticket. Describe your issue and a staff member will be with you shortly." })}
+            tokens={[
+              { token: "{user}", description: "Mentions the member who opened it" },
+              { token: "{type}", description: "The ticket type's name" },
+              { token: "{number}", description: "The ticket number" },
+              { token: "{server}", description: "Your server's name" },
+            ]}
+            tokenValues={{ "{user}": "<@0>", "{type}": editing.name || "Support", "{number}": "42", "{server}": "Your Server" }}
+            moduleButtons={["🙋 Claim", "🔒 Close"]}
           />
 
           <div className="grid grid-cols-2 gap-3 mb-4">

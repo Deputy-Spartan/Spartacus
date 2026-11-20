@@ -712,6 +712,8 @@ model TempChannelLobby {
   controlsChannelId      String?
   guideButton            Boolean @default(true) // the "How it works" button on the panel and in squad channels
   panelGuide             String? // the guide's text; empty uses the built-in step-by-step guide
+  panelEmbedId           String? // the panel's embed built in the dashboard (or a library embed); unset = the title/text/color above
+  guideEmbedId           String? // the guide's embed built in the dashboard (or a library embed); unset = panelGuide
 
   @@index([guildId])
 }
@@ -782,6 +784,7 @@ model TicketType {
   categoryId     String?
   staffRoleIds   Json     @default("[]")
   openMessage    String?
+  savedEmbedId   String? // the message in a new ticket, built in the dashboard (or a library embed); unset = openMessage
   modalFields    Json     @default("[]") // [{ label, placeholder, required, style }]
   autoCloseHours Int?
   slaMinutes     Int?

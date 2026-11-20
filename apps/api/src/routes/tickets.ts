@@ -116,7 +116,7 @@ router.get("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission,
 });
 
 router.post("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission, async (req, res) => {
-  const { name, emoji, description, categoryId, staffRoleIds, openMessage, modalFields, autoCloseHours, slaMinutes, transcriptChannelId, closeBehavior } = req.body;
+  const { name, emoji, description, categoryId, staffRoleIds, openMessage, savedEmbedId, modalFields, autoCloseHours, slaMinutes, transcriptChannelId, closeBehavior } = req.body;
   const row = await prisma.ticketType.create({
     data: {
       guildId: req.params.guildId,
@@ -126,6 +126,7 @@ router.post("/guilds/:guildId/ticket-types", requireAuth, requireGuildPermission
       categoryId,
       staffRoleIds: staffRoleIds ?? [],
       openMessage,
+      savedEmbedId: savedEmbedId || null,
       modalFields: modalFields ?? [],
       autoCloseHours,
       slaMinutes,
@@ -144,6 +145,7 @@ router.patch("/guilds/:guildId/ticket-types/:id", requireAuth, requireGuildPermi
     "categoryId",
     "staffRoleIds",
     "openMessage",
+    "savedEmbedId",
     "modalFields",
     "autoCloseHours",
     "slaMinutes",

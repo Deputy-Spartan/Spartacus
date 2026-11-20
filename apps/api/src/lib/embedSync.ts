@@ -1,6 +1,7 @@
 import { prisma } from "@spartacus/db";
 import { editChannelMessage, editWebhookMessage } from "./discordRest";
 import { buildMessagePayload, type BuilderEmbed, type BuilderComponentRow } from "./embedCreatorPayload";
+import { getBotClient } from "./botClient";
 
 export interface SyncResult {
   updated: number;
@@ -66,6 +67,14 @@ export async function syncPresetUsage(guildId: string, presetId: string): Promis
   }
   for (const r of await prisma.playerReportSettings.findMany({ where: panelWhere })) {
     if (r.panelChannelId) targets.push({ label: "Report panel", channelId: r.panelChannelId, messageId: r.panelMessageId! });
+  }
+
+  // Temp channel panels are redrawn by the bot (they keep their game menu).
+  const lobbies = await prisma.tempChannelLobby.findMany({ where: { guildId, panelEmbedId: presetId, panelChannelId: { not: null } }, select: { id: true } });
+  const client = lobbies.length ? getBotClient() : null;
+  if (client) {
+    const { syncTempPanel } = await import("@spartacus/bot");
+    for (const l of lobbies) await syncTempPanel(client, l.id).catch(() => null);
   }
 
   // Events redraw themselves (with their sign-up lists) on the bot's next sync.

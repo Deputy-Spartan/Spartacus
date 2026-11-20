@@ -287,30 +287,35 @@ export interface BoardSlot extends RepeatSlot {
 
 const REPEAT_TAG: Partial<Record<ScheduleRepeat, string>> = { BIWEEKLY: "every 2 weeks", MONTHLY: "monthly", ONCE: "📌 one time" };
 
-function boardLine(s: BoardSlot, at: Date, timeStyle: "t" | "f"): string {
+// One stream, short and scannable:
+//   🕙 **10:00 PM** · **Deputy_Spartan**
+//   Robbing and Running
+//   -# 🎮 Rob Run · Kick · TikTok · every 2 weeks
+//   -# 💬 Gathering a lot of Goop
+function boardLine(s: BoardSlot, at: Date, when: string, extraTag?: string): string {
   const ts = Math.floor(at.getTime() / 1000);
   const platforms = cleanSlotPlatforms(s.platforms);
-  const mainLink = s.link || platforms.find((p) => p.link)?.link || null;
-  const who = mainLink ? `[${s.streamer}](${mainLink})` : s.streamer;
-  const tag = REPEAT_TAG[cleanRepeat(s.repeat)];
-  const head = `<t:${ts}:${timeStyle}> **${who}**${s.streamTitle ? ` — ${s.streamTitle}` : ""}${tag ? ` · *${tag}*` : ""}`;
+  const tag = extraTag ?? REPEAT_TAG[cleanRepeat(s.repeat)];
+  const lines = [`🕙 **${when || `<t:${ts}:t>`}** · **${s.streamer}**`];
+  if (s.streamTitle) lines.push(s.streamTitle);
   const games = [...new Set([s.title, ...platforms.map((p) => p.category)].filter(Boolean) as string[])];
   const where = platforms.map((p) => (p.link ? `[${SCHEDULE_PLATFORM_NAMES[p.platform]}](${p.link})` : SCHEDULE_PLATFORM_NAMES[p.platform]));
-  const sub = [games.length ? `🎮 ${games.join(", ")}` : "", where.join(" · ")].filter(Boolean).join(" · ");
-  const lines = [head];
+  if (!where.length && s.link) where.push(`[Watch](${s.link})`);
+  const sub = [games.length ? `🎮 ${games.join(", ")}` : "", ...where, tag ?? ""].filter(Boolean).join(" · ");
   if (sub) lines.push(`-# ${sub}`);
-  if (s.message) lines.push(`> ${s.message.replace(/\s*\n\s*/g, " ").slice(0, 180)}`);
+  if (s.message) lines.push(`-# 💬 ${s.message.replace(/\s*\n\s*/g, " ").slice(0, 140)}`);
   return lines.join("\n");
 }
 
+// Streams in a section, with a blank line between them.
 function fitField(lines: string[]): string {
   let out = "";
   for (const l of lines) {
-    if ((out ? out.length + 1 : 0) + l.length > 1020) {
+    if ((out ? out.length + 2 : 0) + l.length > 1020) {
       out += out ? "\n…" : "…";
       break;
     }
-    out += (out ? "\n" : "") + l;
+    out += (out ? "\n\n" : "") + l;
   }
   return out;
 }
@@ -326,8 +331,8 @@ export function buildScheduleBoard(slots: BoardSlot[], timeZone: string, from = 
       .sort((a, b) => a.startMinutes - b.startMinutes)
       .map((s) => {
         const next = nextOccurrence(tz, s, from, s.durationMin * 60_000);
-        const label = REPEAT_LABELS[cleanRepeat(s.repeat)].replace(/ \(.*\)$/, "");
-        return next ? `**${label}** · ${boardLine(s, next, "t")}` : "";
+        const label = REPEAT_LABELS[cleanRepeat(s.repeat)].replace(/ \(.*\)$/, "").toLowerCase();
+        return next ? boardLine(s, next, "", label) : "";
       })
       .filter(Boolean);
     if (lines.length) fields.push({ name: "🔁 Regular streams", value: fitField(lines) });
@@ -336,31 +341,36 @@ export function buildScheduleBoard(slots: BoardSlot[], timeZone: string, from = 
   const others = slots.filter((s) => !regular.includes(s));
   const zoned = new Date(from.getTime() + zoneOffsetMs(from.getTime(), tz));
   const dayStart = (add: number) => new Date(wallInstant(tz, zoned.getUTCFullYear(), zoned.getUTCMonth(), zoned.getUTCDate() + add, 0));
+  const shownThisWeek = new Set<string>();
   for (let i = 0; i < 7; i++) {
     const start = dayStart(i), end = dayStart(i + 1);
     const today = others
       .flatMap((s) => occurrencesBetween(tz, s, i === 0 ? new Date(Math.max(start.getTime(), from.getTime() - s.durationMin * 60_000)) : start, end).map((at) => ({ s, at })))
       .sort((a, b) => a.at.getTime() - b.at.getTime());
     if (!today.length) continue;
+    today.forEach(({ s }) => shownThisWeek.add(s.id));
     const date = new Date(Date.UTC(zoned.getUTCFullYear(), zoned.getUTCMonth(), zoned.getUTCDate() + i));
-    const name = `${i === 0 ? "Today · " : ""}${DAY_NAMES[date.getUTCDay()]}, ${date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
-    fields.push({ name, value: fitField(today.map(({ s, at }) => boardLine(s, at, "t"))) });
+    const short = date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    const name = `📆 ${i === 0 ? "Today" : i === 1 ? "Tomorrow" : DAY_NAMES[date.getUTCDay()]} · ${i < 2 ? `${DAY_NAMES[date.getUTCDay()].slice(0, 3)} ` : ""}${short}`;
+    fields.push({ name, value: fitField(today.map(({ s, at }) => boardLine(s, at, ""))) });
   }
 
+  // Later one-time and monthly streams (anything already shown this week isn't repeated).
   const weekEnd = dayStart(7);
   const later = others
-    .filter((s) => ["ONCE", "MONTHLY", "BIWEEKLY"].includes(cleanRepeat(s.repeat)))
+    .filter((s) => !shownThisWeek.has(s.id) && ["ONCE", "MONTHLY", "BIWEEKLY"].includes(cleanRepeat(s.repeat)))
     .map((s) => ({ s, at: nextOccurrence(tz, s, weekEnd) }))
     .filter((x): x is { s: BoardSlot; at: Date } => !!x.at && x.at.getTime() - weekEnd.getTime() < 45 * 86_400_000)
     .sort((a, b) => a.at.getTime() - b.at.getTime());
-  if (later.length) fields.push({ name: "📅 Coming up", value: fitField(later.map(({ s, at }) => boardLine(s, at, "f"))) });
+  const dateIn = (at: Date) => at.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: tz });
+  if (later.length) fields.push({ name: "🗓️ Coming up", value: fitField(later.map(({ s, at }) => boardLine(s, at, `${dateIn(at)} · <t:${Math.floor(at.getTime() / 1000)}:t>`))) });
   return fields.slice(0, 25);
 }
 
 export const SCHEDULE_POST_DEFAULTS = {
   title: "📅 Stream Schedule",
-  description: "Every time below shows in **your own** time zone.\n\n➕ **Streamers:** add your own stream with `/schedule add` in the bot commands channel.",
-  footer: "Set in {timezone}",
+  description: "Times show in **your** time zone. Streamers, add yours with `/schedule add` in the bot commands channel.",
+  footer: "Updates by itself · Set in {timezone}",
   color: "#5865F2",
 };
 

@@ -209,6 +209,7 @@ export interface StreamExtrasConfigRow {
   scheduleCreateEvents: boolean;
   scheduleEmbedId?: string | null;
   scheduleWeekAhead?: boolean;
+  scheduleWeeksAhead?: number; // 0 = this week only … 4 = a month out
   rewardsEnabled: boolean;
   rewardCoins: number;
   rewardXp: number;

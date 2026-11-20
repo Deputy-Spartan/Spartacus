@@ -14,6 +14,7 @@ export const STREAM_EXTRAS_DEFAULTS = {
   scheduleTimezone: "UTC",
   scheduleCreateEvents: false,
   scheduleWeekAhead: true,
+  scheduleWeeksAhead: 1,
   rewardsEnabled: false,
   rewardCoins: 10,
   rewardXp: 10,
@@ -469,10 +470,53 @@ function weekSection(slots: BoardSlot[], tz: string, start0: { y: number; m: num
   return { fields, total };
 }
 
+// ---- One post per week ----
+export const SCHEDULE_WEEKS_AHEAD = [
+  { value: 0, label: "This week only" },
+  { value: 1, label: "1 week out" },
+  { value: 2, label: "2 weeks out" },
+  { value: 3, label: "3 weeks out" },
+  { value: 4, label: "A month out" },
+] as const;
+export const SCHEDULE_TIPS = "\n-# Times show in your time zone · Streamers, add yours with `/schedule add` in the bot commands channel";
+
+export interface ScheduleWeek {
+  index: number; // 0 = the active week
+  when: string; // "This week", "Next week", "In 2 weeks"
+  label: string; // "Fri, Nov 20 – Sun, Nov 22"
+  fields: Array<{ name: string; value: string }>;
+  total: number;
+}
+
+// The active week (today to Sunday) and then each following week, Monday to Sunday.
+export function buildScheduleWeeks(slots: BoardSlot[], timeZone: string, weeksAhead: number, from = new Date()): ScheduleWeek[] {
+  const tz = isValidTimezone(timeZone) ? timeZone : "UTC";
+  const zoned = new Date(from.getTime() + zoneOffsetMs(from.getTime(), tz));
+  const today = { y: zoned.getUTCFullYear(), m: zoned.getUTCMonth(), d: zoned.getUTCDate() };
+  const mon = scheduleWeekStart(tz, false, from);
+  const daysLeft = 7 - ((new Date(Date.UTC(today.y, today.m, today.d)).getUTCDay() + 6) % 7);
+  const out: ScheduleWeek[] = [];
+  for (let i = 0; i <= Math.max(0, Math.min(4, Math.round(weeksAhead))); i++) {
+    const start = i === 0 ? today : { y: mon.y, m: mon.m, d: mon.d + 7 * i };
+    const s = weekSection(slots, tz, start, i === 0 ? daysLeft : 7, from, i === 0);
+    const first = new Date(Date.UTC(start.y, start.m, start.d));
+    const sunday = new Date(Date.UTC(mon.y, mon.m, mon.d + 7 * i + 6));
+    out.push({
+      index: i,
+      when: i === 0 ? "This week" : i === 1 ? "Next week" : `In ${i} weeks`,
+      label: `${fmtDay(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate())} – ${fmtDay(sunday.getUTCFullYear(), sunday.getUTCMonth(), sunday.getUTCDate())}`,
+      fields: s.fields.length ? s.fields.slice(0, 25) : [{ name: "No streams", value: "-# Nothing scheduled this week yet" }],
+      total: s.total,
+    });
+  }
+  return out;
+}
+
 export const SCHEDULE_POST_DEFAULTS = {
-  title: "📅 Stream Schedule",
-  description: "Week of **{week}** · {count}\n-# Times show in your time zone · Streamers, add yours with `/schedule add` in the bot commands channel",
-  footer: "Next week's schedule posts every Monday",
+  // One of these per week. {tips} is only filled in on the active (bottom) week.
+  title: "📅 {when}",
+  description: "**{week}** · {count}{tips}",
+  footer: "",
   color: "#5865F2",
 };
 

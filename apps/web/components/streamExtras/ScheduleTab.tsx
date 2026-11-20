@@ -16,6 +16,8 @@ import {
   nextOccurrence,
   platformInfo,
   scheduleWeekLabel,
+  SCHEDULE_TIPS,
+  SCHEDULE_WEEKS_AHEAD,
   type ScheduleRepeat,
   type SchedulePlatform,
 } from "@spartacus/shared";
@@ -169,16 +171,25 @@ export function ScheduleTab({
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-white/5">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Post a week ahead</p>
-            <p className={hint}>
-              {config.scheduleWeekAhead !== false
-                ? `On: the post shows the rest of this week plus all of next week (${scheduleWeekLabel(config.scheduleTimezone, true)}), so viewers can plan ahead and still see what's on today.`
-                : `Off: the post shows this week, Monday to Sunday (${scheduleWeekLabel(config.scheduleTimezone, false)}).`}
-            </p>
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <p className="text-sm font-medium mb-1">How far ahead</p>
+          <p className={`${hint} mb-3`}>
+            One post per week, Monday to Sunday. The active week is the <b className="text-slate-300">bottom</b> post, with the next weeks stacked above it. When a
+            week finishes, the posts are edited so everything moves forward, with no new posts.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {SCHEDULE_WEEKS_AHEAD.map((o) => {
+              const on = (config.scheduleWeeksAhead ?? 1) === o.value;
+              return (
+                <button key={o.value} type="button" aria-pressed={on} onClick={() => update({ scheduleWeeksAhead: o.value })} className={`sp-metal px-3 py-2 rounded-lg text-sm font-semibold ${on ? "is-active" : ""}`}>
+                  {o.label}
+                </button>
+              );
+            })}
           </div>
-          <ToggleSwitch enabled={config.scheduleWeekAhead !== false} onChange={(v) => update({ scheduleWeekAhead: v })} label="Post a week ahead" />
+          <p className={`${hint} mt-2`}>
+            {(config.scheduleWeeksAhead ?? 1) + 1} post{(config.scheduleWeeksAhead ?? 1) ? "s" : ""} in the channel: {(config.scheduleWeeksAhead ?? 1) ? `the furthest week at the top, down to this week (${scheduleWeekLabel(tz, false)}) at the bottom.` : `this week (${scheduleWeekLabel(tz, false)}).`}
+          </p>
         </div>
         <button
           className={`${button} mt-4`}
@@ -263,17 +274,19 @@ export function ScheduleTab({
       <ModuleMessage
         guildId={guildId}
         title="Schedule post"
-        description="The pinned schedule message. Monday to Sunday is added under its first embed, a section per day."
+        description="The look of each week's post. That week's days are added under its first embed, a section per day."
         ownerKey="streamExtras:schedulePost"
         savedEmbedId={config.scheduleEmbedId ?? null}
         onSavedEmbedChange={(id) => update({ scheduleEmbedId: id })}
         seed={() => designFrom({ title: SCHEDULE_POST_DEFAULTS.title, description: SCHEDULE_POST_DEFAULTS.description, footer: SCHEDULE_POST_DEFAULTS.footer, color: SCHEDULE_POST_DEFAULTS.color })}
         tokens={[
-          { token: "{week}", description: "The week it shows, e.g. Mon, Nov 30 – Sun, Dec 6" },
+          { token: "{when}", description: "This week, Next week, In 2 weeks…" },
+          { token: "{week}", description: "That week's dates, e.g. Mon, Nov 30 – Sun, Dec 6" },
           { token: "{count}", description: "How many streams that week, e.g. 14 streams" },
+          { token: "{tips}", description: "The time zone and /schedule add tips (only on this week's post)" },
           { token: "{timezone}", description: "Your server's time zone" },
         ]}
-        tokenValues={{ "{timezone}": tz, "{week}": scheduleWeekLabel(tz, config.scheduleWeekAhead !== false), "{count}": `${slots.length} stream${slots.length === 1 ? "" : "s"}` }}
+        tokenValues={{ "{timezone}": tz, "{when}": "This week", "{week}": scheduleWeekLabel(tz, false), "{count}": `${slots.length} stream${slots.length === 1 ? "" : "s"}`, "{tips}": SCHEDULE_TIPS }}
       />
     </div>
   );

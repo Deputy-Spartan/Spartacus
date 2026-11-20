@@ -38,6 +38,7 @@ router.put("/guilds/:guildId/stream-extras", requireAuth, requireGuildPermission
   for (const k of ["clipsEnabled", "clipsWeekly", "scheduleCreateEvents", "scheduleWeekAhead", "rewardsEnabled"]) if (typeof b[k] === "boolean") data[k] = b[k];
   if ("clipsMinViews" in b) data.clipsMinViews = int(b.clipsMinViews, 0, 100000, 0);
   if ("clipsWeeklyDay" in b) data.clipsWeeklyDay = int(b.clipsWeeklyDay, 0, 6, 0);
+  if ("scheduleWeeksAhead" in b) data.scheduleWeeksAhead = int(b.scheduleWeeksAhead, 0, 4, 1);
   if ("rewardCoins" in b) data.rewardCoins = int(b.rewardCoins, 0, 100000, 10);
   if ("rewardXp" in b) data.rewardXp = int(b.rewardXp, 0, 100000, 10);
   if ("rewardIntervalMin" in b) data.rewardIntervalMin = int(b.rewardIntervalMin, 5, 120, 10);
@@ -51,7 +52,7 @@ router.put("/guilds/:guildId/stream-extras", requireAuth, requireGuildPermission
     data.scheduleHash = null;
   }
   const config = await prisma.streamExtrasConfig.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });
-  const touchedSchedule = ["scheduleChannelId", "scheduleTimezone", "scheduleCreateEvents", "scheduleEmbedId", "scheduleWeekAhead"].some((k) => k in data && (data as Record<string, unknown>)[k] !== (before as Record<string, unknown> | null)?.[k]);
+  const touchedSchedule = ["scheduleChannelId", "scheduleTimezone", "scheduleCreateEvents", "scheduleEmbedId", "scheduleWeekAhead", "scheduleWeeksAhead"].some((k) => k in data && (data as Record<string, unknown>)[k] !== (before as Record<string, unknown> | null)?.[k]);
   const client = getBotClient();
   let scheduleNote: string | null = null;
   if (touchedSchedule && client) {

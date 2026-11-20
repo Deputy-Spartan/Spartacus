@@ -3218,6 +3218,8 @@ model StreamExtrasConfig {
   scheduleHash         String?
   scheduleEmbedId      String? // the schedule post's look, built in the dashboard (or a library embed); the days are added under it
   scheduleWeekAhead    Boolean   @default(true) // the post shows next week (Mon-Sun), switching every Monday; false = this week
+  scheduleWeeksAhead   Int       @default(1) // one post per week: 0 = this week only ... 4 = a month out
+  scheduleMessageIds   Json      @default("[]") // the week posts, top to bottom; the last (bottom) one is the active week
   // Viewer rewards (Twitch chat)
   rewardsEnabled       Boolean   @default(false)
   rewardCoins          Int       @default(10)

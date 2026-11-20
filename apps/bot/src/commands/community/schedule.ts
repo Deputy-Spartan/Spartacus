@@ -14,7 +14,7 @@ import {
   type ScheduleRepeat,
 } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
-import { removeSlot, schedulePayload, updateSchedule } from "../../modules/stream/schedule";
+import { removeSlot, schedulePayloads, updateSchedule } from "../../modules/stream/schedule";
 import type { CommandModule } from "../types";
 
 const MAX_SLOTS = 60;
@@ -97,8 +97,9 @@ const command: CommandModule = {
 
     if (sub === "view") {
       const slots = await prisma.streamSlot.findMany({ where: { guildId: guild.id } });
-      const payload = await schedulePayload({ guildId: guild.id, scheduleTimezone: tz, scheduleEmbedId: config?.scheduleEmbedId ?? null }, slots);
-      await interaction.reply({ embeds: payload.embeds, ephemeral: true });
+      // Every week, the active week first, as one private reply.
+      const payloads = await schedulePayloads({ guildId: guild.id, scheduleTimezone: tz, scheduleEmbedId: config?.scheduleEmbedId ?? null, scheduleWeeksAhead: config?.scheduleWeeksAhead ?? 1 }, slots);
+      await interaction.reply({ embeds: payloads.flatMap((p) => p.embeds ?? []).slice(0, 10), ephemeral: true });
       return;
     }
 

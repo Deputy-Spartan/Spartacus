@@ -95,3 +95,22 @@ test("the week post covers Monday to Sunday, a week ahead by default", async () 
   // On a Monday, "a week ahead" is the following Monday.
   assert.equal(scheduleWeekLabel("America/New_York", true, new Date("2026-11-23T18:00:00Z")), "Mon, Nov 30 – Sun, Dec 6");
 });
+
+test("one schedule post per week: active week first, later weeks after, moving forward each Monday", async () => {
+  const { buildScheduleWeeks } = await import("../packages/shared");
+  const tz = "America/New_York";
+  const slot = { id: "a", streamer: "Deputy_Spartan", repeat: "BIWEEKLY", dayOfWeek: 5, startMinutes: 22 * 60, startDate: "2026-11-20", durationMin: 180 };
+  const fri = buildScheduleWeeks([slot], tz, 2, new Date("2026-11-20T15:00:00Z")); // Fri Nov 20, morning
+  assert.deepEqual(fri.map((w) => [w.when, w.label, w.total]), [
+    ["This week", "Fri, Nov 20 – Sun, Nov 22", 1],
+    ["Next week", "Mon, Nov 23 – Sun, Nov 29", 0],
+    ["In 2 weeks", "Mon, Nov 30 – Sun, Dec 6", 1],
+  ]);
+  // The channel shows them in reverse: the furthest week on top, the active week at the bottom.
+  assert.deepEqual([...fri].reverse().map((w) => w.when), ["In 2 weeks", "Next week", "This week"]);
+  // After the week finishes, everything moves up one.
+  const mon = buildScheduleWeeks([slot], tz, 2, new Date("2026-11-23T15:00:00Z"));
+  assert.deepEqual(mon.map((w) => w.label), ["Mon, Nov 23 – Sun, Nov 29", "Mon, Nov 30 – Sun, Dec 6", "Mon, Dec 7 – Sun, Dec 13"]);
+  assert.equal(buildScheduleWeeks([], tz, 4).length, 5); // a month out = 5 posts
+  assert.equal(buildScheduleWeeks([], tz, 0).length, 1); // this week only
+});

@@ -3455,4 +3455,6 @@ model CommandListSettings {
   staffMessageIds Json     @default("[]") // the staff list's messages, same shape
   hash            String?
   updatedAt       DateTime @updatedAt
+  sections        Json     @default("{}") // per category: { on, channelId } — off, or its own channel
+  channelPosts    Json     @default("{}") // channel id → [{key,id,hash}] posted there
 }

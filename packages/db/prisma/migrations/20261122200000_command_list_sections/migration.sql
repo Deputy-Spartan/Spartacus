@@ -1,0 +1,2 @@
+ALTER TABLE "CommandListSettings" ADD COLUMN IF NOT EXISTS "sections" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "CommandListSettings" ADD COLUMN IF NOT EXISTS "channelPosts" JSONB NOT NULL DEFAULT '{}';

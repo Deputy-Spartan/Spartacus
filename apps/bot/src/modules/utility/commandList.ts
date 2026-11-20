@@ -10,7 +10,8 @@ import { commands } from "../../commands";
 // channel with one post per category, as an embed or a plain message. Each
 // command is a Discord command mention, so tapping it (on PC or phone) puts the
 // command straight into the message box. Staff commands can go to their own
-// staff-only channel. Posts are edited in place: adding or removing a command
+// staff-only channel, and each category (section) can be turned off or sent to
+// its own channel. Posts are edited in place: adding or removing a command
 // edits just that category's post.
 
 const CATEGORIES: Array<{ emoji: string; name: string; color: number; names: string[] }> = [
@@ -24,6 +25,15 @@ const CATEGORIES: Array<{ emoji: string; name: string; color: number; names: str
 const OTHER = { emoji: "🧰", name: "More", color: 0x7b99bc, names: [] as string[] };
 const CUSTOM = { emoji: "⭐", name: "This server's commands", color: 0xf0c46a, names: [] as string[] };
 const ORDER = [...CATEGORIES.map((c) => c.name), OTHER.name, CUSTOM.name];
+// Every section, in order, for the dashboard.
+export const COMMAND_SECTIONS = [...CATEGORIES, OTHER, CUSTOM].map((c) => ({ emoji: c.emoji, name: c.name }));
+
+// Per-section settings: off, or posted in its own channel (unset = the main channel).
+export interface SectionSetting {
+  on?: boolean;
+  channelId?: string | null;
+}
+export const sectionsOf = (v: unknown): Record<string, SectionSetting> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, SectionSetting>) : {});
 
 interface Entry {
   mention: string;
@@ -61,9 +71,15 @@ const cleanDesc = (d: string) => d.replace(/^(staff|admins?):\s*/i, "").replace(
 // Every command, grouped by category, for one list. With a staff channel, the
 // main list leaves staff commands out and the staff list has only them.
 export async function buildCommandList(client: Client, guild: Guild, opts: CommandListOptions, audience: ListAudience = "everyone"): Promise<CommandGroup[]> {
-  const ids = await commandIds(client, guild);
   const separate = !!opts.staffChannelId;
   const wanted = (staff: boolean) => (audience === "staff" ? staff : staff ? opts.includeStaff && !separate : true);
+  return (await allCommandGroups(client, guild, opts)).map((g) => ({ ...g, entries: g.entries.filter((e) => wanted(e.staff)) })).filter((g) => g.entries.length);
+}
+
+// Every command, staff or not, grouped by category.
+export async function allCommandGroups(client: Client, guild: Guild, opts: Pick<CommandListOptions, "includeCustom" | "onlyEnabled">): Promise<CommandGroup[]> {
+  const ids = await commandIds(client, guild);
+  const wanted = (_staff: boolean) => true;
   const mention = (full: string, top: string) => (ids.get(top) ? `</${full}:${ids.get(top)}>` : `\`/${full}\``);
   const groups = new Map<string, CommandGroup>();
   const add = (cat: { emoji: string; name: string; color: number }, e: Entry) => {
@@ -197,35 +213,93 @@ export async function syncChannel(client: Client, guildId: string, channelId: st
   return { ok: true, posted };
 }
 
-// Posts both lists (everyone's, and staff's when a staff channel is set), or
-// edits whatever changed.
+type ChannelPosts = Record<string, Posted[]>;
+
+// Which posts are up in which channel. Lists from before sections kept the
+// main and staff channels' posts in their own fields.
+function postedByChannel(s: { channelPosts: unknown; channelId: string | null; staffChannelId: string | null; messageIds: unknown; staffMessageIds: unknown }): ChannelPosts {
+  const out: ChannelPosts = {};
+  if (s.channelPosts && typeof s.channelPosts === "object" && !Array.isArray(s.channelPosts)) {
+    for (const [ch, list] of Object.entries(s.channelPosts as Record<string, unknown>)) out[ch] = postedList(list);
+  }
+  if (s.channelId && postedList(s.messageIds).length) out[s.channelId] = [...(out[s.channelId] ?? []), ...postedList(s.messageIds)];
+  if (s.staffChannelId && postedList(s.staffMessageIds).length) out[s.staffChannelId] = [...(out[s.staffChannelId] ?? []), ...postedList(s.staffMessageIds)];
+  return out;
+}
+
+// Which categories go in which channel. Staff commands go to the staff channel
+// when one is set; a section with its own channel goes there; the rest go to
+// the main channel. Sections turned off are left out everywhere.
+export function planChannels(
+  groups: CommandGroup[],
+  s: { channelId: string | null; staffChannelId: string | null; includeStaff: boolean; sections: unknown }
+): Map<string, CommandGroup[]> {
+  const sections = sectionsOf(s.sections);
+  const plan = new Map<string, CommandGroup[]>();
+  const put = (ch: string | null | undefined, g: CommandGroup) => {
+    if (!ch || !g.entries.length) return;
+    const list = plan.get(ch) ?? [];
+    const same = list.find((x) => x.name === g.name);
+    if (same) same.entries.push(...g.entries);
+    else list.push({ ...g, entries: [...g.entries] });
+    plan.set(ch, list);
+  };
+  for (const g of groups) {
+    const sec = sections[g.name];
+    if (sec?.on === false) continue;
+    const own = sec?.channelId || s.channelId;
+    put(own, { ...g, entries: g.entries.filter((e) => !e.staff || (!s.staffChannelId && s.includeStaff)) });
+    if (s.staffChannelId) put(s.staffChannelId, { ...g, entries: g.entries.filter((e) => e.staff) });
+  }
+  for (const list of plan.values()) list.sort((a, b) => ORDER.indexOf(a.name) - ORDER.indexOf(b.name));
+  // With nothing to show anywhere, the main channel says so (instead of an empty channel).
+  if (s.channelId && !plan.size) plan.set(s.channelId, []);
+  return plan;
+}
+
+// Each section and how many commands it has now, for the dashboard.
+export async function commandListSections(client: Client, guildId: string) {
+  const guild = client.guilds.cache.get(guildId);
+  const settings = await prisma.commandListSettings.findUnique({ where: { guildId } });
+  const groups = guild ? await allCommandGroups(client, guild, { includeCustom: settings?.includeCustom ?? true, onlyEnabled: settings?.onlyEnabled ?? true }) : [];
+  return COMMAND_SECTIONS.map((sec) => {
+    const g = groups.find((x) => x.name === sec.name);
+    return { ...sec, count: g?.entries.length ?? 0, staffCount: g?.entries.filter((e) => e.staff).length ?? 0 };
+  });
+}
+
+// Posts every channel's list, or edits whatever changed. A channel that no
+// longer has anything (a section moved or turned off) has its posts removed.
 export async function refreshCommandList(client: Client, guildId: string, force = false): Promise<{ ok: boolean; error?: string }> {
   const settings = await prisma.commandListSettings.findUnique({ where: { guildId } });
-  if (!settings?.channelId && !settings?.staffChannelId) return { ok: false, error: "Pick a channel for the list first." };
+  if (!settings) return { ok: false, error: "Pick a channel for the list first." };
+  const before = postedByChannel(settings);
+  const anyChannel = settings.channelId || settings.staffChannelId || Object.values(sectionsOf(settings.sections)).some((x) => x?.channelId);
+  if (!anyChannel && !Object.keys(before).length) return { ok: false, error: "Pick a channel for the list first." };
   if (!force && !settings.autoUpdate) return { ok: true };
   const guild = client.guilds.cache.get(guildId);
   if (!guild) return { ok: false, error: "Spartacus isn't in that server." };
+
+  const plan = planChannels(await allCommandGroups(client, guild, settings), settings);
   let error: string | undefined;
-  const data: { messageIds?: Posted[]; staffMessageIds?: Posted[] } = {};
-  if (settings.channelId) {
-    const posts = commandListPosts(await buildCommandList(client, guild, settings, "everyone"), settings.style, "everyone");
-    const r = await syncChannel(client, guildId, settings.channelId, posts, postedList(settings.messageIds), force);
-    data.messageIds = r.posted;
-    if (!r.ok) error = r.error;
-  }
-  if (settings.staffChannelId) {
-    const posts = commandListPosts(await buildCommandList(client, guild, settings, "staff"), settings.style, "staff");
-    const r = await syncChannel(client, guildId, settings.staffChannelId, posts, postedList(settings.staffMessageIds), force);
-    data.staffMessageIds = r.posted;
+  const after: ChannelPosts = {};
+  for (const [ch, groups] of plan) {
+    const audience: ListAudience = ch === settings.staffChannelId && ch !== settings.channelId ? "staff" : "everyone";
+    const r = await syncChannel(client, guildId, ch, commandListPosts(groups, settings.style, audience), before[ch] ?? [], force);
+    after[ch] = r.posted;
     if (!r.ok) error ??= r.error;
   }
-  await prisma.commandListSettings.update({ where: { guildId }, data: data as never });
+  for (const [ch, posted] of Object.entries(before)) {
+    if (plan.has(ch) || !posted.length) continue;
+    const channel = await client.channels.fetch(ch).catch(() => null);
+    if (channel && "messages" in channel) for (const p of posted) await channel.messages.fetch(p.id).then((m) => m.delete()).catch(() => null);
+  }
+  await prisma.commandListSettings.update({ where: { guildId }, data: { channelPosts: after as never, messageIds: [], staffMessageIds: [] } });
   return error ? { ok: false, error } : { ok: true };
 }
-
 // Every few minutes: lists set to update by themselves catch any new, changed or removed command.
 export async function commandListTick(client: Client) {
-  const rows = await prisma.commandListSettings.findMany({ where: { autoUpdate: true, OR: [{ channelId: { not: null } }, { staffChannelId: { not: null } }] }, select: { guildId: true } });
+  const rows = await prisma.commandListSettings.findMany({ where: { autoUpdate: true }, select: { guildId: true } });
   for (const r of rows) {
     if (!client.guilds.cache.has(r.guildId)) continue;
     await refreshCommandList(client, r.guildId).catch((err) => logError("bot", err, r.guildId));

@@ -49,6 +49,13 @@ export function CommandListPost({ guildId }: { guildId: string }) {
     }
   }
 
+  // One section's on/off or channel; the rest stay as they are.
+  function saveSection(name: string, patch: { on?: boolean; channelId?: string | null }) {
+    if (!s) return;
+    const prev = s.sections?.[name] ?? {};
+    void save({ sections: { ...(s.sections ?? {}), [name]: { on: prev.on !== false, channelId: prev.channelId ?? null, ...patch } } });
+  }
+
   if (!s) return <p className="text-slate-400">{msg?.text ?? "Loading…"}</p>;
 
   const row = (title: string, text: string, key: "autoUpdate" | "includeStaff" | "includeCustom" | "onlyEnabled") => (
@@ -107,7 +114,42 @@ export function CommandListPost({ guildId }: { guildId: string }) {
           </button>
           {msg && <span className={`text-xs ${msg.ok ? "text-emerald-400" : "text-rose-400"}`}>{msg.text}</span>}
         </div>
-        <p className={`${hint} mt-3`}>Changing the channel or style removes the old post and posts it fresh in the new place.</p>
+        <p className={`${hint} mt-3`}>Changing a channel moves the posts: the old ones are removed and they&apos;re posted fresh in the new place.</p>
+      </NeonCard>
+
+      <NeonCard>
+        <p className="font-medium mb-1">🗂️ Sections</p>
+        <p className={`${hint} mb-3`}>
+          Turn each category on or off, and pick where it goes. &quot;Main channel&quot; keeps it in the list above. Pick another channel to give that category its own list
+          there (handy for a #stream-commands or #economy channel).
+        </p>
+        <div className="divide-y divide-white/5">
+          {(s.sectionList ?? []).map((sec) => {
+            const cfg = s.sections?.[sec.name] ?? {};
+            const on = cfg.on !== false;
+            const shown = sec.count === undefined ? null : s.staffChannelId || !s.includeStaff ? sec.count - (sec.staffCount ?? 0) : sec.count;
+            return (
+              <div key={sec.name} className="py-3 grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)] gap-2 sm:gap-4 items-center">
+                <div className="flex items-center justify-between gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium truncate ${on ? "" : "text-slate-500 line-through"}`}>
+                      {sec.emoji} {sec.name}
+                    </p>
+                    <p className={hint}>
+                      {shown === null ? "" : shown === 0 ? "No commands right now" : `${shown} command${shown === 1 ? "" : "s"}`}
+                      {s.staffChannelId && sec.staffCount ? ` · ${sec.staffCount} staff in 🔒` : ""}
+                    </p>
+                  </div>
+                  <ToggleSwitch enabled={on} onChange={(v) => saveSection(sec.name, { on: v })} label={`Show ${sec.name}`} />
+                </div>
+                <div className={`min-w-0 ${on ? "" : "opacity-40 pointer-events-none"}`}>
+                  <ChannelSelect guildId={guildId} value={cfg.channelId ?? null} onChange={(id) => saveSection(sec.name, { channelId: id || null })} kind="text" placeholder="Main channel" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {!s.sectionList?.length && <p className={hint}>The bot isn&apos;t connected, so the sections can&apos;t be listed right now.</p>}
       </NeonCard>
     </div>
   );

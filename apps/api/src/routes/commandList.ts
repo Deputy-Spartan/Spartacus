@@ -7,11 +7,21 @@ import { getBotClient } from "../lib/botClient";
 // The command list post (Custom Commands › Command list post).
 const router = Router();
 const P = "/guilds/:guildId/command-list";
-const DEFAULTS = { channelId: null, staffChannelId: null, style: "EMBED", autoUpdate: true, includeStaff: true, includeCustom: true, onlyEnabled: true, posted: false, staffPosted: false };
+const DEFAULTS = { channelId: null, staffChannelId: null, style: "EMBED", autoUpdate: true, includeStaff: true, includeCustom: true, onlyEnabled: true, sections: {}, posted: false, staffPosted: false };
 const has = (v: unknown) => Array.isArray(v) && v.length > 0;
+const SNOWFLAKE = /^\d{15,25}$/;
+type Row = Awaited<ReturnType<typeof prisma.commandListSettings.findUnique>>;
 
-const view = (row: Awaited<ReturnType<typeof prisma.commandListSettings.findUnique>>) =>
-  row
+const anyPosted = (row: NonNullable<Row>) =>
+  has(row.messageIds) || has(row.staffMessageIds) || (!!row.channelPosts && typeof row.channelPosts === "object" && Object.values(row.channelPosts as Record<string, unknown>).some(has));
+
+async function view(guildId: string, row: Row) {
+  // Each section with how many commands it has (needs the bot; without it, just the names).
+  let sectionList: Array<{ emoji: string; name: string; count?: number; staffCount?: number }> = [];
+  const client = getBotClient();
+  const bot = await import("@spartacus/bot").catch(() => null);
+  if (bot) sectionList = client ? await bot.commandListSections(client, guildId).catch(() => bot.COMMAND_SECTIONS) : bot.COMMAND_SECTIONS;
+  const base = row
     ? {
         channelId: row.channelId,
         staffChannelId: row.staffChannelId,
@@ -20,10 +30,13 @@ const view = (row: Awaited<ReturnType<typeof prisma.commandListSettings.findUniq
         includeStaff: row.includeStaff,
         includeCustom: row.includeCustom,
         onlyEnabled: row.onlyEnabled,
-        posted: has(row.messageIds),
-        staffPosted: has(row.staffMessageIds),
+        sections: row.sections ?? {},
+        posted: anyPosted(row),
+        staffPosted: anyPosted(row),
       }
     : DEFAULTS;
+  return { ...base, sectionList };
+}
 
 async function post(guildId: string, force: boolean) {
   const client = getBotClient();
@@ -33,54 +46,54 @@ async function post(guildId: string, force: boolean) {
   return r.ok ? null : (r.error ?? "Couldn't post the list.");
 }
 
-// Removes a list's posts from its old channel.
-async function clear(channelId: string | null | undefined, posted: unknown) {
-  const client = getBotClient();
-  if (!client || !channelId || !Array.isArray(posted)) return;
-  const ch = await client.channels.fetch(channelId).catch(() => null);
-  if (!ch || !("messages" in ch)) return;
-  for (const p of posted) {
-    const id = typeof p === "string" ? p : (p as { id?: string })?.id;
-    if (id) await ch.messages.fetch(id).then((m) => m.delete()).catch(() => null);
+// Only known sections, with an on/off and an optional channel.
+function cleanSections(v: unknown) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+  const out: Record<string, { on: boolean; channelId: string | null }> = {};
+  for (const [name, s] of Object.entries(v as Record<string, unknown>).slice(0, 30)) {
+    if (!s || typeof s !== "object" || name.length > 60) continue;
+    const { on, channelId } = s as { on?: unknown; channelId?: unknown };
+    out[name] = { on: on !== false, channelId: typeof channelId === "string" && SNOWFLAKE.test(channelId) ? channelId : null };
   }
+  return out;
 }
 
 router.get(P, requireAuth, requireGuildPermission, async (req, res) => {
-  res.json(view(await prisma.commandListSettings.findUnique({ where: { guildId: req.params.guildId } })));
+  res.json(await view(req.params.guildId, await prisma.commandListSettings.findUnique({ where: { guildId: req.params.guildId } })));
 });
 
 router.put(P, requireAuth, requireGuildPermission, async (req, res) => {
   const guildId = req.params.guildId;
   const b = (req.body ?? {}) as Record<string, unknown>;
-  const channel = (v: unknown) => (typeof v === "string" && /^\d{15,25}$/.test(v) ? v : null);
+  const channel = (v: unknown) => (typeof v === "string" && SNOWFLAKE.test(v) ? v : null);
   const data: Record<string, unknown> = {};
   if ("channelId" in b) data.channelId = channel(b.channelId);
   if ("staffChannelId" in b) data.staffChannelId = channel(b.staffChannelId);
   if ("style" in b) data.style = b.style === "PLAIN" ? "PLAIN" : "EMBED";
+  if ("sections" in b) data.sections = cleanSections(b.sections);
   for (const k of ["autoUpdate", "includeStaff", "includeCustom", "onlyEnabled"]) if (typeof b[k] === "boolean") data[k] = b[k];
   const before = await prisma.commandListSettings.findUnique({ where: { guildId } });
-  const restyled = "style" in data && data.style !== before?.style;
-  // A new channel or style gets a fresh post (the old one is removed while it's still known).
-  if (("channelId" in data && data.channelId !== before?.channelId) || restyled) {
-    await clear(before?.channelId, before?.messageIds);
+  // Lists from before sections: note where their posts are while the old channels are still known.
+  if (before && (has(before.messageIds) || has(before.staffMessageIds))) {
+    const map: Record<string, unknown[]> = { ...((before.channelPosts as Record<string, unknown[]>) ?? {}) };
+    if (before.channelId && has(before.messageIds)) map[before.channelId] = [...(map[before.channelId] ?? []), ...(before.messageIds as unknown[])];
+    if (before.staffChannelId && has(before.staffMessageIds)) map[before.staffChannelId] = [...(map[before.staffChannelId] ?? []), ...(before.staffMessageIds as unknown[])];
+    data.channelPosts = map;
     data.messageIds = [];
-  }
-  if (("staffChannelId" in data && data.staffChannelId !== before?.staffChannelId) || restyled) {
-    await clear(before?.staffChannelId, before?.staffMessageIds);
     data.staffMessageIds = [];
   }
   const row = await prisma.commandListSettings.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });
+  // A new place, style or section setup always posts (old posts are removed by the bot); other changes follow "Update by itself".
+  const moved = ["channelId", "staffChannelId", "style", "sections"].some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify((before as Record<string, unknown> | null)?.[k] ?? null));
   const changed = Object.keys(data).some((k) => k !== "autoUpdate");
-  // A new place or style always posts; other changes follow "Update by itself".
-  const moved = "messageIds" in data || "staffMessageIds" in data;
-  const error = (row.channelId || row.staffChannelId) && changed ? await post(guildId, moved) : null;
-  res.json({ ...view(await prisma.commandListSettings.findUnique({ where: { guildId } })), error });
+  const error = changed ? await post(guildId, moved) : null;
+  res.json({ ...(await view(guildId, await prisma.commandListSettings.findUnique({ where: { guildId } }))), error: row.channelId || moved ? error : null });
 });
 
 router.post(`${P}/post`, requireAuth, requireGuildPermission, async (req, res) => {
   const error = await post(req.params.guildId, true);
   if (error) return res.status(400).json({ error });
-  res.json(view(await prisma.commandListSettings.findUnique({ where: { guildId: req.params.guildId } })));
+  res.json(await view(req.params.guildId, await prisma.commandListSettings.findUnique({ where: { guildId: req.params.guildId } })));
 });
 
 // Any change to the server's own commands or module switches updates the lists

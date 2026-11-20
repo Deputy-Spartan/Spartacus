@@ -226,6 +226,9 @@ export interface CommandListSettingsRow {
   includeCustom: boolean;
   onlyEnabled: boolean;
   posted: boolean;
+  // Each category: turned off, or posted in its own channel (unset = the main channel).
+  sections: Record<string, { on?: boolean; channelId?: string | null }>;
+  sectionList?: Array<{ emoji: string; name: string; count?: number; staffCount?: number }>;
 }
 export interface StreamSlotRow {
   id: string;

@@ -210,7 +210,7 @@ export { openTournament, tournamentCheckIn, startTournamentNow, setTieWinner, re
 // Re-exported so apps/api's Playing Now page can post the panel and make roles.
 export { syncPlayingNowPanel, createPlayingNowRoles } from "./modules/engagement/playingNow";
 export { syncTempPanel } from "./modules/community/tempChannelPanel";
-export { refreshCommandList, buildCommandList, commandListPosts } from "./modules/utility/commandList";
+export { refreshCommandList, buildCommandList, commandListPosts, commandListSections, COMMAND_SECTIONS } from "./modules/utility/commandList";
 export { startBoardSeason, syncBoard } from "./modules/matches/leaderboard";
 
 export function startBot() {

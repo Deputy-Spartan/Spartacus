@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* iPhone Safari gives date and time boxes their own minimum width and height,
+   so they spill out of their column and overlap the box next to them. This
+   makes them fill their space like every other box. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  min-height: 42px;
+  line-height: normal;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+
 /* The accent color every highlight uses, as "r g b". Each theme can set its
    own below; a person's own pick (Account settings) is set on <html> and
    wins over both. */

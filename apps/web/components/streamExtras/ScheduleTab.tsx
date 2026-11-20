@@ -73,7 +73,11 @@ interface FormState {
   streamTitle: string;
   message: string;
 }
-const today = () => new Date().toISOString().slice(0, 10);
+// Today on this device (not in UTC, which is already tomorrow late in the evening in the US).
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const EMPTY: FormState = { streamer: "", userId: null, repeat: "WEEKLY", day: 5, date: "", time: "19:00", hours: 2, game: "", same: true, on: [], links: {}, cats: {}, streamTitle: "", message: "" };
 
 function fromSlot(s: StreamSlotRow): FormState {
@@ -526,15 +530,21 @@ function StreamForm({ guildId, tz, editing, onCancel, onSaved }: { guildId: stri
             <label className={label} htmlFor="sched-date">
               {f.repeat === "ONCE" ? "Date" : "First stream"}
             </label>
-            <input id="sched-date" type="date" className={field} value={f.date} min={today()} onChange={(e) => set({ date: e.target.value })} />
+            <input id="sched-date" type="date" className={`${field} h-[42px]`} value={f.date} min={today()} onChange={(e) => set({ date: e.target.value })} />
+            {f.date && (
+              <p className={`${hint} mt-1`}>
+                That&apos;s a <b className="text-slate-300">{DAY_NAMES[new Date(f.date + "T12:00:00Z").getUTCDay()]}</b>
+                {f.repeat === "BIWEEKLY" ? ", so it repeats every other " + DAY_NAMES[new Date(f.date + "T12:00:00Z").getUTCDay()] : ""}.
+              </p>
+            )}
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="min-w-0">
+        <div className="grid grid-cols-2 gap-3 items-start">
+          <div className="min-w-0 overflow-hidden">
             <label className={label} htmlFor="sched-time">
               Starts
             </label>
-            <input id="sched-time" type="time" className={`${field} h-[42px]`} value={f.time} onChange={(e) => set({ time: e.target.value })} />
+            <input id="sched-time" type="time" className={`${field} h-[42px] py-0`} value={f.time} onChange={(e) => set({ time: e.target.value })} />
           </div>
           <div className="min-w-0">
             <label className={label} htmlFor="sched-hours">

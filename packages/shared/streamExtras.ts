@@ -411,7 +411,32 @@ function weekLine(s: BoardSlot, at: Date): string {
 // ("Thu – Fri · No streams") so a quiet week stays short.
 export function buildWeekBoard(slots: BoardSlot[], timeZone: string, weekAhead: boolean, from = new Date()) {
   const tz = isValidTimezone(timeZone) ? timeZone : "UTC";
-  const mon = scheduleWeekStart(tz, weekAhead, from);
+  // A week ahead: the rest of this week (from today), then all of next week,
+  // so what's still coming up this week never drops off. Otherwise this week.
+  if (weekAhead) {
+    const zoned = new Date(from.getTime() + zoneOffsetMs(from.getTime(), tz));
+    const today = { y: zoned.getUTCFullYear(), m: zoned.getUTCMonth(), d: zoned.getUTCDate() };
+    const thisMon = scheduleWeekStart(tz, false, from);
+    const nextMon = scheduleWeekStart(tz, true, from);
+    const daysLeft = 7 - ((new Date(Date.UTC(today.y, today.m, today.d)).getUTCDay() + 6) % 7);
+    const a = weekSection(slots, tz, today, daysLeft, from, true);
+    const b = weekSection(slots, tz, nextMon, 7, from, false);
+    const fields = [
+      { name: "🗓️ This week", value: `-# ${fmtDay(today.y, today.m, today.d)} – ${fmtDay(thisMon.y, thisMon.m, thisMon.d + 6)}` },
+      ...a.fields,
+      { name: "🗓️ Next week", value: `-# ${fmtDay(nextMon.y, nextMon.m, nextMon.d)} – ${fmtDay(nextMon.y, nextMon.m, nextMon.d + 6)}` },
+      ...b.fields,
+    ];
+    return { fields: fields.slice(0, 25), total: a.total + b.total, label: `${fmtDay(today.y, today.m, today.d)} – ${fmtDay(nextMon.y, nextMon.m, nextMon.d + 6)}` };
+  }
+  const mon = scheduleWeekStart(tz, false, from);
+  const s = weekSection(slots, tz, mon, 7, from, true);
+  return { fields: s.fields, total: s.total, label: scheduleWeekLabel(tz, false, from) };
+}
+
+// `days` days starting on `start`. On today, a stream that's live right now still shows.
+function weekSection(slots: BoardSlot[], tz: string, start0: { y: number; m: number; d: number }, days: number, from: Date, includesToday: boolean) {
+  const mon = start0;
   const fields: Array<{ name: string; value: string }> = [];
   let total = 0;
   let empty: Array<{ y: number; m: number; d: number }> = [];
@@ -423,13 +448,14 @@ export function buildWeekBoard(slots: BoardSlot[], timeZone: string, weekAhead: 
     fields.push({ name: empty.length === 1 ? `${dayA} · ${fmtDay(a.y, a.m, a.d, false)}` : `${dayA} – ${dayB}`, value: "-# No streams" });
     empty = [];
   };
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < days; i++) {
     const day = new Date(Date.UTC(mon.y, mon.m, mon.d + i));
     const y = day.getUTCFullYear(), m = day.getUTCMonth(), d = day.getUTCDate();
     const start = new Date(wallInstant(tz, y, m, d, 0));
     const end = new Date(wallInstant(tz, y, m, d + 1, 0));
+    const isToday = includesToday && from.getTime() >= start.getTime() && from.getTime() < end.getTime();
     const items = slots
-      .flatMap((s) => occurrencesBetween(tz, s, start, end).map((at) => ({ s, at })))
+      .flatMap((s) => occurrencesBetween(tz, s, isToday ? new Date(Math.max(start.getTime(), from.getTime() - s.durationMin * 60_000)) : start, end).map((at) => ({ s, at })))
       .sort((p, q) => p.at.getTime() - q.at.getTime());
     if (!items.length) {
       empty.push({ y, m, d });
@@ -437,10 +463,10 @@ export function buildWeekBoard(slots: BoardSlot[], timeZone: string, weekAhead: 
     }
     flush();
     total += items.length;
-    fields.push({ name: `📆 ${DAY_NAMES[day.getUTCDay()]} · ${fmtDay(y, m, d, false)}`, value: fitField(items.map(({ s, at }) => weekLine(s, at))) });
+    fields.push({ name: `📆 ${isToday ? "Today · " : ""}${DAY_NAMES[day.getUTCDay()]} · ${fmtDay(y, m, d, false)}`, value: fitField(items.map(({ s, at }) => weekLine(s, at))) });
   }
   flush();
-  return { fields, total, label: scheduleWeekLabel(tz, weekAhead, from) };
+  return { fields, total };
 }
 
 export const SCHEDULE_POST_DEFAULTS = {

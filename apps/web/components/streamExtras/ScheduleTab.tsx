@@ -174,7 +174,7 @@ export function ScheduleTab({
             <p className="text-sm font-medium">Post a week ahead</p>
             <p className={hint}>
               {config.scheduleWeekAhead !== false
-                ? `On: the post shows next week, Monday to Sunday (${scheduleWeekLabel(config.scheduleTimezone, true)} right now), and switches every Monday.`
+                ? `On: the post shows the rest of this week plus all of next week (${scheduleWeekLabel(config.scheduleTimezone, true)}), so viewers can plan ahead and still see what's on today.`
                 : `Off: the post shows this week, Monday to Sunday (${scheduleWeekLabel(config.scheduleTimezone, false)}).`}
             </p>
           </div>

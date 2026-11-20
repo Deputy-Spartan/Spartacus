@@ -10,11 +10,11 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
+import { AllCommands } from "../../../../components/commands/AllCommands";
 import {
   api,
   type AutomodConfig,
   type AutoPurgeConfigRow,
-  type CommandToggleRow,
   type DiscordChannelOption,
   type DiscordRoleOption,
   type LoggingConfig,
@@ -774,23 +774,6 @@ function AutoPurgeTab({ guildId }: { guildId: string }) {
 }
 
 function CommandsTab({ guildId }: { guildId: string }) {
-  const [commands, setCommands] = useState<CommandToggleRow[] | null>(null);
-  const [query, setQuery] = useState("");
-
-  function refreshToggles() {
-    api.getCommandToggles(guildId).then(setCommands);
-  }
-  useEffect(refreshToggles, [guildId]);
-
-  async function toggle(name: string, next: boolean) {
-    setCommands((prev) => (prev ? prev.map((c) => (c.name === name ? { ...c, enabled: next } : c)) : prev));
-    await api.setCommandToggle(guildId, name, next).catch(() => {
-      setCommands((prev) => (prev ? prev.map((c) => (c.name === name ? { ...c, enabled: !next } : c)) : prev));
-    });
-  }
-
-  const filtered = commands?.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()));
-
   return (
     <div className="space-y-4">
       <NeonCard>
@@ -804,31 +787,7 @@ function CommandsTab({ guildId }: { guildId: string }) {
         </p>
       </NeonCard>
 
-      <NeonCard>
-        <p className="font-medium mb-3">All Commands</p>
-        <input
-          className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
-          placeholder="Search commands…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {!commands && <p className="text-sm text-slate-500">Loading…</p>}
-        {commands && filtered?.length === 0 && <p className="text-sm text-slate-500">No commands match "{query}".</p>}
-        <div className="divide-y divide-white/5">
-          {filtered?.map((c) => (
-            <div key={c.name} className="flex items-center justify-between py-2.5 gap-3">
-              <div className="min-w-0">
-                <p className="text-sm text-slate-200">
-                  /{c.name}
-                  {c.moduleKey && <span className="text-slate-600 text-xs ml-2">{c.moduleKey}</span>}
-                </p>
-                <p className="text-xs text-slate-500 truncate">{c.description}</p>
-              </div>
-              <ToggleSwitch enabled={c.enabled} onChange={(v) => toggle(c.name, v)} label={`Toggle /${c.name}`} />
-            </div>
-          ))}
-        </div>
-      </NeonCard>
+      <AllCommands guildId={guildId} />
     </div>
   );
 }

@@ -310,6 +310,17 @@ async function route(interaction: Interaction) {
       return;
     }
 
+    // Role lock (Commands tab): only the picked role or anyone above it. Admins and the owner always pass.
+    if (toggle?.minRoleId && interaction.inCachedGuild()) {
+      const role = interaction.guild.roles.cache.get(toggle.minRoleId);
+      const member = interaction.member;
+      const allowed = !role || member.permissions.has("Administrator") || interaction.guild.ownerId === member.id || member.roles.highest.position >= role.position;
+      if (!allowed) {
+        await interaction.reply({ content: `🔒 \`/${interaction.commandName}\` is only for ${role} and higher.`, ephemeral: true, allowedMentions: { parse: [] } });
+        return;
+      }
+    }
+
     const command = commands.get(interaction.commandName);
 
     if (command) {

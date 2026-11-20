@@ -105,7 +105,7 @@ router.post(`${P}/post`, requireAuth, requireGuildPermission, async (req, res) =
 
 // Any change to the server's own commands or module switches updates the lists
 // straight away (lists set to update by themselves), instead of waiting for the bot's 5-minute check.
-const WATCH = /^\/guilds\/(\d{15,25})\/(commands|custom-slash-commands|modules)(\/|$)/;
+const WATCH = /^\/guilds\/(\d{15,25})\/(commands|custom-slash-commands|modules|command-toggles)(\/|$)/;
 export function commandListWatcher(req: Request, res: Response, next: NextFunction) {
   const m = req.method !== "GET" ? req.path.match(WATCH) : null;
   if (m) {

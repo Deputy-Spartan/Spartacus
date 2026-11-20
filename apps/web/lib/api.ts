@@ -486,6 +486,10 @@ export interface CommandToggleRow {
   description: string;
   moduleKey: string | null;
   enabled: boolean;
+  section?: { emoji: string; name: string };
+  subs?: string[];
+  staff?: boolean;
+  minRoleId?: string | null;
 }
 
 export type LfgMode = "plain" | "embed";
@@ -2238,6 +2242,8 @@ export const api = {
   getCommandToggles: (guildId: string) => request<CommandToggleRow[]>(`/guilds/${guildId}/command-toggles`),
   setCommandToggle: (guildId: string, name: string, enabled: boolean) =>
     request(`/guilds/${guildId}/command-toggles/${name}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+  setCommandRoleLock: (guildId: string, name: string, minRoleId: string | null) =>
+    request(`/guilds/${guildId}/command-toggles/${name}`, { method: "PATCH", body: JSON.stringify({ minRoleId }) }),
 
   getCustomSlashCommands: (guildId: string) => request<CustomSlashCommandRow[]>(`/guilds/${guildId}/custom-slash-commands`),
   createCustomSlashCommand: (guildId: string, c: import("@spartacus/shared").CommandDraft) =>

@@ -25,6 +25,11 @@ const CATEGORIES: Array<{ emoji: string; name: string; color: number; names: str
 const OTHER = { emoji: "🧰", name: "More", color: 0x7b99bc, names: [] as string[] };
 const CUSTOM = { emoji: "⭐", name: "This server's commands", color: 0xf0c46a, names: [] as string[] };
 const ORDER = [...CATEGORIES.map((c) => c.name), OTHER.name, CUSTOM.name];
+// Which section a top-level command belongs to (for the dashboard's All commands tab).
+export const sectionOfCommand = (name: string) => {
+  const c = CATEGORIES.find((x) => x.names.includes(name)) ?? OTHER;
+  return { emoji: c.emoji, name: c.name };
+};
 // Every section, in order, for the dashboard.
 export const COMMAND_SECTIONS = [...CATEGORIES, OTHER, CUSTOM].map((c) => ({ emoji: c.emoji, name: c.name }));
 
@@ -82,7 +87,9 @@ export async function allCommandGroups(client: Client, guild: Guild, opts: Pick<
   const wanted = (_staff: boolean) => true;
   const mention = (full: string, top: string) => (ids.get(top) ? `</${full}:${ids.get(top)}>` : `\`/${full}\``);
   const groups = new Map<string, CommandGroup>();
-  const add = (cat: { emoji: string; name: string; color: number }, e: Entry) => {
+  // Commands switched off on the All commands tab are left out.
+  const off = new Set((await prisma.commandToggle.findMany({ where: { guildId: guild.id, enabled: false }, select: { commandName: true } })).map((t) => t.commandName));
+  const add =(cat: { emoji: string; name: string; color: number }, e: Entry) => {
     if (!wanted(e.staff)) return;
     const g = groups.get(cat.name) ?? { emoji: cat.emoji, name: cat.name, color: cat.color, entries: [] };
     g.entries.push(e);
@@ -90,6 +97,7 @@ export async function allCommandGroups(client: Client, guild: Guild, opts: Pick<
   };
   for (const cmd of commands.values()) {
     const json = cmd.data.toJSON();
+    if (off.has(json.name)) continue;
     if (opts.onlyEnabled && cmd.moduleKey && !(await isModuleEnabled(guild.id, cmd.moduleKey))) continue;
     const cmdStaff = json.default_member_permissions != null;
     const cat = CATEGORIES.find((c) => c.names.includes(json.name)) ?? OTHER;
@@ -105,7 +113,7 @@ export async function allCommandGroups(client: Client, guild: Guild, opts: Pick<
       prisma.customSlashCommand.findMany({ where: { guildId: guild.id, enabled: true }, orderBy: { name: "asc" } }),
       prisma.customCommand.findMany({ where: { guildId: guild.id }, orderBy: { trigger: "asc" } }),
     ]);
-    for (const c of slash) add(CUSTOM, { mention: c.discordCommandId ? `</${c.name}:${c.discordCommandId}>` : `\`/${c.name}\``, description: c.description, staff: c.access === "MODS" || c.access === "ADMINS" });
+    for (const c of slash.filter((x) => !off.has(x.name))) add(CUSTOM, { mention: c.discordCommandId ? `</${c.name}:${c.discordCommandId}>` : `\`/${c.name}\``, description: c.description, staff: c.access === "MODS" || c.access === "ADMINS" });
     for (const t of triggers) add(CUSTOM, { mention: `\`!${t.trigger}\``, description: "Type it in chat", staff: false });
   }
   return [...groups.values()].sort((a, b) => ORDER.indexOf(a.name) - ORDER.indexOf(b.name));
@@ -117,8 +125,8 @@ const lineOf = (e: Entry, markStaff: boolean) => `${e.mention} — ${e.descripti
 // so it can be edited on its own later.
 export function commandListPosts(groups: CommandGroup[], style: string, audience: ListAudience = "everyone"): Array<{ key: string; payload: BaseMessageOptions }> {
   const total = groups.reduce((n, g) => n + g.entries.length, 0);
-  const header = audience === "staff" ? `**🔒 Staff commands** · only staff can see this channel · ${total} command${total === 1 ? "" : "s"}` : `**📜 Spartacus commands** · tap one to put it in your message box · ${total} command${total === 1 ? "" : "s"}`;
-  const markStaff = audience === "everyone";
+  const header = audience === "staff" ? `**🔒 Every command** · staff view, staff-only ones marked \`STAFF\` · ${total} command${total === 1 ? "" : "s"}` : `**📜 Spartacus commands** · tap one to put it in your message box · ${total} command${total === 1 ? "" : "s"}`;
+  const markStaff = true;
   const posts: Array<{ key: string; payload: BaseMessageOptions }> = [];
   groups.forEach((g, gi) => {
     // Split a category's lines into chunks that fit one embed description (4,096) or message (2,000).
@@ -179,7 +187,7 @@ function isListPost(m: Message, botId: string) {
   if (m.author.id !== botId) return false;
   if (m.embeds.some((e) => e.footer?.text?.endsWith("updates by itself"))) return true;
   const c = m.content ?? "";
-  return /^(\*\*📜 Spartacus commands\*\*|\*\*🔒 Staff commands\*\*|### )/.test(c) && (c.includes("</") || c.includes("Nothing to show yet"));
+  return /^(\*\*📜 Spartacus commands\*\*|\*\*🔒 Staff commands\*\*|\*\*🔒 Every command\*\*|### )/.test(c) && (c.includes("</") || c.includes("Nothing to show yet"));
 }
 
 // Removes stray list posts in the channel that aren't being tracked (left over
@@ -269,13 +277,16 @@ export function planChannels(
     else list.push({ ...g, entries: [...g.entries] });
     plan.set(ch, list);
   };
+  // The 🔒 staff channel shows every command (member and staff), whatever the rows below say.
+  const staffCh = s.staffChannelId && s.includeStaff ? s.staffChannelId : null;
+  if (staffCh) for (const g of groups) put(staffCh, g);
   for (const g of groups) {
     const sec = sections[g.name];
     if (sec?.on === false) continue;
     const own = sec?.channelId || s.channelId;
-    // Staff commands only ever go in the staff row's channel (off = shown nowhere).
+    if (own === staffCh) continue; // already all there
+    // Staff commands never go in the member cards (off = only in the staff channel).
     put(own, { ...g, entries: g.entries.filter((e) => !e.staff) });
-    if (s.staffChannelId && s.includeStaff) put(s.staffChannelId, { ...g, entries: g.entries.filter((e) => e.staff) });
   }
   for (const list of plan.values()) list.sort((a, b) => ORDER.indexOf(a.name) - ORDER.indexOf(b.name));
   // With nothing to show anywhere, the main channel says so (instead of an empty channel).
@@ -335,7 +346,7 @@ async function refreshOnce(client: Client, guildId: string, force: boolean, edit
   let error: string | undefined;
   const after: ChannelPosts = {};
   for (const [ch, groups] of plan) {
-    const audience: ListAudience = ch === settings.staffChannelId && ch !== settings.channelId ? "staff" : "everyone";
+    const audience: ListAudience = ch === settings.staffChannelId && settings.includeStaff ? "staff" : "everyone";
     const r = await syncChannel(client, guildId, ch, commandListPosts(groups, settings.style, audience), before[ch] ?? [], editAll);
     after[ch] = r.posted;
     if (!r.ok) error ??= r.error;

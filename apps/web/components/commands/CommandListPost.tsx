@@ -75,7 +75,7 @@ export function CommandListPost({ guildId }: { guildId: string }) {
   if (!s) return <p className="text-slate-400">{msg?.text ?? "Loading…"}</p>;
 
   const list = s.sectionList ?? [];
-  const staffTotal = list.reduce((n, sec) => n + (sec.staffCount ?? 0), 0);
+  const staffTotal = list.reduce((n, sec) => n + (sec.count ?? 0), 0);
   const staffOn = s.includeStaff;
   const anyChannel = !!s.channelId || !!s.staffChannelId || Object.values(s.sections ?? {}).some((x) => x?.channelId);
 
@@ -108,8 +108,8 @@ export function CommandListPost({ guildId }: { guildId: string }) {
         <div className={`rounded-lg border p-3 mb-2 ${staffOn ? "border-rose-500/30 bg-rose-500/5" : "border-white/10"}`}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className={`text-sm font-medium ${staffOn ? "" : "text-slate-500 line-through"}`}>🔒 Staff commands</p>
-              <p className={hint}>{staffTotal ? `${staffTotal} commands from every category · ` : ""}only staff should see this channel</p>
+              <p className={`text-sm font-medium ${staffOn ? "" : "text-slate-500 line-through"}`}>🔒 Staff list: every command</p>
+              <p className={hint}>{staffTotal ? `All ${staffTotal} commands, staff-only ones marked STAFF · ` : ""}only staff should see this channel</p>
             </div>
             <ToggleSwitch enabled={staffOn} onChange={(v) => save({ includeStaff: v })} label="Post staff commands" />
           </div>
@@ -118,7 +118,7 @@ export function CommandListPost({ guildId }: { guildId: string }) {
           </div>
           {staffOn && !s.staffChannelId && <p className="text-xs text-amber-400 mt-1">Pick a channel, or staff commands won&apos;t be posted anywhere.</p>}
         </div>
-        <p className={`${hint} mb-2`}>Staff commands never show in the category cards below. They only appear in the 🔒 row&apos;s channel.</p>
+        <p className={`${hint} mb-2`}>The 🔒 channel always shows every command. Staff-only commands never show in the member cards below.</p>
 
         <div className="divide-y divide-white/5">
           {list.map((sec) => {
@@ -135,7 +135,7 @@ export function CommandListPost({ guildId }: { guildId: string }) {
                     </p>
                     <p className={hint}>
                       {members === null ? "" : members === 0 ? "No member commands right now" : `${members} command${members === 1 ? "" : "s"}`}
-                      {sec.staffCount ? ` · ${sec.staffCount} staff in 🔒` : ""}
+                      {sec.staffCount ? ` · +${sec.staffCount} staff-only (in 🔒)` : ""}
                     </p>
                   </div>
                   <ToggleSwitch enabled={on} onChange={(v) => saveSection(sec.name, { on: v })} label={`Post ${sec.name}`} />

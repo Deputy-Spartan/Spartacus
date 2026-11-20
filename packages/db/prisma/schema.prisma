@@ -1869,6 +1869,7 @@ model CommandToggle {
   guildId     String
   commandName String
   enabled     Boolean @default(true)
+  minRoleId   String? // only this role or higher (or admins) can use it; others get a hidden warning
 
   @@unique([guildId, commandName])
 }

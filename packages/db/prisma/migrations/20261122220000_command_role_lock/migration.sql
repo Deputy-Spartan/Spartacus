@@ -1,0 +1,1 @@
+ALTER TABLE "CommandToggle" ADD COLUMN IF NOT EXISTS "minRoleId" TEXT;

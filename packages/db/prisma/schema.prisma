@@ -3005,6 +3005,7 @@ model EconomyPlus {
   shopPanelMessageId String?
   shopPanelTitle     String?
   shopPanelText      String?
+  shopPanelEmbedId   String? // the shop panel's embed built in the dashboard (or a library embed); unset = title/text above
   cratesEnabled      Boolean  @default(false)
   crateEveryLevels   Int      @default(5)
   crateOnStreak      Boolean  @default(true)

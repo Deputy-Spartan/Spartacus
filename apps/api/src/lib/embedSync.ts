@@ -1,7 +1,8 @@
 import { prisma } from "@spartacus/db";
-import { editChannelMessage, editWebhookMessage } from "./discordRest";
+import { deleteChannelMessage, editChannelMessage, editWebhookMessage } from "./discordRest";
 import { buildMessagePayload, type BuilderEmbed, type BuilderComponentRow } from "./embedCreatorPayload";
 import { getBotClient } from "./botClient";
+import { refreshPanelOrRepost } from "./panelRefresh";
 
 export interface SyncResult {
   updated: number;
@@ -42,11 +43,22 @@ export async function syncPresetUsage(guildId: string, presetId: string): Promis
   const targets: Target[] = [];
   const where = { guildId, savedEmbedId: presetId, messageId: { not: null } } as const;
 
+  // Role panels are redrawn by the bot, so their {options} list and buttons stay right.
   for (const p of await prisma.reactionRolePanel.findMany({ where })) {
-    targets.push({ label: `Reaction role panel "${p.title ?? "untitled"}"`, channelId: p.channelId, messageId: p.messageId! });
+    await refreshPanelOrRepost("reaction", p.id, p.channelId, p.messageId!).catch(() => null);
+    result.updated++;
+    result.places.push(`Reaction role panel "${p.title ?? "untitled"}"`);
   }
   for (const p of await prisma.rolePanel.findMany({ where })) {
-    targets.push({ label: `Role panel "${p.name}"`, channelId: p.channelId, messageId: p.messageId! });
+    await refreshPanelOrRepost("panel", p.id, p.channelId, p.messageId!).catch(() => null);
+    result.updated++;
+    result.places.push(`Role panel "${p.name}"`);
+  }
+  // The shop panel is reposted by the bot within a minute (it fills in the currency).
+  for (const s of await prisma.economyPlus.findMany({ where: { guildId, shopPanelEmbedId: presetId, shopPanelMessageId: { not: null } } })) {
+    if (s.shopPanelChannelId) await deleteChannelMessage(s.shopPanelChannelId, s.shopPanelMessageId!).catch(() => null);
+    await prisma.economyPlus.update({ where: { guildId: s.guildId }, data: { shopPanelMessageId: null } });
+    result.places.push("Shop panel");
   }
   for (const p of await prisma.ticketPanel.findMany({ where })) {
     targets.push({ label: `Ticket panel "${p.name}"`, channelId: p.channelId, messageId: p.messageId! });

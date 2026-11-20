@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ModuleKey } from "@spartacus/shared";
 import {
   CHAMP_CATEGORIES,
@@ -37,6 +37,7 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type EconomyHubView, type ShopItemRow } from "../../../../lib/api";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 
 const field = "w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
 const select = "bg-base-950 border border-white/10 rounded-lg px-2.5 py-2 text-sm";
@@ -234,6 +235,9 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
   const confirm = useConfirm();
   const [tab, setTabState] = useState<Tab>("start");
   const [hub, setHub] = useState<EconomyHubView | null>(null);
+  // The latest hub, for saves that land after a re-render (the panel's message box).
+  const hubRef = useRef(hub);
+  hubRef.current = hub;
   const [modules, setModules] = useState<Record<HubModule, boolean>>({ LEVELING: false, ECONOMY: false, PRESTIGE: false, VOICE_ACTIVITY: false, ACHIEVEMENTS: false, PROFILE_CARDS: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,9 +265,10 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
   if (!hub) return <p className="text-slate-400">{error ?? "Loading…"}</p>;
   const s = hub.settings;
 
-  async function save(next: Partial<EconomyPlusSettings>, panel = hub!.panel, repost = false) {
-    const body = { settings: { ...hub!.settings, ...next }, panel, repost };
-    setHub({ ...hub!, settings: body.settings, panel });
+  async function save(next: Partial<EconomyPlusSettings>, panel = hubRef.current!.panel, repost = false) {
+    const cur = hubRef.current!;
+    const body = { settings: { ...cur.settings, ...next }, panel, repost };
+    setHub({ ...cur, settings: body.settings, panel });
     setSaving(true);
     try {
       setHub(await api.saveEconomyHub(guildId, body));
@@ -563,8 +568,33 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
           </div>
           {hub.panel.channelId && (
             <>
-              <input className={field} placeholder="Title (leave blank for “🛒 Coins Shop”)" defaultValue={hub.panel.title} maxLength={256} onBlur={(e) => e.target.value !== hub.panel.title && save({}, { ...hub.panel, title: e.target.value })} />
-              <textarea className={`${field} min-h-24`} placeholder="Message (leave blank for the default, which explains each button)" defaultValue={hub.panel.text} maxLength={4000} onBlur={(e) => e.target.value !== hub.panel.text && save({}, { ...hub.panel, text: e.target.value })} />
+              <ModuleMessage
+                guildId={guildId}
+                title="Panel message"
+                description="The embed on the shop panel. The Shop, My Crates, Daily and Balance buttons are added under it."
+                ownerKey="economy:shopPanel"
+                savedEmbedId={hub.panel.embedId ?? null}
+                onSavedEmbedChange={(id) => {
+                  const h = hubRef.current;
+                  if (h && (h.panel.embedId ?? null) !== id) void save({}, { ...h.panel, embedId: id });
+                }}
+                seed={() =>
+                  designFrom({
+                    title: hub.panel.title || "🛒 {currency} Shop",
+                    description:
+                      hub.panel.text ||
+                      "Spend your {icon} {currency} on rewards, open loot crates, and claim your daily bonus. Everything opens just for you.\n\n🛒 **Shop**: see what's for sale and buy it\n🎁 **My Crates**: open your loot crates\n📅 **Daily**: claim today's {currency}\n💰 **Balance**: your {currency}, streak and potions",
+                    color: "#E8C547",
+                  })
+                }
+                tokens={[
+                  { token: "{currency}", description: "Your currency's name" },
+                  { token: "{icon}", description: "Your currency's emoji" },
+                ]}
+                tokenValues={{ "{currency}": "Coins", "{icon}": "🪙" }}
+                moduleButtons={["🛒 Shop", "🎁 My Crates", "📅 Daily", "💰 Balance"]}
+                embedsOnly
+              />
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className={hub.panel.posted ? "text-emerald-400" : "text-amber-300"}>{hub.panel.posted ? "● Posted" : "● Not posted yet"}</span>
                 <button type="button" className="neon-button-sm ml-auto" onClick={() => save({}, hub.panel, true)}>

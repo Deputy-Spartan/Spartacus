@@ -1989,7 +1989,7 @@ export interface PlayingNowView {
 
 export interface EconomyHubView {
   settings: import("@spartacus/shared").EconomyPlusSettings;
-  panel: { channelId: string | null; posted?: boolean; title: string; text: string; error?: string | null };
+  panel: { channelId: string | null; posted?: boolean; title: string; text: string; embedId?: string | null; error?: string | null };
   items: ShopItemRow[];
   purchases: Array<{ id: string; userId: string; itemName: string; price: number; createdAt: string }>;
   levelRoles: Array<{ level: number; roleId: string }>;

@@ -5,6 +5,7 @@ import { logError } from "@spartacus/db";
 import { prisma } from "../lib/prisma";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { isSendableChannel } from "../lib/channels";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../lib/savedEmbedRender";
 import { addBalance, getConfig } from "../lib/economy";
 import { addWeekly, economyPlus, giveCrates } from "../lib/economyPlus";
 import { awardXp } from "../modules/leveling/xp";
@@ -169,7 +170,10 @@ export async function postShopPanel(client: Client, guildId: string): Promise<st
     new ButtonBuilder().setCustomId("eshop:panel:daily").setLabel("Daily").setEmoji("📅").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("eshop:panel:balance").setLabel("Balance").setEmoji("💰").setStyle(ButtonStyle.Secondary)
   );
-  const msg = await ch.send({ embeds: [embed], components: [buttons] }).catch((e) => {
+  // The panel's embed built in the dashboard (or a library embed); its buttons stay.
+  const design = await resolveSavedEmbed(row.shopPanelEmbedId);
+  const built = design ? await buildSavedEmbedPayload(guildId, design, { "{currency}": cfg.currencyName, "{icon}": cfg.currencyIcon }) : null;
+  const msg = await ch.send({ embeds: built?.embeds?.length ? built.embeds : [embed], components: [buttons] }).catch((e) => {
     logError("bot", e, guildId);
     return null;
   });

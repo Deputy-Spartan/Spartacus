@@ -25,6 +25,7 @@ async function view(guildId: string, panelError: string | null = null) {
       posted: !!row?.shopPanelMessageId,
       title: row?.shopPanelTitle ?? "",
       text: row?.shopPanelText ?? "",
+      embedId: row?.shopPanelEmbedId ?? null,
       error: panelError,
     },
     items,
@@ -53,8 +54,9 @@ router.put(P, requireAuth, requireGuildPermission, async (req, res) => {
   const panelChannelId = typeof panel.channelId === "string" && /^\d{15,25}$/.test(panel.channelId) ? panel.channelId : null;
   const panelTitle = str(panel.title, 256) || null;
   const panelText = str(panel.text, 4000) || null;
+  const panelEmbedId = typeof panel.embedId === "string" && panel.embedId ? panel.embedId.slice(0, 40) : null;
   const changed =
-    panelChannelId !== (before?.shopPanelChannelId ?? null) || panelTitle !== (before?.shopPanelTitle ?? null) || panelText !== (before?.shopPanelText ?? null) || body.repost === true;
+    panelChannelId !== (before?.shopPanelChannelId ?? null) || panelTitle !== (before?.shopPanelTitle ?? null) || panelText !== (before?.shopPanelText ?? null) || panelEmbedId !== (before?.shopPanelEmbedId ?? null) || body.repost === true;
   if (changed && before?.shopPanelChannelId && before.shopPanelMessageId) await deleteChannelMessage(before.shopPanelChannelId, before.shopPanelMessageId).catch(() => null);
   const data = {
     ...s,
@@ -62,6 +64,7 @@ router.put(P, requireAuth, requireGuildPermission, async (req, res) => {
     shopPanelChannelId: panelChannelId,
     shopPanelTitle: panelTitle,
     shopPanelText: panelText,
+    shopPanelEmbedId: panelEmbedId,
     shopPanelMessageId: changed ? null : (before?.shopPanelMessageId ?? null),
   };
   await prisma.economyPlus.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });

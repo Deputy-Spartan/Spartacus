@@ -248,8 +248,9 @@ export function planChannels(
     const sec = sections[g.name];
     if (sec?.on === false) continue;
     const own = sec?.channelId || s.channelId;
-    put(own, { ...g, entries: g.entries.filter((e) => !e.staff || (!s.staffChannelId && s.includeStaff)) });
-    if (s.staffChannelId) put(s.staffChannelId, { ...g, entries: g.entries.filter((e) => e.staff) });
+    // Staff commands only ever go in the staff row's channel (off = shown nowhere).
+    put(own, { ...g, entries: g.entries.filter((e) => !e.staff) });
+    if (s.staffChannelId && s.includeStaff) put(s.staffChannelId, { ...g, entries: g.entries.filter((e) => e.staff) });
   }
   for (const list of plan.values()) list.sort((a, b) => ORDER.indexOf(a.name) - ORDER.indexOf(b.name));
   // With nothing to show anywhere, the main channel says so (instead of an empty channel).

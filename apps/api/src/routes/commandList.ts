@@ -84,7 +84,7 @@ router.put(P, requireAuth, requireGuildPermission, async (req, res) => {
   }
   const row = await prisma.commandListSettings.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });
   // A new place, style or section setup always posts (old posts are removed by the bot); other changes follow "Update by itself".
-  const moved = ["channelId", "staffChannelId", "style", "sections"].some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify((before as Record<string, unknown> | null)?.[k] ?? null));
+  const moved = ["channelId", "staffChannelId", "style", "sections", "includeStaff"].some((k) => k in data && JSON.stringify(data[k]) !== JSON.stringify((before as Record<string, unknown> | null)?.[k] ?? null));
   const changed = Object.keys(data).some((k) => k !== "autoUpdate");
   const error = changed ? await post(guildId, moved) : null;
   res.json({ ...(await view(guildId, await prisma.commandListSettings.findUnique({ where: { guildId } }))), error: row.channelId || moved ? error : null });

@@ -86,3 +86,12 @@ test("stream schedule repeats land on the right dates", async () => {
   assert.equal(at({ repeat: "ONCE", dayOfWeek: 5, startMinutes: 20 * 60, startDate: "2026-11-27" }), "2026-11-28T02:00:00.000Z");
   assert.equal(at({ repeat: "ONCE", dayOfWeek: 3, startMinutes: 20 * 60, startDate: "2026-11-18" }), null); // over
 });
+
+test("the week post covers Monday to Sunday, a week ahead by default", async () => {
+  const { scheduleWeekLabel } = await import("../packages/shared");
+  const sat = new Date("2026-11-21T18:00:00Z");
+  assert.equal(scheduleWeekLabel("America/New_York", true, sat), "Mon, Nov 23 – Sun, Nov 29");
+  assert.equal(scheduleWeekLabel("America/New_York", false, sat), "Mon, Nov 16 – Sun, Nov 22");
+  // On a Monday, "a week ahead" is the following Monday.
+  assert.equal(scheduleWeekLabel("America/New_York", true, new Date("2026-11-23T18:00:00Z")), "Mon, Nov 30 – Sun, Dec 6");
+});

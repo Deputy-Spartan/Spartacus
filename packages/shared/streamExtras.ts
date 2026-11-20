@@ -13,6 +13,7 @@ export const STREAM_EXTRAS_DEFAULTS = {
   clipsWeeklyDay: 0,
   scheduleTimezone: "UTC",
   scheduleCreateEvents: false,
+  scheduleWeekAhead: true,
   rewardsEnabled: false,
   rewardCoins: 10,
   rewardXp: 10,
@@ -367,10 +368,85 @@ export function buildScheduleBoard(slots: BoardSlot[], timeZone: string, from = 
   return fields.slice(0, 25);
 }
 
+// ---- The whole-week post: Monday to Sunday ----
+const PLATFORM_DOT: Record<SchedulePlatform, string> = { twitch: "🟣", kick: "🟢", tiktok: "🎵", youtube: "🔴" };
+const SHORT_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// The Monday the post covers: next week's (a week ahead), or this week's.
+export function scheduleWeekStart(timeZone: string, weekAhead: boolean, from = new Date()): { y: number; m: number; d: number } {
+  const tz = isValidTimezone(timeZone) ? timeZone : "UTC";
+  const zoned = new Date(from.getTime() + zoneOffsetMs(from.getTime(), tz));
+  const dow = zoned.getUTCDay();
+  const back = (dow + 6) % 7; // days since this Monday
+  const monday = new Date(Date.UTC(zoned.getUTCFullYear(), zoned.getUTCMonth(), zoned.getUTCDate() - back + (weekAhead ? 7 : 0)));
+  return { y: monday.getUTCFullYear(), m: monday.getUTCMonth(), d: monday.getUTCDate() };
+}
+
+const fmtDay = (y: number, m: number, d: number, withDay = true) =>
+  new Date(Date.UTC(y, m, d)).toLocaleDateString("en-US", { ...(withDay ? { weekday: "short" } : {}), month: "short", day: "numeric", timeZone: "UTC" });
+
+// "Mon, Nov 30 – Sun, Dec 6"
+export function scheduleWeekLabel(timeZone: string, weekAhead: boolean, from = new Date()): string {
+  const s = scheduleWeekStart(timeZone, weekAhead, from);
+  return `${fmtDay(s.y, s.m, s.d)} – ${fmtDay(s.y, s.m, s.d + 6)}`;
+}
+
+// One stream in the week post:
+//   **7:00 PM** · **Draven** · Ranked to Champion
+//   -# 🟢 Kick · 🎮 Rainbow Six Siege
+function weekLine(s: BoardSlot, at: Date): string {
+  const platforms = cleanSlotPlatforms(s.platforms);
+  const head = `**<t:${Math.floor(at.getTime() / 1000)}:t>** · **${s.streamer}**${s.streamTitle ? ` · ${s.streamTitle}` : ""}`;
+  const where = platforms.map((p) => `${PLATFORM_DOT[p.platform]} ${p.link ? `[${SCHEDULE_PLATFORM_NAMES[p.platform]}](${p.link})` : SCHEDULE_PLATFORM_NAMES[p.platform]}`);
+  if (!where.length && s.link) where.push(`[Watch](${s.link})`);
+  const games = [...new Set([s.title, ...platforms.map((p) => p.category)].filter(Boolean) as string[])];
+  const sub = [...where, games.length ? `🎮 ${games.join(", ")}` : ""].filter(Boolean).join(" · ");
+  const lines = [head];
+  if (sub) lines.push(`-# ${sub}`);
+  if (s.message) lines.push(`-# 💬 ${s.message.replace(/\s*\n\s*/g, " ").slice(0, 120)}`);
+  return lines.join("\n");
+}
+
+// The week's sections, Monday to Sunday. Days with no streams fold together
+// ("Thu – Fri · No streams") so a quiet week stays short.
+export function buildWeekBoard(slots: BoardSlot[], timeZone: string, weekAhead: boolean, from = new Date()) {
+  const tz = isValidTimezone(timeZone) ? timeZone : "UTC";
+  const mon = scheduleWeekStart(tz, weekAhead, from);
+  const fields: Array<{ name: string; value: string }> = [];
+  let total = 0;
+  let empty: Array<{ y: number; m: number; d: number }> = [];
+  const flush = () => {
+    if (!empty.length) return;
+    const a = empty[0], b = empty[empty.length - 1];
+    const dayA = SHORT_DAYS[new Date(Date.UTC(a.y, a.m, a.d)).getUTCDay()];
+    const dayB = SHORT_DAYS[new Date(Date.UTC(b.y, b.m, b.d)).getUTCDay()];
+    fields.push({ name: empty.length === 1 ? `${dayA} · ${fmtDay(a.y, a.m, a.d, false)}` : `${dayA} – ${dayB}`, value: "-# No streams" });
+    empty = [];
+  };
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(Date.UTC(mon.y, mon.m, mon.d + i));
+    const y = day.getUTCFullYear(), m = day.getUTCMonth(), d = day.getUTCDate();
+    const start = new Date(wallInstant(tz, y, m, d, 0));
+    const end = new Date(wallInstant(tz, y, m, d + 1, 0));
+    const items = slots
+      .flatMap((s) => occurrencesBetween(tz, s, start, end).map((at) => ({ s, at })))
+      .sort((p, q) => p.at.getTime() - q.at.getTime());
+    if (!items.length) {
+      empty.push({ y, m, d });
+      continue;
+    }
+    flush();
+    total += items.length;
+    fields.push({ name: `📆 ${DAY_NAMES[day.getUTCDay()]} · ${fmtDay(y, m, d, false)}`, value: fitField(items.map(({ s, at }) => weekLine(s, at))) });
+  }
+  flush();
+  return { fields, total, label: scheduleWeekLabel(tz, weekAhead, from) };
+}
+
 export const SCHEDULE_POST_DEFAULTS = {
   title: "📅 Stream Schedule",
-  description: "Times show in **your** time zone. Streamers, add yours with `/schedule add` in the bot commands channel.",
-  footer: "Updates by itself · Set in {timezone}",
+  description: "Week of **{week}** · {count}\n-# Times show in your time zone · Streamers, add yours with `/schedule add` in the bot commands channel",
+  footer: "Next week's schedule posts every Monday",
   color: "#5865F2",
 };
 

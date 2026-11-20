@@ -3217,6 +3217,7 @@ model StreamExtrasConfig {
   scheduleCreateEvents Boolean   @default(false)
   scheduleHash         String?
   scheduleEmbedId      String? // the schedule post's look, built in the dashboard (or a library embed); the days are added under it
+  scheduleWeekAhead    Boolean   @default(true) // the post shows next week (Mon-Sun), switching every Monday; false = this week
   // Viewer rewards (Twitch chat)
   rewardsEnabled       Boolean   @default(false)
   rewardCoins          Int       @default(10)

@@ -1,6 +1,6 @@
 import { EmbedBuilder, GuildScheduledEventEntityType, GuildScheduledEventPrivacyLevel, type BaseMessageOptions, type Client, type Guild } from "discord.js";
 import type { StreamExtrasConfig, StreamSlot } from "@prisma/client";
-import { SCHEDULE_POST_DEFAULTS, buildScheduleBoard, cleanSlotPlatforms, describeRepeat, isValidTimezone, nextOccurrence } from "@spartacus/shared";
+import { SCHEDULE_POST_DEFAULTS, buildWeekBoard, cleanSlotPlatforms, describeRepeat, isValidTimezone, nextOccurrence } from "@spartacus/shared";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 import { createHash } from "node:crypto";
 import { logError } from "@spartacus/db";
@@ -14,11 +14,15 @@ import { isModuleEnabled } from "../../lib/moduleGate";
 
 // The schedule post: the look built in the dashboard (or a library embed, or
 // the default), with the streams added under its first embed.
-export async function schedulePayload(config: Pick<StreamExtrasConfig, "guildId" | "scheduleTimezone" | "scheduleEmbedId">, slots: StreamSlot[]): Promise<BaseMessageOptions> {
+export async function schedulePayload(config: Pick<StreamExtrasConfig, "guildId" | "scheduleTimezone" | "scheduleEmbedId"> & { scheduleWeekAhead?: boolean }, slots: StreamSlot[]): Promise<BaseMessageOptions> {
   const tz = isValidTimezone(config.scheduleTimezone) ? config.scheduleTimezone : "UTC";
-  const fields = buildScheduleBoard(slots, tz);
+  // The whole week, Monday to Sunday (next week by default, so viewers can plan).
+  const weekAhead = config.scheduleWeekAhead !== false;
+  const week = buildWeekBoard(slots, tz, weekAhead);
+  const fields = week.fields;
+  const tokens = { "{timezone}": tz, "{week}": week.label, "{count}": `${week.total} stream${week.total === 1 ? "" : "s"}` };
   const design = await resolveSavedEmbed(config.scheduleEmbedId);
-  const built = design ? await buildSavedEmbedPayload(config.guildId, design, { "{timezone}": tz }) : null;
+  const built = design ? await buildSavedEmbedPayload(config.guildId, design, tokens) : null;
   let first: EmbedBuilder;
   const rest: EmbedBuilder[] = [];
   if (built?.embeds?.length) {
@@ -26,9 +30,13 @@ export async function schedulePayload(config: Pick<StreamExtrasConfig, "guildId"
     for (const e of built.embeds.slice(1)) rest.push(EmbedBuilder.from(e as EmbedBuilder));
   } else {
     const d = SCHEDULE_POST_DEFAULTS;
-    first = new EmbedBuilder().setColor(d.color as `#${string}`).setTitle(d.title).setDescription(d.description).setFooter({ text: d.footer.replace("{timezone}", tz) });
+    const fill = (s: string) => Object.entries(tokens).reduce((out, [k, v]) => out.split(k).join(v), s);
+    first = new EmbedBuilder()
+      .setColor(d.color as `#${string}`)
+      .setTitle(d.title)
+      .setDescription(fill(d.description))
+      .setFooter({ text: weekAhead ? fill(d.footer) : "Updates by itself" });
   }
-  if (!fields.length) first.addFields({ name: "Nothing yet", value: "No streams are scheduled yet." });
   const room = 25 - (first.data.fields?.length ?? 0);
   if (room > 0) first.addFields(fields.slice(0, room));
   return { content: built?.content || undefined, embeds: [first, ...rest].slice(0, 10), components: built?.components ?? [], allowedMentions: { parse: [] as never[] } };

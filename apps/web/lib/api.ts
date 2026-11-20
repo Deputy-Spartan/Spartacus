@@ -208,6 +208,7 @@ export interface StreamExtrasConfigRow {
   scheduleTimezone: string;
   scheduleCreateEvents: boolean;
   scheduleEmbedId?: string | null;
+  scheduleWeekAhead?: boolean;
   rewardsEnabled: boolean;
   rewardCoins: number;
   rewardXp: number;

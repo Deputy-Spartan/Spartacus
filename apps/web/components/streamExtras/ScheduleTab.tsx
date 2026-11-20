@@ -15,6 +15,7 @@ import {
   formatTimeOfDay,
   nextOccurrence,
   platformInfo,
+  scheduleWeekLabel,
   type ScheduleRepeat,
   type SchedulePlatform,
 } from "@spartacus/shared";
@@ -168,6 +169,17 @@ export function ScheduleTab({
             </div>
           </div>
         </div>
+        <div className="flex items-center justify-between gap-4 mt-4 pt-4 border-t border-white/5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Post a week ahead</p>
+            <p className={hint}>
+              {config.scheduleWeekAhead !== false
+                ? `On: the post shows next week, Monday to Sunday (${scheduleWeekLabel(config.scheduleTimezone, true)} right now), and switches every Monday.`
+                : `Off: the post shows this week, Monday to Sunday (${scheduleWeekLabel(config.scheduleTimezone, false)}).`}
+            </p>
+          </div>
+          <ToggleSwitch enabled={config.scheduleWeekAhead !== false} onChange={(v) => update({ scheduleWeekAhead: v })} label="Post a week ahead" />
+        </div>
         <button
           className={`${button} mt-4`}
           onClick={async () => {
@@ -251,13 +263,17 @@ export function ScheduleTab({
       <ModuleMessage
         guildId={guildId}
         title="Schedule post"
-        description="The pinned schedule message. The days and streams are added under its first embed."
+        description="The pinned schedule message. Monday to Sunday is added under its first embed, a section per day."
         ownerKey="streamExtras:schedulePost"
         savedEmbedId={config.scheduleEmbedId ?? null}
         onSavedEmbedChange={(id) => update({ scheduleEmbedId: id })}
         seed={() => designFrom({ title: SCHEDULE_POST_DEFAULTS.title, description: SCHEDULE_POST_DEFAULTS.description, footer: SCHEDULE_POST_DEFAULTS.footer, color: SCHEDULE_POST_DEFAULTS.color })}
-        tokens={[{ token: "{timezone}", description: "Your server's time zone" }]}
-        tokenValues={{ "{timezone}": tz }}
+        tokens={[
+          { token: "{week}", description: "The week it shows, e.g. Mon, Nov 30 – Sun, Dec 6" },
+          { token: "{count}", description: "How many streams that week, e.g. 14 streams" },
+          { token: "{timezone}", description: "Your server's time zone" },
+        ]}
+        tokenValues={{ "{timezone}": tz, "{week}": scheduleWeekLabel(tz, config.scheduleWeekAhead !== false), "{count}": `${slots.length} stream${slots.length === 1 ? "" : "s"}` }}
       />
     </div>
   );

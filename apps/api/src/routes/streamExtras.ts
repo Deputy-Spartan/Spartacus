@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
-import { STREAM_EXTRAS_DEFAULTS, isValidTimezone } from "@spartacus/shared";
+import { Prisma, prisma } from "@spartacus/db";
+import { REPEAT_NEEDS_DATE, STREAM_EXTRAS_DEFAULTS, cleanRepeat, cleanScheduleDate, cleanSlotPlatforms, dayOfDate, isValidTimezone } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
@@ -42,6 +42,7 @@ router.put("/guilds/:guildId/stream-extras", requireAuth, requireGuildPermission
   if ("rewardXp" in b) data.rewardXp = int(b.rewardXp, 0, 100000, 10);
   if ("rewardIntervalMin" in b) data.rewardIntervalMin = int(b.rewardIntervalMin, 5, 120, 10);
   if ("rewardDailyCoinCap" in b) data.rewardDailyCoinCap = int(b.rewardDailyCoinCap, 0, 10_000_000, 200);
+  if ("scheduleEmbedId" in b) data.scheduleEmbedId = typeof b.scheduleEmbedId === "string" && b.scheduleEmbedId ? b.scheduleEmbedId.slice(0, 40) : null;
   if ("scheduleTimezone" in b) data.scheduleTimezone = typeof b.scheduleTimezone === "string" && isValidTimezone(b.scheduleTimezone) ? b.scheduleTimezone : "UTC";
   // A new schedule channel gets a fresh message there.
   const before = await prisma.streamExtrasConfig.findUnique({ where: { guildId } });
@@ -50,7 +51,7 @@ router.put("/guilds/:guildId/stream-extras", requireAuth, requireGuildPermission
     data.scheduleHash = null;
   }
   const config = await prisma.streamExtrasConfig.upsert({ where: { guildId }, create: { guildId, ...data }, update: data });
-  const touchedSchedule = ["scheduleChannelId", "scheduleTimezone", "scheduleCreateEvents"].some((k) => k in data && (data as Record<string, unknown>)[k] !== (before as Record<string, unknown> | null)?.[k]);
+  const touchedSchedule = ["scheduleChannelId", "scheduleTimezone", "scheduleCreateEvents", "scheduleEmbedId"].some((k) => k in data && (data as Record<string, unknown>)[k] !== (before as Record<string, unknown> | null)?.[k]);
   const client = getBotClient();
   let scheduleNote: string | null = null;
   if (touchedSchedule && client) {
@@ -62,14 +63,29 @@ router.put("/guilds/:guildId/stream-extras", requireAuth, requireGuildPermission
 });
 
 function slotData(b: Record<string, unknown>) {
+  const repeat = cleanRepeat(b.repeat);
+  const date = cleanScheduleDate(b.startDate);
+  const platforms = cleanSlotPlatforms(b.platforms);
+  const link = typeof b.link === "string" && /^https?:\/\//i.test(b.link) ? b.link.slice(0, 200) : (platforms.find((p) => p.link)?.link ?? null);
   return {
     streamer: text(b.streamer, 60) ?? "Streamer",
+    userId: id(b.userId),
     title: text(b.title, 80),
-    link: typeof b.link === "string" && /^https?:\/\//i.test(b.link) ? b.link.slice(0, 200) : null,
-    dayOfWeek: int(b.dayOfWeek, 0, 6, 0),
+    streamTitle: text(b.streamTitle, 100),
+    message: text(b.message, 500),
+    link,
+    platforms: platforms as unknown as Prisma.InputJsonValue,
+    repeat,
+    startDate: REPEAT_NEEDS_DATE.has(repeat) ? date : null,
+    // A date-based stream's weekday comes from its date.
+    dayOfWeek: REPEAT_NEEDS_DATE.has(repeat) && date ? dayOfDate(date) : int(b.dayOfWeek, 0, 6, 0),
     startMinutes: int(b.startMinutes, 0, 1439, 19 * 60),
-    durationMin: int(b.durationMin, 15, 720, 120),
+    durationMin: int(b.durationMin, 15, 1440, 120),
   };
+}
+function slotProblem(d: ReturnType<typeof slotData>): string | null {
+  if (REPEAT_NEEDS_DATE.has(d.repeat) && !d.startDate) return d.repeat === "ONCE" ? "Pick the date." : "Pick the date of the first stream.";
+  return null;
 }
 
 async function refresh(guildId: string) {
@@ -83,14 +99,20 @@ async function refresh(guildId: string) {
 router.post("/guilds/:guildId/stream-extras/slots", requireAuth, requireGuildPermission, async (req, res) => {
   const guildId = req.params.guildId;
   if ((await prisma.streamSlot.count({ where: { guildId } })) >= 60) return res.status(400).json({ error: "The schedule is full (60 streams)." });
-  const slot = await prisma.streamSlot.create({ data: { guildId, ...slotData(req.body ?? {}) } });
+  const data = slotData(req.body ?? {});
+  const problem = slotProblem(data);
+  if (problem) return res.status(400).json({ error: problem });
+  const slot = await prisma.streamSlot.create({ data: { guildId, ...data } });
   res.status(201).json({ slot, note: await refresh(guildId) });
 });
 
 router.put("/guilds/:guildId/stream-extras/slots/:id", requireAuth, requireGuildPermission, async (req, res) => {
   const existing = await prisma.streamSlot.findUnique({ where: { id: req.params.id } });
   if (!existing || existing.guildId !== req.params.guildId) return res.status(404).json({ error: "Not found." });
-  const slot = await prisma.streamSlot.update({ where: { id: existing.id }, data: slotData(req.body ?? {}) });
+  const data = slotData(req.body ?? {});
+  const problem = slotProblem(data);
+  if (problem) return res.status(400).json({ error: problem });
+  const slot = await prisma.streamSlot.update({ where: { id: existing.id }, data: { ...data, discordEventId: existing.discordEventId } });
   res.json({ slot, note: await refresh(existing.guildId) });
 });
 

@@ -207,6 +207,7 @@ export interface StreamExtrasConfigRow {
   scheduleChannelId?: string | null;
   scheduleTimezone: string;
   scheduleCreateEvents: boolean;
+  scheduleEmbedId?: string | null;
   rewardsEnabled: boolean;
   rewardCoins: number;
   rewardXp: number;
@@ -216,11 +217,17 @@ export interface StreamExtrasConfigRow {
 export interface StreamSlotRow {
   id: string;
   streamer: string;
-  title?: string | null;
+  userId?: string | null;
+  title?: string | null; // what they're playing
   link?: string | null;
   dayOfWeek: number;
   startMinutes: number;
   durationMin: number;
+  repeat?: import("@spartacus/shared").ScheduleRepeat;
+  startDate?: string | null;
+  streamTitle?: string | null;
+  message?: string | null;
+  platforms?: import("@spartacus/shared").SlotPlatform[];
 }
 export interface StreamClipRow {
   id: string;
@@ -2280,6 +2287,8 @@ export const api = {
     request<{ config: StreamExtrasConfigRow; scheduleNote: string | null }>(`/guilds/${guildId}/stream-extras`, { method: "PUT", body: JSON.stringify(body) }),
   addStreamSlot: (guildId: string, body: Omit<StreamSlotRow, "id">) =>
     request<{ slot: StreamSlotRow; note: string | null }>(`/guilds/${guildId}/stream-extras/slots`, { method: "POST", body: JSON.stringify(body) }),
+  updateStreamSlot: (guildId: string, id: string, body: Omit<StreamSlotRow, "id">) =>
+    request<{ slot: StreamSlotRow; note: string | null }>(`/guilds/${guildId}/stream-extras/slots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteStreamSlot: (guildId: string, id: string) => request<{ note: string | null }>(`/guilds/${guildId}/stream-extras/slots/${id}`, { method: "DELETE" }),
   refreshStreamSchedule: (guildId: string) => request<{ ok: boolean; note: string | null }>(`/guilds/${guildId}/stream-extras/refresh-schedule`, { method: "POST" }),
   postClipOfTheWeek: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-extras/clip-of-the-week`, { method: "POST" }),

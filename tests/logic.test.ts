@@ -69,3 +69,20 @@ test("posting jobs look often after a change and rarely when nothing has changed
   assert.equal(shouldLook("test-job"), true);
   assert.equal(shouldLook("test-job"), false, "then it goes quiet again");
 });
+
+test("stream schedule repeats land on the right dates", async () => {
+  const { nextOccurrence } = await import("../packages/shared");
+  const tz = "America/Chicago";
+  const from = new Date("2026-11-20T18:00:00Z"); // Friday Nov 20, noon in Chicago
+  const at = (slot: Parameters<typeof nextOccurrence>[1]) => nextOccurrence(tz, slot, from)?.toISOString() ?? null;
+  assert.equal(at({ repeat: "WEEKLY", dayOfWeek: 1, startMinutes: 19 * 60 }), "2026-11-24T01:00:00.000Z"); // Mon 7 PM
+  assert.equal(at({ repeat: "DAILY", dayOfWeek: 0, startMinutes: 9 * 60 }), "2026-11-21T15:00:00.000Z"); // tomorrow 9 AM
+  assert.equal(at({ repeat: "WEEKDAYS", dayOfWeek: 0, startMinutes: 9 * 60 }), "2026-11-23T15:00:00.000Z"); // Monday
+  assert.equal(at({ repeat: "WEEKENDS", dayOfWeek: 0, startMinutes: 9 * 60 }), "2026-11-21T15:00:00.000Z"); // Saturday
+  // Every 2 weeks from Nov 13 skips Nov 20.
+  assert.equal(at({ repeat: "BIWEEKLY", dayOfWeek: 5, startMinutes: 9 * 60, startDate: "2026-11-13" }), "2026-11-27T15:00:00.000Z");
+  // Monthly on the 31st falls on Nov 30.
+  assert.equal(at({ repeat: "MONTHLY", dayOfWeek: 0, startMinutes: 20 * 60, startDate: "2026-10-31" }), "2026-12-01T02:00:00.000Z");
+  assert.equal(at({ repeat: "ONCE", dayOfWeek: 5, startMinutes: 20 * 60, startDate: "2026-11-27" }), "2026-11-28T02:00:00.000Z");
+  assert.equal(at({ repeat: "ONCE", dayOfWeek: 3, startMinutes: 20 * 60, startDate: "2026-11-18" }), null); // over
+});

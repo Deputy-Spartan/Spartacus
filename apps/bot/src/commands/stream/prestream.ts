@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder, type ButtonInteraction } from "discord.js";
-import { CHECKLIST_MAX, DEFAULT_CHECKLIST, SG_PREFIX, isValidTimezone, nextSlotStart, platformInfo } from "@spartacus/shared";
+import { CHECKLIST_MAX, DEFAULT_CHECKLIST, SG_PREFIX, isValidTimezone, nextOccurrence, platformInfo } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import type { CommandModule } from "../types";
 
@@ -27,7 +27,10 @@ async function statusLines(guildId: string, userId: string) {
   const tz = extras && isValidTimezone(extras.scheduleTimezone) ? extras.scheduleTimezone : "UTC";
   const mine = slots.filter((s) => s.userId === userId);
   const pool = mine.length ? mine : slots;
-  const next = pool.map((s) => ({ s, at: nextSlotStart(tz, s.dayOfWeek, s.startMinutes) })).sort((a, b) => a.at.getTime() - b.at.getTime())[0];
+  const next = pool
+    .map((s) => ({ s, at: nextOccurrence(tz, s) }))
+    .filter((x): x is { s: (typeof pool)[number]; at: Date } => !!x.at)
+    .sort((a, b) => a.at.getTime() - b.at.getTime())[0];
   if (next) lines.push(`📅 Next on the schedule: **${next.s.streamer}** <t:${Math.floor(next.at.getTime() / 1000)}:R>`);
   if (growth?.pingRoleId) lines.push(`🔔 Stream Ping role: <@&${growth.pingRoleId}>`);
   return lines;

@@ -3216,6 +3216,7 @@ model StreamExtrasConfig {
   scheduleTimezone     String    @default("UTC")
   scheduleCreateEvents Boolean   @default(false)
   scheduleHash         String?
+  scheduleEmbedId      String? // the schedule post's look, built in the dashboard (or a library embed); the days are added under it
   // Viewer rewards (Twitch chat)
   rewardsEnabled       Boolean   @default(false)
   rewardCoins          Int       @default(10)
@@ -3263,6 +3264,11 @@ model StreamSlot {
   dayOfWeek      Int // 0 = Sunday
   startMinutes   Int // minutes after midnight, in the server's time zone
   durationMin    Int       @default(120)
+  repeat         String    @default("WEEKLY") // ONCE | DAILY | WEEKDAYS | WEEKENDS | WEEKLY | BIWEEKLY | MONTHLY
+  startDate      String? // YYYY-MM-DD in the server's zone: the date (ONCE) or the first stream (BIWEEKLY, MONTHLY)
+  streamTitle    String?
+  message        String? // what they plan to play, shown under the line
+  platforms      Json      @default("[]") // [{ platform, link, category }]
   discordEventId String?
   eventAt        DateTime? // the start the Discord event was made for
   remindHourFor  DateTime? // the start the "live in 1 hour" post was sent for

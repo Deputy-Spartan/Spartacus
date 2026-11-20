@@ -89,6 +89,15 @@ export async function syncPresetUsage(guildId: string, presetId: string): Promis
     for (const l of lobbies) await syncTempPanel(client, l.id).catch(() => null);
   }
 
+  // The stream schedule post is redrawn with its streams under the new look.
+  const schedules = await prisma.streamExtrasConfig.findMany({ where: { guildId, scheduleEmbedId: presetId, scheduleChannelId: { not: null } }, select: { guildId: true } });
+  const bot = schedules.length ? getBotClient() : null;
+  if (bot) {
+    const { updateSchedule } = await import("@spartacus/bot");
+    for (const s of schedules) await updateSchedule(bot, s.guildId, true).catch(() => null);
+    result.places.push("Stream schedule");
+  }
+
   // Events redraw themselves (with their sign-up lists) on the bot's next sync.
   await prisma.event.updateMany({ where: { guildId, savedEmbedId: presetId }, data: { needsSync: true } }).catch(() => null);
 

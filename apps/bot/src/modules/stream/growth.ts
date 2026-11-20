@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type ButtonInteraction, type Client, type Message } from "discord.js";
 import type { StreamGrowthConfig, StreamSubscription } from "@prisma/client";
 import { createHash } from "node:crypto";
-import { SG_PREFIX, durationText, findClipLinks, isValidTimezone, minutesText, nextSlotStart, platformInfo } from "@spartacus/shared";
+import { SG_PREFIX, cleanSlotPlatforms, durationText, findClipLinks, isValidTimezone, minutesText, nextOccurrence, platformInfo } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isSendableChannel } from "../../lib/channels";
@@ -64,7 +64,8 @@ export async function countdownTick(client: Client) {
       const tz = extras && isValidTimezone(extras.scheduleTimezone) ? extras.scheduleTimezone : "UTC";
       const slots = await prisma.streamSlot.findMany({ where: { guildId: config.guildId } });
       for (const slot of slots) {
-        const next = nextSlotStart(tz, slot.dayOfWeek, slot.startMinutes);
+        const next = nextOccurrence(tz, slot);
+        if (!next) continue;
         const left = (next.getTime() - Date.now()) / 60_000;
         const kind = config.countdownHour && left > 50 && left <= 64 ? "hour" : config.countdownSoon && left > 0 && left <= 12 ? "soon" : null;
         if (!kind) continue;
@@ -72,7 +73,7 @@ export async function countdownTick(client: Client) {
         // Claimed first, so it's only ever posted once.
         const claimed = await prisma.streamSlot.updateMany({ where: { id: slot.id, OR: [{ [field]: null }, { [field]: { not: next } }] }, data: { [field]: next } });
         if (!claimed.count) continue;
-        await sendCountdown(client, config, { streamer: slot.streamer, title: slot.title, link: slot.link, startsAt: next, minutes: Math.max(1, Math.round(left)) });
+        await sendCountdown(client, config, { streamer: slot.streamer, title: slot.streamTitle || slot.title, link: slot.link || cleanSlotPlatforms(slot.platforms).find((p) => p.link)?.link || null, startsAt: next, minutes: Math.max(1, Math.round(left)) });
       }
     } catch (err) {
       logError("bot", err, config.guildId);

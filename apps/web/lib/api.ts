@@ -333,6 +333,7 @@ export interface EventRow {
   enabledRoles: RsvpRole[];
   signups: Array<{ userId: string; role: string }>;
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 export interface EventInput {
   title: string;
@@ -345,6 +346,7 @@ export interface EventInput {
   buttons: StickyButton[];
   enabledRoles: RsvpRole[];
   embedExtra?: EmbedExtra;
+  savedEmbedId?: string | null;
 }
 
 export interface EventTemplateRow {
@@ -1541,6 +1543,7 @@ export interface ChannelLockRow {
   allowedRoleIds: string[];
   notifyEnabled: boolean;
   notifyContent: string | null;
+  savedEmbedId?: string | null;
 }
 export interface ChannelLockInput {
   allowImages: boolean;
@@ -1555,6 +1558,7 @@ export interface ChannelLockInput {
   allowedRoleIds: string[];
   notifyEnabled: boolean;
   notifyContent: string | null;
+  savedEmbedId?: string | null;
 }
 
 export function buildBotInviteUrl(clientId: string, guildId?: string) {
@@ -1775,6 +1779,7 @@ export interface LevelingSettingsRow {
   guildId: string;
   channelId: string | null;
   levelUpMessage: string;
+  savedEmbedId?: string | null;
 }
 
 export interface ChangelogEntryRow {

@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type BaseMessageOptions, type Client } from "discord.js";
-import { cleanBumpMessages, fillBumpStage, BUMP_DEFAULTS, type BumpStage, type BumpStageMessage } from "@spartacus/shared";
+import { bumpTokenMap, cleanBumpMessages, fillBumpStage, BUMP_DEFAULTS, type BumpStage, type BumpStageMessage } from "@spartacus/shared";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "./savedEmbedRender";
 import { prisma } from "./prisma";
 import { isSendableChannel } from "./channels";
 import { applyEmbedExtra } from "./embedExtra";
@@ -21,20 +22,24 @@ function hasEmbedBody(m: BumpStageMessage) {
   return !!(m.title || m.description || e.imageUrl || e.thumbnailUrl || e.footerText || e.authorName || e.fields?.length);
 }
 
-export function buildBumpPayload(row: Row, stage: BumpStage, serverName: string): BaseMessageOptions {
+export async function buildBumpPayload(row: Row, stage: BumpStage, serverName: string): Promise<BaseMessageOptions> {
   let msg = cleanBumpMessages(row.bumpMessages)[stage];
-  // A stage left completely empty falls back to the default so Discord accepts it.
-  if (!msg.content.trim() && !(msg.embedEnabled && hasEmbedBody(msg))) msg = BUMP_DEFAULTS[stage];
   // Before any bump is recorded, "Bump done" counts 2 hours from now and Ready counts from now.
   const ready = row.nextReminderAt ?? new Date(stage === "bumped" ? Date.now() + COOLDOWN_MS : Date.now());
-  const filled = fillBumpStage(msg, {
-    userId: row.lastBumpedById,
-    roleId: row.mentionRoleId,
-    nextAt: ready,
-    serverName,
-    missed: row.missedAlerts,
-    count: row.bumpCount,
-  });
+  const vars = { userId: row.lastBumpedById, roleId: row.mentionRoleId, nextAt: ready, serverName, missed: row.missedAlerts, count: row.bumpCount };
+  const dmRow = () => new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("bump:dm").setLabel("DM me when it's ready").setEmoji("🔔").setStyle(ButtonStyle.Secondary));
+  const allowedMentions = { roles: row.mentionRoleId ? [row.mentionRoleId] : [], users: row.lastBumpedById ? [row.lastBumpedById] : [] };
+
+  // The stage's message built in the dashboard (or a library embed).
+  const saved = await resolveSavedEmbed(msg.savedEmbedId);
+  if (saved) {
+    const built = await buildSavedEmbedPayload(row.guildId, saved, bumpTokenMap(vars));
+    return { ...built, content: built.content || (built.embeds?.length ? "" : "​"), components: [...(built.components ?? []).slice(0, 4), dmRow()], allowedMentions };
+  }
+
+  // A stage left completely empty falls back to the default so Discord accepts it.
+  if (!msg.content.trim() && !(msg.embedEnabled && hasEmbedBody(msg))) msg = BUMP_DEFAULTS[stage];
+  const filled = fillBumpStage(msg, vars);
   const embeds: EmbedBuilder[] = [];
   if (filled.embedEnabled && hasEmbedBody(filled)) {
     const embed = new EmbedBuilder().setColor(filled.color as `#${string}`);
@@ -43,12 +48,11 @@ export function buildBumpPayload(row: Row, stage: BumpStage, serverName: string)
     applyEmbedExtra(embed, filled.extra);
     embeds.push(embed);
   }
-  const dmButton = new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId("bump:dm").setLabel("DM me when it's ready").setEmoji("🔔").setStyle(ButtonStyle.Secondary));
   return {
     content: filled.content || (embeds.length ? "" : "​"),
     embeds,
-    components: [dmButton],
-    allowedMentions: { roles: row.mentionRoleId ? [row.mentionRoleId] : [], users: row.lastBumpedById ? [row.lastBumpedById] : [] },
+    components: [dmRow()],
+    allowedMentions,
   };
 }
 
@@ -73,7 +77,7 @@ export async function showBumpStage(client: Client, guildId: string, stage: Bump
   }
 
   const guild = client.guilds.cache.get(guildId);
-  const payload = buildBumpPayload(row, stage, guild?.name ?? "the server");
+  const payload = await buildBumpPayload(row, stage, guild?.name ?? "the server");
   const pings = opts.ping && /<@&?\d+>/.test(payload.content ?? "");
   const newest = "lastMessageId" in channel ? channel.lastMessageId : null;
 
@@ -142,5 +146,5 @@ export async function refreshBumpStatus(client: Client, guildId: string) {
   const messages = cleanBumpMessages(row.bumpMessages);
   if (stage === "bumped" && !messages.bumped.enabled) return;
   const guild = client.guilds.cache.get(guildId);
-  await old.edit(buildBumpPayload(row, stage, guild?.name ?? "the server")).catch(() => null);
+  await old.edit(await buildBumpPayload(row, stage, guild?.name ?? "the server")).catch(() => null);
 }

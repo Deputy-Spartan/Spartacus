@@ -23,7 +23,7 @@ export function startEventSyncJob(client: Client) {
         continue;
       }
 
-      const payload = buildEventPayload(event, event.signups);
+      const payload = await buildEventPayload(event, event.signups);
 
       if (event.messageId) {
         const existing = await channel.messages.fetch(event.messageId).catch(() => null);

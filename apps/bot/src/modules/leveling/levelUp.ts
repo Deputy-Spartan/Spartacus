@@ -7,6 +7,7 @@ import { addBalance, getConfig } from "../../lib/economy";
 import { economyPlus, giveCrates } from "../../lib/economyPlus";
 import { awardAchievement, checkCustomAchievements } from "../../lib/achievements";
 import { drawLevelUpCard } from "../../lib/levelUpCard";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 
 // Level roles: give the role for each level crossed. With "keep only the
 // newest level role" on, the lower ones come off, so the member's name color
@@ -73,6 +74,31 @@ export async function handleLevelUp(client: Client, guild: Guild, userId: string
   const channel = channelId ? await guild.channels.fetch(channelId).catch(() => null) : null;
   if (!channel || !isSendableChannel(channel)) return;
   const text = (levelSettings?.levelUpMessage || "🎉 {user} just reached **Level {level}**!").replace(/{user}/g, `${member}`).replace(/{level}/g, String(to));
+
+  // A level-up post built in the dashboard (or a library embed).
+  const saved = await resolveSavedEmbed(levelSettings?.savedEmbedId);
+  if (saved) {
+    const rung = ladderRung(to, plus.ladder);
+    const next = plus.ladder.find((r) => r.level > to);
+    const nextLine = next ? `Next: ${next.name} at level ${next.level} (${xpForLevel(next.level).toLocaleString("en-US")} XP)` : "Top of the ladder. Time to /prestige?";
+    const color = plus.levelColors ? levelColor(to, plus.ladder) : "#5865F2";
+    const png = plus.levelUpCard
+      ? await drawLevelUpCard({ name: member.displayName, avatarUrl: member.displayAvatarURL({ extension: "png" }), level: to, color, rankName: rung && rung.level <= to ? rung.name : null, nextLine }).catch(() => null)
+      : null;
+    const payload = await buildSavedEmbedPayload(guild.id, saved, {
+      "{user}": `${member}`,
+      "{level}": String(to),
+      "{rewards}": lines.length ? lines.map((l) => `• ${l}`).join("\n") : "—",
+      "{next}": nextLine,
+      "{rank}": rung && rung.level <= to ? rung.name : "",
+      "{avatar}": member.displayAvatarURL({ extension: "png" }),
+      "{card}": png ? "attachment://levelup.png" : "",
+    });
+    const files = png ? [new AttachmentBuilder(png, { name: "levelup.png" })] : [];
+    await channel.send({ ...payload, files, allowedMentions: { users: [userId] } }).catch(() => null);
+    return;
+  }
+
   if (!plus.levelColors && !plus.levelUpCard) {
     await channel.send({ content: text + (lines.length ? `\n${lines.map((l) => `• ${l}`).join("\n")}` : "") }).catch(() => null);
     return;

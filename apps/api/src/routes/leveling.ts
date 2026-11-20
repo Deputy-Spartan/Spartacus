@@ -38,16 +38,18 @@ router.get("/guilds/:guildId/leveling-settings", requireAuth, requireGuildPermis
 });
 
 router.patch("/guilds/:guildId/leveling-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { channelId, levelUpMessage } = req.body as { channelId?: string | null; levelUpMessage?: string };
+  const { channelId, levelUpMessage, savedEmbedId } = req.body as { channelId?: string | null; levelUpMessage?: string; savedEmbedId?: string | null };
   const row = await prisma.levelingSettings.upsert({
     where: { guildId: req.params.guildId },
     create: {
       guildId: req.params.guildId,
       channelId: channelId || null,
       levelUpMessage: levelUpMessage?.trim() || "🎉 {user} just reached **Level {level}**!",
+      savedEmbedId: savedEmbedId || null,
     },
     update: {
       channelId: channelId !== undefined ? channelId || null : undefined,
+      savedEmbedId: savedEmbedId !== undefined ? savedEmbedId || null : undefined,
       levelUpMessage: levelUpMessage !== undefined ? levelUpMessage.trim() || "🎉 {user} just reached **Level {level}**!" : undefined,
     },
   });

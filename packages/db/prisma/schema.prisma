@@ -425,6 +425,7 @@ model Event {
   embedColor            String?       @default("#00E5FF")
   buttons               Json          @default("[]")
   embedExtra            Json?
+  savedEmbedId          String? // the event post built in the dashboard (or a library embed); unset = the built-in post
   // Which RSVP role buttons show on the event (and correspondingly which
   // stat fields the embed shows) — e.g. a simple meetup might only want
   // Attending/Absent, not the raid roles.
@@ -1301,6 +1302,7 @@ model LevelingSettings {
   guildId        String    @unique
   channelId      String?
   levelUpMessage String    @default("🎉 {user} just reached **Level {level}**!")
+  savedEmbedId   String? // the level-up post built in the dashboard (or a library embed); unset = the built-in post
   // A server-wide XP boost (Stream Deck's XP Boost dial), e.g. 2x for an hour.
   xpBoost        Float     @default(1)
   xpBoostEndsAt  DateTime?
@@ -1457,6 +1459,7 @@ model ChannelLock {
   guild             Guild   @relation(fields: [guildId], references: [id])
   guildId           String
   channelId         String  @unique
+  savedEmbedId      String? // the delete notice built in the dashboard (or a library embed); unset = notifyContent
   allowImages       Boolean @default(true)
   allowLinks        Boolean @default(true)
   allowFiles        Boolean @default(true)

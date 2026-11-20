@@ -7,7 +7,7 @@ import { PanelHeader } from "../../../../components/ui/PanelHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { EventPreview } from "../../../../components/ui/EventPreview";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { StickyPreview } from "../../../../components/ui/StickyPreview";
 import { ButtonsEditor } from "../../../../components/ui/ButtonsEditor";
 import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
@@ -76,6 +76,8 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<EventTemplateRow[]>([]);
   const [embedToLoad, setEmbedToLoad] = useState<SavedEmbedRow | undefined>(undefined);
+  // Names a new event's own embed until it's created.
+  const [formKey, setFormKey] = useState(() => `new-${Date.now().toString(36)}`);
 
   function refreshEvents() {
     api.getEvents(params.guildId).then(setEvents);
@@ -88,6 +90,8 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
   function goCreate() {
     setEditingId(null);
     setForm(EMPTY_EVENT);
+    setFormKey(`new-${Date.now().toString(36)}`);
+    setFormKey(`new-${Date.now().toString(36)}`);
     setError(null);
     setView("create");
   }
@@ -105,6 +109,7 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
       buttons: event.buttons,
       enabledRoles: event.enabledRoles,
       embedExtra: event.embedExtra ?? {},
+      savedEmbedId: event.savedEmbedId ?? null,
     });
     setError(null);
     setView("create");
@@ -183,8 +188,8 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
       {view === "create" && (
         <div>
           <PanelHeader title={editingId ? "Edit Event" : "Create Event"} onBack={() => setView("root")} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <NeonCard>
+          <div>
+            <NeonCard className="max-w-3xl mb-6">
               {!editingId && templates.length > 0 && (
                 <div className="mb-4">
                   <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Load Template</label>
@@ -285,63 +290,45 @@ export default function EventsPage({ params }: { params: { guildId: string } }) 
                 </div>
               </div>
 
-              <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
-                <div>
-                  <p className="text-sm text-slate-300">Use an embed</p>
-                  <p className="text-xs text-slate-500">Only affects the info card look — RSVP buttons above post either way.</p>
-                </div>
-                <ToggleSwitch enabled={form.embedEnabled} onChange={(v) => setForm({ ...form, embedEnabled: v })} />
-              </div>
-
-              {form.embedEnabled && (
-                <div className="mb-4">
-                  <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Embed Color</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      className="h-9 w-12 rounded-lg border border-white/10 bg-base-950 cursor-pointer"
-                      value={form.embedColor}
-                      onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                    />
-                    <input
-                      className="flex-1 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm font-mono"
-                      value={form.embedColor}
-                      onChange={(e) => setForm({ ...form, embedColor: e.target.value })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {form.embedEnabled && (
-                <EmbedExtraFields
-                  guildId={params.guildId}
-                  value={form.embedExtra ?? {}}
-                  onChange={(v) => setForm({ ...form, embedExtra: v })}
-                />
-              )}
 
               <div className="mb-4">
                 <ButtonsEditor guildId={params.guildId} buttons={form.buttons} onChange={(next) => setForm({ ...form, buttons: next })} />
               </div>
 
+            </NeonCard>
+
+            <ModuleMessage
+              key={editingId ?? formKey}
+              guildId={params.guildId}
+              title="Event post"
+              description="Posted in the channel. The sign-up lists are added to the first embed, and the RSVP buttons go under it."
+              ownerKey={`event:${editingId ?? formKey}`}
+              savedEmbedId={form.savedEmbedId ?? null}
+              onSavedEmbedChange={(id) => setForm((f) => ({ ...f, savedEmbedId: id }))}
+              seed={() =>
+                form.embedEnabled
+                  ? designFrom({ title: "⚔️ {title}", description: "{description}", color: form.embedColor, footer: "Spartacus Event Coordination", extra: form.embedExtra })
+                  : designFrom({ content: "**{title}**\n{description}\n🕒 {start}" })
+              }
+              tokens={[
+                { token: "{title}", description: "The event's title" },
+                { token: "{description}", description: "The event's description" },
+                { token: "{start}", description: "When it starts (date and time)" },
+                { token: "{starts_in}", description: "When it starts, as a countdown" },
+              ]}
+              tokenValues={{
+                "{title}": form.title || "Event title",
+                "{description}": form.description || "No description provided.",
+                "{start}": form.startTime ? new Date(form.startTime).toLocaleString() : "Saturday 8:00 PM",
+                "{starts_in}": "in 2 days",
+              }}
+              moduleButtons={form.enabledRoles.map((r) => r.charAt(0) + r.slice(1).toLowerCase())}
+            >
               <button onClick={saveEvent} disabled={saving} className="neon-button">
                 {saving ? "Saving…" : editingId ? "Save Changes" : "Create Event"}
               </button>
               <FormError message={error} />
-            </NeonCard>
-
-            <NeonCard>
-              <p className="text-xs uppercase tracking-wide text-slate-500 mb-3">Preview</p>
-              <EventPreview
-                title={form.title}
-                description={form.description}
-                startTime={form.startTime}
-                embedEnabled={form.embedEnabled}
-                embedColor={form.embedColor}
-                buttons={form.buttons}
-                enabledRoles={form.enabledRoles}
-              />
-            </NeonCard>
+            </ModuleMessage>
           </div>
         </div>
       )}

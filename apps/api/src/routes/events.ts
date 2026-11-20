@@ -47,7 +47,7 @@ router.get("/guilds/:guildId/events", requireAuth, requireGuildPermission, async
 
 router.post("/guilds/:guildId/events", requireAuth, requireGuildPermission, async (req: any, res) => {
   const { guildId } = req.params;
-  const { title, description, channelId, startTime, reminderMinutesBefore, embedEnabled, embedColor, buttons, enabledRoles, embedExtra } =
+  const { title, description, channelId, startTime, reminderMinutesBefore, embedEnabled, embedColor, buttons, enabledRoles, embedExtra, savedEmbedId } =
     req.body;
 
   const settings = await prisma.eventSettings.findUnique({ where: { guildId } });
@@ -65,6 +65,7 @@ router.post("/guilds/:guildId/events", requireAuth, requireGuildPermission, asyn
       buttons: sanitizeButtons(buttons),
       enabledRoles: sanitizeRoles(enabledRoles),
       embedExtra: (embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      savedEmbedId: typeof savedEmbedId === "string" && savedEmbedId ? savedEmbedId : null,
       createdById: req.user.id,
       needsSync: true, // the bot's eventSync job (runs every 15s) picks this up and posts it
     },
@@ -90,7 +91,7 @@ router.put("/guilds/:guildId/events/:id", requireAuth, requireGuildPermission, a
     return res.status(404).json({ error: "Event not found" });
   }
 
-  const { title, description, startTime, reminderMinutesBefore, embedEnabled, embedColor, buttons, enabledRoles, embedExtra } = req.body;
+  const { title, description, startTime, reminderMinutesBefore, embedEnabled, embedColor, buttons, enabledRoles, embedExtra, savedEmbedId } = req.body;
 
   const event = await prisma.event.update({
     where: { id: req.params.id },
@@ -104,6 +105,7 @@ router.put("/guilds/:guildId/events/:id", requireAuth, requireGuildPermission, a
       buttons: buttons !== undefined ? sanitizeButtons(buttons) : undefined,
       enabledRoles: enabledRoles !== undefined ? sanitizeRoles(enabledRoles) : undefined,
       embedExtra: embedExtra !== undefined ? ((embedExtra ?? Prisma.JsonNull) as Prisma.InputJsonValue) : undefined,
+      savedEmbedId: savedEmbedId !== undefined ? (typeof savedEmbedId === "string" && savedEmbedId ? savedEmbedId : null) : undefined,
       needsSync: true, // re-sync the already-posted message with the new content
     },
   });

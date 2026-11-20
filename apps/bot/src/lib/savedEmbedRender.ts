@@ -97,10 +97,11 @@ function hasAction(action?: EmbedActionConfig): boolean {
 // instead of its own inline embed fields.
 export async function buildSavedEmbedPayload(guildId: string, data: SavedEmbedData, tokens?: Record<string, string>): Promise<BaseMessageOptions> {
   const t = (s: string | undefined) => (s && tokens ? applyTokens(s, tokens) : s);
-  // Image links can be a placeholder too, like {avatar}; anything that isn't a web link after that is left out.
+  // Image links can be a placeholder too, like {avatar} or a module's attached
+  // picture ({card} → attachment://…); anything else that isn't a link is left out.
   const u = (s: string | undefined) => {
     const v = t(s)?.trim();
-    return v && /^https?:\/\//i.test(v) ? v : undefined;
+    return v && /^(https?|attachment):\/\//i.test(v) ? v : undefined;
   };
 
   const embeds = (data.embeds || [])

@@ -68,6 +68,9 @@ export async function syncPresetUsage(guildId: string, presetId: string): Promis
     if (r.panelChannelId) targets.push({ label: "Report panel", channelId: r.panelChannelId, messageId: r.panelMessageId! });
   }
 
+  // Events redraw themselves (with their sign-up lists) on the bot's next sync.
+  await prisma.event.updateMany({ where: { guildId, savedEmbedId: presetId }, data: { needsSync: true } }).catch(() => null);
+
   for (const t of targets) {
     const r = await editChannelMessage(t.channelId, t.messageId, edit);
     if (r.error) {

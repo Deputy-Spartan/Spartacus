@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { BUMP_DEFAULTS, BUMP_PLACEHOLDERS, cleanBumpMessages, fillBumpStage, type BumpMessages, type BumpStage, type BumpStageMessage } from "@spartacus/shared";
+import { useEffect, useState } from "react";
+import { BUMP_DEFAULTS, BUMP_PLACEHOLDERS, bumpTokenMap, cleanBumpMessages, type BumpMessages, type BumpStage, type BumpStageMessage } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
-import { MarkdownToolbar } from "../../../../components/ui/MarkdownToolbar";
-import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
-import { EmbedExtraFields } from "../../../../components/ui/EmbedExtraFields";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
-import { DiscordEmbed, DiscordMessage, extraEmbedProps } from "../../../../components/ui/DiscordPreview";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { api, type BumpReminderSettingsRow } from "../../../../lib/api";
-import type { EmbedExtra } from "../../../../lib/embedExtra";
 
 const MISSED_AFTER = [5, 10, 15, 30, 60, 90];
 const SAMPLE_USER = "100000000000000002";
@@ -108,7 +104,7 @@ export default function BumpReminderPage({ params }: { params: { guildId: string
 
   // The preview fills placeholders with your server's role and a sample time.
   const sampleNext = stage === "bumped" ? now + 2 * 60 * 60 * 1000 : now - (stage === "missed" ? missedAfter : 12) * 60_000;
-  const filled = fillBumpStage(current, {
+  const sampleTokens = bumpTokenMap({
     userId: SAMPLE_USER,
     roleId: settings?.mentionRoleId,
     nextAt: new Date(sampleNext),
@@ -116,7 +112,6 @@ export default function BumpReminderPage({ params }: { params: { guildId: string
     missed: 1,
     count: (settings?.bumpCount ?? 0) || 1,
   });
-  const names = { users: { [SAMPLE_USER]: bumper ?? "BustyBunz" } };
 
   return (
     <div>
@@ -235,122 +230,65 @@ export default function BumpReminderPage({ params }: { params: { guildId: string
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <div>
-            <p className="text-xs text-slate-400 mb-4">{stageInfo.when}</p>
+        <div className="max-w-3xl">
+          <p className="text-xs text-slate-400 mb-4">{stageInfo.when}</p>
 
-            {stage === "bumped" && (
-              <div className="flex items-center justify-between gap-3 mb-4 pb-4 border-b border-white/5">
+          {stage === "bumped" && (
+            <div className="flex items-center justify-between gap-3 mb-4 pb-4 border-b border-white/5">
+              <div>
+                <p className="text-sm">Post “Bump done” after each bump</p>
+                <p className="text-xs text-slate-500">Off: the last reminder is just removed after a bump.</p>
+              </div>
+              <ToggleSwitch enabled={current.enabled} onChange={(v) => setStageMessage("bumped", { enabled: v })} label="Post bump done message" />
+            </div>
+          )}
+          {stage === "missed" && (
+            <div className="mb-4 pb-4 border-b border-white/5">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm">Post “Bump done” after each bump</p>
-                  <p className="text-xs text-slate-500">Off: the last reminder is just removed after a bump.</p>
+                  <p className="text-sm">Missed Bump Alert</p>
+                  <p className="text-xs text-slate-500">Posts when nobody bumps in time.</p>
                 </div>
-                <ToggleSwitch enabled={current.enabled} onChange={(v) => setStageMessage("bumped", { enabled: v })} label="Post bump done message" />
+                <ToggleSwitch enabled={missedOn} onChange={(v) => update({ missedAlertEnabled: v })} label="Missed bump alert" />
               </div>
-            )}
-            {stage === "missed" && (
-              <div className="mb-4 pb-4 border-b border-white/5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm">Missed Bump Alert</p>
-                    <p className="text-xs text-slate-500">Posts when nobody bumps in time.</p>
-                  </div>
-                  <ToggleSwitch enabled={missedOn} onChange={(v) => update({ missedAlertEnabled: v })} label="Missed bump alert" />
+              {missedOn && (
+                <div className="mt-3">
+                  <label className={label}>Alert When Nobody Bumps Within</label>
+                  <select className={field} value={missedAfter} onChange={(e) => update({ missedAfterMin: Number(e.target.value) })}>
+                    {MISSED_AFTER.map((m) => (
+                      <option key={m} value={m}>
+                        {m < 60 ? `${m} minutes` : m === 60 ? "1 hour" : "1 hour 30 minutes"} after it's ready
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                {missedOn && (
-                  <div className="mt-3">
-                    <label className={label}>Alert When Nobody Bumps Within</label>
-                    <select className={field} value={missedAfter} onChange={(e) => update({ missedAfterMin: Number(e.target.value) })}>
-                      {MISSED_AFTER.map((m) => (
-                        <option key={m} value={m}>
-                          {m < 60 ? `${m} minutes` : m === 60 ? "1 hour" : "1 hour 30 minutes"} after it's ready
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {stageOn && messages && (
-              <StageFields key={stage} guildId={params.guildId} stage={stage} value={current} onChange={(p) => setStageMessage(stage, p)} />
-            )}
-          </div>
-
-          <div className="lg:sticky lg:top-4">
-            <p className={label}>Preview</p>
-            {stageOn ? (
-              <DiscordMessage content={filled.content || null} names={names}>
-                {filled.embedEnabled && (
-                  <DiscordEmbed
-                    names={names}
-                    color={filled.color}
-                    title={filled.title || null}
-                    description={filled.description || null}
-                    {...extraEmbedProps(filled.extra)}
-                    timestamp={filled.extra.timestamp}
-                  />
-                )}
-              </DiscordMessage>
-            ) : (
-              <p className="text-sm text-slate-500">This stage is switched off.</p>
-            )}
-            <p className="text-xs text-slate-600 mt-2">
-              Sample bumper: {bumper ?? "BustyBunz"}. In Discord the times count live, e.g. “in 1 hour 59 minutes”.
-            </p>
-            <button
-              type="button"
-              onClick={() => setStageMessage(stage, { ...BUMP_DEFAULTS[stage], extra: { ...BUMP_DEFAULTS[stage].extra } })}
-              className="text-xs text-slate-500 hover:text-neon-blue mt-3"
-            >
-              Reset this stage to the default
-            </button>
-          </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {stageOn && messages ? (
+          <ModuleMessage
+            key={stage}
+            guildId={params.guildId}
+            title={`${stageInfo.tab} message`}
+            description={`Sample bumper: ${bumper ?? "BustyBunz"}. In Discord the times count live, e.g. “in 1 hour 59 minutes”.`}
+            ownerKey={`bump:${stage}`}
+            savedEmbedId={current.savedEmbedId ?? null}
+            onSavedEmbedChange={(id) => setStageMessage(stage, { savedEmbedId: id })}
+            seed={() =>
+              current.embedEnabled
+                ? designFrom({ content: current.content, title: current.title, description: current.description, color: current.color, extra: current.extra })
+                : designFrom({ content: current.content })
+            }
+            tokens={BUMP_PLACEHOLDERS.filter((p) => !p.stages || p.stages.includes(stage))}
+            tokenValues={sampleTokens}
+            moduleButtons={["🔔 DM me when it's ready"]}
+          />
+        ) : (
+          <p className="text-sm text-slate-500">This stage is switched off.</p>
+        )}
       </NeonCard>
-    </div>
-  );
-}
-
-function StageFields({ guildId, stage, value, onChange }: { guildId: string; stage: BumpStage; value: BumpStageMessage; onChange: (p: Partial<BumpStageMessage>) => void }) {
-  const contentRef = useRef<HTMLTextAreaElement>(null);
-  const descRef = useRef<HTMLTextAreaElement>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
-  const tokens = BUMP_PLACEHOLDERS.filter((p) => !p.stages || p.stages.includes(stage));
-
-  return (
-    <div>
-      <label className={label}>Message Text</label>
-      <MarkdownToolbar guildId={guildId} textareaRef={contentRef} value={value.content} onChange={(v) => onChange({ content: v })} />
-      <textarea ref={contentRef} className={`${field} min-h-16`} value={value.content} onChange={(e) => onChange({ content: e.target.value })} placeholder="Optional with an embed" />
-      <PlaceholderExamples items={tokens} inputRef={contentRef} value={value.content} onChange={(v) => onChange({ content: v })} />
-
-      <div className="flex items-center justify-between gap-3 mb-4 pt-2 border-t border-white/5">
-        <span className="text-sm text-slate-300 pt-2">Use an embed</span>
-        <ToggleSwitch enabled={value.embedEnabled} onChange={(v) => onChange({ embedEnabled: v })} label="Use an embed" />
-      </div>
-
-      {value.embedEnabled && (
-        <>
-          <label className={label}>Embed Title</label>
-          <input ref={titleRef} className={field} value={value.title} maxLength={256} onChange={(e) => onChange({ title: e.target.value })} />
-          <PlaceholderExamples items={tokens} inputRef={titleRef} value={value.title} onChange={(v) => onChange({ title: v })} />
-
-          <label className={label}>Embed Description</label>
-          <MarkdownToolbar guildId={guildId} textareaRef={descRef} value={value.description} onChange={(v) => onChange({ description: v })} />
-          <textarea ref={descRef} className={`${field} min-h-28`} value={value.description} onChange={(e) => onChange({ description: e.target.value })} />
-          <PlaceholderExamples items={tokens} inputRef={descRef} value={value.description} onChange={(v) => onChange({ description: v })} />
-
-          <label className={label}>Embed Color</label>
-          <div className="flex items-center gap-2 mb-4">
-            <input type="color" className="h-9 w-12 rounded bg-transparent" value={value.color} onChange={(e) => onChange({ color: e.target.value })} />
-            <input className={`${field} max-w-32 font-mono`} value={value.color} onChange={(e) => onChange({ color: e.target.value })} />
-          </div>
-
-          <EmbedExtraFields guildId={guildId} value={value.extra as EmbedExtra} onChange={(next) => onChange({ extra: next })} />
-          <p className="text-xs text-slate-600 mt-2">Placeholders work in the author, footer and fields too.</p>
-        </>
-      )}
     </div>
   );
 }

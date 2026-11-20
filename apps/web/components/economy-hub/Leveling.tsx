@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { NeonCard } from "../ui/NeonCard";
 import { ChannelOverrideField } from "../ui/ChannelOverrideField";
 import { ModuleHeader } from "../ui/ModuleHeader";
-import { PlaceholderExamples } from "../ui/PlaceholderExamples";
 import { SaveStatus } from "../ui/SaveStatus";
+import { ModuleMessage, designFrom } from "../embedCreator/ModuleMessage";
 import { api, type LeaderboardRow, type LevelingSettingsRow } from "../../lib/api";
 import { downloadCsv } from "../../lib/csv";
 import { useAutoSave } from "../../lib/useAutoSave";
@@ -13,11 +13,15 @@ import { useAutoSave } from "../../lib/useAutoSave";
 const LEVEL_UP_TOKENS = [
   { token: "{user}", description: "Mentions the member who leveled up" },
   { token: "{level}", description: "The level they just reached" },
+  { token: "{rewards}", description: "What they got: coins, crates, the new level role" },
+  { token: "{next}", description: "The next rank and the XP it needs" },
+  { token: "{rank}", description: "The name of their rank on the ladder" },
+  { token: "{avatar}", description: "Their profile picture, for an image link" },
+  { token: "{card}", description: "The level-up card picture (put it in the Image link; needs the card turned on)" },
 ];
 
 function LevelUpSettings({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<LevelingSettingsRow | null>(null);
-  const messageRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     api.getLevelingSettings(guildId).then(setSettings);
@@ -30,25 +34,45 @@ function LevelUpSettings({ guildId }: { guildId: string }) {
   if (!settings) return null;
 
   return (
-    <NeonCard className="max-w-lg mb-5">
-      <p className="font-medium mb-1">Level-Up Announcements</p>
-      <ChannelOverrideField
+    <div className="mb-5">
+      <NeonCard className="max-w-lg mb-5">
+        <p className="font-medium mb-1">Level-Up Announcements</p>
+        <ChannelOverrideField
+          guildId={guildId}
+          value={settings.channelId}
+          onChange={(id) => setSettings((s) => (s ? { ...s, channelId: id } : s))}
+          label="Post to a specific channel"
+          fallbackNote="Off — level-ups post in whatever channel the message that triggered them was sent in."
+        />
+        <SaveStatus status={autoSave} />
+      </NeonCard>
+      <ModuleMessage
         guildId={guildId}
-        value={settings.channelId}
-        onChange={(id) => setSettings({ ...settings, channelId: id })}
-        label="Post to a specific channel"
-        fallbackNote="Off — level-ups post in whatever channel the message that triggered them was sent in."
+        title="Level-up post"
+        description="Posted when someone levels up."
+        ownerKey="leveling:levelUp"
+        savedEmbedId={settings.savedEmbedId ?? null}
+        onSavedEmbedChange={(id) => setSettings((s) => (s ? { ...s, savedEmbedId: id } : s))}
+        seed={() =>
+          designFrom({
+            content: "{user}",
+            description: `${settings.levelUpMessage || "🎉 {user} just reached **Level {level}**!"}\n\n**Rewards**\n{rewards}\n\n-# {next}`,
+            color: "#5865F2",
+            imageUrl: "{card}",
+          })
+        }
+        tokens={LEVEL_UP_TOKENS}
+        tokenValues={{
+          "{user}": "<@0>",
+          "{level}": "10",
+          "{rewards}": "• 🪙 250 coins\n• 🎖️ <@&0>",
+          "{next}": "Next: Veteran at level 15 (1,500 XP)",
+          "{rank}": "Soldier",
+          "{avatar}": "https://cdn.discordapp.com/embed/avatars/0.png",
+          "{card}": "",
+        }}
       />
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Message</label>
-      <textarea
-        ref={messageRef}
-        className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm min-h-16 font-mono mb-1"
-        value={settings.levelUpMessage}
-        onChange={(e) => setSettings({ ...settings, levelUpMessage: e.target.value })}
-      />
-      <PlaceholderExamples items={LEVEL_UP_TOKENS} inputRef={messageRef} value={settings.levelUpMessage} onChange={(v) => setSettings({ ...settings, levelUpMessage: v })} />
-      <SaveStatus status={autoSave} />
-    </NeonCard>
+    </div>
   );
 }
 

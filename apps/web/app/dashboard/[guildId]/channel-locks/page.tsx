@@ -5,7 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
-import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
@@ -145,6 +145,7 @@ function LockFields({
   onChannelChange,
   channelLabel,
   channelLocked,
+  ownKey,
   value,
   onChange,
 }: {
@@ -153,11 +154,10 @@ function LockFields({
   onChannelChange: (id: string | null) => void;
   channelLabel: (id: string) => string;
   channelLocked: boolean;
+  ownKey: string;
   value: ChannelLockInput;
   onChange: (patch: Partial<ChannelLockInput>) => void;
 }) {
-  const notifyContentRef = useRef<HTMLTextAreaElement>(null);
-
   return (
     <>
       <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">
@@ -239,16 +239,19 @@ function LockFields({
           onChange={(v) => onChange({ notifyEnabled: v })}
         />
         {value.notifyEnabled && (
-          <div className="pt-3">
-            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Notice Message</label>
-            <textarea
-              ref={notifyContentRef}
-              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
-              rows={2}
-              value={value.notifyContent ?? ""}
-              onChange={(e) => onChange({ notifyContent: e.target.value })}
+          <div className="pt-4">
+            <ModuleMessage
+              key={ownKey}
+              guildId={guildId}
+              title="Notice message"
+              description="Shown only to the member who taps “Why was this removed?”."
+              ownerKey={`channelLock:${ownKey}`}
+              savedEmbedId={value.savedEmbedId ?? null}
+              onSavedEmbedChange={(id) => onChange({ savedEmbedId: id })}
+              seed={() => designFrom({ content: value.notifyContent || "{user}, that message isn't allowed in {channel}." })}
+              tokens={NOTIFY_TOKENS}
+              tokenValues={{ "{user}": "<@0>", "{channel}": "#general" }}
             />
-            <PlaceholderExamples items={NOTIFY_TOKENS} inputRef={notifyContentRef} value={value.notifyContent ?? ""} onChange={(v) => onChange({ notifyContent: v })} />
           </div>
         )}
       </div>
@@ -266,6 +269,8 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
   const [error, setError] = useState<string | null>(null);
   const [draftChannelId, setDraftChannelId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ChannelLockInput>(EMPTY_FORM);
+  // Names a new lock's own notice embed until it's saved.
+  const [draftKey, setDraftKey] = useState(() => `new-${Date.now().toString(36)}`);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [channelOptions, setChannelOptions] = useState<DiscordChannelOption[]>([]);
@@ -300,6 +305,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
       allowedRoleIds: row.allowedRoleIds,
       notifyEnabled: row.notifyEnabled,
       notifyContent: row.notifyContent ?? "{user}, that message isn't allowed in {channel}.",
+      savedEmbedId: row.savedEmbedId ?? null,
     });
     setError(null);
   }
@@ -315,6 +321,7 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
   function resetDraft() {
     setDraftChannelId(null);
     setDraft(EMPTY_FORM);
+    setDraftKey(`new-${Date.now().toString(36)}`);
     setCreateError(null);
   }
 
@@ -432,8 +439,9 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
                       onChannelChange={setChannelId}
                       channelLabel={channelLabel}
                       channelLocked
+                      ownKey={r.id}
                       value={form}
-                      onChange={(patch) => setForm({ ...form, ...patch })}
+                      onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
                     />
                     <button onClick={saveEdit} className="neon-button">
                       Save Changes
@@ -455,8 +463,9 @@ export default function ChannelLocksPage({ params }: { params: { guildId: string
             onChannelChange={setDraftChannelId}
             channelLabel={channelLabel}
             channelLocked={false}
+            ownKey={draftKey}
             value={draft}
-            onChange={(patch) => setDraft({ ...draft, ...patch })}
+            onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
           />
           <button onClick={createLock} disabled={creating} className="neon-button disabled:opacity-50">
             {creating ? "Creating…" : "Create Lock"}

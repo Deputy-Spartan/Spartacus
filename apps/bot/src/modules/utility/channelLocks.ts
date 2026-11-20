@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonInteraction, ButtonStyle, Events
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 
 export const name = Events.MessageCreate;
 
@@ -104,5 +105,12 @@ export async function handleChannelLockReveal(interaction: ButtonInteraction, lo
     return;
   }
 
+  // A notice built in the dashboard (or a library embed).
+  const saved = await resolveSavedEmbed(lock.savedEmbedId);
+  if (saved) {
+    const payload = await buildSavedEmbedPayload(lock.guildId, saved, { "{user}": `<@${authorId}>`, "{channel}": `<#${interaction.channelId}>` });
+    await interaction.reply({ ...payload, content: payload.content || undefined, ephemeral: true });
+    return;
+  }
   await interaction.reply({ content: buildNoticeText(lock.notifyContent, `<@${authorId}>`, interaction.channelId), ephemeral: true });
 }

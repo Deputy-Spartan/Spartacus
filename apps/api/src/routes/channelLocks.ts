@@ -42,6 +42,7 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     allowedRoleIds,
     notifyEnabled,
     notifyContent,
+    savedEmbedId,
   } = req.body;
 
   const data = {
@@ -59,6 +60,7 @@ router.post("/guilds/:guildId/channel-locks", requireAuth, requireGuildPermissio
     allowedRoleIds: sanitizeStringList(allowedRoleIds),
     notifyEnabled: Boolean(notifyEnabled),
     notifyContent: typeof notifyContent === "string" ? notifyContent : undefined,
+      savedEmbedId: typeof savedEmbedId === "string" && savedEmbedId ? savedEmbedId : null,
   };
 
   const row = await prisma.channelLock.upsert({
@@ -88,6 +90,7 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
     allowedRoleIds,
     notifyEnabled,
     notifyContent,
+    savedEmbedId,
   } = req.body;
   const row = await prisma.channelLock.update({
     where: { id: req.params.id },
@@ -104,6 +107,7 @@ router.put("/guilds/:guildId/channel-locks/:id", requireAuth, requireGuildPermis
       allowedRoleIds: sanitizeStringList(allowedRoleIds),
       notifyEnabled: Boolean(notifyEnabled),
       notifyContent: typeof notifyContent === "string" ? notifyContent : undefined,
+      savedEmbedId: typeof savedEmbedId === "string" && savedEmbedId ? savedEmbedId : null,
     },
   });
   res.json(row);

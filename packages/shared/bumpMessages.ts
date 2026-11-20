@@ -26,6 +26,8 @@ export interface BumpStageMessage {
   description: string;
   color: string;
   extra: BumpEmbedExtra;
+  // The stage's message built in the dashboard (or a library embed); unset = the fields above.
+  savedEmbedId?: string | null;
 }
 
 export type BumpMessages = Record<BumpStage, BumpStageMessage>;
@@ -106,6 +108,7 @@ export function cleanBumpMessages(raw: unknown): BumpMessages {
           description: str(v.description, 4096),
           color: typeof v.color === "string" && /^#[0-9a-f]{6}$/i.test(v.color) ? v.color : d.color,
           extra: cleanExtra(v.extra),
+          savedEmbedId: typeof v.savedEmbedId === "string" && v.savedEmbedId ? v.savedEmbedId.slice(0, 40) : null,
         }
       : { ...d, extra: { ...d.extra } };
   }
@@ -119,6 +122,12 @@ export interface BumpVars {
   serverName?: string;
   missed?: number;
   count?: number;
+}
+
+// The same placeholders as fillBumpText, as a map for a built or saved embed.
+export function bumpTokenMap(v: BumpVars): Record<string, string> {
+  const keys = ["{user}", "{role}", "{bump}", "{next}", "{next_time}", "{ready}", "{missed}", "{count}", "{server}"];
+  return Object.fromEntries(keys.map((k) => [k, fillBumpText(k, v)]));
 }
 
 export function fillBumpText(text: string, v: BumpVars): string {

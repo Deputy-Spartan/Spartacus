@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type BaseMessageOptions } from "discord.js";
 import { applyEmbedExtra } from "./embedExtra";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "./savedEmbedRender";
 
 interface LinkButton {
   label: string;
@@ -26,6 +27,8 @@ export interface EventLike {
   buttons: unknown;
   enabledRoles: unknown;
   embedExtra?: unknown;
+  guildId?: string;
+  savedEmbedId?: string | null;
 }
 
 function parseEnabledRoles(input: unknown): RsvpRole[] {
@@ -56,12 +59,33 @@ function linkButtonsRow(buttons: unknown) {
 // plus an optional second row of link buttons. The embed toggle controls
 // only whether the decorative info card renders vs a plain-text summary;
 // RSVP still works either way.
-export function buildEventPayload(event: EventLike, signups: Array<{ userId: string; role: string }> = []): BaseMessageOptions {
+export async function buildEventPayload(event: EventLike, signups: Array<{ userId: string; role: string }> = []): Promise<BaseMessageOptions> {
   const roles = parseEnabledRoles(event.enabledRoles);
   const signedUp = (role: RsvpRole) => signups.filter((s) => s.role === role).map((s) => `<@${s.userId}>`).join("\n").slice(0, 1024) || "—";
   const rows = [rsvpRow(event.id, roles), linkButtonsRow(event.buttons)].filter(
     (r): r is ActionRowBuilder<ButtonBuilder> => r !== null
   );
+
+  // A post built in the dashboard (or a library embed). The sign-up lists
+  // still go on the first embed, and the RSVP buttons under the message.
+  const saved = event.guildId ? await resolveSavedEmbed(event.savedEmbedId) : null;
+  if (saved) {
+    const ts = Math.floor(event.startTime.getTime() / 1000);
+    const built = await buildSavedEmbedPayload(event.guildId!, saved, {
+      "{title}": event.title,
+      "{description}": event.description ?? "",
+      "{start}": `<t:${ts}:F>`,
+      "{starts_in}": `<t:${ts}:R>`,
+    });
+    const embeds = [...(built.embeds ?? [])];
+    if (embeds.length && roles.length) {
+      const first = EmbedBuilder.from(embeds[0] as EmbedBuilder);
+      const room = 25 - (first.data.fields?.length ?? 0);
+      first.addFields(roles.slice(0, Math.max(0, room)).map((role) => ({ name: RSVP_ROLE_META[role].fieldName, value: signedUp(role), inline: true })));
+      embeds[0] = first;
+    }
+    return { content: built.content ?? "", embeds, components: [...(built.components ?? []).slice(0, 5 - rows.length), ...rows] };
+  }
 
   if (!event.embedEnabled) {
     const content = `**${event.title}**\n${event.description ?? ""}\n🕒 <t:${Math.floor(event.startTime.getTime() / 1000)}:F>`;

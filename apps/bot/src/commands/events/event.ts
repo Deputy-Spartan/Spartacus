@@ -91,7 +91,7 @@ const command: CommandModule = {
         },
       });
 
-      const message = await targetChannel.send(buildEventPayload(event));
+      const message = await targetChannel.send(await buildEventPayload(event));
       await prisma.event.update({ where: { id: event.id }, data: { messageId: message.id, needsSync: false } });
 
       await interaction.reply({ content: `✅ Event created in <#${channel.id}>.`, ephemeral: true });

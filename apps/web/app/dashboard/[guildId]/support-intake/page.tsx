@@ -10,6 +10,7 @@ import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { useMemberNames } from "../../../../lib/useMemberNames";
+import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
 import {
   api,
   type SupportFlowRow,
@@ -686,7 +687,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
   if (!settings) return <p className="text-slate-400">Loading…</p>;
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4 max-w-6xl">
       <p className="text-sm text-slate-400">
         Every reply this module sends outside of the category question chains themselves — customize each one for this server's tone, or leave any of
         them blank to use the default wording shown as a placeholder. Use <code className="text-neon-blue">{"{server}"}</code> and{" "}
@@ -701,6 +702,27 @@ function SettingsTab({ guildId }: { guildId: string }) {
           Owner → Bot Customization
         </Link>
         . Everything below always plays right after, once this server has been chosen.
+      </div>
+
+      <div>
+        <ModuleMessage
+          guildId={guildId}
+          title="Opening message"
+          description="The first DM, with the category buttons under it."
+          ownerKey="supportDm:intro"
+          savedEmbedId={settings.introEmbedId ?? null}
+          onSavedEmbedChange={(id) => {
+            setSettings((s) => (s ? { ...s, introEmbedId: id } : s));
+            void api.setSupportSettings(guildId, { introEmbedId: id });
+          }}
+          seed={() => designFrom({ description: draft.introMessage || "👋 Hey! What do you need help with in **{server}**?", color: "#3498DB" })}
+          tokens={[
+            { token: "{server}", description: "Your server's name" },
+            { token: "{user}", description: "Their username" },
+          ]}
+          tokenValues={{ "{server}": "Your Server", "{user}": "NewMember" }}
+          embedsOnly
+        />
       </div>
 
       {MESSAGE_FIELDS.map((f) => (

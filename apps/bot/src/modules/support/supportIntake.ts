@@ -9,6 +9,7 @@ import {
   Message,
   PermissionFlagsBits,
 } from "discord.js";
+import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 import { prisma } from "../../lib/prisma";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
@@ -166,6 +167,12 @@ async function sendFlowPicker(guild: { id: string; name: string }, username: str
     );
   }
 
+  // An opening message built in the dashboard (or a library embed); the category buttons stay under it.
+  const design = await resolveSavedEmbed(settings?.introEmbedId);
+  if (design) {
+    const built = await buildSavedEmbedPayload(guild.id, design, { "{server}": guild.name, "{user}": username });
+    if (built.embeds?.length) return void (await send({ embeds: built.embeds, components: rows }).catch(() => null));
+  }
   await send({ content: intro, components: rows }).catch(() => null);
 }
 

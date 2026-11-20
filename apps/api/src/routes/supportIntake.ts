@@ -117,15 +117,10 @@ router.get("/guilds/:guildId/support-settings", requireAuth, requireGuildPermiss
 });
 
 router.put("/guilds/:guildId/support-settings", requireAuth, requireGuildPermission, async (req, res) => {
-  const { introMessage, noFlowsMessage, alreadyOpenMessage, ticketOpenedMessage, ticketClaimedMessage, ticketClosedMessage } = req.body;
-  const data = {
-    introMessage: introMessage ?? null,
-    noFlowsMessage: noFlowsMessage ?? null,
-    alreadyOpenMessage: alreadyOpenMessage ?? null,
-    ticketOpenedMessage: ticketOpenedMessage ?? null,
-    ticketClaimedMessage: ticketClaimedMessage ?? null,
-    ticketClosedMessage: ticketClosedMessage ?? null,
-  };
+  // Only what was sent changes, so the opening message's embed can be saved on its own.
+  const keys = ["introMessage", "noFlowsMessage", "alreadyOpenMessage", "ticketOpenedMessage", "ticketClaimedMessage", "ticketClosedMessage", "introEmbedId"] as const;
+  const data: Partial<Record<(typeof keys)[number], string | null>> = {};
+  for (const k of keys) if (req.body?.[k] !== undefined) data[k] = typeof req.body[k] === "string" && req.body[k] ? String(req.body[k]) : null;
   const row = await prisma.supportSettings.upsert({
     where: { guildId: req.params.guildId },
     create: { guildId: req.params.guildId, ...data },

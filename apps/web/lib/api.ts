@@ -1217,6 +1217,7 @@ export interface SupportSettingsRow {
   ticketOpenedMessage: string | null;
   ticketClaimedMessage: string | null;
   ticketClosedMessage: string | null;
+  introEmbedId?: string | null;
 }
 
 export type TicketPanelLayout = "BUTTONS" | "DROPDOWN";

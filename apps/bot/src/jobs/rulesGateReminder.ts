@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { replyBody } from "../lib/replyEmbed";
 import { isModuleEnabled } from "../lib/moduleGate";
 
 const DEFAULT_REMINDER =
@@ -44,7 +45,7 @@ export function startRulesGateReminderJob(client: Client) {
       const member = await guild.members.fetch(row.userId).catch(() => null);
       if (member && !(settings.roleId && member.roles.cache.has(settings.roleId))) {
         const message = (settings.reminderMessage || DEFAULT_REMINDER).replace(/\{server\}/g, guild.name);
-        await member.send(message).catch(() => null);
+        await member.send(await replyBody(guild.id, settings.replyEmbeds, "reminderMessage", message, { server: guild.name })).catch(() => null);
       }
 
       await prisma.rulesGatePendingMember.update({ where: { id: row.id }, data: { remindedAt: now } }).catch(() => null);

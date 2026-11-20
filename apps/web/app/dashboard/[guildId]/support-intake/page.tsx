@@ -11,6 +11,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
+import { ReplyMessage, useReplyEmbeds } from "../../../../components/embedCreator/ReplyMessage";
 import {
   api,
   type SupportFlowRow,
@@ -619,6 +620,13 @@ interface MessageFieldDef {
   rows?: number;
 }
 
+const SUPPORT_TOKENS = [
+  { token: "{server}", description: "Your server's name" },
+  { token: "{user}", description: "Their username" },
+  { token: "{category}", description: "The category they picked" },
+  { token: "{staff}", description: "The staff member (claimed / closed)" },
+];
+
 const MESSAGE_FIELDS: MessageFieldDef[] = [
   {
     key: "introMessage",
@@ -668,6 +676,7 @@ function SettingsTab({ guildId }: { guildId: string }) {
   const [settings, setSettings] = useState<SupportSettingsRow | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const replies = useReplyEmbeds(guildId, "support");
 
   useEffect(() => {
     api.getSupportSettings(guildId).then((s) => {
@@ -727,16 +736,31 @@ function SettingsTab({ guildId }: { guildId: string }) {
 
       {MESSAGE_FIELDS.map((f) => (
         <NeonCard key={f.key}>
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">{f.label}</label>
-          <p className="text-xs text-slate-500 mb-2">{f.hint}</p>
-          <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
-            rows={f.rows ?? 2}
-            value={draft[f.key] ?? ""}
-            onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
-            placeholder={f.placeholder}
-          />
-          <p className="text-xs text-slate-600">Leave blank to use the default wording shown above.</p>
+          {f.key === "introMessage" ? (
+            // The opening message's embed is made above; this is its plain text.
+            <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">{f.label} (plain text)</label>
+          ) : null}
+          <ReplyMessage
+            replies={f.key === "introMessage" ? undefined : replies}
+            replyKey={f.key}
+            title={f.label}
+            description={f.hint}
+            text={draft[f.key]}
+            fallback={f.placeholder}
+            color="#3498DB"
+            tokens={SUPPORT_TOKENS}
+            tokenValues={{ "{server}": "Your Server", "{user}": "NewMember", "{category}": "Billing", "{staff}": "ModName" }}
+          >
+            {f.key === "introMessage" && <p className="text-xs text-slate-500 mb-2">{f.hint}</p>}
+            <textarea
+              className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
+              rows={f.rows ?? 2}
+              value={draft[f.key] ?? ""}
+              onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+              placeholder={f.placeholder}
+            />
+            <p className="text-xs text-slate-600">Leave blank to use the default wording shown above. Press Save below after changing text.</p>
+          </ReplyMessage>
         </NeonCard>
       ))}
 

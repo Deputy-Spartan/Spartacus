@@ -10,6 +10,7 @@ import {
   StringSelectMenuInteraction,
 } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { replyBody } from "../../lib/replyEmbed";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 
@@ -71,7 +72,12 @@ export async function handleApplyButton(
       (type.description ? `${type.description}\n\n` : "\n") +
       `I'll ask ${questions.length} question${questions.length === 1 ? "" : "s"}, one at a time — just reply here with your answer to each.`
   ).replace(/{type}/g, type.name);
-  const introDm = await interaction.user.send(`${preamble}\n\n**1/${questions.length}.** ${firstQuestion.label}`).catch(() => null);
+  const firstLine = `**1/${questions.length}.** ${firstQuestion.label}`;
+  // An intro made as an embed goes first, then the first question under it.
+  const introBody = await replyBody(panel.guildId, type.replyEmbeds, "introMessage", preamble, { type: type.name });
+  const introDm = introBody.embeds?.length
+    ? await interaction.user.send(introBody).then((m) => interaction.user.send(firstLine).then(() => m)).catch(() => null)
+    : await interaction.user.send(`${preamble}\n\n${firstLine}`).catch(() => null);
 
   if (!introDm) {
     await interaction.reply({
@@ -156,6 +162,7 @@ async function finalizeApplication(
     reviewChannelId: string | null;
     staffRoleIds: unknown;
     submittedMessage: string | null;
+    replyEmbeds: unknown;
     customResponses: unknown;
   },
   answers: Array<{ label: string; answer: string }>
@@ -165,7 +172,7 @@ async function finalizeApplication(
   });
 
   const submittedText = (type.submittedMessage || "✅ Thanks — your application has been submitted for review!").replace(/{type}/g, type.name);
-  await message.reply(submittedText).catch(() => null);
+  await message.reply(await replyBody(guildId, type.replyEmbeds, "submittedMessage", submittedText, { type: type.name })).catch(() => null);
 
   const guild = await message.client.guilds.fetch(guildId).catch(() => null);
   if (!guild) return;
@@ -245,7 +252,7 @@ export async function handleApplicationReview(interaction: ButtonInteraction, ap
   );
 
   const applicant = await interaction.client.users.fetch(application.userId).catch(() => null);
-  await applicant?.send(dmText).catch(() => null);
+  await applicant?.send(await replyBody(application.guildId, type?.replyEmbeds, decision === "accept" ? "acceptMessage" : "denyMessage", dmText, { type: type?.name ?? "this role" })).catch(() => null);
 }
 
 // A staff-defined "custom response" button — DMs the applicant a canned

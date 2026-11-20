@@ -50,10 +50,16 @@ export interface ModuleMessageProps {
   // Panels that only post the embeds (with the module's own buttons under them).
   embedsOnly?: boolean;
   inline?: { value: DesignedMessage; onChange: (next: DesignedMessage) => void };
+  // Short replies: adds a "Plain text" choice that shows this (the reply's
+  // text box). Plain text means no embed (savedEmbedId null).
+  plain?: React.ReactNode;
+  // A smaller heading and a one-column layout, for use inside a settings card.
+  compact?: boolean;
   children?: React.ReactNode;
 }
 
-type Mode = "build" | "saved";
+type Mode = "plain" | "build" | "saved";
+export const MESSAGE_MODES: Record<Mode, string> = { plain: "💬 Plain text", build: "🎨 Build here", saved: "🗂️ Use a saved embed" };
 const pick = (d: Partial<DesignedMessage> | undefined): DesignedMessage => ({ content: d?.content ?? "", embeds: d?.embeds ?? [], components: d?.components ?? [] });
 
 let seq = 0;
@@ -90,9 +96,10 @@ export function designFrom(opts: {
 }
 
 export function ModuleMessage(props: ModuleMessageProps) {
-  const { guildId, title, description, ownerKey, savedEmbedId, onSavedEmbedChange, seed, tokens, tokenValues, moduleButtons, reservedRows, note, embedsOnly, inline, children } = props;
+  const { guildId, title, description, ownerKey, savedEmbedId, onSavedEmbedChange, seed, tokens, tokenValues, moduleButtons, reservedRows, note, embedsOnly, inline, plain, compact, children } = props;
+  const canPlain = plain !== undefined;
   const [loaded, setLoaded] = useState(!!inline);
-  const [mode, setMode] = useState<Mode>(inline && savedEmbedId ? "saved" : "build");
+  const [mode, setMode] = useState<Mode>(canPlain && !savedEmbedId ? "plain" : inline && savedEmbedId ? "saved" : "build");
   const [ownId, setOwnId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DesignedMessage | null>(null);
   const [libraryData, setLibraryData] = useState<DesignedMessage | null>(null);
@@ -114,7 +121,7 @@ export function ModuleMessage(props: ModuleMessageProps) {
         if (!live) return;
         setOwnId(own?.id ?? null);
         setDraft(own ? pick(own.data) : seedRef.current());
-        setMode(savedRef.current && current && !current.ownerKey ? "saved" : savedRef.current && !current ? "saved" : "build");
+        setMode(canPlain && !savedRef.current ? "plain" : savedRef.current && current && !current.ownerKey ? "saved" : savedRef.current && !current ? "saved" : "build");
         setLoaded(true);
       })
       .catch(() => {
@@ -150,11 +157,24 @@ export function ModuleMessage(props: ModuleMessageProps) {
     if (savedRef.current !== row.id) onSavedEmbedChange(row.id);
   }, 900, ownerKey);
 
-  function choose(next: Mode) {
+  async function choose(next: Mode) {
     if (next === mode) return;
     setMode(next);
+    // Plain text sends the reply's text box, with no embed.
+    if (next === "plain") return onSavedEmbedChange(null);
+    if (next !== "build") return;
     // Build here posts what's built here again (or the module's own settings if nothing's been built yet).
-    if (next === "build") onSavedEmbedChange(inline ? null : ownId);
+    if (inline || ownId || !canPlain) return onSavedEmbedChange(inline ? null : ownId);
+    // A reply that was plain text: start the embed from its text and use it straight away.
+    const fresh = seedRef.current();
+    setDraft(fresh);
+    try {
+      const row = await api.saveModuleEmbed(guildId, ownerKey, fresh);
+      setOwnId(row.id);
+      onSavedEmbedChange(row.id);
+    } catch {
+      setFlash("Couldn't start the embed. Try again.");
+    }
   }
 
   const shown = mode === "build" ? value : libraryData;
@@ -194,28 +214,34 @@ export function ModuleMessage(props: ModuleMessageProps) {
   ) : undefined;
 
   const tab = (m: Mode, label: string) => (
-    <button type="button" aria-pressed={mode === m} onClick={() => choose(m)} className={`sp-metal px-3.5 py-2 rounded-lg text-sm font-semibold ${mode === m ? "is-active" : ""}`}>
+    <button type="button" aria-pressed={mode === m} onClick={() => choose(m)} className={`sp-metal rounded-lg font-semibold ${compact ? "flex-1 sm:flex-none px-2.5 py-1.5 text-xs" : "px-3.5 py-2 text-sm"} ${mode === m ? "is-active" : ""}`}>
       {label}
     </button>
   );
 
   return (
-    <section className="mb-6" aria-label={title}>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+    <section className={compact ? "" : "mb-6"} aria-label={title}>
+      <div className={`flex flex-wrap items-end justify-between gap-2 ${compact ? "mb-2" : "mb-3"}`}>
         <div className="min-w-0">
-          <p className="font-semibold">{title}</p>
+          <p className={compact ? "text-xs uppercase tracking-wide text-slate-400" : "font-semibold"}>{title}</p>
           {description && <p className="text-xs text-slate-500">{description}</p>}
         </div>
-        <div className="flex gap-1.5 p-1 rounded-xl border border-white/10 bg-base-950/60" role="group" aria-label={`How to make the ${title.toLowerCase()}`}>
-          {tab("build", "🧱 Build here")}
-          {tab("saved", "📚 Use a saved embed")}
+        <div className={`flex flex-wrap gap-1.5 p-1 rounded-xl border border-white/10 bg-base-950/60 ${compact ? "w-full sm:w-auto" : ""}`} role="group" aria-label={`How to make the ${title.toLowerCase()}`}>
+          {canPlain && tab("plain", MESSAGE_MODES.plain)}
+          {tab("build", MESSAGE_MODES.build)}
+          {tab("saved", MESSAGE_MODES.saved)}
         </div>
       </div>
 
-      {!loaded || !value ? (
+      {mode === "plain" ? (
+        <div className="min-w-0">
+          {plain}
+          {flash && <p className="text-xs text-rose-400 mt-2">{flash}</p>}
+        </div>
+      ) : !loaded || !value ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,1fr)] gap-5 items-start">
+        <div className={`grid grid-cols-1 gap-5 items-start ${compact ? "" : "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,1fr)]"}`}>
           <div className="min-w-0">
             {mode === "build" ? (
               <>
@@ -248,14 +274,14 @@ export function ModuleMessage(props: ModuleMessageProps) {
                 <SavedEmbedPicker
                   guildId={guildId}
                   value={libraryId}
-                  onChange={(next) => onSavedEmbedChange(next ?? (inline ? null : ownId))}
+                  onChange={(next) => onSavedEmbedChange(next ?? (inline || canPlain ? null : ownId))}
                   bare
                   noneLabel="Pick one…"
                 />
                 <p className="text-xs text-slate-500 mt-3">
                   The editor is hidden while this is on. {tokens?.length ? `Placeholders like ${tokens[0].token} still work inside a saved embed. ` : ""}
                   {moduleButtons?.length ? "This module's own buttons are still added under it. " : ""}
-                  {!libraryId && "Until you pick one, the message you built keeps posting."}
+                  {!libraryId && (canPlain ? "Until you pick one, the plain text is sent." : "Until you pick one, the message you built keeps posting.")}
                 </p>
                 {libraryMissing && <p className="text-xs text-rose-400 mt-2">That saved embed was deleted. Pick another one.</p>}
                 <p className="text-xs text-slate-600 mt-3 pt-3 border-t border-dashed border-white/10">Your built message is kept. Switch back to Build here any time.</p>
@@ -264,7 +290,7 @@ export function ModuleMessage(props: ModuleMessageProps) {
             )}
           </div>
 
-          <div className="min-w-0 space-y-4 xl:sticky xl:top-4">
+          <div className={`min-w-0 space-y-4 ${compact ? "" : "xl:sticky xl:top-4"}`}>
             <NeonCard>
               <p className="font-medium mb-3">Preview in Discord</p>
               {state ? (

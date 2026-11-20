@@ -79,7 +79,7 @@ export function CommandListPost({ guildId }: { guildId: string }) {
             <div className="flex gap-2">
               {(["EMBED", "PLAIN"] as const).map((v) => (
                 <button key={v} type="button" aria-pressed={s.style === v} onClick={() => save({ style: v })} className={`sp-metal flex-1 px-3 py-2.5 rounded-lg text-sm font-semibold ${s.style === v ? "is-active" : ""}`}>
-                  {v === "EMBED" ? "🧱 Embed" : "💬 Plain message"}
+                  {v === "EMBED" ? "🎨 Embed" : "💬 Plain message"}
                 </button>
               ))}
             </div>

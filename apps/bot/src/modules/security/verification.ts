@@ -14,6 +14,8 @@ import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
+import { replyBody } from "../../lib/replyEmbed";
+import type { BaseMessageOptions } from "discord.js";
 import type { VerificationConfig } from "@prisma/client";
 
 export const VERIFY_DEFAULTS = {
@@ -40,6 +42,10 @@ const fill = (template: string | null | undefined, fallback: string, tokens: Rec
   return out;
 };
 
+// A reply as plain text, or the embed made for it in the dashboard.
+const say = (guildId: string, config: VerificationConfig | null, key: keyof VerificationConfig, fallback: string, tokens: Record<string, string>) =>
+  replyBody(guildId, config?.replyEmbeds, key, fill(config?.[key] as string | null | undefined, fallback, tokens), tokens);
+
 type Interaction = ButtonInteraction | ChatInputCommandInteraction;
 type Result = "VERIFIED" | "FAILED" | "TOO_NEW" | "NO_AVATAR" | "KICKED";
 
@@ -55,42 +61,42 @@ async function postLog(member: GuildMember, config: VerificationConfig, text: st
 
 // Checks that run before anything is asked or given. Returns a reply to
 // show when the member can't verify yet, or null when they can go ahead.
-async function preCheck(config: VerificationConfig | null, member: GuildMember): Promise<string | null> {
+async function preCheck(config: VerificationConfig | null, member: GuildMember): Promise<BaseMessageOptions | null> {
   const server = member.guild.name;
-  if (!config?.verifiedRoleId) return fill(config?.noRoleReply, VERIFY_DEFAULTS.noRole, { server });
-  if (member.roles.cache.has(config.verifiedRoleId)) return fill(config.alreadyVerifiedReply, VERIFY_DEFAULTS.alreadyVerified, { server });
+  if (!config?.verifiedRoleId) return say(member.guild.id, config, "noRoleReply", VERIFY_DEFAULTS.noRole, { server });
+  if (member.roles.cache.has(config.verifiedRoleId)) return say(member.guild.id, config, "alreadyVerifiedReply", VERIFY_DEFAULTS.alreadyVerified, { server });
   const ageDays = (Date.now() - member.user.createdTimestamp) / 86_400_000;
   if (config.minAccountAgeDays && ageDays < config.minAccountAgeDays) {
     await logVerification(member.guild.id, member, "TOO_NEW", `Account is ${Math.floor(ageDays)} day(s) old`);
-    return fill(config.accountTooNewMessage, VERIFY_DEFAULTS.tooNew, { server });
+    return say(member.guild.id, config, "accountTooNewMessage", VERIFY_DEFAULTS.tooNew, { server });
   }
   if (config.requireAvatar && !member.user.avatar) {
     await logVerification(member.guild.id, member, "NO_AVATAR");
-    return fill(config.noAvatarMessage, VERIFY_DEFAULTS.noAvatar, { server });
+    return say(member.guild.id, config, "noAvatarMessage", VERIFY_DEFAULTS.noAvatar, { server });
   }
   return null;
 }
 
 // Gives the role and does everything that goes with it. Shared by the
 // button, /verify and the captcha so they all behave the same.
-async function grant(config: VerificationConfig, member: GuildMember): Promise<string> {
+async function grant(config: VerificationConfig, member: GuildMember): Promise<BaseMessageOptions> {
   const server = member.guild.name;
   try {
     await member.roles.add(config.verifiedRoleId!);
   } catch (err) {
     logError("bot", err, member.guild.id);
-    return "⚠️ I can't give that role. Ask an admin to move Spartacus's role above it in Server Settings → Roles.";
+    return { content: "⚠️ I can't give that role. Ask an admin to move Spartacus's role above it in Server Settings → Roles.", embeds: [] };
   }
   if (config.unverifiedRoleId && member.roles.cache.has(config.unverifiedRoleId)) await member.roles.remove(config.unverifiedRoleId).catch(() => null);
   await prisma.verificationPendingMember.deleteMany({ where: { guildId: member.guild.id, userId: member.id } }).catch(() => null);
   await logVerification(member.guild.id, member, "VERIFIED", config.method === "CAPTCHA" ? "Captcha" : "Button");
   await postLog(member, config, `✅ <@${member.id}> verified and got <@&${config.verifiedRoleId}>.`, 0x2ecc71);
-  if (config.dmConfirmEnabled) await member.send(fill(config.dmConfirmMessage, VERIFY_DEFAULTS.dmConfirm, { server })).catch(() => null);
-  return fill(config.verifiedReply, VERIFY_DEFAULTS.verified, { server });
+  if (config.dmConfirmEnabled) await member.send(await say(member.guild.id, config, "dmConfirmMessage", VERIFY_DEFAULTS.dmConfirm, { server })).catch(() => null);
+  return say(member.guild.id, config, "verifiedReply", VERIFY_DEFAULTS.verified, { server });
 }
 
 // Kept for anything that still verifies directly: runs the checks, then grants.
-export async function verifyMember(config: VerificationConfig | null, member: GuildMember): Promise<{ ok: boolean; message: string }> {
+export async function verifyMember(config: VerificationConfig | null, member: GuildMember): Promise<{ ok: boolean; message: BaseMessageOptions }> {
   const blocked = await preCheck(config, member);
   if (blocked) return { ok: false, message: blocked };
   return { ok: true, message: await grant(config!, member) };
@@ -128,7 +134,7 @@ export async function startVerification(interaction: Interaction) {
   }
   const blocked = await preCheck(config, member);
   if (blocked) {
-    await interaction.reply({ content: blocked, ephemeral: true });
+    await interaction.reply({ ...blocked, ephemeral: true });
     return;
   }
   if (config!.method === "CAPTCHA") {
@@ -158,7 +164,7 @@ export async function handleCaptchaAnswer(interaction: ButtonInteraction, token:
 
   if (choice === c.answer) {
     const blocked = await preCheck(config, member);
-    await interaction.update({ content: blocked ?? (await grant(config, member)), components: [] });
+    await interaction.update({ components: [], ...(blocked ?? (await grant(config, member))) });
     return;
   }
 
@@ -181,7 +187,8 @@ export async function handleCaptchaAnswer(interaction: ButtonInteraction, token:
   }
   const left = config.maxFailures > 0 ? config.maxFailures - pending.failures : null;
   const note = left !== null && left > 0 && config.failAction === "KICK" ? `\n-# ${left} tr${left === 1 ? "y" : "ies"} left.` : "";
-  await interaction.update({ content: fill(config.captchaWrongReply, VERIFY_DEFAULTS.captchaWrong, { server: guild.name }) + note, components: [] });
+  const wrong = await say(guild.id, config, "captchaWrongReply", VERIFY_DEFAULTS.captchaWrong, { server: guild.name });
+  await interaction.update({ components: [], ...wrong, content: (wrong.content ?? "") + note });
 }
 
 // ---- Joining ----

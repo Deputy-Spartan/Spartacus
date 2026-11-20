@@ -404,8 +404,8 @@ function AlertSource({
     <div className="mt-5 pt-4 border-t border-white/5">
       <p className={label}>Alert message</p>
       <div className="flex flex-wrap gap-1.5 p-1 rounded-xl border border-white/10 bg-base-950/60 w-fit mb-3" role="group" aria-label="How to make the alert">
-        {tab(false, "🧱 Build here")}
-        {tab(true, "📚 Use a saved embed")}
+        {tab(false, "🎨 Build here")}
+        {tab(true, "🗂️ Use a saved embed")}
       </div>
       {useSaved ? (
         <>

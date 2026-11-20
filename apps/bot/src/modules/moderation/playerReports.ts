@@ -18,6 +18,7 @@ import {
   TextInputStyle,
 } from "discord.js";
 import { prisma } from "../../lib/prisma";
+import { replyBody } from "../../lib/replyEmbed";
 import { logError } from "@spartacus/db";
 import { isSendableChannel } from "../../lib/channels";
 import { isModuleEnabled } from "../../lib/moduleGate";
@@ -265,12 +266,16 @@ export async function createPlayerReport(
   if (settings.dmCreateEnabled) {
     const reporterUserForDm = reporterUser ?? (await client.users.fetch(reporterId).catch(() => null));
     await reporterUserForDm
-      ?.send(renderDmTemplate(settings.dmCreateMessage, DEFAULT_DM_CREATE, { server: guild.name, number: String(reportNumber) }))
+      ?.send(await reportDm(guild.id, settings, "dmCreateMessage", DEFAULT_DM_CREATE, { server: guild.name, number: String(reportNumber) }))
       .catch(() => null); // DMs off — the caller's own ephemeral reply already confirmed it either way.
   }
 
   return { ok: true, report };
 }
+
+// A report DM as plain text, or the embed made for it in the dashboard.
+const reportDm = (guildId: string, settings: PlayerReportSettings | null, key: "dmCreateMessage" | "dmClaimMessage" | "dmCloseMessage", fallback: string, tokens: Record<string, string>) =>
+  replyBody(guildId, settings?.replyEmbeds, key, renderDmTemplate(settings?.[key], fallback, tokens), tokens);
 
 async function canReview(member: GuildMember | null, settings: PlayerReportSettings | null): Promise<boolean> {
   if (!member) return false;
@@ -358,7 +363,7 @@ export async function handleReportClaim(interaction: ButtonInteraction, reportId
     const reporter = await interaction.client.users.fetch(report.reporterId).catch(() => null);
     await reporter
       ?.send(
-        renderDmTemplate(settings?.dmClaimMessage, DEFAULT_DM_CLAIM, {
+        await reportDm(report.guildId, settings, "dmClaimMessage", DEFAULT_DM_CLAIM, {
           server: interaction.guild?.name ?? "the server",
           number: String(report.reportNumber ?? "?"),
         })
@@ -408,10 +413,10 @@ async function finalizeReport(interaction: ButtonInteraction, reportId: string, 
       });
       await reporter
         .send({
-          content: renderDmTemplate(settings?.dmCloseMessage, DEFAULT_DM_CLOSE, {
+          ...(await reportDm(report.guildId, settings, "dmCloseMessage", DEFAULT_DM_CLOSE, {
             server: interaction.guild?.name ?? "the server",
             number: String(updated.reportNumber ?? "?"),
-          }),
+          })),
           files: [attachment],
         })
         .catch(() => null);

@@ -2303,6 +2303,14 @@ export const api = {
   updateStreamSlot: (guildId: string, id: string, body: Omit<StreamSlotRow, "id">) =>
     request<{ slot: StreamSlotRow; note: string | null }>(`/guilds/${guildId}/stream-extras/slots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   getCommandList: (guildId: string) => request<CommandListSettingsRow>(`/guilds/${guildId}/command-list`),
+  // Short replies that can be plain text or an embed: reply name → saved embed id.
+  getReplyEmbeds: (guildId: string, module: string, typeId?: string) =>
+    request<Record<string, string>>(`/guilds/${guildId}/reply-embeds/${module}${typeId ? `?typeId=${encodeURIComponent(typeId)}` : ""}`),
+  setReplyEmbed: (guildId: string, module: string, key: string, id: string | null, typeId?: string) =>
+    request<Record<string, string>>(`/guilds/${guildId}/reply-embeds/${module}${typeId ? `?typeId=${encodeURIComponent(typeId)}` : ""}`, {
+      method: "PUT",
+      body: JSON.stringify({ key, id }),
+    }),
   saveCommandList: (guildId: string, body: Partial<CommandListSettingsRow>) =>
     request<CommandListSettingsRow & { error?: string | null }>(`/guilds/${guildId}/command-list`, { method: "PUT", body: JSON.stringify(body) }),
   postCommandList: (guildId: string) => request<CommandListSettingsRow>(`/guilds/${guildId}/command-list/post`, { method: "POST" }),

@@ -11,6 +11,7 @@ import {
 } from "discord.js";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
 import { prisma } from "../../lib/prisma";
+import { replyBody } from "../../lib/replyEmbed";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 import type { SupportQuestion } from "@spartacus/db";
@@ -133,7 +134,7 @@ async function finalizeTicket(client: Message["client"], ticketId: string) {
       "✅ Thanks — I've opened a support ticket for your **{category}** request. A staff member will reply here in this DM once they pick it up.",
     { category: flow.label, server: guild.name, user: user?.username ?? ticket.userId }
   );
-  await user?.send(openedMessage).catch(() => null);
+  await user?.send(await replyBody(ticket.guildId, settings?.replyEmbeds, "ticketOpenedMessage", openedMessage, { category: flow.label, server: guild.name, user: user?.username ?? ticket.userId })).catch(() => null);
 }
 
 // Sends either the "no categories configured" message or the flow-picker
@@ -148,7 +149,7 @@ async function sendFlowPicker(guild: { id: string; name: string }, username: str
     const noFlows = (settings?.noFlowsMessage || "⚠️ Support requests aren't set up yet — an admin needs to add a category first.")
       .replace(/{server}/g, guild.name)
       .replace(/{user}/g, username);
-    await send(noFlows).catch(() => null);
+    await send(await replyBody(guild.id, settings?.replyEmbeds, "noFlowsMessage", noFlows, { server: guild.name, user: username })).catch(() => null);
     return;
   }
 
@@ -347,7 +348,7 @@ export async function handleFlowSelect(interaction: ButtonInteraction, flowId: s
       server: guild?.name ?? "this server",
       user: interaction.user.username,
     });
-    await interaction.reply({ content: alreadyOpen, ephemeral: true });
+    await interaction.reply({ ...(await replyBody(flow.guildId, settings?.replyEmbeds, "alreadyOpenMessage", alreadyOpen, { server: guild?.name ?? "this server", user: interaction.user.username })), ephemeral: true });
     return;
   }
 
@@ -403,7 +404,7 @@ export async function handleTicketControl(interaction: ButtonInteraction, ticket
     const claimedMessage = applyTokens(settings?.ticketClaimedMessage || "🙋 A staff member has picked up your support ticket.", {
       staff: interaction.user.username,
     });
-    await user?.send(claimedMessage).catch(() => null);
+    await user?.send(await replyBody(ticket.guildId, settings?.replyEmbeds, "ticketClaimedMessage", claimedMessage, { staff: interaction.user.username })).catch(() => null);
     return;
   }
 
@@ -415,7 +416,7 @@ export async function handleTicketControl(interaction: ButtonInteraction, ticket
   const closedMessage = applyTokens(settings?.ticketClosedMessage || "🔒 Your support ticket has been closed. DM me again if you need anything else.", {
     staff: interaction.user.username,
   });
-  await user?.send(closedMessage).catch(() => null);
+  await user?.send(await replyBody(ticket.guildId, settings?.replyEmbeds, "ticketClosedMessage", closedMessage, { staff: interaction.user.username })).catch(() => null);
 
   setTimeout(() => interaction.channel?.delete().catch(() => null), 5000);
 }

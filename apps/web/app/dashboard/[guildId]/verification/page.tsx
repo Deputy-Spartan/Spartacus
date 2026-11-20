@@ -10,6 +10,7 @@ import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { Required } from "../../../../components/ui/Required";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
+import { ReplyMessage, useReplyEmbeds, type ReplyEmbeds } from "../../../../components/embedCreator/ReplyMessage";
 import { DiscordButton, DiscordButtonRow, DiscordMessage } from "../../../../components/ui/DiscordPreview";
 import { api, type VerificationConfig, type VerificationLogRow } from "../../../../lib/api";
 import { useAutoSave } from "../../../../lib/useAutoSave";
@@ -52,6 +53,8 @@ const fill = (t: string | null | undefined, d: string) => (t?.trim() ? t : d).re
 
 type Tab = "settings" | "activity";
 type Update = (patch: Partial<VerificationConfig>) => void;
+const SERVER = [{ token: "{server}", description: "Your server's name" }];
+const SERVER_EXAMPLE = { "{server}": "Your Server" };
 
 export default function VerificationPage({ params }: { params: { guildId: string } }) {
   const [tab, setTab] = useState<Tab>("settings");
@@ -105,6 +108,7 @@ export default function VerificationPage({ params }: { params: { guildId: string
 function SettingsTab({ guildId, config, update }: { guildId: string; config: VerificationConfig; update: Update }) {
   const [step, setStep] = useState(0);
   const last = STEPS.length - 1;
+  const replies = useReplyEmbeds(guildId, "verification");
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -158,9 +162,9 @@ function SettingsTab({ guildId, config, update }: { guildId: string; config: Ver
         {step === 1 && <MessageStep guildId={guildId} config={config} update={update} />}
         {step === 2 && <MethodStep config={config} update={update} />}
         {step === 3 && <SafetyStep config={config} update={update} />}
-        {step === 4 && <ExtrasStep guildId={guildId} config={config} update={update} />}
-        {step === 5 && <ReminderStep config={config} update={update} />}
-        {step === 6 && <RepliesStep config={config} update={update} />}
+        {step === 4 && <ExtrasStep guildId={guildId} config={config} update={update} replies={replies} />}
+        {step === 5 && <ReminderStep config={config} update={update} replies={replies} />}
+        {step === 6 && <RepliesStep config={config} update={update} replies={replies} />}
         {step === 7 && <MaintenanceStep guildId={guildId} config={config} />}
 
         <div className="flex items-center justify-between max-w-xl mt-5 gap-3">
@@ -314,7 +318,7 @@ function SafetyStep({ config, update }: { config: VerificationConfig; update: Up
   );
 }
 
-function ExtrasStep({ guildId, config, update }: { guildId: string; config: VerificationConfig; update: Update }) {
+function ExtrasStep({ guildId, config, update, replies }: { guildId: string; config: VerificationConfig; update: Update; replies: ReplyEmbeds }) {
   return (
     <NeonCard className="max-w-xl">
       <label className={label}>Unverified Role (optional)</label>
@@ -339,13 +343,17 @@ function ExtrasStep({ guildId, config, update }: { guildId: string; config: Veri
         <ToggleSwitch enabled={!!config.dmConfirmEnabled} onChange={(v) => update({ dmConfirmEnabled: v })} label="DM when verified" />
       </div>
       {config.dmConfirmEnabled && (
-        <textarea className={`${field} mt-3 min-h-16`} value={config.dmConfirmMessage ?? ""} placeholder={D.dmConfirm} onChange={(e) => update({ dmConfirmMessage: e.target.value })} />
+        <div className="mt-3">
+          <ReplyMessage replies={replies} replyKey="dmConfirmMessage" title="The DM" text={config.dmConfirmMessage} fallback={D.dmConfirm} color={D.color} tokens={SERVER} tokenValues={SERVER_EXAMPLE}>
+            <textarea className={`${field} min-h-16`} value={config.dmConfirmMessage ?? ""} placeholder={D.dmConfirm} onChange={(e) => update({ dmConfirmMessage: e.target.value })} />
+          </ReplyMessage>
+        </div>
       )}
     </NeonCard>
   );
 }
 
-function ReminderStep({ config, update }: { config: VerificationConfig; update: Update }) {
+function ReminderStep({ config, update, replies }: { config: VerificationConfig; update: Update; replies: ReplyEmbeds }) {
   return (
     <NeonCard className="max-w-xl">
       <div className="flex items-center justify-between gap-3">
@@ -359,8 +367,11 @@ function ReminderStep({ config, update }: { config: VerificationConfig; update: 
         <div className="mt-3">
           <label className={label}>Send After (hours)</label>
           <input type="number" min={1} max={336} className={field} value={config.reminderDelayHours ?? 24} onChange={(e) => update({ reminderDelayHours: Number(e.target.value) })} />
-          <label className={`${label} mt-3`}>Reminder Message</label>
-          <textarea className={`${field} min-h-16`} value={config.reminderMessage ?? ""} placeholder={D.reminder} onChange={(e) => update({ reminderMessage: e.target.value })} />
+          <div className="mt-3">
+            <ReplyMessage replies={replies} replyKey="reminderMessage" title="Reminder Message" text={config.reminderMessage} fallback={D.reminder} tokens={SERVER} tokenValues={SERVER_EXAMPLE}>
+              <textarea className={`${field} min-h-16`} value={config.reminderMessage ?? ""} placeholder={D.reminder} onChange={(e) => update({ reminderMessage: e.target.value })} />
+            </ReplyMessage>
+          </div>
         </div>
       )}
 
@@ -375,8 +386,11 @@ function ReminderStep({ config, update }: { config: VerificationConfig; update: 
         <div className="mt-3">
           <label className={label}>Kick After (hours)</label>
           <input type="number" min={1} max={720} className={field} value={config.kickAfterHours ?? 48} onChange={(e) => update({ kickAfterHours: Number(e.target.value) })} />
-          <label className={`${label} mt-3`}>Message Before the Kick</label>
-          <textarea className={`${field} min-h-16`} value={config.kickMessage ?? ""} placeholder={D.kick} onChange={(e) => update({ kickMessage: e.target.value })} />
+          <div className="mt-3">
+            <ReplyMessage replies={replies} replyKey="kickMessage" title="Message Before the Kick" text={config.kickMessage} fallback={D.kick} color="#ED4245" tokens={SERVER} tokenValues={SERVER_EXAMPLE}>
+              <textarea className={`${field} min-h-16`} value={config.kickMessage ?? ""} placeholder={D.kick} onChange={(e) => update({ kickMessage: e.target.value })} />
+            </ReplyMessage>
+          </div>
         </div>
       )}
       <p className={`${hint} mt-4`}>Only counts members who joined after Verification was set up. Checked every 15 minutes.</p>
@@ -384,7 +398,7 @@ function ReminderStep({ config, update }: { config: VerificationConfig; update: 
   );
 }
 
-function RepliesStep({ config, update }: { config: VerificationConfig; update: Update }) {
+function RepliesStep({ config, update, replies }: { config: VerificationConfig; update: Update; replies: ReplyEmbeds }) {
   const rows: Array<[keyof VerificationConfig, string, string]> = [
     ["verifiedReply", "When They Verify", D.verified],
     ["alreadyVerifiedReply", "When They're Already Verified", D.alreadyVerified],
@@ -396,11 +410,20 @@ function RepliesStep({ config, update }: { config: VerificationConfig; update: U
   ];
   return (
     <NeonCard className="max-w-xl">
-      <p className={`${hint} mb-4`}>Only the member who pressed Verify sees these. Leave one empty to use the default shown. {"{server}"} becomes your server's name.</p>
+      <p className={`${hint} mb-4`}>Only the member who pressed Verify sees these. Each one can be plain text or an embed. Leave the text empty to use the default shown. {"{server}"} becomes your server's name.</p>
       {rows.map(([key, title, def], i) => (
         <div key={key} className={i ? "mt-4" : ""}>
-          <label className={label}>{title}</label>
-          <textarea className={`${field} min-h-14`} value={(config[key] as string | null) ?? ""} placeholder={def} onChange={(e) => update({ [key]: e.target.value } as Partial<VerificationConfig>)} />
+          {key === "captchaPrompt" ? (
+            // The captcha question carries the code buttons, so it stays plain text.
+            <>
+              <label className={label}>{title}</label>
+              <textarea className={`${field} min-h-14`} value={(config[key] as string | null) ?? ""} placeholder={def} onChange={(e) => update({ [key]: e.target.value } as Partial<VerificationConfig>)} />
+            </>
+          ) : (
+            <ReplyMessage replies={replies} replyKey={key} title={title} text={config[key] as string | null} fallback={def} color={D.color} tokens={SERVER} tokenValues={SERVER_EXAMPLE}>
+              <textarea className={`${field} min-h-14`} value={(config[key] as string | null) ?? ""} placeholder={def} onChange={(e) => update({ [key]: e.target.value } as Partial<VerificationConfig>)} />
+            </ReplyMessage>
+          )}
         </div>
       ))}
     </NeonCard>

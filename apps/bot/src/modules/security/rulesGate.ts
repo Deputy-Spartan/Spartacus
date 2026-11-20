@@ -1,6 +1,7 @@
 import { ButtonInteraction, Client, EmbedBuilder } from "discord.js";
 import { prisma } from "../../lib/prisma";
 import { logError } from "@spartacus/db";
+import { replyBody } from "../../lib/replyEmbed";
 
 const DEFAULT_DM_CONFIRM = "✅ Thanks for agreeing to the rules in **{server}** — you now have access!";
 const DEFAULT_AGREE_REPLY = "✅ Thanks — you now have access!";
@@ -16,6 +17,11 @@ function renderMessage(template: string | null | undefined, fallback: string, to
   for (const [key, value] of Object.entries(tokens)) out = out.replace(new RegExp(`\\{${key}\\}`, "g"), value);
   return out;
 }
+
+// A reply as plain text, or the embed made for it in the dashboard.
+type Settings = { guildId: string; replyEmbeds: unknown };
+const say = (settings: Settings, key: string, template: string | null | undefined, fallback: string, tokens: Record<string, string>) =>
+  replyBody(settings.guildId, settings.replyEmbeds, key, renderMessage(template, fallback, tokens), tokens);
 
 // Cheap in-memory debounce so a double-click (or a retried interaction)
 // can't double-DM/double-log someone or trigger two kicks in a row.
@@ -50,7 +56,7 @@ export async function handleRulesGateAgree(interaction: ButtonInteraction, setti
 
   if (!settings.roleId) {
     await interaction.reply({
-      content: renderMessage(settings.noRoleConfiguredMessage, DEFAULT_NO_ROLE_CONFIGURED, { server: interaction.guild.name }),
+      ...(await say(settings, "noRoleConfiguredMessage", settings.noRoleConfiguredMessage, DEFAULT_NO_ROLE_CONFIGURED, { server: interaction.guild.name })),
       ephemeral: true,
     });
     return;
@@ -64,7 +70,7 @@ export async function handleRulesGateAgree(interaction: ButtonInteraction, setti
 
   if (member.roles.cache.has(settings.roleId)) {
     await interaction.reply({
-      content: renderMessage(settings.alreadyAgreedMessage, DEFAULT_ALREADY_AGREED, { server: interaction.guild.name }),
+      ...(await say(settings, "alreadyAgreedMessage", settings.alreadyAgreedMessage, DEFAULT_ALREADY_AGREED, { server: interaction.guild.name })),
       ephemeral: true,
     });
     return;
@@ -74,7 +80,7 @@ export async function handleRulesGateAgree(interaction: ButtonInteraction, setti
     const ageDays = (Date.now() - member.user.createdTimestamp) / 86_400_000;
     if (ageDays < settings.minAccountAgeDays) {
       await interaction.reply({
-        content: renderMessage(settings.accountTooNewMessage, DEFAULT_ACCOUNT_TOO_NEW, { server: interaction.guild.name }),
+        ...(await say(settings, "accountTooNewMessage", settings.accountTooNewMessage, DEFAULT_ACCOUNT_TOO_NEW, { server: interaction.guild.name })),
         ephemeral: true,
       });
       return;
@@ -108,7 +114,7 @@ export async function handleRulesGateAgree(interaction: ButtonInteraction, setti
   await prisma.rulesGatePendingMember.deleteMany({ where: { guildId: interaction.guild.id, userId: member.id } }).catch(() => null);
 
   await interaction.reply({
-    content: renderMessage(settings.agreeReplyMessage, DEFAULT_AGREE_REPLY, { server: interaction.guild.name }),
+    ...(await say(settings, "agreeReplyMessage", settings.agreeReplyMessage, DEFAULT_AGREE_REPLY, { server: interaction.guild.name })),
     ephemeral: true,
   });
 
@@ -124,7 +130,7 @@ export async function handleRulesGateAgree(interaction: ButtonInteraction, setti
   }
 
   if (settings.dmConfirmEnabled) {
-    await member.send(renderMessage(settings.dmConfirmMessage, DEFAULT_DM_CONFIRM, { server: interaction.guild.name })).catch(() => null);
+    await member.send(await say(settings, "dmConfirmMessage", settings.dmConfirmMessage, DEFAULT_DM_CONFIRM, { server: interaction.guild.name })).catch(() => null);
   }
 }
 
@@ -210,7 +216,7 @@ export async function handleRulesGateDecline(interaction: ButtonInteraction, set
   if (settings.declineAction === "CHANNEL") {
     const channelMention = settings.declineChannelId ? `<#${settings.declineChannelId}>` : "the support channel";
     await interaction.reply({
-      content: renderMessage(settings.declineReplyMessage, DEFAULT_DECLINE_REPLY_CHANNEL, { server: interaction.guild.name, channel: channelMention }),
+      ...(await say(settings, "declineReplyMessage", settings.declineReplyMessage, DEFAULT_DECLINE_REPLY_CHANNEL, { server: interaction.guild.name, channel: channelMention })),
       ephemeral: true,
     });
     return;
@@ -218,7 +224,7 @@ export async function handleRulesGateDecline(interaction: ButtonInteraction, set
 
   if (settings.declineAction === "KICK") {
     await interaction.reply({
-      content: renderMessage(settings.declineReplyMessage, DEFAULT_DECLINE_REPLY_KICK, { server: interaction.guild.name, channel: "" }),
+      ...(await say(settings, "declineReplyMessage", settings.declineReplyMessage, DEFAULT_DECLINE_REPLY_KICK, { server: interaction.guild.name, channel: "" })),
       ephemeral: true,
     });
     const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);

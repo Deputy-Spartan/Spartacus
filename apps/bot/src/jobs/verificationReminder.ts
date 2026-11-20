@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { Client } from "discord.js";
 import { prisma } from "../lib/prisma";
+import { replyBody } from "../lib/replyEmbed";
 import { logError } from "@spartacus/db";
 import { isModuleEnabled } from "../lib/moduleGate";
 import { VERIFY_DEFAULTS, logVerification } from "../modules/security/verification";
@@ -35,7 +36,7 @@ export function startVerificationReminderJob(client: Client) {
       const tokens = (t: string | null, d: string) => (t?.trim() ? t : d).replace(/\{server\}/g, guild.name);
 
       if (wantsKick) {
-        await member.send(tokens(config.kickMessage, VERIFY_DEFAULTS.kick)).catch(() => null);
+        await member.send(await replyBody(guild.id, config.replyEmbeds, "kickMessage", tokens(config.kickMessage, VERIFY_DEFAULTS.kick), { server: guild.name })).catch(() => null);
         const kicked = member.kickable ? await member.kick(`Didn't verify within ${config.kickAfterHours} hours`).then(() => true, (err) => (logError("bot", err, guild.id), false)) : false;
         await prisma.verificationPendingMember.delete({ where: { id: row.id } }).catch(() => null);
         if (kicked) {
@@ -48,7 +49,7 @@ export function startVerificationReminderJob(client: Client) {
         continue;
       }
 
-      await member.send(tokens(config.reminderMessage, VERIFY_DEFAULTS.reminder)).catch(() => null);
+      await member.send(await replyBody(guild.id, config.replyEmbeds, "reminderMessage", tokens(config.reminderMessage, VERIFY_DEFAULTS.reminder), { server: guild.name })).catch(() => null);
       await prisma.verificationPendingMember.update({ where: { id: row.id }, data: { remindedAt: new Date() } }).catch(() => null);
     }
   });

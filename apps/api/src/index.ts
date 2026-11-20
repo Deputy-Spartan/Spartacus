@@ -30,6 +30,7 @@ import modulesRouter from "./routes/modules";
 import eventsRouter from "./routes/events";
 import customCommandsRouter from "./routes/customCommands";
 import commandListRouter, { commandListWatcher } from "./routes/commandList";
+import replyEmbedsRouter from "./routes/replyEmbeds";
 import levelingRouter from "./routes/leveling";
 import welcomeRouter from "./routes/welcome";
 import moderationRouter from "./routes/moderation";
@@ -148,6 +149,7 @@ app.use(activityRouter);
 app.use(commandListWatcher); // updates the posted command list after commands or modules change
 app.use(authRouter);
 app.use(commandListRouter);
+app.use(replyEmbedsRouter);
 app.use(guildsRouter);
 app.use(modulesRouter);
 app.use(eventsRouter);

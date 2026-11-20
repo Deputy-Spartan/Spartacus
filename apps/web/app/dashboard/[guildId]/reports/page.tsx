@@ -8,6 +8,7 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExamples";
 import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
+import { ReplyMessage, useReplyEmbeds } from "../../../../components/embedCreator/ReplyMessage";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type ReportSettingsRow } from "../../../../lib/api";
 import { useMemberNames } from "../../../../lib/useMemberNames";
@@ -28,6 +29,7 @@ const CHANNEL_NAME_TOKENS = [
   { token: "{reported}", description: "The reported member's username" },
 ];
 
+const DM_EXAMPLE = { "{server}": "Your Server", "{number}": "12" };
 const DM_TOKENS = [
   { token: "{number}", description: "This report's sequential number" },
   { token: "{server}", description: "This server's name" },
@@ -186,6 +188,7 @@ function DmMessagesCard({ guildId }: { guildId: string }) {
     dmClaimMessage: useRef<HTMLTextAreaElement>(null),
     dmCloseMessage: useRef<HTMLTextAreaElement>(null),
   };
+  const replies = useReplyEmbeds(guildId, "reports");
 
   useEffect(() => {
     api.getReportSettings(guildId).then(setSettings);
@@ -212,6 +215,7 @@ function DmMessagesCard({ guildId }: { guildId: string }) {
               <ToggleSwitch enabled={settings[f.enabledKey]} onChange={(v) => patch({ [f.enabledKey]: v } as Partial<ReportSettingsRow>)} label={`Send DM on ${f.label}`} />
             </div>
             <p className="text-xs text-slate-500 mb-2">{f.hint}</p>
+            <ReplyMessage replies={replies} replyKey={f.messageKey} title="The DM" text={settings[f.messageKey]} fallback={f.placeholder} color="#E74C3C" tokens={DM_TOKENS} tokenValues={DM_EXAMPLE}>
             <textarea
               ref={refs[f.messageKey]}
               className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm disabled:opacity-50"
@@ -227,6 +231,7 @@ function DmMessagesCard({ guildId }: { guildId: string }) {
               value={settings[f.messageKey] ?? ""}
               onChange={(v) => patch({ [f.messageKey]: v || null } as Partial<ReportSettingsRow>)}
             />
+            </ReplyMessage>
           </div>
         ))}
       </div>

@@ -276,20 +276,20 @@ model ModuleToggle {
 }
 
 model WelcomeConfig {
-  id             String  @id @default(cuid())
-  guild          Guild   @relation(fields: [guildId], references: [id])
-  guildId        String  @unique
-  channelId      String?
-  leaveChannelId String? // goodbyes post here when set, otherwise in channelId
-  pingAboveEmbed Boolean @default(true) // embed mentions never notify, so the new member is also pinged above the embed
-  welcomeText    String?
-  goodbyeText    String?
-  embedColor     String? @default("#00E5FF")
-  embedEnabled   Boolean @default(false)
-  embedTitle     String?
-  buttons        Json    @default("[]")
-  embedExtra     Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
-  savedEmbedId   String? // when set, overrides embedTitle/embedExtra/etc. with an EmbedCreatorPreset's content at send time
+  id                  String  @id @default(cuid())
+  guild               Guild   @relation(fields: [guildId], references: [id])
+  guildId             String  @unique
+  channelId           String?
+  leaveChannelId      String? // goodbyes post here when set, otherwise in channelId
+  pingAboveEmbed      Boolean @default(true) // embed mentions never notify, so the new member is also pinged above the embed
+  welcomeText         String?
+  goodbyeText         String?
+  embedColor          String? @default("#00E5FF")
+  embedEnabled        Boolean @default(false)
+  embedTitle          String?
+  buttons             Json    @default("[]")
+  embedExtra          Json? // author/thumbnail/image/footer-icon/timestamp/fields — see apps/web/lib/embedExtra.ts for the shared shape
+  savedEmbedId        String? // when set, overrides embedTitle/embedExtra/etc. with an EmbedCreatorPreset's content at send time
   goodbyeSavedEmbedId String? // the goodbye message's own embed; unset = the plain/legacy goodbye
 }
 
@@ -989,6 +989,7 @@ model VerificationConfig {
   noRoleReply          String?
   captchaPrompt        String?
   captchaWrongReply    String?
+  replyEmbeds          Json    @default("{}") // reply name → saved embed id; a reply with none sends its plain text
 }
 
 // Members who joined and haven't verified yet, for reminders and auto-kick.
@@ -1445,6 +1446,7 @@ model PlayerReportSettings {
   dmClaimMessage  String?
   dmCloseEnabled  Boolean @default(true) // close DM also includes a transcript attachment
   dmCloseMessage  String?
+  replyEmbeds     Json    @default("{}") // reply name → saved embed id; a reply with none sends its plain text
 }
 
 // ---- Perm Watch ----
@@ -1649,8 +1651,9 @@ model RulesGateSettings {
   defaultEmbedTitle       String?
   defaultEmbedDescription String?
 
-  agreements RulesGateAgreement[]
-  sections   RulesGateSection[]
+  agreements  RulesGateAgreement[]
+  sections    RulesGateSection[]
+  replyEmbeds Json                 @default("{}") // reply name → saved embed id; a reply with none sends its plain text
 }
 
 enum RulesGateDeclineAction {
@@ -2191,6 +2194,7 @@ model ApplicationType {
   customResponses  Json     @default("[]") // [{ id, label, message }] — extra buttons on the review embed that just DM the applicant, no status change; capped at 3 in the UI
   enabled          Boolean  @default(true)
   createdAt        DateTime @default(now())
+  replyEmbeds      Json     @default("{}") // reply name → saved embed id; a reply with none sends its plain text
 
   @@index([guildId])
 }
@@ -2254,6 +2258,7 @@ model SupportSettings {
   ticketOpenedMessage  String? // DM sent right after the question chain finishes and the ticket channel is created
   ticketClaimedMessage String? // DM sent when a staff member claims their ticket
   ticketClosedMessage  String? // DM sent when their ticket is closed
+  replyEmbeds          Json    @default("{}") // reply name → saved embed id; a reply with none sends its plain text
 }
 
 // ---- Dashboard Activity ----
@@ -3437,17 +3442,17 @@ model GameNightPlayer {
 
 // The list of every command, posted in a channel and kept up to date.
 model CommandListSettings {
-  id            String   @id @default(cuid())
-  guildId       String   @unique
-  channelId     String?
-  style         String   @default("EMBED") // EMBED | PLAIN
-  autoUpdate    Boolean  @default(true) // edit the posted list when commands change
-  includeStaff  Boolean  @default(true)
-  includeCustom Boolean  @default(true) // the server's own /commands and !triggers
-  onlyEnabled   Boolean  @default(true) // leave out commands from modules that are off
-  messageIds    Json     @default("[]") // the posted messages, top to bottom: [{ key, id, hash }], one per category
+  id              String   @id @default(cuid())
+  guildId         String   @unique
+  channelId       String?
+  style           String   @default("EMBED") // EMBED | PLAIN
+  autoUpdate      Boolean  @default(true) // edit the posted list when commands change
+  includeStaff    Boolean  @default(true)
+  includeCustom   Boolean  @default(true) // the server's own /commands and !triggers
+  onlyEnabled     Boolean  @default(true) // leave out commands from modules that are off
+  messageIds      Json     @default("[]") // the posted messages, top to bottom: [{ key, id, hash }], one per category
   staffChannelId  String? // staff-only commands go here (a channel only staff can see); unset = in the main list
-  staffMessageIds Json    @default("[]") // the staff list's messages, same shape
-  hash          String?
-  updatedAt     DateTime @updatedAt
+  staffMessageIds Json     @default("[]") // the staff list's messages, same shape
+  hash            String?
+  updatedAt       DateTime @updatedAt
 }

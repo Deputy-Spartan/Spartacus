@@ -10,6 +10,7 @@ import { PlaceholderExamples } from "../../../../components/ui/PlaceholderExampl
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { api, type RulesGateSettingsRow, type RulesGateAgreementRow, type RulesGateSectionRow } from "../../../../lib/api";
 import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
+import { ReplyMessage, ReplyEmbedsProvider } from "../../../../components/embedCreator/ReplyMessage";
 import { DiscordButton, DiscordButtonRow, DiscordEmbed, DiscordMessage } from "../../../../components/ui/DiscordPreview";
 
 type Tab = "settings" | "activity";
@@ -39,6 +40,7 @@ const DEFAULT_EMBED_DESCRIPTION = "Click the button below to confirm you've read
 const DEFAULT_ACCOUNT_TOO_NEW = "Your Discord account is too new to agree to the rules in **{server}** yet — try again in a few days.";
 const DEFAULT_DECLINE_REPLY_CHANNEL = "No worries — head to {channel} if you have questions about the rules before agreeing.";
 const DEFAULT_DECLINE_REPLY_KICK = "Understood — you'll be removed from **{server}** since you don't agree to the rules.";
+const RULES_EXAMPLE = { "{server}": "Your Server", "{channel}": "#questions" };
 const DEFAULT_REMINDER =
   '👋 Just a reminder — you still need to agree to the rules in **{server}** to get full access. Head back to the server and click "I Agree".';
 
@@ -82,7 +84,11 @@ export default function RulesGatePage({ params }: { params: { guildId: string } 
         {saved && <p className="text-xs text-emerald-400 self-center ml-1">Saved ✓</p>}
       </div>
 
-      {tab === "settings" && <SettingsTab guildId={params.guildId} settings={settings} update={update} />}
+      {tab === "settings" && (
+        <ReplyEmbedsProvider guildId={params.guildId} module="rules">
+          <SettingsTab guildId={params.guildId} settings={settings} update={update} />
+        </ReplyEmbedsProvider>
+      )}
       {tab === "activity" && <ActivityTab guildId={params.guildId} />}
     </div>
   );
@@ -252,14 +258,17 @@ function SettingsTab({
             />
             {settings?.minAccountAgeDays != null && (
               <>
-                <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-3">Account-Too-New Reply</label>
-                <textarea
-                  value={settings.accountTooNewMessage ?? ""}
-                  onChange={(e) => update({ accountTooNewMessage: e.target.value || null })}
-                  placeholder={DEFAULT_ACCOUNT_TOO_NEW}
-                  rows={2}
-                  className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-                />
+                <div className="mt-3">
+                  <ReplyMessage replyKey="accountTooNewMessage" title="Account-Too-New Reply" text={settings.accountTooNewMessage} fallback={DEFAULT_ACCOUNT_TOO_NEW} tokens={SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+                    <textarea
+                      value={settings.accountTooNewMessage ?? ""}
+                      onChange={(e) => update({ accountTooNewMessage: e.target.value || null })}
+                      placeholder={DEFAULT_ACCOUNT_TOO_NEW}
+                      rows={2}
+                      className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+                    />
+                  </ReplyMessage>
+                </div>
               </>
             )}
           </NeonCard>
@@ -422,21 +431,24 @@ function DeclineCard({
             </>
           )}
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Reply Message</label>
-          <textarea
-            ref={declineRef}
-            value={settings.declineReplyMessage ?? ""}
-            onChange={(e) => update({ declineReplyMessage: e.target.value || null })}
-            placeholder={settings.declineAction === "KICK" ? DEFAULT_DECLINE_REPLY_KICK : DEFAULT_DECLINE_REPLY_CHANNEL}
-            rows={2}
-            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-          />
-          <PlaceholderExamples
+          <div className="mt-4">
+            <ReplyMessage replyKey="declineReplyMessage" title="Reply Message" text={settings.declineReplyMessage} fallback={settings.declineAction === "KICK" ? DEFAULT_DECLINE_REPLY_KICK : DEFAULT_DECLINE_REPLY_CHANNEL} tokens={settings.declineAction === "CHANNEL" ? [...SERVER_TOKEN, { token: "{channel}", description: "The configured channel mention" }] : SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+              <textarea
+                ref={declineRef}
+                value={settings.declineReplyMessage ?? ""}
+                onChange={(e) => update({ declineReplyMessage: e.target.value || null })}
+                placeholder={settings.declineAction === "KICK" ? DEFAULT_DECLINE_REPLY_KICK : DEFAULT_DECLINE_REPLY_CHANNEL}
+                rows={2}
+                className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+              />
+              <PlaceholderExamples
             items={settings.declineAction === "CHANNEL" ? [...SERVER_TOKEN, { token: "{channel}", description: "The configured channel mention" }] : SERVER_TOKEN}
             inputRef={declineRef}
             value={settings.declineReplyMessage ?? ""}
             onChange={(v) => update({ declineReplyMessage: v || null })}
           />
+            </ReplyMessage>
+          </div>
         </>
       )}
     </NeonCard>
@@ -474,16 +486,19 @@ function ReminderCard({
             className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-blue/50"
           />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Reminder Message</label>
-          <textarea
-            ref={reminderRef}
-            value={settings.reminderMessage ?? ""}
-            onChange={(e) => update({ reminderMessage: e.target.value || null })}
-            placeholder={DEFAULT_REMINDER}
-            rows={2}
-            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-          />
-          <PlaceholderExamples items={SERVER_TOKEN} inputRef={reminderRef} value={settings.reminderMessage ?? ""} onChange={(v) => update({ reminderMessage: v || null })} />
+          <div className="mt-4">
+            <ReplyMessage replyKey="reminderMessage" title="Reminder Message" text={settings.reminderMessage} fallback={DEFAULT_REMINDER} tokens={SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+              <textarea
+                ref={reminderRef}
+                value={settings.reminderMessage ?? ""}
+                onChange={(e) => update({ reminderMessage: e.target.value || null })}
+                placeholder={DEFAULT_REMINDER}
+                rows={2}
+                className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+              />
+              <PlaceholderExamples items={SERVER_TOKEN} inputRef={reminderRef} value={settings.reminderMessage ?? ""} onChange={(v) => update({ reminderMessage: v || null })} />
+            </ReplyMessage>
+          </div>
 
           <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
             <div>
@@ -605,49 +620,61 @@ function MessagesCard({
         placeholder.
       </p>
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Reply on Successful Agree</label>
-      <textarea
-        ref={agreeRef}
-        value={settings.agreeReplyMessage ?? ""}
-        onChange={(e) => update({ agreeReplyMessage: e.target.value || null })}
-        placeholder={DEFAULT_AGREE_REPLY}
-        rows={2}
-        className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-      />
-      <PlaceholderExamples items={SERVER_TOKEN} inputRef={agreeRef} value={settings.agreeReplyMessage ?? ""} onChange={(v) => update({ agreeReplyMessage: v || null })} />
+      <div>
+        <ReplyMessage replyKey="agreeReplyMessage" title="Reply on Successful Agree" text={settings.agreeReplyMessage} fallback={DEFAULT_AGREE_REPLY} tokens={SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+          <textarea
+            ref={agreeRef}
+            value={settings.agreeReplyMessage ?? ""}
+            onChange={(e) => update({ agreeReplyMessage: e.target.value || null })}
+            placeholder={DEFAULT_AGREE_REPLY}
+            rows={2}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+          />
+          <PlaceholderExamples items={SERVER_TOKEN} inputRef={agreeRef} value={settings.agreeReplyMessage ?? ""} onChange={(v) => update({ agreeReplyMessage: v || null })} />
+        </ReplyMessage>
+      </div>
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Reply When Already Agreed</label>
-      <textarea
-        ref={alreadyRef}
-        value={settings.alreadyAgreedMessage ?? ""}
-        onChange={(e) => update({ alreadyAgreedMessage: e.target.value || null })}
-        placeholder={DEFAULT_ALREADY_AGREED}
-        rows={2}
-        className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-      />
+      <div className="mt-4">
+        <ReplyMessage replyKey="alreadyAgreedMessage" title="Reply When Already Agreed" text={settings.alreadyAgreedMessage} fallback={DEFAULT_ALREADY_AGREED} tokens={SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+          <textarea
+            ref={alreadyRef}
+            value={settings.alreadyAgreedMessage ?? ""}
+            onChange={(e) => update({ alreadyAgreedMessage: e.target.value || null })}
+            placeholder={DEFAULT_ALREADY_AGREED}
+            rows={2}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+          />
+        </ReplyMessage>
+      </div>
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">Reply When No Role Is Configured</label>
-      <textarea
-        ref={noRoleRef}
-        value={settings.noRoleConfiguredMessage ?? ""}
-        onChange={(e) => update({ noRoleConfiguredMessage: e.target.value || null })}
-        placeholder={DEFAULT_NO_ROLE_CONFIGURED}
-        rows={2}
-        className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
-      />
+      <div className="mt-4">
+        <ReplyMessage replyKey="noRoleConfiguredMessage" title="Reply When No Role Is Configured" text={settings.noRoleConfiguredMessage} fallback={DEFAULT_NO_ROLE_CONFIGURED} tokens={SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+          <textarea
+            ref={noRoleRef}
+            value={settings.noRoleConfiguredMessage ?? ""}
+            onChange={(e) => update({ noRoleConfiguredMessage: e.target.value || null })}
+            placeholder={DEFAULT_NO_ROLE_CONFIGURED}
+            rows={2}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none"
+          />
+        </ReplyMessage>
+      </div>
 
-      <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2 mt-4">DM Confirmation Message</label>
-      <textarea
-        ref={dmRef}
-        value={settings.dmConfirmMessage ?? ""}
-        onChange={(e) => update({ dmConfirmMessage: e.target.value || null })}
-        placeholder={DEFAULT_DM_CONFIRM}
-        rows={2}
-        disabled={!settings.dmConfirmEnabled}
-        className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none disabled:opacity-40"
-      />
+      <div className="mt-4">
+        <ReplyMessage replyKey="dmConfirmMessage" title="DM Confirmation Message" text={settings.dmConfirmMessage} fallback={DEFAULT_DM_CONFIRM} tokens={SERVER_TOKEN} tokenValues={RULES_EXAMPLE}>
+          <textarea
+            ref={dmRef}
+            value={settings.dmConfirmMessage ?? ""}
+            onChange={(e) => update({ dmConfirmMessage: e.target.value || null })}
+            placeholder={DEFAULT_DM_CONFIRM}
+            rows={2}
+            disabled={!settings.dmConfirmEnabled}
+            className="w-full bg-base-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-neon-blue/50 resize-none disabled:opacity-40"
+          />
+          <PlaceholderExamples items={SERVER_TOKEN} inputRef={dmRef} value={settings.dmConfirmMessage ?? ""} onChange={(v) => update({ dmConfirmMessage: v || null })} />
+        </ReplyMessage>
+      </div>
       <p className="text-xs text-slate-600 mt-1">Only sent when DM Confirmation is toggled on above.</p>
-      <PlaceholderExamples items={SERVER_TOKEN} inputRef={dmRef} value={settings.dmConfirmMessage ?? ""} onChange={(v) => update({ dmConfirmMessage: v || null })} />
     </NeonCard>
   );
 }

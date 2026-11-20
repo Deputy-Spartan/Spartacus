@@ -11,6 +11,7 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { Required } from "../../../../components/ui/Required";
 import { FormError } from "../../../../components/ui/FormError";
 import { ModuleMessage, designFrom } from "../../../../components/embedCreator/ModuleMessage";
+import { ReplyMessage, ReplyEmbedsProvider } from "../../../../components/embedCreator/ReplyMessage";
 import { useMemberNames } from "../../../../lib/useMemberNames";
 import {
   api,
@@ -378,6 +379,8 @@ function PanelsTab({ guildId, onGoToTypes }: { guildId: string; onGoToTypes: () 
 // Application Types
 // ---------------------------------------------------------------------------
 
+const APP_TOKENS = [{ token: "{type}", description: "The application type's name" }];
+
 const EMPTY_TYPE: Partial<ApplicationTypeRow> = {
   name: "",
   emoji: "",
@@ -549,7 +552,8 @@ function TypesTab({ guildId }: { guildId: string }) {
             </button>
           </div>
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Opening Message (DM)</label>
+          <ReplyEmbedsProvider guildId={guildId} module="application" typeId={editing.id}>
+          <ReplyMessage replyKey="introMessage" title="Opening Message (DM)" text={editing.introMessage} fallback={`📋 ${editing.name || "Application"}\n\nI'll ask you a few questions, one at a time — just reply here with your answer to each.`} color="#4C8DFF" tokens={APP_TOKENS} tokenValues={{ "{type}": editing.name || "Staff" }}>
           <textarea
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
             rows={2}
@@ -557,9 +561,11 @@ function TypesTab({ guildId }: { guildId: string }) {
             onChange={(e) => setEditing({ ...editing, introMessage: e.target.value })}
             placeholder={`📋 ${editing.name || "Application"}\n\nI'll ask you a few questions, one at a time — just reply here with your answer to each.`}
           />
-          <p className="text-xs text-slate-600 mb-4">Sent before the first question. The first question itself is appended automatically. Leave blank to use the default wording.</p>
+          <p className="text-xs text-slate-600 mb-1">Sent before the first question. The first question itself is sent automatically (under the embed, if you make one). Leave blank to use the default wording.</p>
+          </ReplyMessage>
+          <div className="mb-4" />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Submitted Confirmation (DM)</label>
+          <ReplyMessage replyKey="submittedMessage" title="Submitted Confirmation (DM)" text={editing.submittedMessage} fallback={"✅ Thanks — your application has been submitted for review!"} color="#4C8DFF" tokens={APP_TOKENS} tokenValues={{ "{type}": editing.name || "Staff" }}>
           <textarea
             className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-1"
             rows={2}
@@ -567,24 +573,30 @@ function TypesTab({ guildId }: { guildId: string }) {
             onChange={(e) => setEditing({ ...editing, submittedMessage: e.target.value })}
             placeholder="✅ Thanks — your application has been submitted for review!"
           />
-          <p className="text-xs text-slate-600 mb-4">Sent right after the last question is answered.</p>
+          <p className="text-xs text-slate-600 mb-1">Sent right after the last question is answered.</p>
+          </ReplyMessage>
+          <div className="mb-4" />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Accept Message (DM)</label>
+          <ReplyMessage replyKey="acceptMessage" title="Accept Message (DM)" text={editing.acceptMessage} fallback={"🎉 Your application for {type} was accepted!"} color="#22C55E" tokens={APP_TOKENS} tokenValues={{ "{type}": editing.name || "Staff" }}>
           <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
             rows={2}
             value={editing.acceptMessage ?? ""}
             onChange={(e) => setEditing({ ...editing, acceptMessage: e.target.value })}
           />
+          </ReplyMessage>
+          <div className="mb-4" />
 
-          <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Deny Message (DM)</label>
+          <ReplyMessage replyKey="denyMessage" title="Deny Message (DM)" text={editing.denyMessage} fallback={"Your application for {type} was not accepted this time."} color="#EF4444" tokens={APP_TOKENS} tokenValues={{ "{type}": editing.name || "Staff" }}>
           <textarea
-            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm mb-4"
+            className="w-full bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm"
             rows={2}
             value={editing.denyMessage ?? ""}
             onChange={(e) => setEditing({ ...editing, denyMessage: e.target.value })}
           />
-          <p className="text-xs text-slate-600 -mt-3 mb-4">Use {"{type}"} to reference the application type's name.</p>
+          </ReplyMessage>
+          <p className="text-xs text-slate-600 mt-1 mb-4">Use {"{type}"} to reference the application type's name.</p>
+          </ReplyEmbedsProvider>
 
           <label className="text-xs uppercase tracking-wide text-slate-500 block mb-2">Custom Response Buttons (up to 3)</label>
           <p className="text-xs text-slate-600 mb-2">

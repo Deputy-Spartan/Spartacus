@@ -5,6 +5,7 @@ import { pollClips, postClipOfTheWeek } from "../modules/stream/clips";
 import { scheduleTick } from "../modules/stream/schedule";
 import { rewardTick } from "../modules/stream/rewards";
 import { startTwitchChat } from "../modules/stream/twitchChat";
+import { commandListTick } from "../modules/utility/commandList";
 
 // Stream Extras, in the background: new clips (every 5 minutes, plus the weekly
 // pick), the schedule message and its Discord events (every 10 minutes), and
@@ -34,4 +35,6 @@ export function startStreamExtrasJobs(client: Client) {
   }));
   cron.schedule("4-59/10 * * * *", guarded("schedule", () => scheduleTick(client)));
   cron.schedule("*/5 * * * *", guarded("rewards", () => rewardTick(client)));
+  // The command list (Custom Commands › Command list) catches new or changed commands.
+  cron.schedule("1-59/5 * * * *", guarded("command list", () => commandListTick(client)));
 }

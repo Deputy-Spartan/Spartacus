@@ -4,16 +4,18 @@ import { useState } from "react";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ActionCatalog, CommandBuilder, CommandLog } from "../../../../components/commands/CommandBuilder";
 import { TextTriggers } from "../../../../components/commands/TextTriggers";
+import { CommandListPost } from "../../../../components/commands/CommandListPost";
 import type { CustomSlashCommandRow } from "../../../../lib/api";
 
 // Custom Commands: your own /commands (the Command Builder), !text triggers,
 // the Command Log, and the list of every action.
-type Tab = "slash" | "text" | "log" | "list";
+type Tab = "slash" | "text" | "log" | "list" | "posted";
 const TABS: Array<[Tab, string]> = [
   ["slash", "⚡ Slash commands"],
   ["text", "💬 Text triggers"],
   ["log", "📜 Command Log"],
   ["list", "📋 All actions"],
+  ["posted", "📢 Command list post"],
 ];
 
 export default function CommandsPage({ params }: { params: { guildId: string } }) {
@@ -38,6 +40,7 @@ export default function CommandsPage({ params }: { params: { guildId: string } }
       {tab === "text" && <TextTriggers guildId={params.guildId} />}
       {tab === "log" && <CommandLog guildId={params.guildId} commands={commands} />}
       {tab === "list" && <ActionCatalog />}
+      {tab === "posted" && <CommandListPost guildId={params.guildId} />}
     </div>
   );
 }

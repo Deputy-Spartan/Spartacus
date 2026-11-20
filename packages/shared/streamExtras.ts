@@ -392,6 +392,9 @@ export function scheduleWeekLabel(timeZone: string, weekAhead: boolean, from = n
   return `${fmtDay(s.y, s.m, s.d)} – ${fmtDay(s.y, s.m, s.d + 6)}`;
 }
 
+// A blank line under each day, so the days in the post have space between them.
+const DAY_GAP = "\n​";
+
 // One stream in the week post:
 //   **7:00 PM** · **Draven** · Ranked to Champion
 //   -# 🟢 Kick · 🎮 Rainbow Six Siege
@@ -446,7 +449,7 @@ function weekSection(slots: BoardSlot[], tz: string, start0: { y: number; m: num
     const a = empty[0], b = empty[empty.length - 1];
     const dayA = SHORT_DAYS[new Date(Date.UTC(a.y, a.m, a.d)).getUTCDay()];
     const dayB = SHORT_DAYS[new Date(Date.UTC(b.y, b.m, b.d)).getUTCDay()];
-    fields.push({ name: empty.length === 1 ? `${dayA} · ${fmtDay(a.y, a.m, a.d, false)}` : `${dayA} – ${dayB}`, value: "-# No streams" });
+    fields.push({ name: empty.length === 1 ? `${dayA} · ${fmtDay(a.y, a.m, a.d, false)}` : `${dayA} – ${dayB}`, value: `-# No streams${DAY_GAP}` });
     empty = [];
   };
   for (let i = 0; i < days; i++) {
@@ -464,7 +467,7 @@ function weekSection(slots: BoardSlot[], tz: string, start0: { y: number; m: num
     }
     flush();
     total += items.length;
-    fields.push({ name: `📆 ${isToday ? "Today · " : ""}${DAY_NAMES[day.getUTCDay()]} · ${fmtDay(y, m, d, false)}`, value: fitField(items.map(({ s, at }) => weekLine(s, at))) });
+    fields.push({ name: `📆 ${isToday ? "Today · " : ""}${DAY_NAMES[day.getUTCDay()]} · ${fmtDay(y, m, d, false)}`, value: fitField(items.map(({ s, at }) => weekLine(s, at))) + DAY_GAP });
   }
   flush();
   return { fields, total };

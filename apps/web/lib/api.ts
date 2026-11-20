@@ -216,6 +216,15 @@ export interface StreamExtrasConfigRow {
   rewardIntervalMin: number;
   rewardDailyCoinCap: number;
 }
+export interface CommandListSettingsRow {
+  channelId: string | null;
+  style: "EMBED" | "PLAIN";
+  autoUpdate: boolean;
+  includeStaff: boolean;
+  includeCustom: boolean;
+  onlyEnabled: boolean;
+  posted: boolean;
+}
 export interface StreamSlotRow {
   id: string;
   streamer: string;
@@ -2291,6 +2300,10 @@ export const api = {
     request<{ slot: StreamSlotRow; note: string | null }>(`/guilds/${guildId}/stream-extras/slots`, { method: "POST", body: JSON.stringify(body) }),
   updateStreamSlot: (guildId: string, id: string, body: Omit<StreamSlotRow, "id">) =>
     request<{ slot: StreamSlotRow; note: string | null }>(`/guilds/${guildId}/stream-extras/slots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  getCommandList: (guildId: string) => request<CommandListSettingsRow>(`/guilds/${guildId}/command-list`),
+  saveCommandList: (guildId: string, body: Partial<CommandListSettingsRow>) =>
+    request<CommandListSettingsRow & { error?: string | null }>(`/guilds/${guildId}/command-list`, { method: "PUT", body: JSON.stringify(body) }),
+  postCommandList: (guildId: string) => request<CommandListSettingsRow>(`/guilds/${guildId}/command-list/post`, { method: "POST" }),
   deleteStreamSlot: (guildId: string, id: string) => request<{ note: string | null }>(`/guilds/${guildId}/stream-extras/slots/${id}`, { method: "DELETE" }),
   refreshStreamSchedule: (guildId: string) => request<{ ok: boolean; note: string | null }>(`/guilds/${guildId}/stream-extras/refresh-schedule`, { method: "POST" }),
   postClipOfTheWeek: (guildId: string) => request<{ ok: boolean }>(`/guilds/${guildId}/stream-extras/clip-of-the-week`, { method: "POST" }),

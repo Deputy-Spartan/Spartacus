@@ -3434,3 +3434,18 @@ model GameNightPlayer {
   @@unique([gameNightId, userId])
   @@index([gameNightId])
 }
+
+// The list of every command, posted in a channel and kept up to date.
+model CommandListSettings {
+  id            String   @id @default(cuid())
+  guildId       String   @unique
+  channelId     String?
+  style         String   @default("EMBED") // EMBED | PLAIN
+  autoUpdate    Boolean  @default(true) // edit the posted list when commands change
+  includeStaff  Boolean  @default(true)
+  includeCustom Boolean  @default(true) // the server's own /commands and !triggers
+  onlyEnabled   Boolean  @default(true) // leave out commands from modules that are off
+  messageIds    Json     @default("[]") // the posted messages, top to bottom
+  hash          String?
+  updatedAt     DateTime @updatedAt
+}

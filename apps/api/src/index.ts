@@ -29,6 +29,7 @@ import guildsRouter from "./routes/guilds";
 import modulesRouter from "./routes/modules";
 import eventsRouter from "./routes/events";
 import customCommandsRouter from "./routes/customCommands";
+import commandListRouter, { commandListWatcher } from "./routes/commandList";
 import levelingRouter from "./routes/leveling";
 import welcomeRouter from "./routes/welcome";
 import moderationRouter from "./routes/moderation";
@@ -144,7 +145,9 @@ app.use(healthRouter);
 app.use(publicStatsRouter);
 app.use(activityRouter);
 
+app.use(commandListWatcher); // updates the posted command list after commands or modules change
 app.use(authRouter);
+app.use(commandListRouter);
 app.use(guildsRouter);
 app.use(modulesRouter);
 app.use(eventsRouter);

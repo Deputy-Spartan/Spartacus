@@ -620,8 +620,10 @@ html[data-look="forged"] .sp-shell main h1 {
 }
 html[data-look="forged"] .sp-metal.is-active,
 html[data-look="forged"] .sp-metal.is-active:hover {
-  background: linear-gradient(90deg, rgb(var(--f-gold) / 0.2), transparent 80%), linear-gradient(180deg, var(--f-top), var(--f-bot));
-  box-shadow: inset 3px 0 0 rgb(var(--f-gold)), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 14px rgb(var(--f-gold) / calc(0.25 * var(--f-k)));
+  /* Pressed in and stays down: flipped gradient and a deep inner shadow, plus the gold edge. */
+  transform: translateY(1px);
+  background: linear-gradient(90deg, rgb(var(--f-gold) / 0.18), transparent 80%), linear-gradient(0deg, var(--f-top), var(--f-bot));
+  box-shadow: inset 3px 0 0 rgb(var(--f-gold)), inset 4px 4px 10px var(--m-dark), inset -3px -3px 8px var(--m-hl), inset 0 0 0 1px rgb(var(--f-gold) / 0.35), 0 0 12px rgb(var(--f-gold) / calc(0.2 * var(--f-k)));
 }
 
 /* Capua (light) and Vesuvius (dark) are flat, the "Sleek" look: no metal
@@ -641,7 +643,7 @@ html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-c
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
 }
 html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-sidebar { background: var(--f-raised); box-shadow: inset -1px 0 0 var(--f-lo); }
-html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-metal { background: transparent; }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-metal:not(.is-active) { background: transparent; }
 html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) :is(.neon-button, .neon-button-sm) {
   color: #14110a;
   background: rgb(var(--f-btn));

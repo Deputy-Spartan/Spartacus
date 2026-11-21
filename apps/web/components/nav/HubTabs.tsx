@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { pressNav, usePendingNav } from "../../lib/pendingNav";
 import { usePathname } from "next/navigation";
 import { navSectionForPath } from "@spartacus/shared";
 import { useModules } from "../../lib/useModules";
@@ -28,7 +29,8 @@ export function HubTabs({ guildId }: { guildId: string }) {
   // The owner's names, order and hidden pages from Edit Mode.
   const { sections } = useNavLayout();
   const laidOut = hub ? sections.find((s) => s.key === hub.section) : undefined;
-  const isActive = (href: string) => rel === href || rel.startsWith(`${href}/`);
+  const pending = usePendingNav();
+  const isActive = (href: string) => (pending ? pending === `${base}${href}` : rel === href || rel.startsWith(`${href}/`));
   // A hidden page still gets its tab while it's the one open.
   const items = laidOut ? laidOut.items.filter((i) => !i.hidden || isActive(i.href)) : (hub?.items ?? []);
 
@@ -59,6 +61,7 @@ export function HubTabs({ guildId }: { guildId: string }) {
               href={href}
               ref={active ? activeRef : undefined}
               aria-current={active ? "page" : undefined}
+              onClick={(e) => pressNav(e, href)}
               {...hoverPrefetch(guildId, href)}
               className={[
                 "sp-metal shrink-0 flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm whitespace-nowrap",

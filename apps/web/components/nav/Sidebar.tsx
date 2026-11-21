@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { pressNav, setPendingNav, usePendingNav } from "../../lib/pendingNav";
 import { usePathname, useSearchParams } from "next/navigation";
 import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
 import { useBotAvatar } from "../../lib/useBotAvatar";
@@ -35,6 +36,9 @@ export function Sidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeSection = searchParams.get("section");
+  // The button you just tapped stays pressed until its page opens.
+  const pending = usePendingNav();
+  useEffect(() => setPendingNav(null), [pathname, activeSection]);
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const avatarUrl = useBotAvatar();
@@ -175,7 +179,7 @@ export function Sidebar({
       // point at /modules, differing only by ?section= — so
       // Modules itself is only "active" with no section
       // selected (i.e. the plain All Categories view).
-      const active = pathname === href && (item.href !== "/modules" || !activeSection);
+      const active = pending ? pending === href : pathname === href && (item.href !== "/modules" || !activeSection);
       const moduleKey = NAV_MODULE_KEYS[item.href];
       const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
       const pinned = isPinned(item.href);
@@ -189,7 +193,7 @@ export function Sidebar({
             sectionName === "Owner Only" ? "sp-metal-owner" : "",
           ].join(" ")}
         >
-          <Link href={href} onClick={onNavigate} {...hoverPrefetch(guildId, href)} className={`flex items-center gap-3 flex-1 min-w-0 px-3 ${small ? "py-1.5" : "py-2"}`}>
+          <Link href={href} onClick={(e) => { pressNav(e, href); onNavigate(); }} {...hoverPrefetch(guildId, href)} className={`flex items-center gap-3 flex-1 min-w-0 px-3 ${small ? "py-1.5" : "py-2"}`}>
             <AppIcon emoji={item.icon} size={small ? 18 : 22} />
             <span className="flex-1 min-w-0 truncate">{item.label}</span>
             {enabled !== null && (
@@ -321,13 +325,18 @@ export function Sidebar({
                         // a card for each of its modules (modules/page.tsx).
                         const c = cat as typeof cat & { section: string; pages: string[]; items: NavItem[] };
                         const rel = pathname.slice(`/dashboard/${guildId}`.length);
-                        const active = c.pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === c.section);
                         const groupHref = `/dashboard/${guildId}/modules?section=${encodeURIComponent(c.section)}`;
+                        const active = pending
+                          ? pending === groupHref
+                          : c.pages.some((p) => rel === p || rel.startsWith(`${p}/`)) || (rel === "/modules" && activeSection === c.section);
                         return (
                           <div key={c.section}>
                             <Link
                               href={groupHref}
-                              onClick={onNavigate}
+                              onClick={(e) => {
+                                pressNav(e, groupHref);
+                                onNavigate();
+                              }}
                               aria-current={active ? "page" : undefined}
                               className={`sp-metal relative w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-left ${active ? "is-active" : ""}`}
                             >

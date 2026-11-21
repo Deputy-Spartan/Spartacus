@@ -85,7 +85,7 @@ export function PageGate({ children }: { children: React.ReactNode }) {
 }
 
 export function Shimmer({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-white/5 ${className}`} />;
+  return <div className={`sp-skel rounded-lg ${className}`} />;
 }
 
 function PageShimmer() {

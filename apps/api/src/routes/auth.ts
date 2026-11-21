@@ -1,6 +1,7 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import fetch from "node-fetch";
+import { requireAuthOnly, type AuthedRequest } from "../middleware/requireAuth";
 
 const router = Router();
 
@@ -49,7 +50,8 @@ router.get("/auth/discord/callback", async (req, res) => {
     fetch(`${DISCORD_API}/users/@me`, {
       headers: { Authorization: `Bearer ${tokenJson.access_token}` },
     }),
-    fetch(`${DISCORD_API}/users/@me/guilds`, {
+    // with_counts adds each server's rough member count for the server picker.
+    fetch(`${DISCORD_API}/users/@me/guilds?with_counts=true`, {
       headers: { Authorization: `Bearer ${tokenJson.access_token}` },
     }),
   ]);
@@ -61,6 +63,7 @@ router.get("/auth/discord/callback", async (req, res) => {
     icon: string | null;
     permissions: string;
     owner: boolean;
+    approximate_member_count?: number;
   }>;
 
   // Only servers the user can actually manage go into the session — a
@@ -70,18 +73,15 @@ router.get("/auth/discord/callback", async (req, res) => {
   // authenticated request).
   const MANAGE_GUILD = 0x20;
   const ADMINISTRATOR = 0x8;
-  const guilds = allGuilds.filter((g) => {
-    const perms = BigInt(g.permissions);
-    return (perms & BigInt(MANAGE_GUILD)) !== 0n || (perms & BigInt(ADMINISTRATOR)) !== 0n;
-  });
+  // Only the fields the dashboard uses, so the token stays small.
+  const guilds = allGuilds
+    .filter((g) => {
+      const perms = BigInt(g.permissions);
+      return (perms & BigInt(MANAGE_GUILD)) !== 0n || (perms & BigInt(ADMINISTRATOR)) !== 0n;
+    })
+    .map((g) => ({ id: g.id, name: g.name, icon: g.icon, permissions: g.permissions, owner: g.owner, members: g.approximate_member_count ?? null }));
 
-  // Short-lived now that the dashboard is invite-only — a stolen/forgotten
-  // token on a shared machine is only good for a day, not a week.
-  const session = jwt.sign(
-    { id: user.id, username: user.username, avatar: user.avatar, guilds },
-    process.env.NEXTAUTH_SECRET as string,
-    { expiresIn: "24h" }
-  );
+  const session = signSession({ id: user.id, username: user.username, avatar: user.avatar, guilds });
 
   // Dashboard (Vercel) and API (Render) live on different origins. A cookie
   // set here is cross-site from the dashboard's perspective, and browsers
@@ -92,6 +92,21 @@ router.get("/auth/discord/callback", async (req, res) => {
   // never appears in logs or Referer headers — and the frontend stores it
   // itself (localStorage) and sends it back as a Bearer header.
   res.redirect(`${process.env.NEXTAUTH_URL ?? ""}/auth/callback#token=${session}`);
+});
+
+// A sign-in lasts 30 days, and the dashboard swaps in a fresh token about once
+// a day while you use it, so you stay signed in as long as you keep visiting.
+// Dashboard access is still checked on every request (requireAuth), so taking
+// someone's access away locks them out right away.
+const SESSION_LIFETIME = "30d";
+
+function signSession(payload: object) {
+  return jwt.sign(payload, process.env.NEXTAUTH_SECRET as string, { expiresIn: SESSION_LIFETIME });
+}
+
+router.post("/auth/refresh", requireAuthOnly, (req: AuthedRequest, res) => {
+  const { iat: _iat, exp: _exp, ...payload } = req.session as unknown as Record<string, unknown>;
+  res.json({ token: signSession(payload) });
 });
 
 router.post("/auth/logout", (_req, res) => {

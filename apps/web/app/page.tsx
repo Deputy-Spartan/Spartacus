@@ -86,7 +86,6 @@ function DiscordLogo() {
 function LandingContent() {
   const params = useSearchParams();
   const expired = params.get("expired") === "1";
-  const idle = params.get("idle") === "1";
   const signinFailed = params.get("error") === "signin";
   const { stats, failed: statsFailed } = useServerCount();
   const { cards, statusUrl } = useFrontPage();
@@ -96,9 +95,7 @@ function LandingContent() {
 
   useEffect(() => setLastUser(readLastUser()), []);
 
-  const notice = idle
-    ? "You were signed out after 30 minutes of inactivity."
-    : signinFailed
+  const notice = signinFailed
       ? "Sign-in didn't go through — the dashboard couldn't reach the server after Discord authorized you. Check your connection and try again."
       : expired
         ? "Your session expired — please sign in again."

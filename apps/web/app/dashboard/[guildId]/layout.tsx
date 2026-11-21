@@ -9,8 +9,9 @@ import { TopHeader } from "../../../components/nav/TopHeader";
 import { CommandPalette } from "../../../components/nav/CommandPalette";
 import { PageGuideButton } from "../../../components/nav/PageGuideButton";
 import { ConfirmProvider } from "../../../components/ui/ConfirmDialog";
-import { api, clearToken, type CurrentUser } from "../../../lib/api";
-import { useIdleLogout } from "../../../lib/useIdleLogout";
+import { api, refreshSessionIfOld, type CurrentUser } from "../../../lib/api";
+import { rememberLastGuild } from "../../../lib/lastGuild";
+import { SpartacusLoader } from "../../../components/ui/SpartacusLoader";
 import { PageGate } from "../../../components/nav/PageGate";
 import { preloadGuild } from "../../../lib/prefetch";
 import { UserPrefsProvider } from "../../../lib/userPrefs";
@@ -28,7 +29,6 @@ export default function DashboardLayout({
   params: { guildId: string };
 }) {
   const router = useRouter();
-  useIdleLogout();
   const [guilds, setGuilds] = useState<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean }>>([]);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -37,13 +37,23 @@ export default function DashboardLayout({
   // so this one state drives both the mobile overlay drawer AND the
   // desktop collapse toggle instead of two separate mechanisms.
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [access, setAccess] = useState<"checking" | "allowed" | "denied">("checking");
+  const [access, setAccess] = useState<"checking" | "allowed" | "denied" | "error">("checking");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (window.innerWidth < 768) setSidebarOpen(false);
+    refreshSessionIfOld();
   }, []);
 
   useEffect(() => {
+    // An expired login already sends you to the sign-in page (lib/api.ts).
+    // Anything else (the API down, no internet) shows Try again instead of
+    // logging you out.
+    const failed = (err: unknown) => {
+      if (err instanceof Error && err.message === "Session expired") return;
+      setAccess("error");
+    };
+    setAccess("checking");
     api
       .getAccessStatus()
       .then((status) => {
@@ -63,18 +73,13 @@ export default function DashboardLayout({
               router.push("/dashboard");
             } else {
               setAccess("allowed");
+              rememberLastGuild(params.guildId);
               preloadGuild(params.guildId);
             }
           })
-          .catch(() => {
-            clearToken();
-            router.push("/");
-          });
+          .catch(failed);
       })
-      .catch(() => {
-        clearToken();
-        router.push("/");
-      });
+      .catch(failed);
     api
       .getMe()
       .then((me) => {
@@ -84,14 +89,23 @@ export default function DashboardLayout({
         rememberLastUser(me);
       })
       .catch(() => null);
-  }, [router, params.guildId]);
+  }, [router, params.guildId, attempt]);
+
+  if (access === "error") {
+    return (
+      <main className="min-h-screen bg-base-950 flex flex-col items-center justify-center gap-3 px-4 text-center">
+        <p className="text-4xl" aria-hidden="true">📡</p>
+        <h1 className="text-lg font-semibold text-slate-100">Can&apos;t reach Spartacus right now</h1>
+        <p className="text-sm text-slate-400 max-w-sm">You&apos;re still signed in. Check your internet, then try again.</p>
+        <button type="button" onClick={() => setAttempt((n) => n + 1)} className="neon-button mt-2">
+          Try again
+        </button>
+      </main>
+    );
+  }
 
   if (access !== "allowed") {
-    return (
-      <div className="min-h-screen bg-base-950 flex items-center justify-center text-slate-400">
-        {access === "checking" ? "Checking access…" : "Redirecting…"}
-      </div>
-    );
+    return <SpartacusLoader label={access === "checking" ? "Opening your dashboard" : "Taking you to your servers"} />;
   }
 
   return (

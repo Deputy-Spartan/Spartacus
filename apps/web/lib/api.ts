@@ -37,9 +37,65 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// The API sleeps when nobody has used it for a while and takes up to a minute
+// to wake. Instead of failing (which used to log people out), loads wait and
+// try again, and the "Waking up Spartacus" card shows meanwhile.
+const WAKE_DELAYS = [2000, 3000, 5000, 8000, 10000, 15000];
+let waking = 0;
+
+function wakeEvent(name: "spartacus:waking" | "spartacus:awake", detail?: { attempt: number; max: number }) {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
+async function fetchWithWake(url: string, init: RequestInit): Promise<Response> {
+  const isGet = (init.method ?? "GET").toUpperCase() === "GET";
+  for (let attempt = 0; ; attempt++) {
+    let res: Response | null = null;
+    let err: unknown = null;
+    try {
+      res = await fetch(url, init);
+    } catch (e) {
+      err = e;
+    }
+    // 502/503/504 come from the host before the API itself saw anything, so
+    // trying again is safe for saves too. A network failure is only retried
+    // for loads, since a save might have gone through.
+    const asleep = res ? [502, 503, 504].includes(res.status) : isGet;
+    if (!asleep || attempt >= WAKE_DELAYS.length || typeof window === "undefined") {
+      if (attempt > 0 && --waking === 0) wakeEvent("spartacus:awake");
+      if (res) return res;
+      throw err;
+    }
+    if (attempt === 0) waking++;
+    wakeEvent("spartacus:waking", { attempt: attempt + 1, max: WAKE_DELAYS.length });
+    await new Promise((r) => setTimeout(r, WAKE_DELAYS[attempt]));
+  }
+}
+
+// About once a day while you use the dashboard, swap the token for a fresh
+// 30-day one, so you only have to sign in again after a month away.
+let refreshing = false;
+export async function refreshSessionIfOld() {
+  const token = getToken();
+  if (!token || refreshing) return;
+  try {
+    const { iat } = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))) as { iat?: number };
+    if (!iat || Date.now() / 1000 - iat < 12 * 60 * 60) return;
+    refreshing = true;
+    const res = await send("/auth/refresh", { method: "POST" });
+    const { token: fresh } = (await res.json()) as { token?: string };
+    // Swap only if nobody signed out or in meanwhile.
+    if (fresh && getToken() === token) localStorage.setItem(TOKEN_KEY, fresh);
+  } catch {
+    // keep the current token; it's still good
+  } finally {
+    refreshing = false;
+  }
+}
+
 async function send(path: string, init?: RequestInit): Promise<Response> {
   const token = getToken();
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchWithWake(`${API_URL}${path}`, {
     ...init,
     credentials: "include",
     headers: {
@@ -2132,7 +2188,7 @@ export const api = {
   getMyPrefs: () => request<UserPrefs>("/me/prefs"),
   saveMyPrefs: (body: Partial<UserPrefs>) => request<UserPrefs>("/me/prefs", { method: "PUT", body: JSON.stringify(body) }),
   getGuilds: () =>
-    request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean; owner: boolean }>>("/guilds"),
+    request<Array<{ id: string; name: string; icon: string | null; botInstalled: boolean; owner: boolean; members?: number | null }>>("/guilds"),
 
   getAccessStatus: () => request<AccessStatus>("/access-status"),
   getDashboardTexts: () => request<Record<string, string>>("/dashboard-texts"),

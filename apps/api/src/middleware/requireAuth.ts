@@ -6,7 +6,7 @@ interface SessionPayload {
   id: string;
   username: string;
   avatar: string | null;
-  guilds: Array<{ id: string; name: string; icon: string | null; permissions: string; owner: boolean }>;
+  guilds: Array<{ id: string; name: string; icon: string | null; permissions: string; owner: boolean; members?: number | null }>;
 }
 
 export interface AuthedRequest extends Request {

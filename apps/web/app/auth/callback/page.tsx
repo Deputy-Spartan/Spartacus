@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { setToken, api } from "../../../lib/api";
 import { rememberLastUser } from "../../../lib/lastUser";
+import { SpartacusLoader } from "../../../components/ui/SpartacusLoader";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -22,7 +23,8 @@ export default function AuthCallbackPage() {
     api
       .getAccessStatus()
       .then((s) => {
-        router.replace(s.status === "owner" || s.status === "approved" ? "/dashboard" : "/access-required");
+        // ?auto=1 lets the server list jump straight to your last server.
+        router.replace(s.status === "owner" || s.status === "approved" ? "/dashboard?auto=1" : "/access-required");
       })
       .catch((err) => {
         // Most likely cause: NEXTAUTH_URL on the API doesn't exactly match
@@ -34,9 +36,5 @@ export default function AuthCallbackPage() {
       });
   }, [router]);
 
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-base-950 text-slate-400">
-      Signing you in…
-    </main>
-  );
+  return <SpartacusLoader label="Signing you in" />;
 }

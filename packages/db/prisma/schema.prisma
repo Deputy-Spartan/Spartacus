@@ -2271,10 +2271,12 @@ model SupportSettings {
 // them, saved to their account so it follows them to every device.
 model DashboardUserPrefs {
   userId       String   @id
-  theme        String   @default("studio") // studio | glass | daylight | steel | midnight | dusk
+  theme        String   @default("studio") // studio | glass | daylight | steel | midnight | dusk | a Forged theme id (web lib/themeScript FORGED)
   accent       String? // the person's own accent color (#rrggbb); null = the theme's own
   compact      Boolean  @default(false) // smaller text and spacing so more fits
   reduceMotion Boolean  @default(false)
+  glow         String   @default("normal") // off | normal | strong (Forged themes)
+  texture      Boolean  @default(true) // brushed-metal texture (Forged themes)
   displayName  String?
   updatedAt    DateTime @default(now()) @updatedAt
 }

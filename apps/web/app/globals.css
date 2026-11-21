@@ -507,40 +507,108 @@ html[data-theme="dusk"] {
   --t-card: #2a2534; --t-card-hi: #312b3d; --t-line: #3b3448; --t-side: #211d29; --t-header: rgba(29, 26, 36, 0.88);
   --m-top: #3d3550; --m-bot: #272233; --m-light: rgba(255, 255, 255, 0.09); --m-hl: rgba(255, 255, 255, 0.05); --m-dark: rgba(0, 0, 0, 0.5); --m-text: #d8d1e6;
 }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) body { background: var(--t-page); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.sp-shell, .sp-login) { background-color: var(--t-page) !important; }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) select,
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) select option { background-color: var(--t-900); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: var(--t-950); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: var(--t-900); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: var(--t-800); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: var(--t-800); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .bg-base-700:not([class*="bg-[#"] *) { background-color: var(--t-700); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-card {
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) body { background: var(--t-page); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) :is(.sp-shell, .sp-login) { background-color: var(--t-page) !important; }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) select,
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) select option { background-color: var(--t-900); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: var(--t-950); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: var(--t-900); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: var(--t-800); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: var(--t-800); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .bg-base-700:not([class*="bg-[#"] *) { background-color: var(--t-700); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .neon-card {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 40%), var(--t-card);
   border-color: var(--t-line);
   border-radius: 14px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-card:hover { border-color: rgb(var(--accent-rgb) / 0.45); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 22px rgb(var(--accent-rgb) / 0.16); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-sidebar { background: var(--t-side); border-color: var(--t-line); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-header { background: var(--t-header); border-color: var(--t-line); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-tabbar { background: var(--t-header); border-color: var(--t-line); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-hubtab-on { background: var(--t-800); color: rgb(var(--accent-rgb)); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button,
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button-sm { background: rgb(var(--accent-rgb)); color: #0a0c10; font-weight: 700; box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35); transition: background-color 0.15s, box-shadow 0.15s; }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button:hover,
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 85%, #fff); box-shadow: 0 0 24px rgb(var(--accent-rgb) / 0.5); }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-card-link:hover {
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .neon-card:hover { border-color: rgb(var(--accent-rgb) / 0.45); box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 22px rgb(var(--accent-rgb) / 0.16); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .sp-sidebar { background: var(--t-side); border-color: var(--t-line); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .sp-header { background: var(--t-header); border-color: var(--t-line); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .sp-tabbar { background: var(--t-header); border-color: var(--t-line); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .sp-hubtab-on { background: var(--t-800); color: rgb(var(--accent-rgb)); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .neon-button,
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .neon-button-sm { background: rgb(var(--accent-rgb)); color: #0a0c10; font-weight: 700; box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35); transition: background-color 0.15s, box-shadow 0.15s; }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .neon-button:hover,
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 85%, #fff); box-shadow: 0 0 24px rgb(var(--accent-rgb) / 0.5); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .sp-card-link:hover {
   transform: translateY(-3px);
   border-color: rgb(var(--accent-rgb) / 0.7);
   background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.08), transparent 45%), var(--t-card-hi);
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 30px rgb(var(--accent-rgb) / 0.28);
 }
-html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"]) .sp-card-link:hover .sp-card-icon { transform: scale(1.07); }
+html:is([data-theme="steel"], [data-theme="midnight"], [data-theme="dusk"], [data-look="forged"]) .sp-card-link:hover .sp-card-icon { transform: scale(1.07); }
 /* Midnight's glow is a little stronger, since it sits on pure black. */
 html[data-theme="midnight"] .sp-card-link:hover { box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.35), 0 0 40px rgb(var(--accent-rgb) / 0.35); }
+
+/* ---------------------------------------------------------------------------
+   Forged themes (A–Z): on top of the dark rules above, cards get a metal edge
+   that catches light, a glowing line across the top and a brushed texture;
+   the open menu item and buttons light up. Colors come from --f-* (set on
+   <html> by lib/themeScript forgedVars). Account settings → Effects sets
+   data-glow (off / strong) and data-texture="off".
+   ------------------------------------------------------------------------- */
+html[data-look="forged"] {
+  --f-k: 1;
+  --f-tex: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
+  --f-btn: var(--f-btn-rgb, var(--accent-rgb));
+}
+html[data-look="forged"][data-glow="strong"] { --f-k: 1.8; }
+html[data-look="forged"][data-glow="off"] { --f-k: 0; }
+html[data-look="forged"][data-texture="off"] { --f-tex: linear-gradient(transparent, transparent); }
+html[data-look="forged"] :is(.sp-shell, .sp-login) {
+  background:
+    radial-gradient(1100px 520px at 75% -12%, rgb(var(--accent-rgb) / calc(0.16 * var(--f-k))), transparent 60%),
+    linear-gradient(180deg, var(--f-raised), var(--t-page) 420px) !important;
+}
+html[data-look="forged"] .neon-card {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(90deg, transparent, rgb(var(--accent-rgb) / calc(0.9 * var(--f-k))) 50%, transparent) center top / calc(100% - 36px) 2px no-repeat padding-box,
+    var(--f-tex) padding-box,
+    linear-gradient(180deg, var(--f-top), var(--f-bot)) padding-box,
+    linear-gradient(160deg, var(--f-hi), var(--f-mid) 30%, var(--f-lo) 70%, var(--f-mid)) border-box;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 24px rgb(var(--accent-rgb) / calc(0.08 * var(--f-k)));
+}
+html[data-look="forged"] .neon-card:hover {
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 0 30px rgb(var(--accent-rgb) / calc(0.2 * var(--f-k)));
+}
+html[data-look="forged"] .sp-card-link:hover {
+  background:
+    linear-gradient(90deg, transparent, rgb(var(--accent-rgb)) 50%, transparent) center top / calc(100% - 36px) 2px no-repeat padding-box,
+    linear-gradient(180deg, rgb(var(--accent-rgb) / 0.1), transparent 45%) padding-box,
+    linear-gradient(180deg, var(--f-top), var(--f-bot)) padding-box,
+    linear-gradient(160deg, var(--f-hi), rgb(var(--accent-rgb)) 40%, var(--f-lo) 80%) border-box;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), 0 0 32px rgb(var(--accent-rgb) / calc(0.3 * var(--f-k)));
+}
+html[data-look="forged"] .sp-sidebar {
+  background: var(--f-tex), linear-gradient(180deg, var(--f-raised), var(--t-page));
+  box-shadow: inset -1px 0 0 rgb(var(--accent-rgb) / calc(0.25 * var(--f-k)));
+}
+html[data-look="forged"] .sp-metal {
+  background: var(--f-tex), linear-gradient(180deg, var(--f-top), var(--f-bot));
+}
+html[data-look="forged"] .sp-metal.is-active,
+html[data-look="forged"] .sp-metal.is-active:hover {
+  color: #fff;
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.16), transparent 70%), linear-gradient(180deg, var(--f-top), var(--f-bot));
+  box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 18px rgb(var(--accent-rgb) / calc(0.35 * var(--f-k)));
+}
+html[data-look="forged"] :is(.neon-button, .neon-button-sm) {
+  color: #0a0c10;
+  background: linear-gradient(180deg, color-mix(in srgb, rgb(var(--f-btn)) 55%, #fff), rgb(var(--f-btn)));
+  box-shadow: 0 0 16px rgb(var(--f-btn) / calc(0.4 * var(--f-k))), inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+}
+html[data-look="forged"] :is(.neon-button, .neon-button-sm):hover {
+  background: linear-gradient(180deg, color-mix(in srgb, rgb(var(--f-btn)) 40%, #fff), color-mix(in srgb, rgb(var(--f-btn)) 85%, #fff));
+  box-shadow: 0 0 24px rgb(var(--f-btn) / calc(0.55 * var(--f-k))), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+html[data-look="forged"] .neon-toggle-on { box-shadow: 0 0 12px rgb(var(--accent-rgb) / calc(0.5 * var(--f-k))); }
+html[data-look="forged"] .sp-shell main h1 {
+  color: color-mix(in srgb, var(--f-hi) 55%, #fff);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 18px rgb(var(--accent-rgb) / calc(0.3 * var(--f-k)));
+}
 
 /* Account settings → Compact mode: everything a step smaller (the dashboard
    is sized in rem), so more fits on the screen. */

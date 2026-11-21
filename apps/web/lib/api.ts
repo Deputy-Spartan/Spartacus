@@ -1850,7 +1850,7 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
-export type DashboardTheme = "studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk";
+export type DashboardTheme = "studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk" | (string & {}); // plus the Forged themes (lib/themeScript FORGED)
 
 export interface LiveStrip {
   memberCount: number | null;
@@ -1865,6 +1865,8 @@ export interface UserPrefs {
   compact: boolean;
   reduceMotion: boolean;
   displayName: string | null;
+  glow?: "off" | "normal" | "strong"; // how much the Forged themes glow
+  texture?: boolean; // brushed-metal texture on Forged themes
 }
 
 export interface AccessStatus {

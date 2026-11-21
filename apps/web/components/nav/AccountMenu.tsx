@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { clearToken } from "../../lib/api";
 import { THEMES, useUserPrefs } from "../../lib/userPrefs";
 import { Icon } from "../ui/AppIcon";
+import { ThemePreview } from "../ui/ThemePreview";
 
-// The avatar in the top bar opens this: who you're signed in as, a quick
-// theme switch, Profile, Account settings and Log out.
+// The avatar in the top bar opens this: who you're signed in as, a Theme row
+// (opens preview cards to pick from), Profile, Account settings and Log out.
 export function AccountMenu({ user, guildId }: { user: { username: string; avatar: string | null }; guildId: string }) {
   const router = useRouter();
   const { prefs, save } = useUserPrefs();
@@ -16,6 +17,13 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
   const [statusUrl, setStatusUrl] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const name = prefs.displayName || user.username;
+  // The menu shows either its main list or the theme picker (preview cards).
+  const [view, setView] = useState<"main" | "theme">("main");
+  const current = THEMES.find((t) => t.id === prefs.theme);
+  const [group, setGroup] = useState<"forged" | "classic">(current?.group ?? "forged");
+  useEffect(() => {
+    if (!open) setView("main");
+  }, [open]);
 
   // The public status page link, if the owner has set one (Owner Only → Front Page).
   useEffect(() => {
@@ -72,27 +80,67 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
             </div>
           </div>
 
-          <div className="px-3 pt-2 pb-3 border-y border-white/5 my-1">
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">Theme</p>
-            <div className="grid grid-cols-3 gap-1.5">
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={prefs.theme === t.id}
-                  onClick={() => save({ theme: t.id })}
-                  className={[
-                    "rounded-lg border px-2 py-1.5 text-xs transition-colors",
-                    prefs.theme === t.id ? "border-neon-blue bg-neon-blue/15 text-slate-100" : "border-white/10 text-slate-400 hover:text-slate-200 hover:border-white/20",
-                  ].join(" ")}
-                >
-                  {t.name}
+          {view === "theme" ? (
+            <div className="border-t border-white/5 mt-1 pt-2">
+              <div className="flex items-center justify-between px-1 mb-2">
+                <button type="button" onClick={() => setView("main")} className="text-xs text-slate-400 hover:text-slate-100 px-2 py-1 rounded-md hover:bg-white/5">
+                  ‹ Back
                 </button>
-              ))}
+                <p className="text-xs font-semibold text-slate-200">🎨 Theme</p>
+                <span className="w-12" />
+              </div>
+              <div className="flex gap-1 px-1 mb-2">
+                {(["forged", "classic"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    aria-pressed={group === g}
+                    onClick={() => setGroup(g)}
+                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors ${group === g ? "border-neon-blue bg-neon-blue/15 text-slate-100" : "border-white/10 text-slate-400 hover:text-slate-200"}`}
+                  >
+                    {g === "forged" ? "⚔️ Forged A–Z" : "🧱 Classic"}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto px-1 pb-1">
+                {THEMES.filter((t) => t.group === group).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={prefs.theme === t.id}
+                    onClick={() => save({ theme: t.id })}
+                    className={`text-left rounded-lg border p-1.5 transition-colors ${prefs.theme === t.id ? "border-neon-blue bg-neon-blue/10" : "border-white/10 hover:border-white/25"}`}
+                  >
+                    <ThemePreview id={t.id} small />
+                    <p className="text-[11px] font-semibold text-slate-200 mt-1 leading-tight">
+                      {t.name} {prefs.theme === t.id && <span className="text-neon-blue">✓</span>}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              <Link href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className="block text-center text-xs text-neon-blue hover:underline py-2">
+                Glow, texture and accent color ›
+              </Link>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="border-t border-white/5 my-1" />
+              <button role="menuitem" type="button" onClick={() => setView("theme")} className={item}>
+                <span className="w-12 h-9 shrink-0 overflow-hidden rounded-md">
+                  <ThemePreview id={prefs.theme} small />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] uppercase tracking-widest text-slate-500">Theme</span>
+                  <span className="block truncate">{current?.name ?? "Studio"}</span>
+                </span>
+                <span className="text-slate-500">›</span>
+              </button>
+              <div className="border-t border-white/5 my-1" />
+            </>
+          )}
 
+          {view === "main" && (<>
           <Link role="menuitem" href={`/dashboard/${guildId}/account?tab=profile`} onClick={() => setOpen(false)} className={item}>
             <Icon name="user" /> Profile
           </Link>
@@ -108,6 +156,7 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
           <button role="menuitem" type="button" onClick={logout} className={`${item} text-rose-300 hover:bg-rose-500/10`}>
             <Icon name="log-out" /> Log out
           </button>
+          </>)}
         </div>
       )}
     </div>

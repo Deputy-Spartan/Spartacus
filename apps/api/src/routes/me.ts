@@ -13,7 +13,7 @@ router.get("/me", requireAuthOnly, (req: AuthedRequest, res) => {
 // How the dashboard looks for this person. Saved to their Discord account,
 // so it's the same on every device they sign in from.
 // The Forged A–Z themes (colors live in the web app's lib/themeScript.ts FORGED; keep these ids in step).
-const FORGED = ["forged", "arc", "gunmetal", "crown", "sapphire", "chrome", "ice", "bronze", "royal", "crimson", "emerald", "midgold", "storm", "frost", "plasma", "copper", "ocean", "blackout", "spartan", "titanium", "cobaltbronze", "jade", "wolf", "arena", "rose", "shadow"];
+const FORGED = ["gladiator", "sleek", "forged", "arc", "gunmetal", "crown", "sapphire", "chrome", "ice", "bronze", "royal", "crimson", "emerald", "midgold", "storm", "frost", "plasma", "copper", "ocean", "blackout", "spartan", "titanium", "cobaltbronze", "jade", "wolf", "arena", "rose", "shadow"];
 const THEMES: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk", ...FORGED];
 // Neon was replaced by Daylight; anyone who had picked it gets Studio.
 const theme = (t: string) => (THEMES.includes(t) ? t : "studio");

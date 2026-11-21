@@ -610,6 +610,52 @@ html[data-look="forged"] .sp-shell main h1 {
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 18px rgb(var(--accent-rgb) / calc(0.3 * var(--f-k)));
 }
 
+/* ★ Gladiator: Forged without the brushed lines, a gold line under page
+   titles and a gold edge on the open menu item. */
+html[data-theme="gladiator"] { --f-tex: linear-gradient(transparent, transparent); }
+html[data-look="forged"][data-theme="gladiator"] .sp-shell main h1 {
+  background: linear-gradient(90deg, #e2b54f, transparent) left bottom / 90px 2px no-repeat;
+  padding-bottom: 0.45rem;
+}
+html[data-look="forged"][data-theme="gladiator"] .sp-metal.is-active,
+html[data-look="forged"][data-theme="gladiator"] .sp-metal.is-active:hover {
+  background: linear-gradient(90deg, rgba(226, 181, 79, 0.2), transparent 80%), linear-gradient(180deg, var(--f-top), var(--f-bot));
+  box-shadow: inset 3px 0 0 #e2b54f, inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 14px rgba(226, 181, 79, calc(0.25 * var(--f-k)));
+}
+
+/* ★ Sleek: modern and flat. No metal edge, no glow line, no texture; thin
+   light borders, soft shadows and plain white buttons. */
+html[data-theme="sleek"] { --f-tex: linear-gradient(transparent, transparent); }
+html[data-look="forged"][data-theme="sleek"] :is(.sp-shell, .sp-login) {
+  background: radial-gradient(900px 420px at 80% -15%, rgb(var(--accent-rgb) / calc(0.07 * var(--f-k))), transparent 60%), var(--t-page) !important;
+}
+html[data-look="forged"][data-theme="sleek"] .neon-card {
+  background: linear-gradient(180deg, var(--f-top), var(--f-bot));
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+html[data-look="forged"][data-theme="sleek"] .neon-card:hover { border-color: rgb(var(--accent-rgb) / 0.35); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4); }
+html[data-look="forged"][data-theme="sleek"] .sp-card-link:hover {
+  background: linear-gradient(180deg, var(--f-top), var(--f-bot));
+  border-color: rgb(var(--accent-rgb) / 0.45);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+html[data-look="forged"][data-theme="sleek"] .sp-sidebar { background: var(--f-raised); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
+html[data-look="forged"][data-theme="sleek"] .sp-metal { background: transparent; }
+html[data-look="forged"][data-theme="sleek"] .sp-metal.is-active,
+html[data-look="forged"][data-theme="sleek"] .sp-metal.is-active:hover {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 2px 0 0 rgb(var(--accent-rgb));
+}
+html[data-look="forged"][data-theme="sleek"] :is(.neon-button, .neon-button-sm) {
+  color: #0a0a0c;
+  background: rgb(var(--f-btn));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+html[data-look="forged"][data-theme="sleek"] :is(.neon-button, .neon-button-sm):hover { background: color-mix(in srgb, rgb(var(--f-btn)) 86%, #000); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+html[data-look="forged"][data-theme="sleek"] .neon-toggle-on { box-shadow: none; }
+html[data-look="forged"][data-theme="sleek"] .sp-shell main h1 { color: #f5f6f8; text-shadow: none; letter-spacing: -0.01em; }
+
 /* Account settings → Compact mode: everything a step smaller (the dashboard
    is sized in rem), so more fits on the screen. */
 html[data-density="compact"] { font-size: 14px; }

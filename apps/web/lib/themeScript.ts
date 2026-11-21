@@ -9,6 +9,9 @@ export const PREFS_CACHE_KEY = "spartacus_prefs";
 // and differ only in these colors, set as CSS variables on <html>.
 // [id, name, blurb, page, raised, metal light, metal mid, metal dark, card top, card bottom, accent, button color?]
 export const FORGED: Array<[string, string, string, string, string, string, string, string, string, string, string, string?]> = [
+  // Two picked looks first, with a few extra rules each in globals.css.
+  ["gladiator", "★ Gladiator", "Smooth steel, gold buttons, blue switches. No lines.", "#0b0d11", "#12161d", "#cfd8e3", "#6b7685", "#1d232d", "#1f2630", "#141921", "#5aa9ff", "#e2b54f"],
+  ["sleek", "★ Sleek", "Clean and modern: flat dark panels, thin edges, white buttons.", "#0a0a0c", "#111114", "#2c2c33", "#222228", "#1a1a1f", "#17171b", "#121215", "#5b8cff", "#f2f4f7"],
   ["forged", "A · Forged Steel", "Brushed metal with the logo's blue glow.", "#0d1016", "#141922", "#c9d3df", "#5d6979", "#1d232d", "#222a35", "#151a22", "#5aa9ff"],
   ["arc", "B · Arc Blue", "Deep navy glass with a strong neon blue.", "#070b16", "#0c1430", "#7fb6ff", "#2a4c86", "#0d1730", "#1c2c56", "#0c142a", "#3d8bff"],
   ["gunmetal", "C · Gunmetal Gold", "Dark steel with gold trim.", "#0e0f11", "#17181b", "#e7c873", "#6f6448", "#1f1e1b", "#24262a", "#17181b", "#e2b54f"],

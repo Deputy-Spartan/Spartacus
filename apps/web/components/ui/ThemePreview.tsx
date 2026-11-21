@@ -30,9 +30,16 @@ function forgedPreview(c: NonNullable<ThemeInfo["colors"]>) {
   };
 }
 
+// Sleek is flat (no metal edge or glow line), so it gets its own picture.
+const SLEEK = {
+  bg: "radial-gradient(140px 70px at 80% 0%, #5b8cff22, transparent 70%), #0a0a0c",
+  side: "#111114",
+  card: { background: "linear-gradient(180deg,#17171b,#121215)", border: "1px solid rgba(255,255,255,.09)" } as React.CSSProperties,
+};
+
 export function ThemePreview({ id, small }: { id: DashboardTheme; small?: boolean }) {
   const info = THEMES.find((t) => t.id === id);
-  const p = info?.colors ? forgedPreview(info.colors) : PREVIEW[id as keyof typeof PREVIEW] ?? PREVIEW.studio;
+  const p = id === "sleek" ? SLEEK : info?.colors ? forgedPreview(info.colors) : PREVIEW[id as keyof typeof PREVIEW] ?? PREVIEW.studio;
   const card = { ...p.card, borderRadius: 8 };
   return (
     <div className={`${small ? "h-14 p-1.5 gap-1" : "h-20 p-2 gap-1.5"} rounded-lg overflow-hidden flex`} style={{ background: p.bg }} aria-hidden="true">

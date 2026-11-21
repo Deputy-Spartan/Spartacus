@@ -88,7 +88,6 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
                 <p className="text-xs font-semibold text-slate-200">🎨 Theme</p>
                 <span className="w-12" />
               </div>
-              <p className="px-2 mb-2 text-[11px] text-slate-500">☀ Light → Dark ☾</p>
               <div className="grid grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto px-1 pb-1">
                 {THEMES.map((t) => (
                   <button
@@ -107,7 +106,7 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
                 ))}
               </div>
               <Link href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className="block text-center text-xs text-neon-blue hover:underline py-2">
-                Glow and accent color ›
+                Accent color ›
               </Link>
             </div>
           ) : (
@@ -119,7 +118,7 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[10px] uppercase tracking-widest text-slate-500">Theme</span>
-                  <span className="block truncate">{current?.name ?? "Vesuvius"}</span>
+                  <span className="block truncate">{current?.name ?? "Studio"}</span>
                 </span>
                 <span className="text-slate-500">›</span>
               </button>

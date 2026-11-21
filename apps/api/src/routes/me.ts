@@ -12,14 +12,14 @@ router.get("/me", requireAuthOnly, (req: AuthedRequest, res) => {
 
 // How the dashboard looks for this person. Saved to their Discord account,
 // so it's the same on every device they sign in from.
-// The six gladiator themes, light to dark (colors live in the web app's
-// lib/themeScript.ts FORGED; keep these ids in step). Any older saved theme
-// (Studio, the Forged A–Z set…) reads back as Vesuvius.
-const THEMES: string[] = ["capua", "colosseum", "thraex", "crixus", "murmillo", "vesuvius"];
-const theme = (t: string) => (THEMES.includes(t) ? t : "vesuvius");
+// The original themes (keep in step with the web app's lib/themeScript.ts
+// THEME_IDS). A theme that's no longer offered (Forged A–Z, the gladiator
+// six) reads back as Studio.
+const THEMES: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk"];
+const theme = (t: string) => (THEMES.includes(t) ? t : "studio");
 const HEX = /^#[0-9a-f]{6}$/i;
 const GLOW = ["off", "normal", "strong"];
-const DEFAULTS = { theme: "vesuvius", accent: null as string | null, compact: false, reduceMotion: false, displayName: null as string | null, glow: "normal", texture: true };
+const DEFAULTS = { theme: "studio", accent: null as string | null, compact: false, reduceMotion: false, displayName: null as string | null, glow: "normal", texture: true };
 
 type Row = { theme: string; accent: string | null; compact: boolean; reduceMotion: boolean; displayName: string | null; glow: string; texture: boolean };
 const shape = (row: Row) => ({

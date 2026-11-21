@@ -77,9 +77,8 @@ function SettingsTab({ run, access, onSignOut }: { run: Run; access: AccessStatu
           <NeonCard>
             <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
               <p className={label + " mb-0"}>Theme</p>
-              <p className="text-xs text-slate-500">Now: <span className="text-slate-200 font-medium">{current?.name ?? "Vesuvius"}</span></p>
+              <p className="text-xs text-slate-500">Now: <span className="text-slate-200 font-medium">{current?.name ?? "Studio"}</span></p>
             </div>
-            <p className="text-xs text-slate-500 mb-3">Six gladiator themes, from light to dark. Turn the glow up or down under Effects.</p>
             <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
               {THEMES.map((t) => (
                 <button
@@ -148,17 +147,6 @@ function SettingsTab({ run, access, onSignOut }: { run: Run; access: AccessStatu
         <section id="set-effects" className="scroll-mt-24">
           <NeonCard>
             <p className={label}>Effects</p>
-            {row(
-              "Glow",
-              "How much the cards, buttons and menu glow.",
-              <div className="flex gap-1 shrink-0">
-                {(["off", "normal", "strong"] as const).map((g) => (
-                  <button key={g} type="button" aria-pressed={(prefs.glow ?? "normal") === g} onClick={() => run({ glow: g }, `✅ Glow: ${g}`)} className={`sp-metal px-3 py-1.5 rounded-lg text-xs font-semibold capitalize ${(prefs.glow ?? "normal") === g ? "is-active" : ""}`}>
-                    {g}
-                  </button>
-                ))}
-              </div>
-            )}
             {row("Reduce motion", "Turns off the hover sweeps, sheens and fades.", <ToggleSwitch enabled={prefs.reduceMotion} onChange={(v) => run({ reduceMotion: v }, v ? "✅ Motion reduced" : "✅ Motion back on")} label="Reduce motion" />)}
           </NeonCard>
         </section>

@@ -4,23 +4,16 @@
 // client-only.
 export const PREFS_CACHE_KEY = "spartacus_prefs";
 
-// The six gladiator themes, light to dark (picked on the theme page). All share
-// one set of rules (data-look="forged") and differ in these colors, set as CSS
-// variables on <html>. Capua and Vesuvius are flat (the "Sleek" look); the four
-// in between are smooth metal. Capua and Colosseum are light (data-tone="light").
+// Metal "Forged" theme colors. Empty: the user went back to the original
+// themes on 2026-11-21. The rules for them (data-look="forged" in
+// globals.css) stay in place but do nothing while this list is empty.
 // [id, name, blurb, page, raised, metal light, metal mid, metal dark, card top, card bottom, accent, button color?]
-export const FORGED: Array<[string, string, string, string, string, string, string, string, string, string, string, string?]> = [
-  ["capua", "Capua", "Light: white marble and gold. Clean and flat.", "#ece8e1", "#f6f3ee", "#ffffff", "#d6cfc3", "#c9bfae", "#ffffff", "#f5f1ea", "#a8242f", "#d9a93f"],
-  ["colosseum", "Colosseum", "Warm arena sandstone, bronze buttons, deep red.", "#cfc5b3", "#dbd2c2", "#f3ecdf", "#b4a58c", "#a89878", "#ebe3d5", "#ddd3c2", "#8c2f2f", "#c98a52"],
-  ["thraex", "Thraex", "Dark bronze helmet, gold buttons, teal glow.", "#2a241f", "#332c26", "#f0c79a", "#8a6240", "#4a3a2c", "#3d352d", "#2e2721", "#39c4d6", "#e2b54f"],
-  ["crixus", "Crixus", "Dark iron with Roman red glow and gold buttons.", "#15110f", "#1d1715", "#e3cdd0", "#6e4c52", "#2e2220", "#2a201e", "#1b1513", "#d9343f", "#e2b54f"],
-  ["murmillo", "Murmillo", "Smooth steel like the logo, gold buttons, blue glow.", "#0b0d11", "#12161d", "#cfd8e3", "#6b7685", "#1d232d", "#1f2630", "#141921", "#5aa9ff", "#e2b54f"],
-  ["vesuvius", "Vesuvius", "Dark: flat black panels, thin edges, gold.", "#060607", "#0d0d0f", "#2a2a30", "#202026", "#18181c", "#151517", "#101012", "#e2b54f", "#e2b54f"],
-];
-export const LIGHT_THEMES = ["capua", "colosseum"];
-export const DEFAULT_THEME = "vesuvius";
+export const FORGED: Array<[string, string, string, string, string, string, string, string, string, string, string, string?]> = [];
+export const LIGHT_THEMES: string[] = [];
+export const DEFAULT_THEME = "studio";
 
-export const THEME_IDS = FORGED.map((t) => t[0]);
+// The original themes.
+export const THEME_IDS: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk", ...FORGED.map((t) => t[0])];
 
 const rgbOf = (hex: string) => {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -46,7 +39,7 @@ export function forgedVars(id: string): Record<string, string> | null {
       : { "--m-light": "rgba(255,255,255,.1)", "--m-hl": "rgba(255,255,255,.05)", "--m-dark": "rgba(0,0,0,.6)", "--m-text": "#cfd6df" }),
   };
 }
-export const FORGED_VAR_NAMES = Object.keys(forgedVars("murmillo") ?? {}); // has every variable, button color included
+export const FORGED_VAR_NAMES = Object.keys(forgedVars(FORGED[0]?.[0] ?? "") ?? {});
 
 // The accent color as the two CSS variables every theme reads: the color
 // itself and a deeper shade of it (for gradients and pressed states), each

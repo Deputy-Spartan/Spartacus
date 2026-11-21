@@ -7,11 +7,18 @@ import { PREFS_CACHE_KEY as CACHE_KEY, DEFAULT_THEME, FORGED, FORGED_VAR_NAMES, 
 // The theme is saved to the person's account (so it follows them to every
 // device) and also remembered in this browser, so the page can paint in the
 // right theme before the account answers. `accent` is each theme's own
-// accent color, used until the person picks their own. The six gladiator
-// themes, light to dark.
-export type ThemeInfo = { id: DashboardTheme; name: string; blurb: string; accent: string; colors: (typeof FORGED)[number] };
-export const THEMES: ThemeInfo[] = FORGED.map((t) => ({ id: t[0], name: t[1], blurb: t[2], accent: t[10], colors: t }));
-// A theme saved before the six (Studio, Forged A–Z…) falls back to the default.
+// accent color, used until the person picks their own.
+export type ThemeInfo = { id: DashboardTheme; name: string; blurb: string; accent: string; colors?: (typeof FORGED)[number] };
+export const THEMES: ThemeInfo[] = [
+  { id: "studio", name: "Studio", blurb: "Solid and bold: an accent bar on every card, filled buttons.", accent: "#7b99bc" },
+  { id: "glass", name: "Glass", blurb: "Frosted see-through panels over a colorful glow, with a sheen on hover.", accent: "#7b99bc" },
+  { id: "daylight", name: "Daylight", blurb: "A soft light theme: cloudy gray page, darker metal buttons, dark text.", accent: "#7b99bc" },
+  { id: "steel", name: "Steel", blurb: "Near-black with brushed steel and an electric blue glow, to match the S logo.", accent: "#4a95ff" },
+  { id: "midnight", name: "Midnight", blurb: "True black for OLED phone screens, with a cool cyan glow. Easy on battery.", accent: "#4fd1ff" },
+  { id: "dusk", name: "Dusk", blurb: "Soft purple-gray, calm for late nights. Matches the purple group icons.", accent: "#b9a2ff" },
+  ...FORGED.map((t) => ({ id: t[0], name: t[1], blurb: t[2], accent: t[10], colors: t })),
+];
+// A theme that's no longer offered (Forged A–Z, the gladiator six…) falls back to Studio.
 const known = (t: string | undefined) => (t && THEME_IDS.includes(t) ? t : DEFAULT_THEME);
 
 // Ready-made accent colors to pick from (any other color works too).

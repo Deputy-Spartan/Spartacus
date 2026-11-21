@@ -33,7 +33,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="studio" suppressHydrationWarning>
+    <html lang="en" data-theme="vesuvius" suppressHydrationWarning>
       <head>
         {/* Paints the saved theme before anything shows, so it never flashes. */}
         <script dangerouslySetInnerHTML={{ __html: EARLY_THEME_SCRIPT }} />

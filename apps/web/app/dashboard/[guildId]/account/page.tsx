@@ -27,11 +27,9 @@ type Run = (patch: Partial<import("../../../../lib/api").UserPrefs>, done: strin
 function SettingsTab({ run, access, onSignOut }: { run: Run; access: AccessStatus | null; onSignOut: () => void }) {
   const { prefs } = useUserPrefs();
   const current = THEMES.find((t) => t.id === prefs.theme);
-  const [group, setGroup] = useState<"forged" | "classic">(current?.group ?? "forged");
   const [active, setActive] = useState("theme");
   const accentTimer = useRef<ReturnType<typeof setTimeout>>();
   const label = "text-xs uppercase tracking-wide text-slate-500 block mb-2";
-  const isForged = current?.group === "forged";
 
   // Highlight the section on screen.
   useEffect(() => {
@@ -57,7 +55,6 @@ function SettingsTab({ run, access, onSignOut }: { run: Run; access: AccessStatu
       {control}
     </div>
   );
-  const list = THEMES.filter((t) => t.group === group);
 
   return (
     <div className="grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)] items-start">
@@ -80,20 +77,11 @@ function SettingsTab({ run, access, onSignOut }: { run: Run; access: AccessStatu
           <NeonCard>
             <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
               <p className={label + " mb-0"}>Theme</p>
-              <p className="text-xs text-slate-500">Now: <span className="text-slate-200 font-medium">{current?.name ?? "Studio"}</span></p>
+              <p className="text-xs text-slate-500">Now: <span className="text-slate-200 font-medium">{current?.name ?? "Vesuvius"}</span></p>
             </div>
-            <div className="flex gap-2 mb-4">
-              {(["forged", "classic"] as const).map((g) => (
-                <button key={g} type="button" aria-pressed={group === g} onClick={() => setGroup(g)} className={`sp-metal px-3 py-2 rounded-lg text-sm font-semibold ${group === g ? "is-active" : ""}`}>
-                  {g === "forged" ? `⚔️ Forged A–Z (${THEMES.filter((t) => t.group === "forged").length})` : `🧱 Classic (${THEMES.filter((t) => t.group === "classic").length})`}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-slate-500 mb-3">
-              {group === "forged" ? "Metal-edged cards with a glowing line on top, made to match the S logo. Turn the glow up or down under Effects." : "The original looks."}
-            </p>
-            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
-              {list.map((t) => (
+            <p className="text-xs text-slate-500 mb-3">Six gladiator themes, from light to dark. Turn the glow up or down under Effects.</p>
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
+              {THEMES.map((t) => (
                 <button
                   key={t.id}
                   type="button"
@@ -162,20 +150,13 @@ function SettingsTab({ run, access, onSignOut }: { run: Run; access: AccessStatu
             <p className={label}>Effects</p>
             {row(
               "Glow",
-              isForged ? "How much the cards, buttons and menu glow." : "Works with the Forged themes. Pick one under Theme to use it.",
-              <div className={`flex gap-1 shrink-0 ${isForged ? "" : "opacity-40 pointer-events-none"}`}>
+              "How much the cards, buttons and menu glow.",
+              <div className="flex gap-1 shrink-0">
                 {(["off", "normal", "strong"] as const).map((g) => (
                   <button key={g} type="button" aria-pressed={(prefs.glow ?? "normal") === g} onClick={() => run({ glow: g }, `✅ Glow: ${g}`)} className={`sp-metal px-3 py-1.5 rounded-lg text-xs font-semibold capitalize ${(prefs.glow ?? "normal") === g ? "is-active" : ""}`}>
                     {g}
                   </button>
                 ))}
-              </div>
-            )}
-            {row(
-              "Brushed metal texture",
-              isForged ? "The fine brushed-steel lines on cards and the menu." : "Works with the Forged themes.",
-              <div className={isForged ? "" : "opacity-40 pointer-events-none"}>
-                <ToggleSwitch enabled={prefs.texture !== false} onChange={(v) => run({ texture: v }, v ? "✅ Texture on" : "✅ Texture off")} label="Brushed metal texture" />
               </div>
             )}
             {row("Reduce motion", "Turns off the hover sweeps, sheens and fades.", <ToggleSwitch enabled={prefs.reduceMotion} onChange={(v) => run({ reduceMotion: v }, v ? "✅ Motion reduced" : "✅ Motion back on")} label="Reduce motion" />)}

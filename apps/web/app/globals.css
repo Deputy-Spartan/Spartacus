@@ -245,8 +245,8 @@ input[type="datetime-local"]::-webkit-date-and-time-value {
 .rank-1 { background: linear-gradient(135deg, #f7d774, #c9a03a); color: #1c1d20; }
 .rank-2 { background: linear-gradient(135deg, #e3e7ed, #9aa3af); color: #1c1d20; }
 .rank-3 { background: linear-gradient(135deg, #e0a26a, #a9652e); color: #1c1d20; }
-html[data-theme="daylight"] .chart-grid { stroke: rgba(28, 29, 32, 0.08); }
-html[data-theme="daylight"] .sp-tabbar { background: rgba(200, 208, 217, 0.96); border-color: rgba(25, 40, 60, 0.16); }
+html:is([data-theme="daylight"], [data-tone="light"]) .chart-grid { stroke: rgba(28, 29, 32, 0.08); }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-tabbar { background: rgba(200, 208, 217, 0.96); border-color: rgba(25, 40, 60, 0.16); }
 html[data-theme="glass"] .sp-tabbar { background: rgba(36, 37, 41, 0.7); }
 
 /* ---------- Studio: solid and bold, an accent bar on every card ---------- */
@@ -310,52 +310,52 @@ html[data-theme="glass"] .sp-login-card { background: rgba(36, 37, 41, 0.45); bo
    The dashboard's pages were built dark, so this remaps its dark colors.
    Anything inside a Discord preview (those use fixed bg-[#…] colors) is
    left alone so previews still look like Discord. */
-html[data-theme="daylight"] { color-scheme: light; }
-html[data-theme="daylight"] body { background: #b9c2cd; color: #1c1d20; }
-html[data-theme="daylight"] select,
-html[data-theme="daylight"] select option { background-color: #d6dce4; color: #1c1d20; }
-html[data-theme="daylight"] :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #d3dae2; }
-html[data-theme="daylight"] :is(.sp-shell, .sp-login) { background-color: #b9c2cd !important; }
-html[data-theme="daylight"] :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #d0d7df; }
-html[data-theme="daylight"] :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #c4ccd6; }
-html[data-theme="daylight"] .bg-base-700:not([class*="bg-[#"] *) { background-color: #b3bdc9; }
-html[data-theme="daylight"] :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #c4ccd6; }
-html[data-theme="daylight"] .text-slate-100:not([class*="bg-[#"] *) { color: #1c1d20; }
-html[data-theme="daylight"] .text-slate-200:not([class*="bg-[#"] *) { color: #23262b; }
-html[data-theme="daylight"] .text-slate-300:not([class*="bg-[#"] *) { color: #37393f; }
-html[data-theme="daylight"] .text-slate-400:not([class*="bg-[#"] *) { color: #3f4550; }
-html[data-theme="daylight"] .text-slate-500:not([class*="bg-[#"] *) { color: #4c5360; }
-html[data-theme="daylight"] .text-slate-600:not([class*="bg-[#"] *) { color: #626975; }
-html[data-theme="daylight"] :is(.hover\:text-slate-100, .hover\:text-slate-200, .hover\:text-slate-300):hover:not([class*="bg-[#"] *) { color: #1c1d20; }
-html[data-theme="daylight"] .text-neon-blue:not([class*="bg-[#"] *) { color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); }
-html[data-theme="daylight"] :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/\[0\.07\]):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.1); }
-html[data-theme="daylight"] :is(.border-white\/20, .border-white\/30):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.18); }
-html[data-theme="daylight"] :is(.hover\:border-white\/15, .hover\:border-white\/20, .hover\:border-white\/25):hover:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.25); }
-html[data-theme="daylight"] :is(.divide-white\/5) > * + *:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.08); }
-html[data-theme="daylight"] :is(.bg-white\/5, .bg-white\/10, .bg-white\/\[0\.03\], .bg-white\/\[0\.06\], .bg-black\/20, .bg-black\/10):not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.04); }
-html[data-theme="daylight"] :is(.hover\:bg-white\/5, .hover\:bg-white\/10, .hover\:bg-white\/\[0\.06\], .hover\:bg-white\/\[0\.07\]):hover:not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.06); }
-html[data-theme="daylight"] :is(input, textarea, select):not([class*="bg-[#"] *) { color: #1c1d20; }
-html[data-theme="daylight"] ::placeholder { color: #6b727e; }
-html[data-theme="daylight"] .neon-card {
+html:is([data-theme="daylight"], [data-tone="light"]) { color-scheme: light; }
+html:is([data-theme="daylight"], [data-tone="light"]) body { background: #b9c2cd; color: #1c1d20; }
+html:is([data-theme="daylight"], [data-tone="light"]) select,
+html:is([data-theme="daylight"], [data-tone="light"]) select option { background-color: #d6dce4; color: #1c1d20; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.bg-base-950, .bg-base-950\/90, .bg-base-950\/80, .bg-base-950\/60, .bg-base-950\/50, .bg-base-950\/40, .bg-base-950\/20):not([class*="bg-[#"] *) { background-color: #d3dae2; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.sp-shell, .sp-login) { background-color: #b9c2cd !important; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.bg-base-900, .bg-base-900\/50):not([class*="bg-[#"] *) { background-color: #d0d7df; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.bg-base-800, .bg-base-800\/60, .bg-base-800\/40):not([class*="bg-[#"] *) { background-color: #c4ccd6; }
+html:is([data-theme="daylight"], [data-tone="light"]) .bg-base-700:not([class*="bg-[#"] *) { background-color: #b3bdc9; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.hover\:bg-base-800\/60, .hover\:bg-base-800):hover:not([class*="bg-[#"] *) { background-color: #c4ccd6; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-slate-100:not([class*="bg-[#"] *) { color: #1c1d20; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-slate-200:not([class*="bg-[#"] *) { color: #23262b; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-slate-300:not([class*="bg-[#"] *) { color: #37393f; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-slate-400:not([class*="bg-[#"] *) { color: #3f4550; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-slate-500:not([class*="bg-[#"] *) { color: #4c5360; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-slate-600:not([class*="bg-[#"] *) { color: #626975; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.hover\:text-slate-100, .hover\:text-slate-200, .hover\:text-slate-300):hover:not([class*="bg-[#"] *) { color: #1c1d20; }
+html:is([data-theme="daylight"], [data-tone="light"]) .text-neon-blue:not([class*="bg-[#"] *) { color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/\[0\.07\]):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.1); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.border-white\/20, .border-white\/30):not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.18); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.hover\:border-white\/15, .hover\:border-white\/20, .hover\:border-white\/25):hover:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.25); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.divide-white\/5) > * + *:not([class*="bg-[#"] *) { border-color: rgba(28, 29, 32, 0.08); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.bg-white\/5, .bg-white\/10, .bg-white\/\[0\.03\], .bg-white\/\[0\.06\], .bg-black\/20, .bg-black\/10):not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.04); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.hover\:bg-white\/5, .hover\:bg-white\/10, .hover\:bg-white\/\[0\.06\], .hover\:bg-white\/\[0\.07\]):hover:not([class*="bg-[#"] *) { background-color: rgba(28, 29, 32, 0.06); }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(input, textarea, select):not([class*="bg-[#"] *) { color: #1c1d20; }
+html:is([data-theme="daylight"], [data-tone="light"]) ::placeholder { color: #6b727e; }
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-card {
   background: #d0d7df;
   border-color: rgba(25, 40, 60, 0.16);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(28, 29, 32, 0.05), 0 4px 14px rgba(28, 29, 32, 0.04);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
-html[data-theme="daylight"] .neon-card:hover { border-color: rgb(var(--accent-rgb)); box-shadow: 0 2px 4px rgba(28, 29, 32, 0.07), 0 14px 30px rgb(var(--accent2-rgb) / 0.15); }
-html[data-theme="daylight"] .sp-sidebar { background: #c8d0d9; border-color: rgba(25, 40, 60, 0.16); }
-html[data-theme="daylight"] .sp-sidebar .bg-base-800.text-neon-blue { background: rgb(var(--accent-rgb) / 0.18); color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); font-weight: 600; box-shadow: none; }
-html[data-theme="daylight"] .sp-hubtab-on { background: rgb(var(--accent-rgb) / 0.18); color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); }
-html[data-theme="daylight"] .sp-header { background: rgba(200, 208, 217, 0.92); border-color: rgba(25, 40, 60, 0.16); }
-html[data-theme="daylight"] .neon-button,
-html[data-theme="daylight"] .neon-button-sm { background: rgb(var(--accent2-rgb)); color: #fff; box-shadow: 0 1px 2px rgba(28, 29, 32, 0.15); }
-html[data-theme="daylight"] .neon-button:hover,
-html[data-theme="daylight"] .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 70%, #000); }
-html[data-theme="daylight"] .neon-toggle-on { background: rgb(var(--accent2-rgb)); }
-html[data-theme="daylight"] .spartacus-wave { background-image: linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 0%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 35%, rgb(var(--accent-rgb)) 50%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 65%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 100%); }
-html[data-theme="daylight"] .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgb(var(--accent-rgb) / 0.22), transparent 65%), #c4ccd6; color: #1c1d20; }
-html[data-theme="daylight"] .sp-login-card { background: #d0d7df; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-card:hover { border-color: rgb(var(--accent-rgb)); box-shadow: 0 2px 4px rgba(28, 29, 32, 0.07), 0 14px 30px rgb(var(--accent2-rgb) / 0.15); }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-sidebar { background: #c8d0d9; border-color: rgba(25, 40, 60, 0.16); }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-sidebar .bg-base-800.text-neon-blue { background: rgb(var(--accent-rgb) / 0.18); color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); font-weight: 600; box-shadow: none; }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-hubtab-on { background: rgb(var(--accent-rgb) / 0.18); color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-header { background: rgba(200, 208, 217, 0.92); border-color: rgba(25, 40, 60, 0.16); }
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-button,
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-button-sm { background: rgb(var(--accent2-rgb)); color: #fff; box-shadow: 0 1px 2px rgba(28, 29, 32, 0.15); }
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-button:hover,
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-button-sm:hover { background: color-mix(in srgb, rgb(var(--accent-rgb)) 70%, #000); }
+html:is([data-theme="daylight"], [data-tone="light"]) .neon-toggle-on { background: rgb(var(--accent2-rgb)); }
+html:is([data-theme="daylight"], [data-tone="light"]) .spartacus-wave { background-image: linear-gradient(90deg, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 0%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 35%, rgb(var(--accent-rgb)) 50%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 65%, color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000) 100%); }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-hero { background: radial-gradient(700px 500px at 0% 0%, rgb(var(--accent-rgb) / 0.22), transparent 65%), #c4ccd6; color: #1c1d20; }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-login-card { background: #d0d7df; box-shadow: 0 20px 50px rgba(28, 29, 32, 0.12); }
 
 /* ---------------------------------------------------------------------------
    Hover on the cards you click to open something (the module cards on a
@@ -398,13 +398,13 @@ html[data-theme="glass"] .sp-card-link:hover .sp-card-icon { transform: translat
 html[data-theme="glass"] .sp-card-link:hover .sp-card-open { color: #ffffff; }
 
 /* Daylight */
-html[data-theme="daylight"] .sp-card-link:hover {
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-card-link:hover {
   transform: translateY(-3px);
   border-color: rgb(var(--accent-rgb));
   background: linear-gradient(180deg, rgb(var(--accent2-rgb) / 0.12), rgba(255, 255, 255, 0) 46%), #d8dee5;
   box-shadow: 0 2px 4px rgba(28, 29, 32, 0.06), 0 18px 36px rgb(var(--accent2-rgb) / 0.22);
 }
-html[data-theme="daylight"] .sp-card-link:hover .sp-card-icon { transform: scale(1.06); }
+html:is([data-theme="daylight"], [data-tone="light"]) .sp-card-link:hover .sp-card-icon { transform: scale(1.06); }
 
 @media (prefers-reduced-motion: reduce) {
   .sp-card-link,
@@ -414,13 +414,13 @@ html[data-theme="daylight"] .sp-card-link:hover .sp-card-icon { transform: scale
   .sp-card-link:hover .sp-card-icon,
   .sp-card-link:hover .sp-card-open { transform: none !important; }
 }
-html[data-theme="daylight"] .setup-ready { background: rgba(31, 138, 76, 0.12); color: #1f7a45; }
-html[data-theme="daylight"] .setup-needs { background: rgba(201, 138, 46, 0.16); color: #8a5a10; }
-html[data-theme="daylight"] :is(.text-amber-300, .text-amber-400):not([class*="bg-[#"] *) { color: #8a5a10; }
-html[data-theme="daylight"] :is(.text-emerald-300, .text-emerald-400):not([class*="bg-[#"] *) { color: #1f7a45; }
-html[data-theme="daylight"] :is(.text-rose-300, .text-rose-400):not([class*="bg-[#"] *) { color: #b42318; }
-html[data-theme="daylight"] .stroke-white\/10 { stroke: rgba(28, 29, 32, 0.1); }
-html[data-theme="daylight"] * { scrollbar-color: rgba(28, 29, 32, 0.2) transparent; }
+html:is([data-theme="daylight"], [data-tone="light"]) .setup-ready { background: rgba(31, 138, 76, 0.12); color: #1f7a45; }
+html:is([data-theme="daylight"], [data-tone="light"]) .setup-needs { background: rgba(201, 138, 46, 0.16); color: #8a5a10; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.text-amber-300, .text-amber-400):not([class*="bg-[#"] *) { color: #8a5a10; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.text-emerald-300, .text-emerald-400):not([class*="bg-[#"] *) { color: #1f7a45; }
+html:is([data-theme="daylight"], [data-tone="light"]) :is(.text-rose-300, .text-rose-400):not([class*="bg-[#"] *) { color: #b42318; }
+html:is([data-theme="daylight"], [data-tone="light"]) .stroke-white\/10 { stroke: rgba(28, 29, 32, 0.1); }
+html:is([data-theme="daylight"], [data-tone="light"]) * { scrollbar-color: rgba(28, 29, 32, 0.2) transparent; }
 
 /* Account settings → Reduce motion: no sweeps, sheens or fades. */
 html[data-motion="reduce"] *,
@@ -446,7 +446,7 @@ html[data-theme="glass"] {
   --m-dark: rgba(0, 0, 0, 0.4); --m-glow: rgb(var(--accent-rgb) / 0.5); --m-ring: rgb(var(--accent-rgb) / 0.55);
   --m-text: #e1e7ef; --m-text-hi: #ffffff; --m-accent: color-mix(in srgb, rgb(var(--accent-rgb)) 65%, #fff); --m-owner: #d8ccff;
 }
-html[data-theme="daylight"] {
+html:is([data-theme="daylight"], [data-tone="light"]) {
   --m-top: #dde3e9; --m-bot: #b3bdc9; --m-light: rgba(255, 255, 255, 0.75); --m-hl: rgba(255, 255, 255, 0.55);
   --m-dark: rgba(25, 40, 60, 0.34); --m-glow: rgb(var(--accent2-rgb) / 0.32); --m-ring: rgb(var(--accent2-rgb) / 0.45);
   --m-text: #2b3038; --m-text-hi: #12161c; --m-accent: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #000); --m-owner: #6d4fc2;
@@ -551,7 +551,7 @@ html[data-theme="midnight"] .sp-card-link:hover { box-shadow: 0 0 0 1px rgb(var(
    ------------------------------------------------------------------------- */
 html[data-look="forged"] {
   --f-k: 1;
-  --f-tex: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
+  --f-tex: linear-gradient(transparent, transparent); /* the brushed lines were removed */
   --f-btn: var(--f-btn-rgb, var(--accent-rgb));
 }
 html[data-look="forged"][data-glow="strong"] { --f-k: 1.8; }
@@ -610,51 +610,57 @@ html[data-look="forged"] .sp-shell main h1 {
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6), 0 0 18px rgb(var(--accent-rgb) / calc(0.3 * var(--f-k)));
 }
 
-/* ★ Gladiator: Forged without the brushed lines, a gold line under page
-   titles and a gold edge on the open menu item. */
-html[data-theme="gladiator"] { --f-tex: linear-gradient(transparent, transparent); }
-html[data-look="forged"][data-theme="gladiator"] .sp-shell main h1 {
-  background: linear-gradient(90deg, #e2b54f, transparent) left bottom / 90px 2px no-repeat;
+/* The six gladiator themes: a gold line under page titles and a gold edge on
+   the open menu item (darker gold on the two light ones). */
+html[data-look="forged"] { --f-gold: 226 181 79; }
+html[data-look="forged"][data-tone="light"] { --f-gold: 168 122 38; }
+html[data-look="forged"] .sp-shell main h1 {
+  background: linear-gradient(90deg, rgb(var(--f-gold)), transparent) left bottom / 90px 2px no-repeat;
   padding-bottom: 0.45rem;
 }
-html[data-look="forged"][data-theme="gladiator"] .sp-metal.is-active,
-html[data-look="forged"][data-theme="gladiator"] .sp-metal.is-active:hover {
-  background: linear-gradient(90deg, rgba(226, 181, 79, 0.2), transparent 80%), linear-gradient(180deg, var(--f-top), var(--f-bot));
-  box-shadow: inset 3px 0 0 #e2b54f, inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 14px rgba(226, 181, 79, calc(0.25 * var(--f-k)));
+html[data-look="forged"] .sp-metal.is-active,
+html[data-look="forged"] .sp-metal.is-active:hover {
+  background: linear-gradient(90deg, rgb(var(--f-gold) / 0.2), transparent 80%), linear-gradient(180deg, var(--f-top), var(--f-bot));
+  box-shadow: inset 3px 0 0 rgb(var(--f-gold)), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 14px rgb(var(--f-gold) / calc(0.25 * var(--f-k)));
 }
 
-/* ★ Sleek: modern and flat. No metal edge, no glow line, no texture; thin
-   light borders, soft shadows and plain white buttons. */
-html[data-theme="sleek"] { --f-tex: linear-gradient(transparent, transparent); }
-html[data-look="forged"][data-theme="sleek"] :is(.sp-shell, .sp-login) {
+/* Capua (light) and Vesuvius (dark) are flat, the "Sleek" look: no metal
+   edge or glow line; thin borders, soft shadows and solid buttons. */
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) :is(.sp-shell, .sp-login) {
   background: radial-gradient(900px 420px at 80% -15%, rgb(var(--accent-rgb) / calc(0.07 * var(--f-k))), transparent 60%), var(--t-page) !important;
 }
-html[data-look="forged"][data-theme="sleek"] .neon-card {
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .neon-card {
   background: linear-gradient(180deg, var(--f-top), var(--f-bot));
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--f-lo);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
-html[data-look="forged"][data-theme="sleek"] .neon-card:hover { border-color: rgb(var(--accent-rgb) / 0.35); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4); }
-html[data-look="forged"][data-theme="sleek"] .sp-card-link:hover {
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .neon-card:hover { border-color: rgb(var(--accent-rgb) / 0.4); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4); }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-card-link:hover {
   background: linear-gradient(180deg, var(--f-top), var(--f-bot));
-  border-color: rgb(var(--accent-rgb) / 0.45);
+  border-color: rgb(var(--accent-rgb) / 0.5);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
 }
-html[data-look="forged"][data-theme="sleek"] .sp-sidebar { background: var(--f-raised); box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.06); }
-html[data-look="forged"][data-theme="sleek"] .sp-metal { background: transparent; }
-html[data-look="forged"][data-theme="sleek"] .sp-metal.is-active,
-html[data-look="forged"][data-theme="sleek"] .sp-metal.is-active:hover {
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 2px 0 0 rgb(var(--accent-rgb));
-}
-html[data-look="forged"][data-theme="sleek"] :is(.neon-button, .neon-button-sm) {
-  color: #0a0a0c;
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-sidebar { background: var(--f-raised); box-shadow: inset -1px 0 0 var(--f-lo); }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-metal { background: transparent; }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) :is(.neon-button, .neon-button-sm) {
+  color: #14110a;
   background: rgb(var(--f-btn));
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
-html[data-look="forged"][data-theme="sleek"] :is(.neon-button, .neon-button-sm):hover { background: color-mix(in srgb, rgb(var(--f-btn)) 86%, #000); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
-html[data-look="forged"][data-theme="sleek"] .neon-toggle-on { box-shadow: none; }
-html[data-look="forged"][data-theme="sleek"] .sp-shell main h1 { color: #f5f6f8; text-shadow: none; letter-spacing: -0.01em; }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) :is(.neon-button, .neon-button-sm):hover { background: color-mix(in srgb, rgb(var(--f-btn)) 86%, #000); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .neon-toggle-on { box-shadow: none; }
+html[data-look="forged"][data-theme="vesuvius"] .sp-shell main h1 { color: #f5f0e6; text-shadow: none; }
+
+/* Capua and Colosseum are light: dark text (the light rules above, via
+   data-tone="light") and softer shadows. */
+html[data-look="forged"][data-tone="light"] { color-scheme: light; }
+html[data-look="forged"][data-tone="light"] .sp-shell main h1 { color: #2a241d; text-shadow: none; }
+html[data-look="forged"][data-tone="light"] .neon-card { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 6px 18px rgba(60, 45, 25, 0.12); }
+html[data-look="forged"][data-tone="light"] .neon-card:hover,
+html[data-look="forged"][data-tone="light"] .sp-card-link:hover { box-shadow: 0 10px 24px rgba(60, 45, 25, 0.18); }
+html[data-look="forged"][data-tone="light"] .sp-metal.is-active,
+html[data-look="forged"][data-tone="light"] .sp-metal.is-active:hover { color: #1c1d20; }
+html[data-look="forged"][data-tone="light"] :is(.neon-button, .neon-button-sm) { color: #14110a; }
 
 /* Account settings → Compact mode: everything a step smaller (the dashboard
    is sized in rem), so more fits on the screen. */

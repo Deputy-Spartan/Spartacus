@@ -20,7 +20,6 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
   // The menu shows either its main list or the theme picker (preview cards).
   const [view, setView] = useState<"main" | "theme">("main");
   const current = THEMES.find((t) => t.id === prefs.theme);
-  const [group, setGroup] = useState<"forged" | "classic">(current?.group ?? "forged");
   useEffect(() => {
     if (!open) setView("main");
   }, [open]);
@@ -89,21 +88,9 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
                 <p className="text-xs font-semibold text-slate-200">🎨 Theme</p>
                 <span className="w-12" />
               </div>
-              <div className="flex gap-1 px-1 mb-2">
-                {(["forged", "classic"] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    aria-pressed={group === g}
-                    onClick={() => setGroup(g)}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors ${group === g ? "border-neon-blue bg-neon-blue/15 text-slate-100" : "border-white/10 text-slate-400 hover:text-slate-200"}`}
-                  >
-                    {g === "forged" ? "⚔️ Forged A–Z" : "🧱 Classic"}
-                  </button>
-                ))}
-              </div>
+              <p className="px-2 mb-2 text-[11px] text-slate-500">☀ Light → Dark ☾</p>
               <div className="grid grid-cols-2 gap-2 max-h-[55vh] overflow-y-auto px-1 pb-1">
-                {THEMES.filter((t) => t.group === group).map((t) => (
+                {THEMES.map((t) => (
                   <button
                     key={t.id}
                     type="button"
@@ -120,7 +107,7 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
                 ))}
               </div>
               <Link href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className="block text-center text-xs text-neon-blue hover:underline py-2">
-                Glow, texture and accent color ›
+                Glow and accent color ›
               </Link>
             </div>
           ) : (
@@ -132,7 +119,7 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[10px] uppercase tracking-widest text-slate-500">Theme</span>
-                  <span className="block truncate">{current?.name ?? "Studio"}</span>
+                  <span className="block truncate">{current?.name ?? "Vesuvius"}</span>
                 </span>
                 <span className="text-slate-500">›</span>
               </button>

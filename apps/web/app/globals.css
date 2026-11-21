@@ -586,14 +586,19 @@ html[data-look="forged"] .sp-sidebar {
   background: var(--f-tex), linear-gradient(180deg, var(--f-raised), var(--t-page));
   box-shadow: inset -1px 0 0 rgb(var(--accent-rgb) / calc(0.25 * var(--f-k)));
 }
+/* Menu buttons. The background never changes and every state uses the same
+   six shadows in the same order (gold edge, top shine, inner press, gold tint,
+   drop shadow, glow), so pressing in and popping out animate smoothly. */
 html[data-look="forged"] .sp-metal {
-  background: var(--f-tex), linear-gradient(180deg, var(--f-top), var(--f-bot));
+  background: linear-gradient(180deg, var(--f-top), var(--f-bot));
+  box-shadow: inset 0 0 0 0 rgb(var(--f-gold) / 0), inset 0 1px 0 var(--m-light), inset 0 0 0 0 rgba(0, 0, 0, 0), inset 0 0 0 999px rgb(var(--f-gold) / 0), 0 1px 2px var(--m-dark), 0 0 0 0 rgb(var(--accent-rgb) / 0);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.28s ease, color 0.22s ease, filter 0.22s ease;
 }
-html[data-look="forged"] .sp-metal.is-active,
-html[data-look="forged"] .sp-metal.is-active:hover {
-  color: #fff;
-  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.16), transparent 70%), linear-gradient(180deg, var(--f-top), var(--f-bot));
-  box-shadow: inset 0 0 0 1px rgb(var(--accent-rgb) / 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 18px rgb(var(--accent-rgb) / calc(0.35 * var(--f-k)));
+html[data-look="forged"] .sp-metal:hover {
+  box-shadow: inset 0 0 0 0 rgb(var(--f-gold) / 0), inset 0 1px 0 var(--m-light), inset 0 0 0 0 rgba(0, 0, 0, 0), inset 0 0 0 999px rgb(var(--f-gold) / 0), 0 6px 14px var(--m-dark), 0 0 16px rgb(var(--accent-rgb) / calc(0.15 * var(--f-k)));
+}
+html[data-look="forged"] .sp-metal:active {
+  box-shadow: inset 0 0 0 0 rgb(var(--f-gold) / 0), inset 0 1px 0 rgba(255, 255, 255, 0), inset 3px 3px 8px var(--m-dark), inset 0 0 0 999px rgb(var(--f-gold) / 0.06), 0 0 0 0 rgba(0, 0, 0, 0), 0 0 0 0 rgb(var(--accent-rgb) / 0);
 }
 html[data-look="forged"] :is(.neon-button, .neon-button-sm) {
   color: #0a0c10;
@@ -620,10 +625,11 @@ html[data-look="forged"] .sp-shell main h1 {
 }
 html[data-look="forged"] .sp-metal.is-active,
 html[data-look="forged"] .sp-metal.is-active:hover {
-  /* Pressed in and stays down: flipped gradient and a deep inner shadow, plus the gold edge. */
+  /* Pressed in and stays down: deep inner shadow, gold tint and the gold edge (same six shadows as above). */
   transform: translateY(1px);
-  background: linear-gradient(90deg, rgb(var(--f-gold) / 0.18), transparent 80%), linear-gradient(0deg, var(--f-top), var(--f-bot));
-  box-shadow: inset 3px 0 0 rgb(var(--f-gold)), inset 4px 4px 10px var(--m-dark), inset -3px -3px 8px var(--m-hl), inset 0 0 0 1px rgb(var(--f-gold) / 0.35), 0 0 12px rgb(var(--f-gold) / calc(0.2 * var(--f-k)));
+  filter: none;
+  background: linear-gradient(180deg, var(--f-top), var(--f-bot));
+  box-shadow: inset 3px 0 0 0 rgb(var(--f-gold)), inset 0 1px 0 rgba(255, 255, 255, 0), inset 4px 4px 10px var(--m-dark), inset 0 0 0 999px rgb(var(--f-gold) / 0.1), 0 0 0 0 rgba(0, 0, 0, 0), 0 0 12px rgb(var(--f-gold) / calc(0.2 * var(--f-k)));
 }
 
 /* Capua (light) and Vesuvius (dark) are flat, the "Sleek" look: no metal
@@ -643,7 +649,7 @@ html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-c
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
 }
 html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-sidebar { background: var(--f-raised); box-shadow: inset -1px 0 0 var(--f-lo); }
-html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) .sp-metal:not(.is-active) { background: transparent; }
+html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) :is(.sp-metal, .sp-metal.is-active, .sp-metal.is-active:hover) { background: transparent; }
 html[data-look="forged"]:is([data-theme="capua"], [data-theme="vesuvius"]) :is(.neon-button, .neon-button-sm) {
   color: #14110a;
   background: rgb(var(--f-btn));

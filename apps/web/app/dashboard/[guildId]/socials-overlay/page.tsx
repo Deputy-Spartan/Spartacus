@@ -111,6 +111,36 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
     [next[i], next[i + by]] = [next[i + by], next[i]];
     update({ platforms: next });
   };
+  // Tap-to-toggle chips for one list (stream or post). Each list is separate,
+  // so e.g. Discord can be on stream but left out of the Discord post.
+  const picker = (key: "on" | "post", label: string, sub: string) => {
+    const named = s.platforms.map((p, i) => ({ p, i })).filter(({ p }) => p.name.trim());
+    return (
+      <NeonCard>
+        <p className="font-medium">{label}</p>
+        <p className={`${hint} mb-3`}>{sub}</p>
+        {named.length === 0 ? (
+          <p className="text-xs text-amber-200">Type your names in Your names first.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {named.map(({ p, i }) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPlatform(i, { [key]: !p[key] })}
+                aria-pressed={p[key]}
+                className={`flex items-center gap-2 text-sm pl-1.5 pr-3 py-1.5 rounded-full border transition-colors ${p[key] ? "border-neon-blue bg-neon-blue/15 text-white" : "border-white/10 text-slate-500 opacity-60 hover:opacity-100"}`}
+              >
+                <Tile id={p.id} size={22} radius={6} />
+                {SOCIAL_PLATFORMS[p.id].label}
+                <span className="text-xs">{p[key] ? "✓" : "off"}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </NeonCard>
+    );
+  };
   const onStream = s.platforms.filter((p) => p.on && p.name.trim());
   const inPost = s.platforms.filter((p) => p.post && p.name.trim());
   const title = s.postTitle?.trim() || SOCIALS_POST_DEFAULTS.title;
@@ -228,6 +258,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
 
         {tab === "stream" && (
           <>
+            {picker("on", "📺 What shows on stream", "Tap to turn one on or off. This doesn't change the Discord post.")}
             <NeonCard>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
@@ -382,9 +413,11 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
               </div>
             </NeonCard>
 
+            {picker("post", "📋 What's in the post", "Tap to turn one on or off. This doesn't change your stream overlay. Tip: leave Discord off when posting in your own server.")}
+
             <NeonCard>
               <p className="font-medium">👀 How it looks in Discord</p>
-              <p className={`${hint} mb-3`}>Change the platforms in Your names. Untick Post to leave one out.</p>
+              <p className={`${hint} mb-3`}>Names and order come from Your names.</p>
               <div className="rounded-lg bg-[#313338] p-3 sm:p-4 text-[#dbdee1] text-sm">
                 <div className="flex gap-3">
                   <div className="w-10 h-10 shrink-0 rounded-full bg-[#111] bg-[url('/logo-mark.png')] bg-[length:80%] bg-center bg-no-repeat" aria-hidden="true" />
@@ -395,7 +428,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                       <span className="text-[#949ba4] text-xs">Today</span>
                     </p>
                     {inPost.length === 0 ? (
-                      <p className="text-amber-200 text-xs mt-2">Tick Post on a platform in Your names and type its name.</p>
+                      <p className="text-amber-200 text-xs mt-2">Turn on at least one platform in What&apos;s in the post.</p>
                     ) : s.postStyle === "embed" ? (
                       <div className="mt-1.5 max-w-lg rounded border-l-4 border-[#e0a91e] bg-[#2b2d31] p-3 pr-4">
                         <div className="flex gap-3">

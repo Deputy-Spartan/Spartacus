@@ -7,8 +7,8 @@
 <style>
 /* OBS browser source, 1920x1080, see-through background.
    Settings come from the address (setup.html builds it):
-   show=twitch,kick,youtube   which ones, in order. Next to each other with the
-                              same name, they share one name, like the example.
+   show=twitch,kick,youtube   which ones, in order. All the ones with the same
+                              name share one name, wherever they are in the list.
    hold=0       seconds it stays up (0 = stays until you hide it)
    every=0      minutes before it pops up again (0 = once)
    pos=left|center|right, size=100 (percent), and a name per platform: kick=Name&twitch=Name... */
@@ -66,12 +66,14 @@ const row = document.getElementById("row");
 row.className = `row ${pos}`;
 row.style.transform = `${pos === "center" ? "translateX(-50%) " : ""}scale(${size})`;
 
-// Platforms next to each other with the same name share one name.
+// Every platform with the same name shares one name, wherever it is in the list,
+// so there is one group per different name (in the order each name first shows up).
+// Names must match exactly, capitals included, so each shows exactly as typed.
 const groups = [];
 for (const id of show) {
   const name = (q.get(id) || DEFAULT_NAME).trim();
-  const last = groups[groups.length - 1];
-  if (last && last.name.toLowerCase() === name.toLowerCase()) last.ids.push(id);
+  const same = groups.find((g) => g.name === name);
+  if (same) same.ids.push(id);
   else groups.push({ name, ids: [id] });
 }
 

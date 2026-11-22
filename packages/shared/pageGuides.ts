@@ -450,7 +450,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     ],
     members: ["Viewers see the overlay on your stream.", "Members see one post with an icon and a link for each platform."],
     tips: [
-      "Platforms next to each other with the same name share one name on the Sticker overlay.",
+      "Platforms with the same name share one name on the Sticker overlay, wherever they are in the list.",
       "Everything saves by itself, and the overlay on stream updates within about 20 seconds. You never need a new OBS link.",
       "Changed a name? Press Update post and the same Discord message is edited.",
       "The icons in the post are Spartacus's own emojis, so nothing needs uploading.",

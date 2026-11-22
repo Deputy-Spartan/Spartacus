@@ -1813,6 +1813,8 @@ export interface SocialsOverlaySettings {
 export type MoneyCounterSettings = import("@spartacus/shared").MoneyCounter;
 // Streaming › K/D Counter: KILLS / DEATHS for OBS.
 export type KdCounterSettings = import("@spartacus/shared").KdCounter;
+// Streaming › Overlays: Game, Win/Loss, Timer, Goal, Challenge, Discord, Latest.
+export type OverlaySettings = import("@spartacus/shared").OverlayState;
 
 export interface AppealSettingsRow {
   appealChannelId: string | null;
@@ -2806,6 +2808,10 @@ export const api = {
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter`, { method: "PUT", body: JSON.stringify(input) }),
   changeMoney: (guildId: string, change: { add: number } | { set: number }) =>
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter/amount`, { method: "POST", body: JSON.stringify(change) }),
+  getOverlay: (guildId: string, kind: string) => request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}`),
+  saveOverlay: (guildId: string, kind: string, input: OverlaySettings) => request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}`, { method: "PUT", body: JSON.stringify(input) }),
+  overlayAction: (guildId: string, kind: string, action: Record<string, unknown>) =>
+    request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}/action`, { method: "POST", body: JSON.stringify(action) }),
   getKdCounter: (guildId: string) => request<KdCounterSettings>(`/guilds/${guildId}/kd-counter`),
   saveKdCounter: (guildId: string, input: KdCounterSettings) => request<KdCounterSettings>(`/guilds/${guildId}/kd-counter`, { method: "PUT", body: JSON.stringify(input) }),
   changeKd: (guildId: string, change: { stat: "kills" | "deaths"; add: number } | { stat: "kills" | "deaths" | "both"; set: number }) =>

@@ -1,20 +1,27 @@
-// Streaming › Money Counter and K/D Counter: the shared overlay engine.
-// counter.html (OBS) and the dashboard preview use it, and the test pages
-// inline a copy. Sizes are in --u units (1px on the 1400x500 OBS canvas), so
-// a smaller preview just sets a smaller --u.
+// Streaming › Overlays: the shared overlay engine for every counter and box
+// (money, K/D, win/loss, challenge, timer, goal, game, Discord, latest
+// follower). counter.html (OBS) and the dashboard preview use it, and the test
+// pages inline a copy. Sizes are in --u units (1px on the 1400x500 OBS
+// canvas), so a smaller preview just sets a smaller --u.
 //
 //   const fx = CounterFX.mount(rootElement);
-//   fx.set(settings, values);  // values: { amount } or { kills, deaths, streak }
-//   fx.demo(key, diff);        // plays an animation without changing the numbers
+//   fx.set(settings, values);  // see VALUES below for each kind
+//   fx.demo(key, diff);        // plays an animation without changing anything
 //
-// Settings are listed in packages/shared/counters.ts.
+// VALUES by kind:
+//   money { amount }            kd { kills, deaths, streak }
+//   winloss { wins, losses, streak }   challenge { count }
+//   timer { timer: { running, base, t0 } }  (base = ms left, or ms counted, at t0)
+//   goal { cur, target }        game { game }
+//   discord { members, online } ticker { type: "follow"|"sub"|"raid", name, recent: [] }
 (function () {
   const CSS = `
 .cfx { --u: 1px; --kc: #f9c933; --dc: #ffffff; --up: #4ade80; --down: #f87171; --gold: #f9c933; --ow: 1; --dsize: 1; --rad: calc(var(--u) * 20);
   --font: "Lilita One", "Arial Black", sans-serif; position: relative; overflow: hidden; }
 .cfx-place { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--scale, 1)); }
-.cfx-place.at-right { left: 36%; }
-.cfx-place.at-left { left: 64%; }
+/* The +/- on one side: pin the box to the other edge so it never runs off. */
+.cfx-place.at-right { left: 4%; transform: translate(0, -50%) scale(var(--scale, 1)); transform-origin: left center; }
+.cfx-place.at-left { left: auto; right: 4%; transform: translate(0, -50%) scale(var(--scale, 1)); transform-origin: right center; }
 .cfx-overlay { position: relative; }
 .cfx-overlay.bob { animation: cfx-bob 3s ease-in-out infinite; }
 @keyframes cfx-bob { 0%, 100% { transform: translateY(0) rotate(-.6deg); } 50% { transform: translateY(calc(var(--u) * -14)) rotate(.6deg); } }
@@ -35,6 +42,7 @@
 .cfx-box.look-glass { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.35); box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 30) rgba(0,0,0,.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .cfx-box.look-military { background: linear-gradient(180deg, #4b5320 0%, #2f3514 100%); border-color: #1a1d0a; box-shadow: inset 0 calc(var(--u) * 2) 0 rgba(255,255,255,.15), 0 calc(var(--u) * 10) calc(var(--u) * 22) rgba(0,0,0,.5); }
 .cfx-box.look-red { background: linear-gradient(180deg, #7f1d1d 0%, #3b0a0a 100%); border-color: #1a0505; }
+.cfx-box.look-discord { background: linear-gradient(180deg, #5865f2 0%, #3c45c9 100%); border-color: #1e2266; }
 .cfx-box.look-none { background: none; border-color: transparent; box-shadow: none; }
 .cfx-box.shine { overflow: visible; }
 .cfx-box.shine::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
@@ -53,9 +61,10 @@
 .cfx-label:empty { display: none; }
 .cfx-num { display: flex; font-size: calc(var(--u) * 104); margin-top: calc(var(--u) * 2); color: var(--kc); font-variant-numeric: tabular-nums;
   -webkit-text-stroke: calc(var(--u) * 12 * var(--ow)) #111; paint-order: stroke fill; text-shadow: 0 calc(var(--u) * 6 * var(--ow)) 0 #111; transition: color .2s; }
-.ow-0 .cfx-num, .ow-0 .cfx-label { filter: drop-shadow(0 calc(var(--u) * 4) calc(var(--u) * 6) rgba(0,0,0,.7)); }
-.cfx-stat.deaths .cfx-num { color: var(--dc); }
-.cfx-stat.ratio .cfx-num { color: #fff; }
+.ow-0 .cfx-num, .ow-0 .cfx-label, .ow-0 .cfx-sub { filter: drop-shadow(0 calc(var(--u) * 4) calc(var(--u) * 6) rgba(0,0,0,.7)); }
+.cfx-stat.deaths .cfx-num, .cfx-stat.losses .cfx-num { color: var(--dc); }
+.cfx-stat.ratio .cfx-num, .cfx-stat.winrate .cfx-num { color: #fff; }
+.cfx-stat.game .cfx-num, .cfx-stat.ticker .cfx-num, .cfx-stat.discord .cfx-num { font-size: calc(var(--u) * 84); }
 .cfx-num.flash-up { color: var(--up) !important; }
 .cfx-num.flash-down { color: var(--down) !important; }
 .cfx-num.glitch { animation: cfx-glitch .1s steps(2) infinite; }
@@ -65,6 +74,23 @@
 .cfx-col { display: inline-block; height: 1.12em; overflow: hidden; }
 .cfx-strip { display: flex; flex-direction: column; }
 .cfx-strip span, .cfx-ch { height: 1.12em; line-height: 1.12em; }
+.cfx-main { display: flex; flex-direction: column; align-items: center; }
+.lay-line .cfx-main { align-items: flex-start; }
+.cfx-row { display: flex; align-items: center; gap: calc(var(--u) * 16); }
+.cfx-icon { font-size: calc(var(--u) * 66); line-height: 1; display: inline-grid; place-items: center; filter: drop-shadow(0 calc(var(--u) * 4) calc(var(--u) * 4) rgba(0,0,0,.6)); }
+.cfx-icon svg { width: calc(var(--u) * 72); height: calc(var(--u) * 72); }
+.cfx-sub { margin-top: calc(var(--u) * 8); font-size: calc(var(--u) * 28); letter-spacing: .04em; color: #d6dae1; -webkit-text-stroke: calc(var(--u) * 5 * var(--ow)) #000; paint-order: stroke fill; }
+.cfx-sub:empty { display: none; }
+.look-gold .cfx-sub, .look-clean .cfx-sub { color: #2a2a2a; -webkit-text-stroke: 0; }
+/* Goal: a bar under the number */
+.cfx-stat.goal { min-width: calc(var(--u) * 440); }
+.cfx-stat.goal .cfx-num { font-size: calc(var(--u) * 76); }
+.cfx-bar { position: relative; width: 100%; height: calc(var(--u) * 30); margin-top: calc(var(--u) * 12); border-radius: 999px; background: rgba(0,0,0,.55); border: calc(var(--u) * 3) solid #000; overflow: hidden; }
+.cfx-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: linear-gradient(180deg, color-mix(in srgb, var(--kc) 70%, #fff), var(--kc) 55%, color-mix(in srgb, var(--kc) 70%, #000)); box-shadow: 0 0 calc(var(--u) * 14) var(--kc); }
+.cfx-fill::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, rgba(255,255,255,.22) 0 calc(var(--u) * 12), transparent calc(var(--u) * 12) calc(var(--u) * 24)); animation: cfx-stripes 1.2s linear infinite; }
+@keyframes cfx-stripes { from { background-position: 0 0; } to { background-position: calc(var(--u) * 34) 0; } }
+/* Timer: the last seconds */
+.cfx-num.urgent { color: var(--down) !important; }
 
 .cfx-spot { --dscale: 1; position: absolute; pointer-events: none; z-index: 4; }
 .cfx-spot.right { left: 100%; top: 50%; transform: translateY(-50%); margin-left: calc(var(--u) * 18); }
@@ -85,7 +111,6 @@
 .cfx-spark { position: absolute; font-size: calc(var(--u) * 42); pointer-events: none; z-index: 3; }
 .cfx-banner { position: absolute; left: 50%; top: 9%; z-index: 6; font-family: var(--font); font-size: calc(var(--u) * 78); color: var(--gold); white-space: nowrap;
   -webkit-text-stroke: calc(var(--u) * 12) #000; paint-order: stroke fill; text-shadow: 0 calc(var(--u) * 7) 0 #000; pointer-events: none; }
-/* Bullets: a brass round with a hot trail, then a hole and sparks where it hits */
 .cfx-bullet { position: absolute; left: calc(var(--u) * -46); top: calc(var(--u) * -5); width: calc(var(--u) * 46); height: calc(var(--u) * 10); transform-origin: 100% 50%;
   border-radius: 0 999px 999px 0; pointer-events: none; z-index: 5;
   background: linear-gradient(90deg, rgba(255,200,80,0) 0%, rgba(255,210,110,.55) 45%, #c9932e 72%, #f5d27a 86%, #8a6115 100%);
@@ -95,9 +120,10 @@
     radial-gradient(circle, #050505 0 26%, #2a2a2a 31%, rgba(90,90,90,.85) 38%, rgba(0,0,0,0) 56%),
     repeating-conic-gradient(from 12deg, rgba(20,20,20,.75) 0 5deg, rgba(0,0,0,0) 5deg 44deg); }
 .cfx-shard { position: absolute; width: calc(var(--u) * 16); height: calc(var(--u) * 3); margin-top: calc(var(--u) * -1.5); border-radius: 2px; background: #ffd66b; box-shadow: 0 0 calc(var(--u) * 6) #ffb020; transform-origin: 0 50%; pointer-events: none; z-index: 5; }
-@media (prefers-reduced-motion: reduce) { .cfx-overlay.bob, .cfx-overlay.pulse .cfx-box, .cfx-box.shine::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .cfx-overlay.bob, .cfx-overlay.pulse .cfx-box, .cfx-box.shine::after, .cfx-fill::after { animation: none; } }
 `;
 
+  const DISCORD_SVG = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.2a18.3 18.3 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.4C.6 9 0 13.6.3 18.1a19.9 19.9 0 0 0 6 3l1.3-2a13 13 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 11.8 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.8 19.8 0 0 0 6-3c.4-5.3-.7-9.8-3.4-13.7zM8.5 15.4c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4zm7 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4z"/></svg>';
   const FONTS = {
     lilita: '"Lilita One", "Arial Black", sans-serif',
     bangers: '"Bangers", "Arial Black", sans-serif',
@@ -111,13 +137,28 @@
 
   const DEFAULTS = {
     kind: "money", size: 100, anim: "bounce", spot: "right", look: "dark", font: "lilita", corners: "round", outline: "thick", idle: "none",
-    color: "#f9c933", dstyle: "text", dsize: 1, speed: 1, sound: "off", volume: 0.6,
+    color: "#f9c933", dstyle: "text", dsize: 1, speed: 1, sound: "off", volume: 0.6, layout: "side",
     // money
-    label: "TOTAL MONEY", prefix: "$", suffix: "", bigwin: true, short: false, layout: "side",
-    // kills & deaths
+    label: "TOTAL MONEY", prefix: "$", suffix: "", bigwin: true, short: false,
+    // two-stat counters (kills & deaths, wins & losses)
     dcolor: "#ffffff", colors: "kd", dtext: "num", ratio: true, streakOn: true, streakEvery: 5,
     killsLabel: "KILLS", deathsLabel: "DEATHS", ratioLabel: "K/D",
+    winsLabel: "WINS", lossesLabel: "LOSSES", rateLabel: "WIN %",
+    // challenge
+    chLabel: "SQUATS OWED", upBad: false,
+    // timer
+    timerLabel: "STARTING SOON", timerMode: "down", doneText: "⏰ TIME'S UP!", finalFlash: true,
+    // goal
+    goalLabel: "FOLLOWER GOAL", goalDone: "🎉 GOAL REACHED!", showPct: false,
+    // game
+    gameLabel: "NOW PLAYING", icon: "🎮", sub: "", uppercase: false, tag: "NEW GAME", showTag: true,
+    // discord
+    discordLabel: "JOIN THE DISCORD", invite: "discord.gg/yourcode", showOnline: true,
+    // latest follower / sub / raid
+    followLabel: "LATEST FOLLOWER", subLabel: "LATEST SUB", raidLabel: "LATEST RAID", showRecent: true,
   };
+  const TEXT_KINDS = ["game", "ticker"];
+  const ICON_KINDS = ["game", "ticker", "challenge", "discord"];
 
   function injectCSS() {
     if (document.getElementById("cfx-css")) return;
@@ -137,7 +178,7 @@
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let s = { ...DEFAULTS };
-    let v = { amount: 0, kills: 0, deaths: 0, streak: 0 };
+    let v = { amount: 0, kills: 0, deaths: 0, wins: 0, losses: 0, streak: 0, count: 0, cur: 0, target: 1000, members: 0, online: 0, game: "", type: "follow", name: "", recent: [], timer: { running: false, base: 0, t0: 0 } };
     let cells = {};
     let built = "";
     let started = false;
@@ -156,28 +197,106 @@
       const gone = () => (el._spot || el).remove();
       a.finished.then(gone).catch(gone);
     };
+    const num = (n) => Math.abs(Math.round(n)).toLocaleString("en-US");
 
     // ---- What's shown ----
-    const keys = () => (s.kind === "kd" ? ["kills", "deaths", ...(s.ratio ? ["ratio"] : [])] : ["amount"]);
-    const valueOf = (k) => (k === "ratio" ? v.kills / Math.max(1, v.deaths) : Number(v[k]) || 0);
-    const labelOf = (k) => ({ amount: s.label, kills: s.killsLabel, deaths: s.deathsLabel, ratio: s.ratioLabel })[k] ?? "";
+    function keys() {
+      switch (s.kind) {
+        case "kd": return ["kills", "deaths", ...(s.ratio ? ["ratio"] : [])];
+        case "winloss": return ["wins", "losses", ...(s.ratio ? ["winrate"] : [])];
+        case "money": return ["amount"];
+        default: return [{ challenge: "count", timer: "timer", goal: "goal", game: "game", discord: "discord", ticker: "ticker" }[s.kind] || "amount"];
+      }
+    }
+    function timerMs(T) {
+      const t = T || {};
+      const run = t.running ? Date.now() - (Number(t.t0) || Date.now()) : 0;
+      return s.timerMode === "up" ? (Number(t.base) || 0) + run : Math.max(0, (Number(t.base) || 0) - run);
+    }
+    function valueOf(k, vals = v) {
+      switch (k) {
+        case "game": return String(vals.game ?? "");
+        case "ticker": return String(vals.name ?? "");
+        case "ratio": return vals.kills / Math.max(1, vals.deaths);
+        case "winrate": return vals.wins + vals.losses ? vals.wins / (vals.wins + vals.losses) : 0;
+        case "timer": return timerMs(vals.timer);
+        case "goal": return Number(vals.cur) || 0;
+        case "discord": return Number(vals.members) || 0;
+        default: return Number(vals[k]) || 0;
+      }
+    }
+    function labelOf(k) {
+      if (k === "ticker") return v.type === "sub" ? s.subLabel : v.type === "raid" ? s.raidLabel : s.followLabel;
+      return ({ amount: s.label, kills: s.killsLabel, deaths: s.deathsLabel, ratio: s.ratioLabel, wins: s.winsLabel, losses: s.lossesLabel, winrate: s.rateLabel,
+        count: s.chLabel, timer: s.timerLabel, goal: s.goalLabel, game: s.gameLabel, discord: s.discordLabel })[k] ?? "";
+    }
     function shortNum(n) {
       const a = Math.abs(n);
       const [d, u] = a >= 1e9 ? [1e9, "B"] : a >= 1e6 ? [1e6, "M"] : a >= 1e4 ? [1e3, "K"] : [1, ""];
       return d === 1 ? Math.round(a).toLocaleString("en-US") : (a / d).toFixed(a / d >= 100 ? 0 : 1).replace(/\.0$/, "") + u;
     }
-    const moneyBody = (n) => (s.short ? shortNum(n) : Math.abs(Math.round(n)).toLocaleString("en-US"));
-    function textOf(k, n) {
-      if (k === "ratio") return n.toFixed(2);
-      if (k === "amount") return `${n < 0 ? "-" : ""}${s.prefix}${moneyBody(n)}${s.suffix}`;
-      return String(Math.round(n));
+    const moneyBody = (n) => (s.short ? shortNum(n) : num(n));
+    function clock(ms) {
+      const t = Math.max(0, s.timerMode === "up" ? Math.floor(ms / 1000) : Math.ceil(ms / 1000));
+      const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+      return h ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`;
     }
-    const isGood = (k, diff) => (s.kind === "kd" && s.colors === "kd" ? k === "kills" : diff > 0);
+    function textOf(k, n) {
+      switch (k) {
+        case "game": case "ticker": return s.uppercase ? String(n).toUpperCase() : String(n);
+        case "discord": return s.invite;
+        case "ratio": return n.toFixed(2);
+        case "winrate": return `${Math.round(n * 100)}%`;
+        case "amount": return `${n < 0 ? "-" : ""}${s.prefix}${moneyBody(n)}${s.suffix}`;
+        case "timer": return clock(n);
+        case "goal": {
+          const t = Number(v.target) || 0;
+          return `${num(n)} / ${num(t)}${s.showPct && t ? ` · ${Math.min(999, Math.round((n / t) * 100))}%` : ""}`;
+        }
+        default: return num(n);
+      }
+    }
+    function subOf(k) {
+      if (k === "game") return s.sub;
+      if (k === "discord") return `👥 ${num(v.members)} members${s.showOnline ? `  ·  🟢 ${num(v.online)} online` : ""}`;
+      if (k === "ticker") return s.showRecent && v.recent?.length ? `Also: ${v.recent.slice(0, 3).join(" · ")}` : "";
+      return "";
+    }
+    const firstStat = { kd: "kills", winloss: "wins" };
+    function isGood(k, diff) {
+      if (TEXT_KINDS.includes(k) || k === "discord") return true;
+      if ((s.kind === "kd" || s.kind === "winloss") && s.colors === "kd") return k === firstStat[s.kind];
+      if (k === "count" && s.upBad) return diff < 0;
+      return diff > 0;
+    }
     function deltaText(k, diff) {
       const sign = diff > 0 ? "+" : "-";
-      if (k === "amount") return `${sign}${s.prefix}${moneyBody(diff)}${s.suffix}`;
-      const word = s.dtext === "word" ? (k === "kills" ? " KILL" : " DEATH") + (Math.abs(diff) === 1 ? "" : "S") : "";
-      return `${sign}${Math.abs(diff)}${word}`;
+      switch (k) {
+        case "game": return s.tag || "NEW GAME";
+        case "ticker": return v.type === "sub" ? "NEW SUB!" : v.type === "raid" ? "RAID!" : "NEW FOLLOWER!";
+        case "discord": return diff > 0 ? `+${Math.abs(diff)} 👋` : `-${Math.abs(diff)}`;
+        case "amount": return `${sign}${s.prefix}${moneyBody(diff)}${s.suffix}`;
+        case "timer": return `${sign}${clock(Math.abs(diff))}`;
+      }
+      const words = { kills: "KILL", deaths: "DEATH", wins: "WIN", losses: "LOSS" };
+      const plural = (w) => (Math.abs(diff) === 1 ? w : w === "LOSS" ? "LOSSES" : w + "S");
+      const word = s.dtext === "word" && words[k] ? " " + plural(words[k]) : "";
+      return `${sign}${num(diff)}${word}`;
+    }
+    // What rains, bursts and sparkles for each thing.
+    function iconFor(k, diff) {
+      switch (k) {
+        case "amount": return diff > 0 ? "💵" : "💸";
+        case "kills": return diff > 0 ? "🔥" : "↩️";
+        case "deaths": return diff > 0 ? "💀" : "↩️";
+        case "wins": return diff > 0 ? "🏆" : "↩️";
+        case "losses": return diff > 0 ? "❌" : "↩️";
+        case "timer": return "⏰";
+        case "goal": return "🎉";
+        case "discord": return "👋";
+        case "count": return s.icon || "🔥";
+        default: return s.icon || "🎮";
+      }
     }
 
     function drawLook() {
@@ -192,7 +311,7 @@
       overlay.classList.toggle("bob", s.anim === "float" || s.idle === "float");
       overlay.classList.toggle("pulse", s.idle === "pulse");
       root.classList.toggle("ow-0", s.outline === "none");
-      const lay = s.kind === "kd" ? s.layout : s.layout === "line" ? "line" : "side";
+      const lay = s.kind === "kd" || s.kind === "winloss" ? s.layout : s.layout === "line" ? "line" : "side";
       box.className = `cfx-box look-${s.look} lay-${lay}${s.idle === "shine" ? " shine" : ""}`;
     }
 
@@ -207,11 +326,55 @@
         l.textContent = labelOf(k);
         const n = document.createElement("div");
         n.className = "cfx-num";
-        n.textContent = textOf(k, valueOf(k));
-        c.append(l, n);
+        const cell = { cell: c, num: n, label: l, shown: valueOf(k), raf: 0, sub: null, fill: null };
+        const hasIcon = ICON_KINDS.includes(k === "count" ? "challenge" : k) && (k === "discord" || s.icon);
+        const hasSub = ["game", "discord", "ticker"].includes(k);
+        if (hasIcon || hasSub || k === "goal") {
+          const main = document.createElement("div");
+          main.className = "cfx-main";
+          const row = document.createElement("div");
+          row.className = "cfx-row";
+          if (hasIcon) {
+            const ic = document.createElement("span");
+            ic.className = "cfx-icon";
+            if (k === "discord") ic.innerHTML = DISCORD_SVG; else ic.textContent = s.icon;
+            row.appendChild(ic);
+          }
+          row.appendChild(n);
+          main.appendChild(row);
+          if (k === "goal") {
+            const bar = document.createElement("div");
+            bar.className = "cfx-bar";
+            const fill = document.createElement("div");
+            fill.className = "cfx-fill";
+            bar.appendChild(fill);
+            main.appendChild(bar);
+            cell.fill = fill;
+          }
+          if (hasSub) {
+            const sub = document.createElement("div");
+            sub.className = "cfx-sub";
+            main.appendChild(sub);
+            cell.sub = sub;
+          }
+          c.append(l, main);
+        } else c.append(l, n);
         box.appendChild(c);
-        cells[k] = { cell: c, num: n, shown: valueOf(k), raf: 0 };
+        cells[k] = cell;
+        paint(k, cell.shown);
       }
+    }
+    // Draws one stat at a value (also its bar and second line).
+    function paint(k, val) {
+      const c = cells[k];
+      if (!c) return;
+      c.num.textContent = textOf(k, val);
+      if (c.fill) {
+        const t = Number(v.target) || 0;
+        c.fill.style.width = `${t ? Math.max(0, Math.min(100, (val / t) * 100)) : 0}%`;
+      }
+      if (c.sub) c.sub.textContent = subOf(k);
+      if (k === "ticker") c.label.textContent = labelOf(k);
     }
 
     // ---- Number drawing ----
@@ -220,22 +383,45 @@
       if (!c) return;
       const to = valueOf(k), from = c.shown;
       cancelAnimationFrame(c.raf);
-      if (reduce || from === to) { c.shown = to; c.num.textContent = textOf(k, to); return; }
+      if (typeof to === "string" || k === "timer" || reduce || from === to) { c.shown = to; paint(k, to); return; }
       const t0 = performance.now(), ms = 900 / speed();
       const step = (t) => {
         const p = Math.min(1, (t - t0) / ms);
         c.shown = from + (to - from) * (1 - Math.pow(1 - p, 3));
-        c.num.textContent = textOf(k, p === 1 ? to : c.shown);
+        paint(k, p === 1 ? to : c.shown);
         if (p < 1) c.raf = requestAnimationFrame(step); else c.shown = to;
       };
       c.raf = requestAnimationFrame(step);
     }
-    function drawSlot(k, prevText) {
+    // Text: the letters scramble, then land one by one from the left.
+    function scramble(k) {
       const c = cells[k];
       if (!c) return;
       cancelAnimationFrame(c.raf);
-      const t = textOf(k, valueOf(k));
       c.shown = valueOf(k);
+      paint(k, c.shown);
+      const target = c.num.textContent;
+      if (reduce) return;
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&@";
+      const t0 = performance.now(), ms = (500 + target.length * 45) / speed();
+      const step = (t) => {
+        const p = Math.min(1, (t - t0) / ms);
+        const fixed = Math.floor(p * target.length);
+        let out = "";
+        for (let i = 0; i < target.length; i++) out += i < fixed || /[\s/·:,.%]/.test(target[i]) ? target[i] : chars[Math.floor(Math.random() * chars.length)];
+        c.num.textContent = out;
+        if (p < 1) c.raf = requestAnimationFrame(step);
+      };
+      c.raf = requestAnimationFrame(step);
+    }
+    function drawSlot(k, prevText) {
+      if (typeof valueOf(k) === "string" || k === "discord" || k === "timer") return scramble(k);
+      const c = cells[k];
+      if (!c) return;
+      cancelAnimationFrame(c.raf);
+      c.shown = valueOf(k);
+      paint(k, c.shown);
+      const t = c.num.textContent;
       c.num.textContent = "";
       const strips = [];
       [...t].forEach((ch, i) => {
@@ -266,13 +452,14 @@
       n._t = setTimeout(() => n.classList.remove("flash-up", "flash-down"), ms / speed());
     }
 
-    // ---- The +/- amount, in the chosen spot around the stat that changed ----
+    // ---- The +/- (or tag), in the chosen spot around the stat that changed ----
     function makeDelta(k, diff) {
       const sp = document.createElement("div");
       sp.className = "cfx-spot " + s.spot;
       const d = document.createElement("div");
       d.className = "cfx-delta " + (isGood(k, diff) ? "up" : "down") + (s.dstyle === "pill" ? " pill" : "");
       d.textContent = deltaText(k, diff);
+      if (TEXT_KINDS.includes(k) && !s.showTag) d.style.display = "none";
       sp.appendChild(d);
       cells[k].cell.appendChild(sp);
       d._spot = sp;
@@ -316,7 +503,11 @@
     }
     function bits(k, diff) {
       const u = U(), cell = cells[k].cell;
-      const ch = (i) => s.kind === "kd" ? (k === "deaths" && diff > 0 ? "💀" : diff > 0 ? "+1" : "-1") : i % 3 === 0 ? (diff > 0 ? "+" : "-") : s.prefix.trim() || "$";
+      const ch = (i) => {
+        if (k === "amount") return i % 3 === 0 ? (diff > 0 ? "+" : "-") : s.prefix.trim() || "$";
+        if (["kills", "deaths", "wins", "losses", "count", "goal"].includes(k)) return i % 2 ? iconFor(k, diff) : diff > 0 ? "+1" : "-1";
+        return i % 2 ? "★" : iconFor(k, diff);
+      };
       for (let i = 0; i < 16; i++) {
         const b = document.createElement("div");
         b.className = "cfx-bit"; b.textContent = ch(i); b.style.color = isGood(k, diff) ? "var(--up)" : "var(--down)";
@@ -330,6 +521,19 @@
         ], { duration: 900 + Math.random() * 300, easing: "cubic-bezier(.2,.7,.4,1)" }), b);
       }
     }
+    function rainDown(ch, n = 22) {
+      const u = U(), h = root.clientHeight;
+      for (let i = 0; i < n; i++) {
+        const e = document.createElement("div");
+        e.className = "cfx-drop"; e.textContent = ch;
+        e.style.left = Math.random() * 95 + "%";
+        root.appendChild(e);
+        done(play(e, [
+          { transform: `translateY(0) rotate(${rnd() * 30}deg)` },
+          { transform: `translate(${rnd() * 40 * u}px, ${h + 180 * u}px) rotate(${rnd() * 180}deg)` },
+        ], { duration: 1400 + Math.random() * 900, delay: Math.random() * 500, easing: "cubic-bezier(.4,.1,.7,1)" }), e);
+      }
+    }
 
     // Bullets fly in from one side and hit the wall around the stat: a hole,
     // sparks, and a little kick on the box.
@@ -337,7 +541,7 @@
       const u = U();
       const rr = root.getBoundingClientRect(), cr = cells[k].cell.getBoundingClientRect();
       const fromLeft = Math.random() < 0.5;
-      const n = Math.min(8, Math.max(3, Math.abs(diff) + 3));
+      const n = Math.min(8, Math.max(3, Math.abs(Number(diff) || 1) + 3));
       for (let i = 0; i < n; i++) {
         later(() => {
           const x = cr.left - rr.left + (Math.random() * 1.5 - 0.25) * cr.width;
@@ -352,10 +556,7 @@
             { transform: `translate(${x0}px, ${y0}px) rotate(${ang}deg)` },
             { transform: `translate(${x}px, ${y}px) rotate(${ang}deg)` },
           ], { duration: 170, easing: "linear", fill: "forwards" });
-          a.finished.then(() => {
-            b.remove();
-            impact(x, y, ang, u, isGood(k, diff));
-          }).catch(() => b.remove());
+          a.finished.then(() => { b.remove(); impact(x, y, ang, u, isGood(k, diff)); }).catch(() => b.remove());
         }, i * 120);
       }
     }
@@ -382,11 +583,10 @@
           { opacity: 0, transform: `rotate(${back}deg) translateX(${dist}px) scaleX(.3)` },
         ], { duration: 320, easing: "ease-out", fill: "forwards" }), sh);
       }
-      const sc = scale();
-      play(place, [
-        { transform: `translate(-50%, -50%) scale(${sc})` },
-        { transform: `translate(calc(-50% + ${rnd() * 8 * u}px), calc(-50% + ${rnd() * 6 * u}px)) scale(${sc})` },
-        { transform: `translate(-50%, -50%) scale(${sc})` },
+      play(box, [
+        { transform: "none" },
+        { transform: `translate(${rnd() * 8 * u}px, ${rnd() * 6 * u}px)` },
+        { transform: "none" },
       ], { duration: 110, fill: "none" });
       sound("shot");
     }
@@ -448,21 +648,12 @@
       },
       rain(k, diff) {
         countTo(k); flash(k, diff, 800);
-        const u = U(), w = root.clientWidth, h = root.clientHeight;
-        const ch = s.kind === "kd" ? (diff < 0 ? "↩️" : k === "kills" ? "🔥" : "💀") : diff > 0 ? "💵" : "💸";
-        for (let i = 0; i < 22; i++) {
-          const e = document.createElement("div");
-          if (diff > 0 || s.kind === "kd") {
-            e.className = "cfx-drop"; e.textContent = ch;
-            e.style.left = Math.random() * 95 + "%";
-            root.appendChild(e);
-            done(play(e, [
-              { transform: `translateY(0) rotate(${rnd() * 30}deg)` },
-              { transform: `translate(${rnd() * 40 * u}px, ${h + 180 * u}px) rotate(${rnd() * 180}deg)` },
-            ], { duration: 1400 + Math.random() * 900, delay: Math.random() * 500, easing: "cubic-bezier(.4,.1,.7,1)" }), e);
-          } else {
-            // Taking money away: bills fly off from the box.
-            e.className = "cfx-fly"; e.textContent = ch;
+        if (k === "amount" && diff < 0) {
+          // Taking money away: bills fly off from the box.
+          const u = U(), w = root.clientWidth, h = root.clientHeight;
+          for (let i = 0; i < 22; i++) {
+            const e = document.createElement("div");
+            e.className = "cfx-fly"; e.textContent = "💸";
             cells[k].cell.appendChild(e);
             const x = rnd() * w * 0.4, y = -Math.random() * h * 0.45 - 40 * u;
             done(play(e, [
@@ -470,7 +661,7 @@
               { transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(1) rotate(${x / 6 / u}deg)`, opacity: 0 },
             ], { duration: 1200 + Math.random() * 500, delay: Math.random() * 300, easing: "ease-out" }), e);
           }
-        }
+        } else rainDown(iconFor(k, diff));
         rise(k, diff);
       },
       bullets(k, diff) {
@@ -482,7 +673,7 @@
         countTo(k); flash(k, diff, 1200);
         const cell = cells[k].cell;
         glow(cell, 1500); shake(cell);
-        sparkles(cell, s.kind === "kd" && k === "deaths" && diff > 0 ? "💀" : diff > 0 ? "✨" : "💥");
+        sparkles(cell, isGood(k, diff) ? "✨" : iconFor(k, diff) === "💀" ? "💀" : "💥");
         const d = makeDelta(k, diff);
         done(play(d, [
           { opacity: 0, transform: "scale(0) rotate(-20deg)" }, { opacity: 1, transform: "scale(1.5) rotate(6deg)", offset: .18 },
@@ -552,6 +743,9 @@
       ding() { tone(1320, 0, 0.7, "sine", 0.35); tone(2640, 0, 0.35, "sine", 0.08); },
       down() { tone(420, 0, 0.14, "triangle", 0.3, 300); tone(300, 0.12, 0.3, "triangle", 0.3, 180); },
       shot() { noise(0, 0.12, 0.5, "lowpass", 2500); },
+      whoosh() { noise(0, 0.45, 0.5, "bandpass", 900); tone(220, 0, 0.4, "sine", 0.15, 660); },
+      fanfare() { tone(523, 0, 0.14, "square", 0.1); tone(659, 0.13, 0.14, "square", 0.1); tone(784, 0.26, 0.14, "square", 0.1); tone(1047, 0.39, 0.5, "square", 0.12); },
+      tick() { tone(1000, 0, 0.05, "square", 0.08); },
     };
     function sound(name) {
       if (s.sound === "off") return;
@@ -559,14 +753,15 @@
       (SOUNDS[name] || (() => null))();
     }
 
-    // Streak banner: every N kills without dying.
-    function banner(n) {
+    // Big banners: streaks, goal reached, time's up.
+    function banner(text, cellKey) {
       const b = document.createElement("div");
       b.className = "cfx-banner";
-      b.textContent = `🔥 ${n} KILL STREAK!`;
+      b.textContent = text;
       root.appendChild(b);
-      if (cells.kills) { glow(cells.kills.cell, 1600); sparkles(cells.kills.cell, "✨", 10); }
-      sound("ding");
+      const c = cells[cellKey || keys()[0]];
+      if (c) { glow(c.cell, 1600); sparkles(c.cell, "✨", 10); }
+      if (s.sound !== "off") SOUNDS.fanfare();
       done(play(b, [
         { opacity: 0, transform: "translateX(-50%) scale(0) rotate(-10deg)" },
         { opacity: 1, transform: "translateX(-50%) scale(1.25) rotate(3deg)", offset: .15 },
@@ -575,6 +770,7 @@
         { opacity: 0, transform: "translateX(-50%) translateY(-30px) scale(1)" },
       ], { duration: 2600, easing: "ease-out" }), b);
     }
+    const streakText = (n) => (s.kind === "winloss" ? `🏆 ${n} WIN STREAK!` : `🔥 ${n} KILL STREAK!`);
 
     function celebrate(k, diff, prevText) {
       if (!cells[k]) return;
@@ -586,27 +782,81 @@
       if (s.kind === "money" && s.bigwin && diff >= 1000000 && s.anim !== "jackpot") { glow(cells[k].cell, 1400); sparkles(cells[k].cell, "✨"); }
     }
 
+    // ---- The timer ticks by itself ----
+    let lastSec = null;
+    setInterval(() => {
+      if (s.kind !== "timer" || !cells.timer || !started) return;
+      const c = cells.timer;
+      const ms = timerMs(v.timer);
+      if (!c.num.querySelector(".cfx-col") && !c.raf) paint("timer", ms);
+      const running = !!v.timer?.running;
+      const sec = Math.ceil(ms / 1000);
+      if (s.timerMode === "down" && running && sec !== lastSec) {
+        if (s.finalFlash && sec > 0 && sec <= 10) {
+          c.num.classList.add("urgent");
+          play(c.num, [{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }], { duration: 300, easing: "ease-out", fill: "none" });
+          if (s.sound !== "off") SOUNDS.tick();
+        }
+        if (sec === 0 && lastSec > 0) { c.num.classList.remove("urgent"); banner(s.doneText || "⏰ TIME'S UP!", "timer"); }
+      }
+      if (sec > 10 || !running) c.num.classList.remove("urgent");
+      lastSec = sec;
+    }, 200);
+
     // ---- Public ----
     function set(next, vals) {
       const oldV = v;
       s = { ...s, ...(next || {}) };
       v = { ...v, ...(vals || {}) };
       drawLook();
-      const shape = JSON.stringify([s.kind, s.ratio, s.layout, s.label, s.killsLabel, s.deathsLabel, s.ratioLabel, s.prefix, s.suffix, s.short]);
+      const shape = JSON.stringify([s.kind, s.ratio, s.layout, s.label, s.killsLabel, s.deathsLabel, s.ratioLabel, s.winsLabel, s.lossesLabel, s.rateLabel,
+        s.prefix, s.suffix, s.short, s.gameLabel, s.icon, s.sub, s.uppercase, s.chLabel, s.timerLabel, s.goalLabel, s.discordLabel, s.invite, s.showOnline, s.showPct, s.showRecent,
+        s.followLabel, s.subLabel, s.raidLabel, s.timerMode]);
       if (shape !== built || !started) {
         built = shape;
         build();
         return;
       }
-      for (const k of keys()) {
-        if (k === "ratio") continue;
-        const diff = (Number(v[k]) || 0) - (Number(oldV[k]) || 0);
-        if (diff) celebrate(k, diff, textOf(k, Number(oldV[k]) || 0));
+      const old = (k) => valueOf(k, oldV);
+      switch (s.kind) {
+        case "game":
+          if (old("game") !== valueOf("game")) celebrate("game", 1, textOf("game", old("game")));
+          return;
+        case "ticker":
+          if (old("ticker") !== valueOf("ticker") || oldV.type !== v.type) celebrate("ticker", 1, "");
+          else paint("ticker", valueOf("ticker"));
+          return;
+        case "timer": {
+          const diff = valueOf("timer") - old("timer");
+          if (Math.abs(diff) > 1500 && (v.timer?.base !== oldV.timer?.base)) celebrate("timer", diff, textOf("timer", old("timer")));
+          else if (!!v.timer?.running !== !!oldV.timer?.running) play(cells.timer.num, [{ transform: "scale(1)" }, { transform: "scale(1.12)" }, { transform: "scale(1)" }], { duration: 300, fill: "none" });
+          paint("timer", valueOf("timer"));
+          return;
+        }
+        case "goal": {
+          if (v.target !== oldV.target) paint("goal", cells.goal.shown);
+          const diff = valueOf("goal") - old("goal");
+          if (diff) celebrate("goal", diff, textOf("goal", old("goal")));
+          const t = Number(v.target) || 0;
+          if (t && old("goal") < t && valueOf("goal") >= t) later(() => { banner(s.goalDone || "🎉 GOAL REACHED!", "goal"); rainDown("🎉", 18); }, 500);
+          return;
+        }
+        case "discord": {
+          const diff = valueOf("discord") - old("discord");
+          if (diff) celebrate("discord", diff, "");
+          else paint("discord", valueOf("discord"));
+          return;
+        }
       }
-      if (cells.ratio && (v.kills !== oldV.kills || v.deaths !== oldV.deaths)) countTo("ratio");
+      for (const k of keys()) {
+        if (k === "ratio" || k === "winrate") continue;
+        const diff = valueOf(k) - old(k);
+        if (diff) celebrate(k, diff, textOf(k, old(k)));
+      }
+      for (const r of ["ratio", "winrate"]) if (cells[r]) countTo(r);
       const every = Math.max(1, Number(s.streakEvery) || 5);
-      if (s.kind === "kd" && s.streakOn && v.streak > oldV.streak && Math.floor(v.streak / every) > Math.floor(oldV.streak / every)) {
-        later(() => banner(Math.floor(v.streak / every) * every), 400);
+      if ((s.kind === "kd" || s.kind === "winloss") && s.streakOn && v.streak > oldV.streak && Math.floor(v.streak / every) > Math.floor(oldV.streak / every)) {
+        later(() => banner(streakText(Math.floor(v.streak / every) * every), firstStat[s.kind]), 400);
       }
     }
     function start() {
@@ -614,12 +864,16 @@
       build();
       play(box, [{ opacity: 0, transform: "translateY(-16px) scale(.9)" }, { opacity: 1, transform: "translateY(2px) scale(1.03)", offset: 0.7 }, { opacity: 1, transform: "none" }], { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)", fill: "none" });
     }
-    // Plays an animation with a pretend change; the numbers stay the same.
+    // Plays an animation with a pretend change; nothing changes.
     function demo(k, diff) {
       if (!cells[k]) k = keys()[0];
       celebrate(k, diff, textOf(k, valueOf(k)));
     }
-    function streakDemo() { banner(Math.max(1, Number(s.streakEvery) || 5)); }
+    function streakDemo() {
+      if (s.kind === "goal") return banner(s.goalDone || "🎉 GOAL REACHED!", "goal");
+      if (s.kind === "timer") return banner(s.doneText || "⏰ TIME'S UP!", "timer");
+      banner(streakText(Math.max(1, Number(s.streakEvery) || 5)), firstStat[s.kind]);
+    }
 
     drawLook();
     build();

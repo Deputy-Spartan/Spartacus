@@ -166,7 +166,7 @@ export function CounterPreview({
   frameRef,
   children,
 }: {
-  kind: "money" | "kd";
+  kind: string;
   start: Record<string, string>;
   settings: object;
   values: object;

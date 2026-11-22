@@ -1,3 +1,4 @@
+import { OVERLAYS, OVERLAY_KINDS, type OverlayKind } from "./overlays";
 // Step-by-step help for every dashboard page, shown by the Guide button and
 // on the cards !setup-test-modules posts in a test server.
 // Keyed by the page's path after /dashboard/:guildId, matching navItems.ts.
@@ -488,6 +489,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     ],
     tips: ["The tabs at the top of each overlay page switch between them.", "The Money and K/D counters work with the Spartacus Stream Deck plugin."],
   },
+  ...overlayGuides(),
   "/overlays/socials": {
     title: "Socials",
     purpose: "Your names on Twitch, Kick, YouTube, TikTok, X, Discord and Instagram in one place. Show them on stream with an OBS overlay, and post them in Discord as one clean message.",
@@ -765,3 +767,33 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     steps: ["Tap + Post New.", "Enter the Title and Description.", "Tap Post an Update.", "Delete old entries under Posted Updates."],
   },
 };
+
+// Streaming › Overlays › Game, Win/Loss, Timer, Goal bar, Challenge, Discord box
+// and Latest follower: one guide each, built from the same steps.
+function overlayGuides(): Record<string, PageGuide> {
+  const extra: Record<OverlayKind, { step: string; tips: string[] }> = {
+    game: { step: "Type a game and press Show it, or tap one of your recent games.", tips: ["Make a Stream Deck key for each game you play: Spartacus → Game, type the game.", "Scramble makes the letters jumble, then land one by one."] },
+    winloss: { step: "Press +1 under Wins or Losses after each match.", tips: ["A loss ends the win streak.", "Stream Deck: Spartacus → Win / Loss. For a reset key pick Both, type 0 and Set."] },
+    timer: { step: "Pick Down (countdown) or Up (stopwatch), then press Start. +1 min, +5 min and −1 min change it while it runs.", tips: ["In the last 10 seconds it turns red and pulses each second, then your words show.", "Stream Deck: Spartacus → Timer, pick Start / pause, Restart or Add minutes."] },
+    goal: { step: "Type your goal, then use +1 or +10 as you go. Turn on Count Kick follows to have it move by itself.", tips: ["Reaching the goal shows a banner and confetti.", "Stream Deck: Spartacus → Goal Bar."] },
+    challenge: { step: "Type what you're counting (like SQUATS OWED), then use +1 and −1.", tips: ["Turn on Going up is bad for things you owe, so adding shows red.", "Stream Deck: Spartacus → Challenge."] },
+    discord: { step: "Check your invite. Leave it empty to use the Discord invite from Overlays › Socials.", tips: ["The member and online counts come from your server by themselves, about every minute."] },
+    ticker: { step: "Kick follows show by themselves. You can also pick Follower, Sub or Raid, type a name and press Show it.", tips: ["Turn on Show the last 3 to list the ones before.", "Kick follows need Kick set up in Stream Growth."] },
+  };
+  return Object.fromEntries(
+    OVERLAY_KINDS.map((k) => [
+      `/overlays/${k}`,
+      {
+        title: OVERLAYS[k].title,
+        purpose: `${OVERLAYS[k].line} Same looks and animations as the counters.`,
+        steps: [
+          extra[k].step,
+          "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set Width 1400 and Height 500. Drag it where you want it.",
+          "Pick an animation, the look, font, colors and sound under the preview. Each one plays in the preview when you pick it.",
+        ],
+        members: ["Viewers see it on your stream, with an animation each time it changes."],
+        tips: [...extra[k].tips, "The background is see-through on stream. The checkered pattern only shows in the preview."],
+      },
+    ]),
+  );
+}

@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { OVERLAYS as OVERLAY_INFO, OVERLAY_KINDS } from "@spartacus/shared";
 
 // Streaming › Overlays: the three overlays. The hub page shows them as cards,
 // and each overlay's page has them as tabs along the top.
-export const OVERLAYS = [
+export const OVERLAYS: Array<{ href: string; label: string; icon: string; line: string }> = [
   { href: "/overlays/socials", label: "Socials", icon: "🏷️", line: "Your platform names as a lower third, and a socials post in Discord." },
   { href: "/overlays/money", label: "Money Counter", icon: "💰", line: "A TOTAL MONEY box you change with a Stream Deck button." },
   { href: "/overlays/kd", label: "K/D Counter", icon: "🎯", line: "Kills, deaths and K/D, with kill streak banners." },
-] as const;
+  ...OVERLAY_KINDS.map((k) => ({ href: `/overlays/${k}`, label: OVERLAY_INFO[k].title, icon: OVERLAY_INFO[k].icon, line: OVERLAY_INFO[k].line })),
+];
 
 export function OverlayTabs({ guildId }: { guildId: string }) {
   const path = usePathname();

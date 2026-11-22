@@ -1,6 +1,20 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
-import { KD_STATE_KEY, MONEY_STATE_KEY, changeKd, cleanKd, cleanMoney, clampMoney } from "@spartacus/shared";
+import {
+  KD_STATE_KEY,
+  MONEY_STATE_KEY,
+  applyOverlayAction,
+  changeKd,
+  cleanKd,
+  cleanMoney,
+  cleanOverlay,
+  clampMoney,
+  isOverlayKind,
+  mergeOverlayLook,
+  overlayStateKey,
+  type OverlayKind,
+} from "@spartacus/shared";
+import { getBotClient } from "../lib/botClient";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -80,6 +94,65 @@ router.post("/guilds/:guildId/kd-counter/change", requireAuth, requireGuildPermi
 router.get("/public/kd-counter/:guildId", async (req, res) => {
   if (!validGuild(req.params.guildId)) return res.status(404).json({ error: "Not found" });
   res.set("Cache-Control", "no-store").json(await loadKd(req.params.guildId));
+});
+
+// ---- Game, Win/Loss, Timer, Goal, Challenge, Discord box, Latest follower ----
+const loadOverlay = async (guildId: string, kind: OverlayKind) => cleanOverlay(kind, await loadState(guildId, overlayStateKey(kind)));
+
+router.get("/guilds/:guildId/overlay/:kind", requireAuth, requireGuildPermission, async (req, res) => {
+  if (!isOverlayKind(req.params.kind)) return res.status(404).json({ error: "No overlay like that." });
+  res.json(await loadOverlay(req.params.guildId, req.params.kind));
+});
+
+// The look only; the numbers are kept as they are.
+router.put("/guilds/:guildId/overlay/:kind", requireAuth, requireGuildPermission, async (req, res) => {
+  const kind = req.params.kind;
+  if (!isOverlayKind(kind)) return res.status(404).json({ error: "No overlay like that." });
+  const cur = await loadOverlay(req.params.guildId, kind);
+  res.json(await saveState(req.params.guildId, overlayStateKey(kind), mergeOverlayLook(kind, cur, req.body)));
+});
+
+router.post("/guilds/:guildId/overlay/:kind/action", requireAuth, requireGuildPermission, async (req, res) => {
+  const kind = req.params.kind;
+  if (!isOverlayKind(kind)) return res.status(404).json({ error: "No overlay like that." });
+  const next = applyOverlayAction(kind, await loadOverlay(req.params.guildId, kind), (req.body ?? {}) as Record<string, unknown>);
+  if ("error" in next) return res.status(400).json(next);
+  res.json(await saveState(req.params.guildId, overlayStateKey(kind), next));
+});
+
+// Live member and online counts for the Discord box, asked of Discord at most
+// once a minute per server.
+const countCache = new Map<string, { at: number; members: number; online: number }>();
+async function discordCounts(guildId: string) {
+  const hit = countCache.get(guildId);
+  if (hit && Date.now() - hit.at < 60_000) return hit;
+  const client = getBotClient();
+  const g = await client?.guilds.fetch({ guild: guildId, withCounts: true, force: true }).catch(() => null);
+  const counts = { at: Date.now(), members: g?.approximateMemberCount ?? g?.memberCount ?? hit?.members ?? 0, online: g?.approximatePresenceCount ?? hit?.online ?? 0 };
+  countCache.set(guildId, counts);
+  return counts;
+}
+// The invite, if it's left empty: the Discord one from Streaming › Socials.
+async function socialsInvite(guildId: string) {
+  const row = await prisma.socialsOverlay.findUnique({ where: { guildId } }).catch(() => null);
+  const d = (Array.isArray(row?.platforms) ? (row!.platforms as Array<{ id?: string; name?: string; url?: string }>) : []).find((p) => p.id === "discord");
+  if (!d?.name && !d?.url) return "";
+  return (d.url || `discord.gg/${String(d.name).replace(/^https?:\/\/(discord\.gg|discord\.com\/invite)\//, "")}`).replace(/^https?:\/\//, "");
+}
+
+// Public: OBS reads this every second. `now` lets the overlay line its clock
+// up with the server's, so the timer is right even if the PC clock is off.
+router.get("/public/overlay/:kind/:guildId", async (req, res) => {
+  const kind = req.params.kind;
+  if (!isOverlayKind(kind) || !validGuild(req.params.guildId)) return res.status(404).json({ error: "Not found" });
+  const st: Record<string, unknown> = { ...(await loadOverlay(req.params.guildId, kind)), now: Date.now() };
+  if (kind === "discord") {
+    const c = await discordCounts(req.params.guildId);
+    st.members = c.members;
+    st.online = c.online;
+    if (!st.invite) st.invite = (await socialsInvite(req.params.guildId)) || "discord.gg/yourcode";
+  }
+  res.set("Cache-Control", "no-store").json(st);
 });
 
 export default router;

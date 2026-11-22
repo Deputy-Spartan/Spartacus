@@ -1,6 +1,7 @@
 import { createPublicKey, verify, type KeyObject } from "node:crypto";
 import fetch from "node-fetch";
-import { LINK_CODE_PATTERN } from "@spartacus/shared";
+import { LINK_CODE_PATTERN, cleanOverlay, overlayStateKey } from "@spartacus/shared";
+import { changeOverlay } from "../utility/streamDeck";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { recordChat } from "../../lib/chatActivity";
@@ -70,9 +71,24 @@ export async function handleKickEvent(type: string, messageId: string, payload: 
       if (code) await verifyKickLink([user, (p.sender.channel_slug ?? "").toLowerCase()].filter(Boolean), code[0]);
     } else if (type === "channel.followed") {
       await prisma.streamSubscription.updateMany({ where: { platform: "kick", channelName: { equals: slug, mode: "insensitive" }, isLive: true }, data: { streamFollows: { increment: 1 } } });
+      await followToOverlays(slug, p.follower?.username ?? "");
     }
   } catch (err) {
     logError("bot", err);
+  }
+}
+
+// A Kick follow shows on Streaming › Overlays › Latest follower and moves the
+// Goal bar, in every server that follows this Kick channel and turned that on.
+async function followToOverlays(slug: string, follower: string) {
+  const subs = await prisma.streamSubscription.findMany({ where: { platform: "kick", channelName: { equals: slug, mode: "insensitive" } }, select: { guildId: true } });
+  for (const guildId of new Set(subs.map((x) => x.guildId))) {
+    const rows = await prisma.streamDeckState.findMany({ where: { guildId, key: { in: [overlayStateKey("ticker"), overlayStateKey("goal")] } } });
+    for (const row of rows) {
+      const kind = row.key === overlayStateKey("ticker") ? "ticker" : "goal";
+      if (!cleanOverlay(kind, row.value).autoKick) continue;
+      await changeOverlay(guildId, kind, kind === "ticker" ? { type: "follow", name: follower || "Someone" } : { add: 1 });
+    }
   }
 }
 

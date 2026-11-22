@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Guild, type GuildMember, type GuildTextBasedChannel, type VoiceBasedChannel } from "discord.js";
-import { KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
+import { applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
@@ -104,6 +104,17 @@ async function changeKdState(guildId: string, stat: "kills" | "deaths" | "both",
 }
 const kdStat = (s: Settings) => (s.stat === "deaths" ? "deaths" : s.stat === "both" ? "both" : "kills");
 const kdLine = (k: { kills: number; deaths: number }) => `${k.kills} / ${k.deaths}`;
+
+// Streaming › Overlays: Game, Win/Loss, Timer, Goal bar, Challenge (and the
+// Latest follower, from Kick follows). One row each.
+const getOverlay = async (guildId: string, kind: OverlayKind) => cleanOverlay(kind, await getState(guildId, overlayStateKey(kind)));
+export async function changeOverlay(guildId: string, kind: OverlayKind, action: OverlayAction) {
+  const next = applyOverlayAction(kind, await getOverlay(guildId, kind), action);
+  if ("error" in next) return next;
+  await setState(guildId, overlayStateKey(kind), next);
+  return next;
+}
+const ovMinutes = (s: Settings, d: number) => moneyAmount(s, d) * 60_000;
 
 // ---- Options for the plugin's settings (dropdowns) ----
 export async function streamDeckOptions(guild: Guild) {
@@ -285,6 +296,34 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
     case "dkd": {
       const k = await getKd(g.id);
       return { title: "Kills · Deaths", line: kdLine(k), tone: "green", pct: Math.min(1, k.kills / Math.max(1, k.kills + k.deaths)) };
+    }
+    case "ovgame": {
+      const o = await getOverlay(g.id, "game");
+      const name = str(s, "gameName");
+      return { title: short(name || "Pick a game"), line: name && name === o.game ? "On stream" : "Press to show", tone: name && name === o.game ? "green" : name ? "" : "off" };
+    }
+    case "ovwl": {
+      const o = await getOverlay(g.id, "winloss");
+      const stat = s.wlStat === "losses" ? "Loss" : s.wlStat === "both" ? "W/L" : "Win";
+      const by = moneyAmount(s, 1);
+      const set = s.moneyMode === "set" || s.wlStat === "both";
+      return { title: set ? `Set ${stat} ${moneyAmount(s, 0)}` : `${by < 0 ? "−" : "+"}${Math.abs(by)} ${stat}`, line: `W ${o.wins} · L ${o.losses}`, tone: set ? "warn" : stat === "Win" ? "green" : "red" };
+    }
+    case "ovtimer": {
+      const o = await getOverlay(g.id, "timer");
+      const op = str(s, "timerOp") || "toggle";
+      const title = op === "restart" ? "Restart" : op === "add" ? `${moneyAmount(s, 5) < 0 ? "−" : "+"}${Math.abs(moneyAmount(s, 5))} min` : (o.timer as { running: boolean }).running ? "Pause" : "Start";
+      return { title, line: formatClock(timerNow(o), o.timerMode === "up"), tone: (o.timer as { running: boolean }).running ? "green" : "" };
+    }
+    case "ovgoal": {
+      const o = await getOverlay(g.id, "goal");
+      const by = moneyAmount(s, 1);
+      return { title: s.moneyMode === "set" ? `Set ${by}` : `${by < 0 ? "−" : "+"}${Math.abs(by)} goal`, line: `${o.cur} / ${o.target}`, tone: "green", pct: Math.min(1, Number(o.cur) / Math.max(1, Number(o.target))) };
+    }
+    case "ovchal": {
+      const o = await getOverlay(g.id, "challenge");
+      const by = moneyAmount(s, 1);
+      return { title: s.moneyMode === "set" ? `Set ${by}` : `${by < 0 ? "−" : "+"}${Math.abs(by)}`, line: `${short(String(o.chLabel), 10)} ${o.count}`, tone: o.upBad ? (by > 0 ? "red" : "green") : by > 0 ? "green" : "red" };
     }
   }
   return { title: action, line: "", tone: "" };
@@ -604,6 +643,23 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
       else if (op === "press") k = await changeKdState(g.id, "deaths", { add: 1 });
       else return { ok: true, message: "" };
       return { ok: true, message: `Kills ${k.kills}, deaths ${k.deaths}.` };
+    }
+    // Streaming › Overlays keys.
+    case "ovgame":
+    case "ovwl":
+    case "ovtimer":
+    case "ovgoal":
+    case "ovchal": {
+      const set = s.moneyMode === "set";
+      let r;
+      if (action === "ovgame") r = await changeOverlay(g.id, "game", { game: str(s, "gameName") });
+      else if (action === "ovwl") r = await changeOverlay(g.id, "winloss", s.wlStat === "both" || set ? { stat: s.wlStat === "both" ? "both" : s.wlStat === "losses" ? "losses" : "wins", set: moneyAmount(s, 0) } : { stat: s.wlStat === "losses" ? "losses" : "wins", add: moneyAmount(s, 1) });
+      else if (action === "ovtimer") {
+        const opName = str(s, "timerOp") || "toggle";
+        r = await changeOverlay(g.id, "timer", opName === "add" ? { op: "add", ms: ovMinutes(s, 5) } : { op: opName === "restart" ? "restart" : "toggle" });
+      } else r = await changeOverlay(g.id, action === "ovgoal" ? "goal" : "challenge", set ? { set: moneyAmount(s, 0) } : { add: moneyAmount(s, 1) });
+      if ("error" in r && typeof r.error === "string") return { ok: false, message: r.error };
+      return { ok: true, message: "Overlay updated." };
     }
   }
   return { ok: false, message: "Spartacus doesn't know that button yet. Update the plugin." };

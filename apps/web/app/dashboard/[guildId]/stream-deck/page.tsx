@@ -30,6 +30,11 @@ const ACTIONS: Array<[string, Array<[string, string, string]>]> = [
       ["🟢", "My Status", "Steps through Live, Be right back and Offline, and keeps one status post up to date."],
       ["💰", "Money Counter", "Adds an amount to your on-stream money counter (a minus amount takes away), or sets it. Make one key per amount."],
       ["🎯", "Kill / Death", "Adds to your on-stream kills or deaths, or sets them. Pick Both and Set with 0 for a reset key."],
+      ["🎮", "Game", "Shows a game on your Game overlay. Make one key per game."],
+      ["🏆", "Win / Loss", "Adds to your on-stream wins or losses, or sets them."],
+      ["⏱️", "Timer", "Starts or pauses your Timer overlay, restarts it, or adds minutes."],
+      ["📈", "Goal Bar", "Moves your Goal bar by an amount, or sets it."],
+      ["🏋️", "Challenge", "Adds to your Challenge counter, or sets it."],
     ],
   ],
   [

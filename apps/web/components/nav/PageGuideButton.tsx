@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { OVERLAY_KINDS } from "@spartacus/shared";
 import { PAGE_GUIDES, type PageGuide } from "../../lib/pageGuides";
 
 function Block({ title, items }: { title: string; items: string[] }) {
@@ -66,7 +67,7 @@ function GuidePanel({ guide, onClose }: { guide: PageGuide; onClose: () => void 
 
 // Pages that put the Guide button in their own header (next to the title),
 // so the layout doesn't also show it on a row of its own.
-const PLACED_BY_PAGE = new Set(["/overlays", "/overlays/socials", "/overlays/money", "/overlays/kd"]);
+const PLACED_BY_PAGE = new Set(["/overlays", "/overlays/socials", "/overlays/money", "/overlays/kd", ...OVERLAY_KINDS.map((k) => `/overlays/${k}`)]);
 
 // Shown on every dashboard page, so each one has its own step-by-step help.
 // inline = the page placed it itself; otherwise it's the layout's own row.

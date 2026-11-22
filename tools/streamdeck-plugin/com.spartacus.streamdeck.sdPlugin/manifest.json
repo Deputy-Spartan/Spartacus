@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.spartacus.streamdeck",
   "Name": "Spartacus",
-  "Version": "1.3.0.0",
+  "Version": "1.4.0.0",
   "Author": "Spartacus",
   "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   "Category": "Spartacus",
@@ -554,6 +554,101 @@
       "States": [
         {
           "Image": "imgs/actions/kd",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovgame",
+      "Name": "Game",
+      "Icon": "imgs/actions/ovgame",
+      "Tooltip": "Shows this game on your Game overlay. Make one key per game.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovgame",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovwl",
+      "Name": "Win / Loss",
+      "Icon": "imgs/actions/ovwl",
+      "Tooltip": "Adds to your wins or losses on stream, or sets them. Pick Both and Set with 0 for a reset key.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovwl",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovtimer",
+      "Name": "Timer",
+      "Icon": "imgs/actions/ovtimer",
+      "Tooltip": "Starts or pauses your Timer overlay, restarts it, or adds minutes (a minus takes away).",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovtimer",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovgoal",
+      "Name": "Goal Bar",
+      "Icon": "imgs/actions/ovgoal",
+      "Tooltip": "Moves your Goal bar on stream by the amount, or sets it.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovgoal",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovchal",
+      "Name": "Challenge",
+      "Icon": "imgs/actions/ovchal",
+      "Tooltip": "Adds to your Challenge counter (a minus takes away), or sets it.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovchal",
           "TitleAlignment": "middle",
           "FontSize": 11,
           "ShowTitle": true

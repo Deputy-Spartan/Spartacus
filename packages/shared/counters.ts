@@ -21,6 +21,7 @@ export const COUNTER_LOOKS = [
   ["glass", "Glass"],
   ["military", "Army"],
   ["red", "Red"],
+  ["discord", "Discord"],
   ["none", "No box"],
 ] as const;
 // [id, name on the button, the font itself for the button]

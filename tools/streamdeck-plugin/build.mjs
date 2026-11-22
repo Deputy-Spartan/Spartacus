@@ -63,7 +63,7 @@ const manifest = {
   $schema: "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   UUID: PLUGIN_UUID,
   Name: "Spartacus",
-  Version: "1.3.0.0",
+  Version: "1.4.0.0",
   Author: "Spartacus",
   Description: "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   Category: "Spartacus",
@@ -98,7 +98,7 @@ writeFileSync(join(plugin, "bin/package.json"), JSON.stringify({ type: "module" 
 //    emoji go in the key's title, which Stream Deck draws itself.)
 //    logo.png is refreshed from the live bot each build, and the saved copy
 //    is used when offline.
-const COLORS = { raid: "#ef4444", safe: "#22c55e", golive: "#f43f5e", liveind: "#ef4444", post: "#9146ff", bump: "#f59e0b", lock: "#64748b", slow: "#0ea5e9", module: "#6366f1", role: "#a855f7", squadlock: "#38bdf8", mute: "#94a3b8", pull: "#14b8a6", newsquad: "#22c55e", online: "#3b82f6", tickets: "#eab308", claim: "#f97316", apps: "#10b981", giveaway: "#facc15", purge: "#f87171", poll: "#5865f2", say: "#7b99bc", shout: "#9146ff", event: "#06b6d4", sticky: "#f472b6", status: "#22c55e", botstat: "#10b981", money: "#f7c936", dmoney: "#f7c936", kd: "#ef4444", dkd: "#ef4444" };
+const COLORS = { raid: "#ef4444", safe: "#22c55e", golive: "#f43f5e", liveind: "#ef4444", post: "#9146ff", bump: "#f59e0b", lock: "#64748b", slow: "#0ea5e9", module: "#6366f1", role: "#a855f7", squadlock: "#38bdf8", mute: "#94a3b8", pull: "#14b8a6", newsquad: "#22c55e", online: "#3b82f6", tickets: "#eab308", claim: "#f97316", apps: "#10b981", giveaway: "#facc15", purge: "#f87171", poll: "#5865f2", say: "#7b99bc", shout: "#9146ff", event: "#06b6d4", sticky: "#f472b6", status: "#22c55e", botstat: "#10b981", money: "#f7c936", dmoney: "#f7c936", kd: "#ef4444", dkd: "#ef4444", ovgame: "#a78bfa", ovwl: "#22c55e", ovtimer: "#f9c933", ovgoal: "#f9c933", ovchal: "#f87171" };
 const sharp = (await import("sharp")).default;
 const logoFile = join(here, "logo.png");
 try {

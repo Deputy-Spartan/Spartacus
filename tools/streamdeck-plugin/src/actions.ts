@@ -1,7 +1,7 @@
 // Every Spartacus action: what it's called, its icon, which settings it uses,
 // and whether it's a key or a Stream Deck + dial.
 
-export type Field = "channel" | "voice" | "role" | "ping" | "module" | "embed" | "game" | "text" | "question" | "prize" | "minutes" | "count" | "streamer" | "link" | "note" | "slow" | "liveChannel" | "safeChannel" | "confirm" | "amount" | "moneyMode" | "stat";
+export type Field = "channel" | "voice" | "role" | "ping" | "module" | "embed" | "game" | "text" | "question" | "prize" | "minutes" | "count" | "streamer" | "link" | "note" | "slow" | "liveChannel" | "safeChannel" | "confirm" | "amount" | "moneyMode" | "stat" | "gameName" | "wlStat" | "timerOp";
 
 export interface ActionDef {
   id: string;
@@ -43,6 +43,11 @@ export const KEYS: ActionDef[] = [
   { id: "status", name: "My Status", icon: "🟢", glyph: "radio-tower", tip: "Live, Be right back, Offline.", fields: ["channel", "note"] },
   { id: "money", name: "Money Counter", icon: "💰", glyph: "circle-dollar-sign", tip: "Adds the amount to your money counter on stream (a minus amount takes away), or sets it.", fields: ["amount", "moneyMode"] },
   { id: "kd", name: "Kill / Death", icon: "🎯", glyph: "crosshair", tip: "Adds to your kills or deaths on stream (a minus amount takes away), or sets them. Pick Both and Set with 0 for a reset key.", fields: ["stat", "amount", "moneyMode"] },
+  { id: "ovgame", name: "Game", icon: "🎮", glyph: "gamepad-2", tip: "Shows this game on your Game overlay. Make one key per game.", fields: ["gameName"] },
+  { id: "ovwl", name: "Win / Loss", icon: "🏆", glyph: "trophy", tip: "Adds to your wins or losses on stream, or sets them. Pick Both and Set with 0 for a reset key.", fields: ["wlStat", "amount", "moneyMode"] },
+  { id: "ovtimer", name: "Timer", icon: "⏱️", glyph: "timer-reset", tip: "Starts or pauses your Timer overlay, restarts it, or adds minutes (a minus takes away).", fields: ["timerOp", "amount"] },
+  { id: "ovgoal", name: "Goal Bar", icon: "📈", glyph: "chart-no-axes-column-increasing", tip: "Moves your Goal bar on stream by the amount, or sets it.", fields: ["amount", "moneyMode"] },
+  { id: "ovchal", name: "Challenge", icon: "🏋️", glyph: "dumbbell", tip: "Adds to your Challenge counter (a minus takes away), or sets it.", fields: ["amount", "moneyMode"] },
   { id: "botstat", name: "Bot Status", icon: "💚", glyph: "heart-pulse", tip: "Is Spartacus online, and its ping.", fields: [] },
 ];
 

@@ -238,14 +238,16 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
   },
   "/socials-overlay": {
-    prepared: "Nothing to set up in Discord. This one lives on the dashboard and in OBS.",
+    prepared: "Nothing is set up for you. Pick this channel on the Discord post tab.",
     tryIt: [
-      "Open Socials Overlay on the dashboard, tick two platforms and type a name on each. The preview shows them.",
-      "Switch the look between Sticker and Gold bar and press Play again.",
+      "Your names tab: type a name on two platforms and tick Stream and Post on both.",
+      "On stream tab: switch between Sticker and Gold bar and press Play again.",
       "Copy the OBS link, open it in a new browser tab, and check your names pop in.",
-      "Change a name on the dashboard, wait about 20 seconds, and check the open tab updates by itself.",
+      "Discord post tab: pick this channel and press Post in Discord. Check each line has its icon.",
+      "Change a name, press Update post, and check the same message changed.",
+      "Switch to Plain, press Update post, then press Remove post.",
     ],
-    needs: "OBS, to see it on a real stream.",
+    needs: "OBS, to see the overlay on a real stream.",
   },
   "/stream-growth": {
     prepared: "Countdowns post here with a Stream Ping role, friends go live in #stream-raids, game nights go to #game-nights, the live board is posted here, and recaps and Viewer of the Week are on.",

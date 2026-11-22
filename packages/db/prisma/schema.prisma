@@ -3477,4 +3477,13 @@ model SocialsOverlay {
   hold      Int      @default(0) // seconds it stays up (sticker: 0 = until hidden)
   every     Int      @default(0) // minutes before it plays again (0 = once)
   updatedAt DateTime @updatedAt
+
+  // The socials post in Discord (Streaming › Socials › Discord post). Each
+  // platform row also has post: true/false for whether it goes in the post.
+  postChannelId   String?
+  postStyle       String  @default("embed") // embed | plain
+  postTitle       String?
+  postText        String?
+  postMessageId   String? // the message Spartacus posted, edited in place on Update
+  postedChannelId String? // where that message is, to clean it up after a channel change
 }

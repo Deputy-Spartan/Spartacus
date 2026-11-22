@@ -212,6 +212,7 @@ export { syncPlayingNowPanel, createPlayingNowRoles } from "./modules/engagement
 export { syncTempPanel } from "./modules/community/tempChannelPanel";
 export { refreshCommandList, buildCommandList, commandListPosts, commandListSections, COMMAND_SECTIONS, sectionOfCommand } from "./modules/utility/commandList";
 export { startBoardSeason, syncBoard } from "./modules/matches/leaderboard";
+export { postSocials, removeSocialsPost, buildSocialsPost } from "./modules/stream/socialsPost";
 
 export function startBot() {
   const client = new Client({

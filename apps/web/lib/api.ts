@@ -1793,12 +1793,18 @@ export interface MilestoneSettingsRow {
 // Streaming › Socials Overlay: the lower third with your platform names.
 export type SocialsPlatformId = "twitch" | "kick" | "youtube" | "tiktok" | "x" | "discord" | "instagram";
 export interface SocialsOverlaySettings {
-  platforms: Array<{ id: SocialsPlatformId; on: boolean; name: string }>;
+  // on = shown on stream, post = in the Discord post
+  platforms: Array<{ id: SocialsPlatformId; on: boolean; post: boolean; name: string }>;
   style: "sticker" | "gold";
   pos: "left" | "center" | "right";
   size: number;
   hold: number;
   every: number;
+  postChannelId: string | null;
+  postStyle: "embed" | "plain";
+  postTitle: string | null;
+  postText: string | null;
+  posted?: { channelId: string; messageId: string } | null;
   updatedAt?: string | null;
 }
 
@@ -2787,6 +2793,8 @@ export const api = {
   getSocialsOverlay: (guildId: string) => request<SocialsOverlaySettings>(`/guilds/${guildId}/socials-overlay`),
   saveSocialsOverlay: (guildId: string, input: SocialsOverlaySettings) =>
     request<SocialsOverlaySettings>(`/guilds/${guildId}/socials-overlay`, { method: "PUT", body: JSON.stringify(input) }),
+  postSocials: (guildId: string) => request<{ url: string; settings: SocialsOverlaySettings }>(`/guilds/${guildId}/socials-overlay/post`, { method: "POST" }),
+  removeSocialsPost: (guildId: string) => request<SocialsOverlaySettings>(`/guilds/${guildId}/socials-overlay/post`, { method: "DELETE" }),
   getMilestoneSettings: (guildId: string) => request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`),
   updateMilestoneSettings: (guildId: string, input: Partial<MilestoneSettingsRow>) =>
     request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`, { method: "PUT", body: JSON.stringify(input) }),

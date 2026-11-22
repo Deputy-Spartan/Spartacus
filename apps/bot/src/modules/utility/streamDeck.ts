@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Guild, type GuildMember, type GuildTextBasedChannel, type VoiceBasedChannel } from "discord.js";
-import { applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
+import { TOOL_COMMANDS, applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
@@ -8,6 +8,7 @@ import { sendBumpStatusNow } from "../../lib/bumpStatus";
 import { forceRepost } from "../community/stickyMessages";
 import { createSquad } from "../community/tempChannels";
 import { changeRole } from "./roleManager";
+import { changeTool } from "../../lib/streamTools";
 import { forgetXpBoost } from "../leveling/xp";
 
 // Everything the Spartacus Stream Deck plugin can do. A key shows a "face"
@@ -296,6 +297,12 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
     case "dkd": {
       const k = await getKd(g.id);
       return { title: "Kills · Deaths", line: kdLine(k), tone: "green", pct: Math.min(1, k.kills / Math.max(1, k.kills + k.deaths)) };
+    }
+    case "clipit":
+      return { title: "Clip it", line: "📌 Saves the time", tone: "" };
+    case "tool": {
+      const c = TOOL_COMMANDS.find(([v]) => v === (str(s, "toolCmd") || "clip"));
+      return { title: c ? short(c[1].replace(/^\S+\s/, ""), 14) : "Pick a tool", line: c ? c[1].split(" ")[0] : "", tone: c ? "" : "off" };
     }
     case "ovgame": {
       const o = await getOverlay(g.id, "game");
@@ -643,6 +650,16 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
       else if (op === "press") k = await changeKdState(g.id, "deaths", { add: 1 });
       else return { ok: true, message: "" };
       return { ok: true, message: `Kills ${k.kills}, deaths ${k.deaths}.` };
+    }
+    // Streaming › Overlays › stream tools.
+    case "clipit":
+    case "tool": {
+      const cmd = action === "clipit" ? "clip" : str(s, "toolCmd") || "clip";
+      const c = TOOL_COMMANDS.find(([v]) => v === cmd);
+      if (!c) return { ok: false, message: "Pick what the key does." };
+      const r = await changeTool(g.id, c[2], { ...c[3] });
+      if ("error" in r && typeof r.error === "string") return { ok: false, message: r.error };
+      return { ok: true, message: c[1] };
     }
     // Streaming › Overlays keys.
     case "ovgame":

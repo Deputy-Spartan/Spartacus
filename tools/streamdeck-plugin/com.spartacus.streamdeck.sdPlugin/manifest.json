@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.spartacus.streamdeck",
   "Name": "Spartacus",
-  "Version": "1.4.0.0",
+  "Version": "1.5.0.0",
   "Author": "Spartacus",
   "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   "Category": "Spartacus",
@@ -649,6 +649,44 @@
       "States": [
         {
           "Image": "imgs/actions/ovchal",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.clipit",
+      "Name": "Clip It",
+      "Icon": "imgs/actions/clipit",
+      "Tooltip": "Saves this moment so you can find it later (and shows CLIPPED! if your Clip marker overlay is on).",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/clipit",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.tool",
+      "Name": "Overlay Tool",
+      "Icon": "imgs/actions/tool",
+      "Tooltip": "Runs one of your stream tools: spin the wheel, roll dice, switch scenes, polls, predictions, giveaways and more.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/tool",
           "TitleAlignment": "middle",
           "FontSize": 11,
           "ShowTitle": true

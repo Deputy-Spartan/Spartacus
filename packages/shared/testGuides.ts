@@ -1,4 +1,5 @@
 import { OVERLAYS, OVERLAY_KINDS } from "./overlays";
+import { TOOLS, TOOL_KINDS } from "./tools";
 import type { ModuleKey } from "./moduleKeys";
 
 // How to try each module in a test server once !setup-test-modules has run.
@@ -268,6 +269,20 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     needs: "Nothing.",
   },
   ...Object.fromEntries(OVERLAY_KINDS.map((k) => [`/overlays/${k}`, { prepared: "Nothing is set up for you.", tryIt: [`Open Streaming → Overlays → ${OVERLAYS[k].title}. Change it with the buttons in the top card and check the preview animates.`, "Pick a few animations and looks under the preview and check each one plays.", "Copy the OBS link, open it in a new browser tab, change it here, and check it changes there within a second."], needs: "OBS to see it on a real stream." }])),
+  ...Object.fromEntries(
+    TOOL_KINDS.map((k) => [
+      `/overlays/${k}`,
+      {
+        prepared: "Nothing is set up for you.",
+        tryIt: [
+          `Open Streaming → Overlays → ${TOOLS[k].title}.${TOOLS[k].buttons.length ? " Press each button at the top and check the preview plays it." : " Check the preview fills in."}`,
+          "Change a few looks under the preview and check it updates.",
+          "Copy the OBS link, open it in a new browser tab, press a button here, and check it plays there within a second.",
+        ],
+        needs: TOOLS[k].auto ? `To see it fill in by itself: ${TOOLS[k].auto}` : "OBS to see it on a real stream.",
+      },
+    ]),
+  ),
   "/overlays/socials": {
     prepared: "Nothing is set up for you. Pick this channel on the Discord post tab.",
     tryIt: [

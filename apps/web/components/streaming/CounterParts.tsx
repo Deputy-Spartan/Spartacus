@@ -219,7 +219,7 @@ export function CounterPreview({
 export const demoIn = (frame: HTMLIFrameElement | null, key: string, diff: number) => frame?.contentWindow?.postMessage({ type: "counter-demo", key, diff }, window.location.origin);
 
 // The OBS link card.
-export function ObsCard({ path, note }: { path: string; note?: ReactNode }) {
+export function ObsCard({ path, note, w = OBS_W, h = OBS_H }: { path: string; note?: ReactNode; w?: number; h?: number }) {
   const [copied, setCopied] = useState(false);
   const link = typeof window !== "undefined" ? `${window.location.origin}${path}` : "";
   return (
@@ -247,7 +247,7 @@ export function ObsCard({ path, note }: { path: string; note?: ReactNode }) {
         <li>In OBS: Sources → + → Browser.</li>
         <li>Untick Local file and paste the link into URL.</li>
         <li>
-          Set Width {OBS_W} and Height {OBS_H}.
+          Set Width {w} and Height {h}.
         </li>
         <li>Drag it where you want it. Bigger? Use the Size slider here, not OBS, so it stays sharp.</li>
         <li>Using a sound? Tick Control audio via OBS so it plays in your stream.</li>

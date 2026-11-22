@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { OVERLAYS as OVERLAY_INFO, OVERLAY_KINDS } from "@spartacus/shared";
+import { OVERLAYS as OVERLAY_INFO, OVERLAY_KINDS, TOOLS, TOOL_KINDS } from "@spartacus/shared";
 
 // Streaming › Overlays: the three overlays. The hub page shows them as cards,
 // and each overlay's page has them as tabs along the top.
-export const OVERLAYS: Array<{ href: string; label: string; icon: string; line: string }> = [
-  { href: "/overlays/socials", label: "Socials", icon: "🏷️", line: "Your platform names as a lower third, and a socials post in Discord." },
-  { href: "/overlays/money", label: "Money Counter", icon: "💰", line: "A TOTAL MONEY box you change with a Stream Deck button." },
-  { href: "/overlays/kd", label: "K/D Counter", icon: "🎯", line: "Kills, deaths and K/D, with kill streak banners." },
-  ...OVERLAY_KINDS.map((k) => ({ href: `/overlays/${k}`, label: OVERLAY_INFO[k].title, icon: OVERLAY_INFO[k].icon, line: OVERLAY_INFO[k].line })),
+export const OVERLAYS: Array<{ href: string; label: string; icon: string; line: string; section: "counters" | "extras" | "tools" }> = [
+  { href: "/overlays/socials", label: "Socials", icon: "🏷️", line: "Your platform names as a lower third, and a socials post in Discord.", section: "counters" },
+  { href: "/overlays/money", label: "Money Counter", icon: "💰", line: "A TOTAL MONEY box you change with a Stream Deck button.", section: "counters" },
+  { href: "/overlays/kd", label: "K/D Counter", icon: "🎯", line: "Kills, deaths and K/D, with kill streak banners.", section: "counters" },
+  ...OVERLAY_KINDS.map((k) => ({ href: `/overlays/${k}`, label: OVERLAY_INFO[k].title, icon: OVERLAY_INFO[k].icon, line: OVERLAY_INFO[k].line, section: "counters" as const })),
+  ...TOOL_KINDS.map((k) => ({ href: `/overlays/${k}`, label: TOOLS[k].title, icon: TOOLS[k].icon, line: TOOLS[k].line, section: TOOLS[k].section })),
 ];
 
 export function OverlayTabs({ guildId }: { guildId: string }) {

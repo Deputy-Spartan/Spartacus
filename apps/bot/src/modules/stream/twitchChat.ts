@@ -4,6 +4,7 @@ import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isLeader } from "../../lib/leader";
 import { forgetChannel, forgetOldChatters, recordChat } from "../../lib/chatActivity";
+import { onStreamChat } from "../../lib/streamTools";
 
 // Reads Twitch chat anonymously (the same way a viewer's browser does) for the
 // channels that are live right now, so viewers who linked their Twitch name can
@@ -116,6 +117,7 @@ function onLine(line: string) {
   const channel = rest.slice(0, space).toLowerCase();
   const text = rest.slice(space + 2);
   recordChat("twitch", channel, user);
+  void onStreamChat("twitch", channel, user, text);
   const code = text.match(LINK_CODE_PATTERN);
   if (code) void verifyLink(user, code[0]);
 }

@@ -1,4 +1,5 @@
 import { OVERLAYS, OVERLAY_KINDS, type OverlayKind } from "./overlays";
+import { TOOLS, TOOL_KINDS } from "./tools";
 // Step-by-step help for every dashboard page, shown by the Guide button and
 // on the cards !setup-test-modules posts in a test server.
 // Keyed by the page's path after /dashboard/:guildId, matching navItems.ts.
@@ -490,6 +491,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     tips: ["The tabs at the top of each overlay page switch between them.", "The Money and K/D counters work with the Spartacus Stream Deck plugin."],
   },
   ...overlayGuides(),
+  ...toolGuides(),
   "/overlays/socials": {
     title: "Socials",
     purpose: "Your names on Twitch, Kick, YouTube, TikTok, X, Discord and Instagram in one place. Show them on stream with an OBS overlay, and post them in Discord as one clean message.",
@@ -795,5 +797,32 @@ function overlayGuides(): Record<string, PageGuide> {
         tips: [...extra[k].tips, "The background is see-through on stream. The checkered pattern only shows in the preview."],
       },
     ]),
+  );
+}
+// Streaming › Overlays › stream tools: one guide each, built from the tool's own words.
+function toolGuides(): Record<string, PageGuide> {
+  return Object.fromEntries(
+    TOOL_KINDS.map((k) => {
+      const t = TOOLS[k];
+      const full = ["scenes", "cam", "chat", "stats"].includes(k);
+      return [
+        `/overlays/${k}`,
+        {
+          title: t.title,
+          purpose: `${t.line} Same looks, fonts and colors as your other overlays.`,
+          steps: [
+            ...(t.auto ? [t.auto] : []),
+            ...(t.buttons.length ? [`Use the buttons at the top (${t.buttons.map((b) => b[0]).join(", ")}). The preview plays them too.`] : []),
+            "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set Width 1920 and Height 1080 (the full screen).",
+            "Pick the look, font, colors and sound under the preview. It saves by itself.",
+          ],
+          members: ["Viewers see it on your stream."],
+          tips: [
+            "Stream Deck: drag Spartacus → Overlay Tool onto a key and pick what it does (plugin 1.5 or newer).",
+            full ? "It covers the whole screen, but the see-through parts don't hide anything." : "The background is see-through on stream. The checkered pattern only shows in the preview.",
+          ],
+        },
+      ];
+    }),
   );
 }

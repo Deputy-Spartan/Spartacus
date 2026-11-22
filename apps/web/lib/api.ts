@@ -1815,6 +1815,8 @@ export type MoneyCounterSettings = import("@spartacus/shared").MoneyCounter;
 export type KdCounterSettings = import("@spartacus/shared").KdCounter;
 // Streaming › Overlays: Game, Win/Loss, Timer, Goal, Challenge, Discord, Latest.
 export type OverlaySettings = import("@spartacus/shared").OverlayState;
+// Streaming › Overlays › stream tools (Alerts, Chat box, Scenes, … Welcome).
+export type ToolRowData = import("@spartacus/shared").ToolRow;
 
 export interface AppealSettingsRow {
   appealChannelId: string | null;
@@ -2808,6 +2810,9 @@ export const api = {
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter`, { method: "PUT", body: JSON.stringify(input) }),
   changeMoney: (guildId: string, change: { add: number } | { set: number }) =>
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter/amount`, { method: "POST", body: JSON.stringify(change) }),
+  getTool: (guildId: string, kind: string) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`),
+  saveTool: (guildId: string, kind: string, settings: ToolRowData["settings"]) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`, { method: "PUT", body: JSON.stringify({ settings }) }),
+  toolAction: (guildId: string, kind: string, action: Record<string, unknown>) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}/action`, { method: "POST", body: JSON.stringify(action) }),
   getOverlay: (guildId: string, kind: string) => request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}`),
   saveOverlay: (guildId: string, kind: string, input: OverlaySettings) => request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}`, { method: "PUT", body: JSON.stringify(input) }),
   overlayAction: (guildId: string, kind: string, action: Record<string, unknown>) =>

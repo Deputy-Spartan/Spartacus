@@ -237,7 +237,7 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
       "Remove an item, or press Reset, and run /prestream again.",
     ],
   },
-  "/money-counter": {
+  "/overlays/money": {
     prepared: "Nothing is set up for you. It starts at $0.",
     tryIt: [
       "Type 100000 and press + Add. Check the total and the preview roll up to $100,000.",
@@ -249,7 +249,7 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
     needs: "OBS and a Stream Deck to try it on a real stream.",
   },
-  "/kd-counter": {
+  "/overlays/kd": {
     prepared: "Nothing is set up for you. Kills and deaths start at 0.",
     tryIt: [
       "Press +1 under Kills and +1 under Deaths. Check the preview animates the one that changed and K/D updates.",
@@ -261,7 +261,12 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
     needs: "OBS and a Stream Deck to try it on a real stream.",
   },
-  "/socials-overlay": {
+  "/overlays": {
+    prepared: "Nothing to set up here. It lists your stream overlays.",
+    tryIt: ["Open Streaming → Overlays and check you see Socials, Money Counter and K/D Counter.", "Open each one, then use the tabs at the top to switch between them."],
+    needs: "Nothing.",
+  },
+  "/overlays/socials": {
     prepared: "Nothing is set up for you. Pick this channel on the Discord post tab.",
     tryIt: [
       "Your names tab: type a name on two platforms and tick Stream and Post on both.",

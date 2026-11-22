@@ -13,7 +13,7 @@ export const LIGHT_THEMES: string[] = [];
 export const DEFAULT_THEME = "studio";
 
 // The original themes.
-export const THEME_IDS: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk", ...FORGED.map((t) => t[0])];
+export const THEME_IDS: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk", "jackpot", ...FORGED.map((t) => t[0])];
 
 const rgbOf = (hex: string) => {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);

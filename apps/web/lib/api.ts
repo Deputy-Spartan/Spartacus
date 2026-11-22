@@ -1930,7 +1930,7 @@ export interface CurrentUser {
   avatar: string | null;
 }
 
-export type DashboardTheme = "studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk" | (string & {}); // plus the Forged themes (lib/themeScript FORGED)
+export type DashboardTheme = "studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk" | "jackpot" | (string & {}); // plus the Forged themes (lib/themeScript FORGED)
 
 export interface LiveStrip {
   memberCount: number | null;

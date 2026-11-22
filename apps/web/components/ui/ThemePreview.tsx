@@ -3,7 +3,7 @@
 import type { DashboardTheme } from "../../lib/api";
 
 // A small picture of each theme, drawn with the theme's own look.
-const PREVIEW: Record<"studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk", { bg: string; side: string; card: React.CSSProperties }> = {
+const PREVIEW: Record<"studio" | "glass" | "daylight" | "steel" | "midnight" | "dusk" | "jackpot", { bg: string; side: string; card: React.CSSProperties }> = {
   studio: { bg: "#1c1d20", side: "#242529", card: { background: "linear-gradient(90deg,#5e7fa6,#7b99bc,#94a3b8) top/100% 3px no-repeat, #2a2c31", border: "1px solid #37393f" } },
   glass: {
     bg: "radial-gradient(120px 80px at 15% 10%, rgba(123,153,188,.45), transparent 70%), radial-gradient(120px 90px at 100% 100%, rgba(94,127,166,.5), transparent 70%), #1c1d20",
@@ -14,6 +14,7 @@ const PREVIEW: Record<"studio" | "glass" | "daylight" | "steel" | "midnight" | "
   steel: { bg: "#0b0c0e", side: "#121316", card: { background: "#15171a", border: "1px solid #262930", boxShadow: "0 0 10px rgba(74,149,255,.25)" } },
   midnight: { bg: "#000000", side: "#07080c", card: { background: "#0b0d13", border: "1px solid #1a1e2a", boxShadow: "0 0 10px rgba(79,209,255,.22)" } },
   dusk: { bg: "#1d1a24", side: "#24202d", card: { background: "#2a2534", border: "1px solid #3b3448", boxShadow: "0 0 10px rgba(185,162,255,.2)" } },
+  jackpot: { bg: "#121316", side: "#0f1013", card: { background: "#1b1d22", border: "2px solid #2c2f36", boxShadow: "inset 0 0 0 1px rgba(249,201,51,.12)" } },
 };
 
 export function ThemePreview({ id, small }: { id: DashboardTheme; small?: boolean }) {

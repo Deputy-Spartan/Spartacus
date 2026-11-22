@@ -15,7 +15,7 @@ router.get("/me", requireAuthOnly, (req: AuthedRequest, res) => {
 // The original themes (keep in step with the web app's lib/themeScript.ts
 // THEME_IDS). A theme that's no longer offered (Forged A–Z, the gladiator
 // six) reads back as Studio.
-const THEMES: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk"];
+const THEMES: string[] = ["studio", "glass", "daylight", "steel", "midnight", "dusk", "jackpot"];
 const theme = (t: string) => (THEMES.includes(t) ? t : "studio");
 const HEX = /^#[0-9a-f]{6}$/i;
 const GLOW = ["off", "normal", "strong"];

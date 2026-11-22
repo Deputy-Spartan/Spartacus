@@ -16,6 +16,7 @@ export const THEMES: ThemeInfo[] = [
   { id: "steel", name: "Steel", blurb: "Near-black with brushed steel and an electric blue glow, to match the S logo.", accent: "#4a95ff" },
   { id: "midnight", name: "Midnight", blurb: "True black for OLED phone screens, with a cool cyan glow. Easy on battery.", accent: "#4fd1ff" },
   { id: "dusk", name: "Dusk", blurb: "Soft purple-gray, calm for late nights. Matches the purple group icons.", accent: "#b9a2ff" },
+  { id: "jackpot", name: "Jackpot", blurb: "Charcoal and gold, like the stream counters: chunky headings, bold bordered buttons that press in.", accent: "#f9c933" },
   ...FORGED.map((t) => ({ id: t[0], name: t[1], blurb: t[2], accent: t[10], colors: t })),
 ];
 // A theme that's no longer offered (Forged A–Z, the gladiator six…) falls back to Studio.

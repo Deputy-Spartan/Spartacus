@@ -439,7 +439,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Ticks aren't saved. Every /prestream starts fresh.",
     ],
   },
-  "/money-counter": {
+  "/overlays/money": {
     title: "Money Counter",
     purpose: "A TOTAL MONEY box on stream that you change with a Stream Deck button or from this page.",
     steps: [
@@ -459,7 +459,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Using a sound? In the OBS Browser source, tick Control audio via OBS so it plays in your stream.",
     ],
   },
-  "/kd-counter": {
+  "/overlays/kd": {
     title: "K/D Counter",
     purpose: "KILLS and DEATHS (and your K/D) on stream, changed with Stream Deck buttons or from this page. Same looks and animations as the Money Counter.",
     steps: [
@@ -478,7 +478,17 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "The background is see-through on stream. The checkered pattern only shows in the preview.",
     ],
   },
-  "/socials-overlay": {
+  "/overlays": {
+    title: "Overlays",
+    purpose: "Everything you put on stream with OBS, in one place: your socials, a money counter and a kill/death counter.",
+    steps: [
+      "Tap an overlay to set it up.",
+      "Each one has its own OBS link. In OBS add a Browser source, untick Local file and paste the link.",
+      "Change the look on the overlay's page; the stream picks it up by itself.",
+    ],
+    tips: ["The tabs at the top of each overlay page switch between them.", "The Money and K/D counters work with the Spartacus Stream Deck plugin."],
+  },
+  "/overlays/socials": {
     title: "Socials",
     purpose: "Your names on Twitch, Kick, YouTube, TikTok, X, Discord and Instagram in one place. Show them on stream with an OBS overlay, and post them in Discord as one clean message.",
     steps: [

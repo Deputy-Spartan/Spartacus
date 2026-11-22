@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MONEY_ANIMS, MONEY_DEFAULTS, MONEY_SPOTS, formatMoney } from "@spartacus/shared";
+import { MONEY_ANIMS, MONEY_COLORS, MONEY_DEFAULTS, MONEY_DSIZES, MONEY_LOOKS, MONEY_SPEEDS, MONEY_SPOTS, formatMoney } from "@spartacus/shared";
+import type { ReactNode } from "react";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
@@ -20,6 +21,39 @@ const OBS_W = 1400;
 const OBS_H = 500;
 
 type Look = Omit<MoneyCounterSettings, "amount">;
+
+// A row of small pick-one buttons (spot, box look, color, size, speed).
+function Choices<T extends string | number>({
+  title,
+  items,
+  value,
+  onPick,
+}: {
+  title: ReactNode;
+  items: ReadonlyArray<readonly [T, string] | readonly [T, string, ReactNode]>;
+  value: T;
+  onPick: (v: T) => void;
+}) {
+  return (
+    <div className="mt-4">
+      <p className="text-sm mb-1.5">{title}</p>
+      <div className="grid grid-cols-3 gap-2">
+        {items.map(([id, name, icon]) => (
+          <button
+            key={String(id)}
+            type="button"
+            onClick={() => onPick(id)}
+            aria-pressed={value === id}
+            className={`text-sm rounded-lg border px-2 py-2 transition-colors ${value === id ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-300 hover:border-white/25"}`}
+          >
+            {icon}
+            {name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Streaming › Money Counter: a TOTAL MONEY box on stream that Stream Deck keys
 // (or this page) add to.
@@ -45,8 +79,9 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
         const { amount: a, ...rest } = m;
         setAmount(a);
         setLook(rest);
-        // Starts with the saved look; later changes are sent to it so they animate.
-        setSrc(`/overlays/money.html?${new URLSearchParams({ preview: "1", amount: String(a), label: rest.label, prefix: rest.prefix, suffix: rest.suffix, size: String(rest.size), anim: rest.anim, spot: rest.spot })}`);
+        // Starts at the saved total; the look is sent once it loads (onLoad),
+        // and later changes are sent too so they animate.
+        setSrc(`/overlays/money.html?${new URLSearchParams({ preview: "1", amount: String(a) })}`);
       })
       .catch(() => setFailed(true));
   }, [guildId]);
@@ -166,6 +201,7 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
                 ref={frame}
                 src={src}
                 title="Money counter preview"
+                onLoad={() => frame.current?.contentWindow?.postMessage({ type: "money", value: { ...look, amount } }, window.location.origin)}
                 className="absolute left-0 top-0 border-0 pointer-events-none"
                 style={{ width: OBS_W, height: OBS_H, transform: `scale(${scale})`, transformOrigin: "0 0" }}
               />
@@ -199,20 +235,67 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
             ))}
           </div>
 
-          <p className="text-sm mt-4 mb-1.5">
-            Where the <span className="text-emerald-300">+$</span> / <span className="text-rose-300">−$</span> shows
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {MONEY_SPOTS.map(([id, name]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => pick({ spot: id })}
-                aria-pressed={look.spot === id}
-                className={`text-sm rounded-lg border px-2 py-2 transition-colors ${look.spot === id ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-300 hover:border-white/25"}`}
-              >
-                {name}
-              </button>
+          <Choices
+            title={
+              <>
+                Where the <span className="text-emerald-300">+$</span> / <span className="text-rose-300">−$</span> shows
+              </>
+            }
+            items={MONEY_SPOTS}
+            value={look.spot}
+            onPick={(spot) => pick({ spot })}
+          />
+          <Choices title="Box look" items={MONEY_LOOKS} value={look.look} onPick={(v) => pick({ look: v })} />
+          <Choices
+            title="Number color"
+            items={MONEY_COLORS.map(([c, name]) => [c, name, <span key={c} className="inline-block w-3 h-3 rounded-full border border-black mr-1.5 align-[-1px]" style={{ background: c }} />] as const)}
+            value={look.color}
+            onPick={(color) => pick({ color })}
+          />
+          <Choices
+            title={
+              <>
+                <span className="text-emerald-300">+$</span> / <span className="text-rose-300">−$</span> style
+              </>
+            }
+            items={[["text", "Outlined text"], ["pill", "Pill badge"]] as const}
+            value={look.dstyle}
+            onPick={(dstyle) => pick({ dstyle })}
+          />
+          <Choices
+            title={
+              <>
+                <span className="text-emerald-300">+$</span> / <span className="text-rose-300">−$</span> size
+              </>
+            }
+            items={MONEY_DSIZES}
+            value={look.dsize}
+            onPick={(dsize) => pick({ dsize })}
+          />
+          <Choices title="Speed" items={MONEY_SPEEDS} value={look.speed} onPick={(speed) => pick({ speed })} />
+
+          <div className="grid sm:grid-cols-2 gap-2 mt-4">
+            {(
+              [
+                ["bigwin", "Big win celebration", "Adding 1,000,000 or more also gets the gold glow and sparkles."],
+                ["short", "Short numbers", "Shows $7.3M instead of $7,300,000."],
+              ] as const
+            ).map(([key, name, desc]) => (
+              <label key={key} className="flex items-start gap-3 rounded-lg border border-white/10 p-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent-rgb))]"
+                  checked={look[key]}
+                  onChange={(e) => {
+                    update({ [key]: e.target.checked });
+                    if (key === "bigwin" && e.target.checked) setTimeout(() => demo(1000000), 200);
+                  }}
+                />
+                <span>
+                  <span className="text-sm font-medium block">{name}</span>
+                  <span className={hint}>{desc}</span>
+                </span>
+              </label>
             ))}
           </div>
 
@@ -234,8 +317,14 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
               <input className={`${field} mt-1`} value={look.suffix} maxLength={12} placeholder="e.g.  coins" onChange={(e) => update({ suffix: e.target.value })} />
             </label>
           </div>
-          {(look.label !== MONEY_DEFAULTS.label || look.prefix !== MONEY_DEFAULTS.prefix || look.suffix || look.size !== 100) && (
-            <button className={`${button} mt-3`} onClick={() => update({ label: MONEY_DEFAULTS.label, prefix: MONEY_DEFAULTS.prefix, suffix: "", size: 100 })}>
+          {(Object.keys(MONEY_DEFAULTS) as Array<keyof MoneyCounterSettings>).some((k) => k !== "amount" && look[k as keyof Look] !== MONEY_DEFAULTS[k]) && (
+            <button
+              className={`${button} mt-3`}
+              onClick={() => {
+                const { amount: _a, ...defaults } = MONEY_DEFAULTS;
+                update(defaults);
+              }}
+            >
               Back to the default look
             </button>
           )}

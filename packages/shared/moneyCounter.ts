@@ -13,7 +13,43 @@ export interface MoneyCounter {
   size: number; // percent
   anim: MoneyAnim; // how it moves when the number changes
   spot: MoneySpot; // where the green +$ / red -$ amount shows
+  look: MoneyLook; // the box behind the number
+  color: string; // the number's color, #rrggbb
+  dstyle: "text" | "pill"; // the +$ / -$: outlined letters or a badge
+  dsize: number; // the +$ / -$ size: 0.75, 1 or 1.4
+  speed: number; // animation speed: 0.6, 1 or 1.6
+  bigwin: boolean; // adding 1,000,000 or more also gets the gold glow and sparkles
+  short: boolean; // $7.3M instead of $7,300,000
 }
+
+export const MONEY_LOOKS = [
+  ["dark", "Dark"],
+  ["gold", "Gold"],
+  ["neon", "Neon"],
+  ["clean", "White"],
+  ["glass", "Glass"],
+  ["none", "No box"],
+] as const;
+export type MoneyLook = (typeof MONEY_LOOKS)[number][0];
+
+export const MONEY_COLORS = [
+  ["#f9c933", "Gold"],
+  ["#ffffff", "White"],
+  ["#4ade80", "Green"],
+  ["#22d3ee", "Cyan"],
+  ["#f472b6", "Pink"],
+  ["#fb923c", "Orange"],
+] as const;
+export const MONEY_DSIZES = [
+  [0.75, "Small"],
+  [1, "Medium"],
+  [1.4, "Big"],
+] as const;
+export const MONEY_SPEEDS = [
+  [0.6, "Slow"],
+  [1, "Normal"],
+  [1.6, "Fast"],
+] as const;
 
 export const MONEY_ANIMS = [
   ["bounce", "Bounce", "The box hops and the amount bounces in, then floats away."],
@@ -21,6 +57,9 @@ export const MONEY_ANIMS = [
   ["slam", "Slam", "The amount slams down, the box shakes and flashes green or red."],
   ["burst", "Money burst", "$ signs pop out of the number, and the amount pops up."],
   ["slot", "Slot machine", "Each digit spins like a slot machine. The amount floats up."],
+  ["pop", "Pop", "The number jumps big and wiggles."],
+  ["rain", "Money rain", "💵 rain down when you add. 💸 fly away when you take."],
+  ["jackpot", "Jackpot", "The box glows gold and sparkles ✨ fly out."],
 ] as const;
 export type MoneyAnim = (typeof MONEY_ANIMS)[number][0];
 
@@ -34,7 +73,12 @@ export const MONEY_SPOTS = [
 ] as const;
 export type MoneySpot = (typeof MONEY_SPOTS)[number][0];
 
-export const MONEY_DEFAULTS: MoneyCounter = { amount: 0, label: "TOTAL MONEY", prefix: "$", suffix: "", size: 100, anim: "bounce", spot: "right" };
+export const MONEY_DEFAULTS: MoneyCounter = { amount: 0, label: "TOTAL MONEY", prefix: "$", suffix: "", size: 100, anim: "bounce", spot: "right", look: "dark", color: "#f9c933", dstyle: "text", dsize: 1, speed: 1, bigwin: true, short: false };
+
+const pickNum = (v: unknown, list: ReadonlyArray<readonly [number, string]>, d: number) => {
+  const n = Number(v);
+  return list.some(([x]) => x === n) ? n : d;
+};
 
 export const clampMoney = (n: number) => Math.max(-MONEY_MAX, Math.min(MONEY_MAX, Math.round(Number.isFinite(n) ? n : 0)));
 
@@ -50,6 +94,13 @@ export function cleanMoney(v: unknown): MoneyCounter {
     size: Number.isFinite(size) ? Math.max(30, Math.min(250, size)) : 100,
     anim: MONEY_ANIMS.some(([id]) => id === r.anim) ? (r.anim as MoneyAnim) : MONEY_DEFAULTS.anim,
     spot: MONEY_SPOTS.some(([id]) => id === r.spot) ? (r.spot as MoneySpot) : MONEY_DEFAULTS.spot,
+    look: MONEY_LOOKS.some(([id]) => id === r.look) ? (r.look as MoneyLook) : MONEY_DEFAULTS.look,
+    color: typeof r.color === "string" && /^#[0-9a-f]{6}$/i.test(r.color) ? r.color.toLowerCase() : MONEY_DEFAULTS.color,
+    dstyle: r.dstyle === "pill" ? "pill" : "text",
+    dsize: pickNum(r.dsize, MONEY_DSIZES, 1),
+    speed: pickNum(r.speed, MONEY_SPEEDS, 1),
+    bigwin: typeof r.bigwin === "boolean" ? r.bigwin : MONEY_DEFAULTS.bigwin,
+    short: r.short === true,
   };
 }
 

@@ -444,7 +444,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     purpose: "A TOTAL MONEY box on stream that you change with a Stream Deck button or from this page.",
     steps: [
       "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set Width 1400 and Height 500. Drag it where you want it.",
-      "Pick an animation (Bounce, Float, Slam, Money burst or Slot machine) and where the green +$ / red −$ shows. Each one plays in the preview when you pick it.",
+      "Pick an animation (Bounce, Float, Slam, Money burst, Slot machine, Pop, Money rain or Jackpot) and where the green +$ / red −$ shows. Each one plays in the preview when you pick it.",
+      "Pick the box look, the number color, the +$ / −$ style and size, and the speed. Turn on Big win celebration or Short numbers if you want them.",
       "Change the words on top, the $ and the size under the preview if you want.",
       "Use Add, Take away or Set to this to change the total from here.",
       "For the Stream Deck: get plugin 1.2 or newer on the Stream Deck page, drag Spartacus → Money Counter onto a key, type an amount and pick Add or Set.",
@@ -454,6 +455,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Make one key per amount, like +100000, +1000000 and -100000. A key set to 0 is a reset button.",
       "On a Stream Deck +, the Money Dial adds or takes away the amount per click. Press it twice to reset.",
       "Make it bigger with the Size slider instead of stretching it in OBS, so it stays sharp.",
+      "The background is see-through on stream. The checkered pattern only shows in the preview.",
     ],
   },
   "/socials-overlay": {

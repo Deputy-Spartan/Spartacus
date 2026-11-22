@@ -5,6 +5,7 @@ import { SOCIAL_PLATFORMS, SOCIALS_POST_DEFAULTS, socialUrl } from "@spartacus/s
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
+import { PageGuideButton } from "../../../../components/nav/PageGuideButton";
 import { useAutoSave } from "../../../../lib/useAutoSave";
 import { api, type SocialsOverlaySettings, type SocialsPlatformId } from "../../../../lib/api";
 
@@ -191,12 +192,13 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
   }
 
   return (
-    <div>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold">🏷️ Socials</h1>
-        <p className="text-slate-400 text-sm mt-1 max-w-2xl">
-          Your names on Twitch, Kick, YouTube and more, in one place. Show them on stream with an OBS overlay, and post them in Discord as one clean message.
-        </p>
+    <div className="max-w-4xl">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold">🏷️ Socials</h1>
+          <p className="text-slate-400 text-sm mt-1">Your names in one place. Show them on stream and post them in Discord.</p>
+        </div>
+        <PageGuideButton guildId={guildId} inline />
       </div>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {TABS.map(([id, label]) => (
@@ -215,12 +217,12 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
         </span>
       </div>
 
-      <div className="space-y-4 max-w-4xl">
+      <div className="space-y-4">
         {tab === "names" && (
           <NeonCard>
             <p className="font-medium">📱 Your names</p>
             <p className={`${hint} mb-3`}>
-              Type your name on each platform. Tick <b>Stream</b> to show it on the OBS overlay and <b>Post</b> to put it in the Discord post. The arrows change the order for both.
+              Type your name, and a link if you want one. <b>Stream</b> shows it on the overlay, <b>Post</b> puts it in the Discord post. Arrows change the order.
             </p>
             <ul className="space-y-2">
               {s.platforms.map((p, i) => {
@@ -242,7 +244,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                         className={`${field} text-xs`}
                         value={p.url ?? ""}
                         maxLength={300}
-                        placeholder={p.name.trim() ? `Link (optional), e.g. ${meta.link(p.name)}` : "Link (optional)"}
+                        placeholder="🔗 Link (optional)"
                         onChange={(e) => setPlatform(i, { url: e.target.value })}
                         aria-label={`${meta.label} link`}
                       />
@@ -263,7 +265,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
               })}
             </ul>
             <p className={`${hint} mt-3`}>
-              The link is what opens when someone taps your name in the Discord post. Leave it empty and it&apos;s made from your name. For Discord, type your server invite code (the part after discord.gg/) or paste the full invite in the link box. A ticked platform with no name is skipped.
+              No link? One is made from your name. For Discord, type your invite code (the part after discord.gg/). Platforms with no name are skipped.
             </p>
           </NeonCard>
         )}

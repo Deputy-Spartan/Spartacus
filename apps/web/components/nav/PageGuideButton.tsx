@@ -64,23 +64,29 @@ function GuidePanel({ guide, onClose }: { guide: PageGuide; onClose: () => void 
   );
 }
 
+// Pages that put the Guide button in their own header (next to the title),
+// so the layout doesn't also show it on a row of its own.
+const PLACED_BY_PAGE = new Set(["/socials-overlay"]);
+
 // Shown on every dashboard page, so each one has its own step-by-step help.
-export function PageGuideButton({ guildId }: { guildId: string }) {
+// inline = the page placed it itself; otherwise it's the layout's own row.
+export function PageGuideButton({ guildId, inline = false }: { guildId: string; inline?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const key = pathname.split(`/dashboard/${guildId}`)[1]?.replace(/\/$/, "") ?? "";
   const guide = PAGE_GUIDES[key];
 
   useEffect(() => setOpen(false), [pathname]);
-  if (!guide) return null;
+  if (!guide || (!inline && PLACED_BY_PAGE.has(key))) return null;
 
+  const button = (
+    <button type="button" onClick={() => setOpen(true)} className="shrink-0 rounded-lg border border-white/10 bg-base-900 px-3 py-1.5 text-xs text-slate-300 hover:border-neon-blue hover:text-neon-blue">
+      📖 Guide
+    </button>
+  );
   return (
     <>
-      <div className="flex justify-end mb-3">
-        <button type="button" onClick={() => setOpen(true)} className="rounded-lg border border-white/10 bg-base-900 px-3 py-1.5 text-xs text-slate-300 hover:border-neon-blue hover:text-neon-blue">
-          📖 Guide
-        </button>
-      </div>
+      {inline ? button : <div className="flex justify-end mb-3">{button}</div>}
       {open && <GuidePanel guide={guide} onClose={() => setOpen(false)} />}
     </>
   );

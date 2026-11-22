@@ -1811,6 +1811,8 @@ export interface SocialsOverlaySettings {
 
 // Streaming › Money Counter: the TOTAL MONEY box for OBS.
 export type MoneyCounterSettings = import("@spartacus/shared").MoneyCounter;
+// Streaming › K/D Counter: KILLS / DEATHS for OBS.
+export type KdCounterSettings = import("@spartacus/shared").KdCounter;
 
 export interface AppealSettingsRow {
   appealChannelId: string | null;
@@ -2804,6 +2806,10 @@ export const api = {
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter`, { method: "PUT", body: JSON.stringify(input) }),
   changeMoney: (guildId: string, change: { add: number } | { set: number }) =>
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter/amount`, { method: "POST", body: JSON.stringify(change) }),
+  getKdCounter: (guildId: string) => request<KdCounterSettings>(`/guilds/${guildId}/kd-counter`),
+  saveKdCounter: (guildId: string, input: KdCounterSettings) => request<KdCounterSettings>(`/guilds/${guildId}/kd-counter`, { method: "PUT", body: JSON.stringify(input) }),
+  changeKd: (guildId: string, change: { stat: "kills" | "deaths"; add: number } | { stat: "kills" | "deaths" | "both"; set: number }) =>
+    request<KdCounterSettings>(`/guilds/${guildId}/kd-counter/change`, { method: "POST", body: JSON.stringify(change) }),
   getMilestoneSettings: (guildId: string) => request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`),
   updateMilestoneSettings: (guildId: string, input: Partial<MilestoneSettingsRow>) =>
     request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`, { method: "PUT", body: JSON.stringify(input) }),

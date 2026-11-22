@@ -51,6 +51,7 @@ export const ROUTE_LOADS: Record<string, Loader[]> = {
   "/pre-stream": ["getStreamGrowth"],
   "/socials-overlay": ["getSocialsOverlay"],
   "/money-counter": ["getMoneyCounter"],
+  "/kd-counter": ["getKdCounter"],
   "/stream-growth": ["getStreamGrowth"],
   "/suggestion-analytics": ["getSuggestionAnalyticsSettings"],
   "/support-intake": ["getSupportFlows", "getSupportSettings"],

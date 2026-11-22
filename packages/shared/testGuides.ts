@@ -249,6 +249,18 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
     needs: "OBS and a Stream Deck to try it on a real stream.",
   },
+  "/kd-counter": {
+    prepared: "Nothing is set up for you. Kills and deaths start at 0.",
+    tryIt: [
+      "Press +1 under Kills and +1 under Deaths. Check the preview animates the one that changed and K/D updates.",
+      "Pick Bullets and press ▶ Try +1 kill. Check bullets hit around the number with holes and sparks.",
+      "Try each layout, then turn Show K/D off and on.",
+      "Turn on Kill streak, pick 3 kills, then press +1 kill three times. Check the KILL STREAK banner shows.",
+      "Copy the OBS link, open it in a new browser tab, press +1 kill here, and check it changes there within a second.",
+      "With the Stream Deck plugin 1.3: add a Kill / Death key for Kills with 1, press it, and check kills go up.",
+    ],
+    needs: "OBS and a Stream Deck to try it on a real stream.",
+  },
   "/socials-overlay": {
     prepared: "Nothing is set up for you. Pick this channel on the Discord post tab.",
     tryIt: [

@@ -17413,6 +17413,7 @@ var KEYS = [
   { id: "sticky", name: "Resend Sticky", icon: "\u{1F4CC}", glyph: "pin", tip: "Moves a sticky back to the bottom.", fields: ["channel"] },
   { id: "status", name: "My Status", icon: "\u{1F7E2}", glyph: "radio-tower", tip: "Live, Be right back, Offline.", fields: ["channel", "note"] },
   { id: "money", name: "Money Counter", icon: "\u{1F4B0}", glyph: "circle-dollar-sign", tip: "Adds the amount to your money counter on stream (a minus amount takes away), or sets it.", fields: ["amount", "moneyMode"] },
+  { id: "kd", name: "Kill / Death", icon: "\u{1F3AF}", glyph: "crosshair", tip: "Adds to your kills or deaths on stream (a minus amount takes away), or sets them. Pick Both and Set with 0 for a reset key.", fields: ["stat", "amount", "moneyMode"] },
   { id: "botstat", name: "Bot Status", icon: "\u{1F49A}", glyph: "heart-pulse", tip: "Is Spartacus online, and its ping.", fields: [] }
 ];
 var DIALS = [
@@ -17424,6 +17425,7 @@ var DIALS = [
   { id: "dxp", name: "XP Boost Dial", icon: "\u2B50", glyph: "star", tip: "Turn 1x to 3x. Press for an hour of boosted XP.", fields: ["channel"], dial: { rotate: "1x to 3x", push: "Start an hour" } },
   { id: "dpurge", name: "Clear Chat Dial", icon: "\u{1F9F9}", glyph: "eraser", tip: "Turn for how many. Press twice to clear.", fields: ["channel"], dial: { rotate: "How many", push: "Clear (press twice)" }, confirm: true },
   { id: "dmoney", name: "Money Dial", icon: "\u{1F4B0}", glyph: "circle-dollar-sign", tip: "Turn to add or take away the amount per click. Press twice to reset to 0.", fields: ["amount"], dial: { rotate: "Add or take away", push: "Reset to 0 (press twice)" }, confirm: true },
+  { id: "dkd", name: "Kill / Death Dial", icon: "\u{1F3AF}", glyph: "crosshair", tip: "Turn to add or take away kills. Press for +1 death.", fields: [], dial: { rotate: "Kills", push: "+1 death" } },
   { id: "dmm", name: "Matchmaking Dial", icon: "\u{1F3AE}", glyph: "gamepad-2", tip: "Press to open or close matchmaking.", fields: [], dial: { rotate: "\u2014", push: "Open or close" } }
 ];
 var PLUGIN_UUID = "com.spartacus.streamdeck";
@@ -17459,6 +17461,7 @@ var GLYPHS = {
   "pin": '<path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />',
   "radio-tower": '<path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9" /> <path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5" /> <circle cx="12" cy="9" r="2" /> <path d="M16.2 4.8c2 2 2.26 5.11.8 7.47" /> <path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1" /> <path d="M9.5 18h5" /> <path d="m8 22 4-11 4 11" />',
   "circle-dollar-sign": '<circle cx="12" cy="12" r="10" /> <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /> <path d="M12 18V6" />',
+  "crosshair": '<circle cx="12" cy="12" r="10" /> <line x1="22" x2="18" y1="12" y2="12" /> <line x1="6" x2="2" y1="12" y2="12" /> <line x1="12" x2="12" y1="6" y2="2" /> <line x1="12" x2="12" y1="22" y2="18" />',
   "heart-pulse": '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /> <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />',
   "shuffle": '<path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22" /> <path d="m18 2 4 4-4 4" /> <path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" /> <path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" /> <path d="m18 14 4 4-4 4" />',
   "chart-column": '<path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="M18 17V9" /> <path d="M13 17V5" /> <path d="M8 17v-3" />',
@@ -17653,6 +17656,11 @@ plugin_default.actions.onDialRotate(async (ev) => {
     const step = Number(String(s.amount ?? "").replace(/[^0-9-]/g, "")) || 1e3;
     const total = step * n;
     await draw(v, { ...f, line: `${total < 0 ? "\u2212" : "+"}${Math.abs(total).toLocaleString("en-US")}`, tone: total < 0 ? "red" : "green" });
+    send = n;
+  } else if (v.id === "dkd") {
+    const n = (moneyTicks.get(v.action.id) ?? 0) + t;
+    moneyTicks.set(v.action.id, n);
+    await draw(v, { ...f, line: `${n < 0 ? "\u2212" : "+"}${Math.abs(n)} kill${Math.abs(n) === 1 ? "" : "s"}`, tone: n < 0 ? "red" : "green" });
     send = n;
   } else if (v.id === "dpurge") {
     const c = clamp((Number(s.count) || 10) + t * 5, 5, 100);

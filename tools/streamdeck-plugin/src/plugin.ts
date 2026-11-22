@@ -201,6 +201,12 @@ streamDeck.actions.onDialRotate<Settings>(async (ev) => {
     const total = step * n;
     await draw(v, { ...f, line: `${total < 0 ? "−" : "+"}${Math.abs(total).toLocaleString("en-US")}`, tone: total < 0 ? "red" : "green" });
     send = n;
+  } else if (v.id === "dkd") {
+    // Same as the Money Dial: clicks add up, then go as one change.
+    const n = (moneyTicks.get(v.action.id) ?? 0) + t;
+    moneyTicks.set(v.action.id, n);
+    await draw(v, { ...f, line: `${n < 0 ? "−" : "+"}${Math.abs(n)} kill${Math.abs(n) === 1 ? "" : "s"}`, tone: n < 0 ? "red" : "green" });
+    send = n;
   } else if (v.id === "dpurge") {
     const c = clamp((Number(s.count) || 10) + t * 5, 5, 100);
     s.count = c;

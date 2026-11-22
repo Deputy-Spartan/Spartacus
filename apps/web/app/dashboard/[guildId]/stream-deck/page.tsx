@@ -29,6 +29,7 @@ const ACTIONS: Array<[string, Array<[string, string, string]>]> = [
       ["📣", "Shoutout", "Posts a shoutout card for another streamer."],
       ["🟢", "My Status", "Steps through Live, Be right back and Offline, and keeps one status post up to date."],
       ["💰", "Money Counter", "Adds an amount to your on-stream money counter (a minus amount takes away), or sets it. Make one key per amount."],
+      ["🎯", "Kill / Death", "Adds to your on-stream kills or deaths, or sets them. Pick Both and Set with 0 for a reset key."],
     ],
   ],
   [
@@ -74,6 +75,7 @@ const ACTIONS: Array<[string, Array<[string, string, string]>]> = [
       ["⭐", "XP Boost dial", "Turn from 1x to 3x. Press to start an hour of boosted XP, which Spartacus announces."],
       ["🧹", "Clear Chat dial", "Turn to pick how many messages. Press twice to clear them."],
       ["🎮", "Matchmaking dial", "Press to open or close matchmaking."],
+      ["🎯", "Kill / Death dial", "Turn to add or take away kills. Press for +1 death."],
       ["💰", "Money dial", "Turn to add or take away your amount per click on the Money Counter. Press twice to reset it to 0."],
     ],
   ],

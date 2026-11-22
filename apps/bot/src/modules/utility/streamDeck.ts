@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Guild, type GuildMember, type GuildTextBasedChannel, type VoiceBasedChannel } from "discord.js";
-import { MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
+import { KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
@@ -94,6 +94,16 @@ async function changeMoney(guildId: string, f: (cur: number) => number) {
   await setState(guildId, MONEY_STATE_KEY, m);
   return m;
 }
+
+// Streaming › K/D Counter (same idea, its own row).
+const getKd = async (guildId: string) => cleanKd(await getState(guildId, KD_STATE_KEY));
+async function changeKdState(guildId: string, stat: "kills" | "deaths" | "both", op: { add: number } | { set: number }) {
+  const next = changeKd(await getKd(guildId), stat, op);
+  await setState(guildId, KD_STATE_KEY, next);
+  return next;
+}
+const kdStat = (s: Settings) => (s.stat === "deaths" ? "deaths" : s.stat === "both" ? "both" : "kills");
+const kdLine = (k: { kills: number; deaths: number }) => `${k.kills} / ${k.deaths}`;
 
 // ---- Options for the plugin's settings (dropdowns) ----
 export async function streamDeckOptions(guild: Guild) {
@@ -263,6 +273,18 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
     case "dmoney": {
       const m = await getMoney(g.id);
       return { title: `Money ±${shortMoney(Math.abs(moneyAmount(s, 1000)), m.prefix)}`, line: shortMoney(m.amount, m.prefix), tone: "green" };
+    }
+    case "kd": {
+      const k = await getKd(g.id);
+      const stat = kdStat(s);
+      const by = moneyAmount(s, 1);
+      const name = stat === "both" ? "K/D" : stat === "kills" ? "Kill" : "Death";
+      const title = s.moneyMode === "set" || stat === "both" ? `Set ${name} ${stat === "both" ? moneyAmount(s, 0) : by}` : `${by < 0 ? "−" : "+"}${Math.abs(by)} ${name}${Math.abs(by) === 1 ? "" : "s"}`;
+      return { title, line: kdLine(k), tone: s.moneyMode === "set" || stat === "both" ? "warn" : stat === "kills" ? "green" : "red" };
+    }
+    case "dkd": {
+      const k = await getKd(g.id);
+      return { title: "Kills · Deaths", line: kdLine(k), tone: "green", pct: Math.min(1, k.kills / Math.max(1, k.kills + k.deaths)) };
     }
   }
   return { title: action, line: "", tone: "" };
@@ -569,6 +591,19 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
       else if (op === "press") m = await changeMoney(g.id, () => 0);
       else return { ok: true, message: "" };
       return { ok: true, message: `Money: ${formatMoney(m.amount, m.prefix, m.suffix)}.` };
+    }
+    // K/D Counter: the key adds to kills or deaths (or sets them; "both" sets
+    // both). The dial adds kills when turned and a death when pressed.
+    case "kd":
+    case "dkd": {
+      let k;
+      if (action === "kd") {
+        const stat = kdStat(s);
+        k = s.moneyMode === "set" || stat === "both" ? await changeKdState(g.id, stat, { set: moneyAmount(s, 0) }) : await changeKdState(g.id, stat, { add: moneyAmount(s, 1) });
+      } else if (op === "turn") k = await changeKdState(g.id, "kills", { add: Math.round(value ?? 0) });
+      else if (op === "press") k = await changeKdState(g.id, "deaths", { add: 1 });
+      else return { ok: true, message: "" };
+      return { ok: true, message: `Kills ${k.kills}, deaths ${k.deaths}.` };
     }
   }
   return { ok: false, message: "Spartacus doesn't know that button yet. Update the plugin." };

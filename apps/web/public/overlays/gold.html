@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Socials Lower Third</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap">
+<style>
+/* OBS browser source, 1920x1080, see-through background.
+   Settings come from the address (setup.html builds it):
+   show=kick,discord   which ones, in order
+   hold=8              seconds each one stays up
+   every=0             minutes before the whole set plays again (0 = play once)
+   pos=left|center|right, size=100 (percent), and a name per platform: kick=Name&twitch=Name... */
+:root {
+  --gold: #e0a91e; --gold-hi: #f6cf5c; --gold-lo: #8a6206;
+  --ink: #0a0a0a; --text: #f4efe6; --brand: #e0a91e;
+}
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+body.preview { background: repeating-conic-gradient(#2a2c31 0 25%, #222428 0 50%) 0 0 / 40px 40px; }
+#stage { position: fixed; inset: 0; }
+.lt { position: absolute; bottom: 70px; height: 124px; display: inline-block; font-family: "Poppins", "Segoe UI", system-ui, sans-serif; visibility: hidden; }
+.lt.left { left: 70px; transform-origin: bottom left; }
+.lt.right { right: 70px; transform-origin: bottom right; }
+.lt.center { left: 50%; transform-origin: bottom center; }
+
+/* Silver circle with the logo */
+.badge { position: absolute; left: 0; top: 10px; width: 104px; height: 104px; border-radius: 50%; z-index: 4; display: grid; place-items: center;
+  background: radial-gradient(circle at 34% 28%, #ffffff, #e2e2e2 40%, #a7a7a7 78%, #8b8b8b);
+  box-shadow: 0 0 0 4px var(--gold), 0 0 0 6px var(--gold-lo), 0 8px 20px rgba(0,0,0,.55), inset 0 -6px 12px rgba(0,0,0,.25); }
+.badge svg { width: 56px; height: 56px; color: #141414; filter: drop-shadow(0 1px 0 rgba(255,255,255,.6)); }
+
+/* Black bar with the name */
+.bar { position: relative; z-index: 2; margin: 24px 0 0 60px; height: 76px; display: flex; align-items: center; padding: 0 52px 0 72px;
+  border: 3px solid var(--gold); border-left: 0; border-radius: 0 42px 42px 0; overflow: hidden;
+  background: linear-gradient(180deg, #202020 0%, #050505 52%, #0e0e0e 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 10px 24px rgba(0,0,0,.45); }
+.name { color: var(--text); font-weight: 600; font-size: 38px; letter-spacing: .01em; white-space: nowrap; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.brandline { position: absolute; left: 56px; right: 46px; bottom: 9px; height: 3px; border-radius: 3px; background: var(--brand); box-shadow: 0 0 10px var(--brand); transform-origin: left; opacity: .9; }
+.sheen { position: absolute; top: 0; bottom: 0; width: 120px; left: -160px; background: linear-gradient(100deg, transparent, rgba(255,255,255,.18), transparent); }
+
+/* Gold tag on top: "Follow me on Kick" */
+.tag { position: absolute; z-index: 3; left: 98px; top: 2px; height: 24px; display: flex; align-items: center; padding: 0 28px 0 14px;
+  background: linear-gradient(90deg, #b07f0c, var(--gold-hi) 55%, var(--gold)); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
+  color: #1d1400; font-weight: 700; font-size: 13px; letter-spacing: .03em; white-space: nowrap; }
+
+/* Gold strip under the bar */
+.under { position: absolute; z-index: 1; left: 100px; top: 96px; height: 14px; width: 46%; min-width: 180px;
+  background: linear-gradient(90deg, var(--gold-lo), var(--gold) 40%, var(--gold-hi)); clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+
+/* Speed lines */
+.lines { position: absolute; right: 40px; z-index: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.lines.top { top: 4px; } .lines.bot { top: 104px; }
+.lines i { display: block; height: 2px; border-radius: 2px; background: var(--gold); animation: zip 2.4s ease-in-out infinite; }
+.lines i:nth-child(2) { background: #8d8d8d; animation-delay: .4s; }
+.lines i:nth-child(3) { animation-delay: .8s; }
+@keyframes zip { 0%, 100% { transform: translateX(0); opacity: .9; } 50% { transform: translateX(-26px); opacity: .5; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="lt left" id="lt">
+    <div class="lines top"><i style="width:90px"></i><i style="width:60px"></i><i style="width:24px"></i></div>
+    <div class="tag" id="tag"></div>
+    <div class="bar" id="bar"><div class="name" id="name"></div><div class="brandline" id="brandline"></div><div class="sheen" id="sheen"></div></div>
+    <div class="under" id="under"></div>
+    <div class="lines bot"><i style="width:70px"></i><i style="width:110px"></i></div>
+    <div class="badge" id="badge"></div>
+  </div>
+</div>
+<script>
+// Each platform: the words on the gold tag, its color (the thin glowing line), and its logo.
+const PLATFORMS = {
+  kick: { tag: "Follow me on Kick", color: "#53fc18",
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h6v5h2V6h2V4h2V3h6v6h-2v2h-2v2h2v2h2v6h-6v-1h-2v-2h-2v-2H9v5H3z"/></svg>' },
+  discord: { tag: "Join my Discord", color: "#5865f2",
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.2a18.3 18.3 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.4C.6 9 0 13.6.3 18.1a19.9 19.9 0 0 0 6 3l1.3-2a13 13 0 0 1-2-1l.5-.4a14.2 14.2 0 0 0 11.8 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.8 19.8 0 0 0 6-3c.4-5.3-.7-9.8-3.4-13.7zM8.5 15.4c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4zm7 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4z"/></svg>' },
+  x: { tag: "Follow me on X", color: "#ffffff",
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.2 2.3h3.4l-7.4 8.4 8.8 11h-6.8l-5.3-6.9-6.1 6.9H1.4l7.9-9L1 2.3h7l4.8 6.3 5.4-6.3zm-1.2 17.4h1.9L7.1 4.2H5.1z"/></svg>' },
+  twitch: { tag: "Follow me on Twitch", color: "#9146ff",
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.3 2 2.5 6.6v13.6h5V23h2.8l2.8-2.8h4.2l5.6-5.6V2H4.3zm16 11.8-3.3 3.3h-5.2l-2.8 2.8v-2.8H4.6V4h15.7v9.8zM15.6 7.1h1.9v5.6h-1.9zm-5.2 0h1.9v5.6h-1.9z"/></svg>' },
+  youtube: { tag: "Subscribe on YouTube", color: "#ff0033",
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.75 15.02V8.98L15.5 12z"/></svg>' },
+  tiktok: { tag: "Follow me on TikTok", color: "#25f4ee",
+    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 2h-3.3v13.4a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9.2a6.3 6.3 0 1 0 5.3 6.2V8.6a8 8 0 0 0 4.7 1.5V6.8A4.8 4.8 0 0 1 16.6 2z"/></svg>' },
+  instagram: { tag: "Follow me on Instagram", color: "#e1306c",
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="5.5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none"/></svg>' },
+};
+const DEFAULT_NAME = "";
+
+const q = new URLSearchParams(location.search);
+const show = (q.get("show") || "kick,discord,x,twitch,youtube").split(",").map((s) => s.trim().toLowerCase()).filter((s) => PLATFORMS[s] && (q.get(s) || DEFAULT_NAME));
+const hold = Math.max(2, Number(q.get("hold")) || 8) * 1000;
+const every = Math.max(0, Number(q.get("every")) || 0) * 60000;
+const gap = 900;
+const pos = ["left", "center", "right"].includes(q.get("pos")) ? q.get("pos") : "left";
+const size = Math.min(200, Math.max(40, Number(q.get("size")) || 100)) / 100;
+if (q.get("preview") === "1") document.body.classList.add("preview");
+
+const $ = (id) => document.getElementById(id);
+const lt = $("lt");
+lt.className = `lt ${pos}`;
+const base = pos === "center" ? "translateX(-50%) " : "";
+lt.style.transform = `${base}scale(${size})`;
+
+
+// From the dashboard (Streaming › Socials Overlay): when the settings are
+// saved again, reload so the stream shows the new names straight away.
+if (q.get("g") && q.get("api")) {
+  setInterval(() => {
+    fetch(`${q.get("api")}/public/socials-overlay/${q.get("g")}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (s && s.updatedAt !== q.get("v")) location.replace(`/overlay/socials/${q.get("g")}`); })
+      .catch(() => null);
+  }, 20000);
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const EASE = "cubic-bezier(.2,.8,.2,1)";
+
+// [element, keyframes, start (ms), length (ms)]
+function parts() {
+  return [
+    [$("badge"), [{ transform: "scale(0) rotate(-120deg)", opacity: 0 }, { transform: "scale(1.08) rotate(8deg)", opacity: 1, offset: 0.7 }, { transform: "scale(1) rotate(0)", opacity: 1 }], 0, 520],
+    [$("bar"), [{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)" }], 260, 560],
+    [$("under"), [{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)" }], 560, 420],
+    [$("tag"), [{ transform: "translateY(14px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], 640, 380],
+    [$("name"), [{ transform: "translateX(-24px)", opacity: 0, filter: "blur(6px)" }, { transform: "translateX(0)", opacity: 1, filter: "blur(0)" }], 700, 460],
+    [$("brandline"), [{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], 860, 520],
+    ...[...document.querySelectorAll(".lines")].map((el) => [el, [{ opacity: 0, transform: "translateX(30px)" }, { opacity: 1, transform: "translateX(0)" }], 880, 420]),
+  ];
+}
+
+function run(list, out) {
+  const end = Math.max(...list.map(([, , d, len]) => d + len));
+  return Promise.all(
+    list.map(([el, kf, d, len]) =>
+      el.animate(out ? [...kf].reverse() : kf, {
+        duration: out ? len * 0.7 : len,
+        delay: out ? (end - d - len) * 0.6 : d,
+        easing: out ? "cubic-bezier(.6,0,.8,.2)" : EASE,
+        fill: "both",
+      }),
+    ).map((a) => {
+      if (q.get("still") === "1") a.finish(); // for screenshots: jump to the end
+      return a.finished;
+    }),
+  );
+}
+
+async function playOne(id) {
+  const p = PLATFORMS[id];
+  $("badge").innerHTML = p.icon;
+  $("tag").textContent = p.tag;
+  $("name").textContent = q.get(id) || DEFAULT_NAME;
+  lt.style.setProperty("--brand", p.color);
+  const list = parts();
+  lt.style.visibility = "visible";
+  await run(list, false);
+  $("sheen").animate([{ transform: "translateX(0)" }, { transform: "translateX(1400px)" }], { duration: 1300, easing: "ease-in-out" });
+  await sleep(hold);
+  await run(list, true);
+  lt.style.visibility = "hidden";
+}
+
+(async () => {
+  await document.fonts.ready.catch(() => null);
+  await sleep(300);
+  do {
+    for (const id of show) {
+      await playOne(id);
+      await sleep(gap);
+    }
+    if (every) await sleep(every);
+  } while (every);
+})();
+</script>
+</body>
+</html>

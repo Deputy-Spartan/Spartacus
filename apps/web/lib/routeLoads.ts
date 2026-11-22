@@ -49,6 +49,7 @@ export const ROUTE_LOADS: Record<string, Loader[]> = {
   "/stream-alerts": ["getStreamSubscriptions"],
   "/stream-extras": ["getStreamExtras"],
   "/pre-stream": ["getStreamGrowth"],
+  "/socials-overlay": ["getSocialsOverlay"],
   "/stream-growth": ["getStreamGrowth"],
   "/suggestion-analytics": ["getSuggestionAnalyticsSettings"],
   "/support-intake": ["getSupportFlows", "getSupportSettings"],

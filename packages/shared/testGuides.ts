@@ -237,6 +237,16 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
       "Remove an item, or press Reset, and run /prestream again.",
     ],
   },
+  "/socials-overlay": {
+    prepared: "Nothing to set up in Discord. This one lives on the dashboard and in OBS.",
+    tryIt: [
+      "Open Socials Overlay on the dashboard, tick two platforms and type a name on each. The preview shows them.",
+      "Switch the look between Sticker and Gold bar and press Play again.",
+      "Copy the OBS link, open it in a new browser tab, and check your names pop in.",
+      "Change a name on the dashboard, wait about 20 seconds, and check the open tab updates by itself.",
+    ],
+    needs: "OBS, to see it on a real stream.",
+  },
   "/stream-growth": {
     prepared: "Countdowns post here with a Stream Ping role, friends go live in #stream-raids, game nights go to #game-nights, the live board is posted here, and recaps and Viewer of the Week are on.",
     tryIt: [

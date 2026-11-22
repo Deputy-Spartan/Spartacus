@@ -439,6 +439,23 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Ticks aren't saved. Every /prestream starts fresh.",
     ],
   },
+  "/socials-overlay": {
+    title: "Socials Overlay",
+    purpose: "A lower third for your stream that shows your names on Twitch, Kick, YouTube, TikTok, X, Discord and Instagram, so viewers can find you.",
+    steps: [
+      "Tick the platforms to show and type your name on each. Use the arrows to change the order.",
+      "Pick a look: Sticker (all in one row) or Gold bar (one platform at a time).",
+      "Choose where it sits, its size, how long it stays up and how often it comes back.",
+      "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set 1920 by 1080.",
+      "Tick Shutdown source when not visible and Refresh browser when scene becomes active, so it pops in each time you show it.",
+    ],
+    members: ["Viewers see it on your stream. Nothing is posted in Discord."],
+    tips: [
+      "Platforms next to each other with the same name share one name.",
+      "It saves by itself, and the overlay on stream updates within about 20 seconds. You never need a new link.",
+      "Add the same link more than once in OBS if you want it in more than one scene.",
+    ],
+  },
   "/stream-growth": {
     title: "Stream Growth",
     purpose: "Help your streams grow: countdown pings, friends to raid and shout out, a who's-live board, a recap after each stream, Viewer of the Week, game nights, title updates and chat ranks.",

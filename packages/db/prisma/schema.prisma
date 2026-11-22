@@ -3461,3 +3461,20 @@ model CommandListSettings {
   sections        Json     @default("{}") // per category: { on, channelId } — off, or its own channel
   channelPosts    Json     @default("{}") // channel id → [{key,id,hash}] posted there
 }
+
+// ---- Socials overlay ----
+// The stream lower third with your platform names (Streaming › Socials Overlay).
+// OBS loads it from /overlay/socials/:guildId on the dashboard site, which
+// reads these settings through the public API, so a change here shows on
+// stream without pasting a new link.
+model SocialsOverlay {
+  id        String   @id @default(cuid())
+  guildId   String   @unique
+  platforms Json     @default("[]") // [{ id: "kick", on: true, name: "Deputy_Spartan" }] in the order shown
+  style     String   @default("sticker") // sticker | gold
+  pos       String   @default("left") // left | center | right
+  size      Int      @default(100) // percent
+  hold      Int      @default(0) // seconds it stays up (sticker: 0 = until hidden)
+  every     Int      @default(0) // minutes before it plays again (0 = once)
+  updatedAt DateTime @updatedAt
+}

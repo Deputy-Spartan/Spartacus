@@ -1790,6 +1790,18 @@ export interface MilestoneSettingsRow {
   channelId: string | null;
 }
 
+// Streaming › Socials Overlay: the lower third with your platform names.
+export type SocialsPlatformId = "twitch" | "kick" | "youtube" | "tiktok" | "x" | "discord" | "instagram";
+export interface SocialsOverlaySettings {
+  platforms: Array<{ id: SocialsPlatformId; on: boolean; name: string }>;
+  style: "sticker" | "gold";
+  pos: "left" | "center" | "right";
+  size: number;
+  hold: number;
+  every: number;
+  updatedAt?: string | null;
+}
+
 export interface AppealSettingsRow {
   appealChannelId: string | null;
 }
@@ -2772,6 +2784,9 @@ export const api = {
   updateConfessionSettings: (guildId: string, input: Partial<ConfessionSettingsRow>) =>
     request<ConfessionSettingsRow>(`/guilds/${guildId}/confession-settings`, { method: "PUT", body: JSON.stringify(input) }),
 
+  getSocialsOverlay: (guildId: string) => request<SocialsOverlaySettings>(`/guilds/${guildId}/socials-overlay`),
+  saveSocialsOverlay: (guildId: string, input: SocialsOverlaySettings) =>
+    request<SocialsOverlaySettings>(`/guilds/${guildId}/socials-overlay`, { method: "PUT", body: JSON.stringify(input) }),
   getMilestoneSettings: (guildId: string) => request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`),
   updateMilestoneSettings: (guildId: string, input: Partial<MilestoneSettingsRow>) =>
     request<MilestoneSettingsRow>(`/guilds/${guildId}/milestone-settings`, { method: "PUT", body: JSON.stringify(input) }),

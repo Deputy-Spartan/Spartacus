@@ -37,9 +37,11 @@ function Tile({ id, size = 36, radius = 10 }: { id: SocialsPlatformId; size?: nu
 }
 
 // The overlay page with these settings, for the preview (before saving).
-function previewUrl(s: SocialsOverlaySettings) {
+// tall = the 1080x1920 (TikTok) version, with the names stacked.
+function previewUrl(s: SocialsOverlaySettings, tall: boolean) {
   const shown = s.platforms.filter((p) => p.on && p.name.trim());
   const q = new URLSearchParams({ preview: "1", show: shown.map((p) => p.id).join(","), pos: s.pos, size: String(s.size), hold: String(s.hold), every: "0" });
+  if (tall) q.set("vert", "1");
   for (const p of shown) q.set(p.id, p.name.trim());
   return `/overlays/${s.style === "gold" ? "gold" : "sticker"}.html?${q}`;
 }
@@ -58,7 +60,8 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
   const [s, setS] = useState<SocialsOverlaySettings | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("names");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"" | "wide" | "tall">("");
+  const [tall, setTall] = useState(false);
   const [playKey, setPlayKey] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
@@ -76,26 +79,26 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
     if (s) await api.saveSocialsOverlay(guildId, s);
   });
 
-  // Keep the 1920x1080 preview fitted to its box.
+  // Keep the 1920x1080 (or 1080x1920) preview fitted to its box.
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const fit = () => setScale(el.clientWidth / 1920);
+    const fit = () => setScale(el.clientWidth / (tall ? 1080 : 1920));
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [s === null, tab]);
+  }, [s === null, tab, tall]);
 
   // The preview catches up half a second after you stop typing, instead of
   // restarting on every letter.
   const [src, setSrc] = useState("");
   useEffect(() => {
     if (!s) return;
-    const t = setTimeout(() => setSrc(previewUrl(s)), src ? 500 : 0);
+    const t = setTimeout(() => setSrc(previewUrl(s, tall)), src ? 500 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s]);
+  }, [s, tall]);
 
   if (failed) return <p className="text-rose-300">Couldn&apos;t load the socials settings. Refresh the page to try again.</p>;
   if (!s) return <p className="text-slate-400">Loading…</p>;
@@ -113,13 +116,17 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
   const title = s.postTitle?.trim() || SOCIALS_POST_DEFAULTS.title;
   const text = s.postText ?? SOCIALS_POST_DEFAULTS.text;
   const obsLink = typeof window !== "undefined" ? `${window.location.origin}/overlay/socials/${guildId}` : "";
+  const links = [
+    { id: "wide" as const, label: "📺 Wide (normal stream)", size: "Width 1920, Height 1080.", url: obsLink },
+    { id: "tall" as const, label: "📱 Tall (TikTok / vertical)", size: "Width 1080, Height 1920. Add it to your vertical scenes.", url: `${obsLink}?vert=1` },
+  ];
 
-  const copy = () => {
+  const copy = (which: "wide" | "tall", url: string) => {
     navigator.clipboard
-      .writeText(obsLink)
+      .writeText(url)
       .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        setCopied(which);
+        setTimeout(() => setCopied(""), 1500);
       })
       .catch(() => null);
   };
@@ -227,19 +234,32 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                   <p className="font-medium">👀 Preview</p>
                   <p className={hint}>The checkered part is see-through on stream.</p>
                 </div>
-                <button className={button} onClick={() => setPlayKey((k) => k + 1)}>
-                  ▶ Play again
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      [false, "📺 Wide"],
+                      [true, "📱 Tall"],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button key={label} type="button" onClick={() => setTall(v)} aria-pressed={tall === v} className={`${button} ${tall === v ? "border-neon-blue bg-neon-blue/15 text-white" : ""}`}>
+                      {label}
+                    </button>
+                  ))}
+                  <button className={button} onClick={() => setPlayKey((k) => k + 1)}>
+                    ▶ Play again
+                  </button>
+                </div>
               </div>
-              <div ref={box} className="relative w-full aspect-video overflow-hidden rounded-lg border border-white/10 bg-black">
+              <div ref={box} className={`relative overflow-hidden rounded-lg border border-white/10 bg-black ${tall ? "w-full max-w-[280px] mx-auto aspect-[9/16]" : "w-full aspect-video"}`}>
                 <iframe
                   key={`${playKey}:${src}`}
                   src={src || undefined}
                   title="Socials overlay preview"
                   className="absolute left-0 top-0 border-0 pointer-events-none"
-                  style={{ width: 1920, height: 1080, transform: `scale(${scale})`, transformOrigin: "0 0" }}
+                  style={{ width: tall ? 1080 : 1920, height: tall ? 1920 : 1080, transform: `scale(${scale})`, transformOrigin: "0 0" }}
                 />
               </div>
+              {tall && <p className={`${hint} mt-2 text-center`}>Names stack one per line, up near the top so TikTok&apos;s comments don&apos;t cover them.</p>}
               {onStream.length === 0 && <p className="text-xs text-amber-200 mt-2">Tick Stream on a platform in Your names and type its name to see it.</p>}
             </NeonCard>
 
@@ -294,17 +314,26 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
 
             <NeonCard>
               <p className="font-medium">🎥 Add it to OBS</p>
-              <p className={`${hint} mb-3`}>One link. It keeps working when you change anything on this page.</p>
-              <div className="flex flex-col sm:flex-row gap-2 mb-4">
-                <input className={`${field} font-mono text-xs`} value={obsLink} readOnly onFocus={(e) => e.target.select()} aria-label="OBS link" />
-                <button className={`${button} shrink-0`} onClick={copy}>
-                  {copied ? "Copied ✓" : "Copy link"}
-                </button>
+              <p className={`${hint} mb-3`}>One link for your normal stream, one for vertical (TikTok). Both keep working when you change anything on this page.</p>
+              <div className="space-y-3 mb-4">
+                {links.map((l) => (
+                  <div key={l.id}>
+                    <p className="text-sm mb-1">
+                      {l.label} <span className={hint}>{l.size}</span>
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input className={`${field} font-mono text-xs`} value={l.url} readOnly onFocus={(e) => e.target.select()} aria-label={`${l.label} OBS link`} />
+                      <button className={`${button} shrink-0`} onClick={() => copy(l.id, l.url)}>
+                        {copied === l.id ? "Copied ✓" : "Copy link"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
               <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-300">
                 <li>In OBS: Sources → + → Browser.</li>
                 <li>Untick Local file and paste the link into URL.</li>
-                <li>Width 1920, Height 1080.</li>
+                <li>Set the width and height shown above the link.</li>
                 <li>Tick Shutdown source when not visible and Refresh browser when scene becomes active, so it pops in each time you show it.</li>
               </ol>
               <p className={`${hint} mt-3`}>After you change something here, the overlay on stream updates within about 20 seconds.</p>

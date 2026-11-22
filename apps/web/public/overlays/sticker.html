@@ -11,6 +11,7 @@
                               name share one name, wherever they are in the list.
    hold=0       seconds it stays up (0 = stays until you hide it)
    every=0      minutes before it pops up again (0 = once)
+   vert=1       for a 1080x1920 canvas: names stacked, near the top
    pos=left|center|right, size=100 (percent), and a name per platform: kick=Name&twitch=Name... */
 :root { --tile: 74px; --gap: 7px; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
@@ -20,6 +21,13 @@ body.preview { background: repeating-conic-gradient(#3a3d44 0 25%, #30333a 0 50%
 .row.right { right: 70px; transform-origin: bottom right; }
 .row.center { left: 50%; transform-origin: bottom center; }
 .group { display: flex; align-items: center; gap: var(--gap); }
+
+/* vert=1: for a 1080x1920 (TikTok) canvas. One name per line, stacked, up near
+   the top so TikTok's comments and buttons at the bottom don't cover it. */
+.vert .row { bottom: auto; top: 270px; flex-direction: column; gap: 22px; }
+.vert .row.left { left: 50px; align-items: flex-start; transform-origin: top left; }
+.vert .row.right { right: 50px; align-items: flex-end; transform-origin: top right; }
+.vert .row.center { align-items: center; transform-origin: top center; }
 
 /* App tile: brand color, white sticker border, thin black edge */
 .tile { width: var(--tile); height: var(--tile); box-sizing: border-box; border-radius: 22px; border: 6px solid #fff; display: grid; place-items: center;
@@ -61,10 +69,13 @@ const every = Math.max(0, Number(q.get("every")) || 0) * 60000;
 const pos = ["left", "center", "right"].includes(q.get("pos")) ? q.get("pos") : "left";
 const size = Math.min(200, Math.max(30, Number(q.get("size")) || 100)) / 100;
 if (q.get("preview") === "1") document.body.classList.add("preview");
+const vert = q.get("vert") === "1";
+if (vert) document.body.classList.add("vert");
 
 const row = document.getElementById("row");
 row.className = `row ${pos}`;
-row.style.transform = `${pos === "center" ? "translateX(-50%) " : ""}scale(${size})`;
+const placeRow = (s) => { row.style.transform = `${pos === "center" ? "translateX(-50%) " : ""}scale(${s})`; };
+placeRow(size);
 
 // Every platform with the same name shares one name, wherever it is in the list,
 // so there is one group per different name (in the order each name first shows up).
@@ -100,6 +111,12 @@ for (const g of groups) {
   row.appendChild(el);
 }
 
+// Never run off the screen: shrink to fit the canvas width if it's too wide.
+function fitRow() {
+  const room = window.innerWidth - 100;
+  const wide = row.scrollWidth * size;
+  placeRow(wide > room ? (size * room) / wide : size);
+}
 
 // From the dashboard (Streaming › Socials Overlay): when the settings are
 // saved again, reload so the stream shows the new names straight away.
@@ -107,7 +124,7 @@ if (q.get("g") && q.get("api")) {
   setInterval(() => {
     fetch(`${q.get("api")}/public/socials-overlay/${q.get("g")}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => { if (s && s.updatedAt !== q.get("v")) location.replace(`/overlay/socials/${q.get("g")}`); })
+      .then((s) => { if (s && s.updatedAt !== q.get("v")) location.replace(`/overlay/socials/${q.get("g")}${vert ? "?vert=1" : ""}`); })
       .catch(() => null);
   }, 20000);
 }
@@ -157,6 +174,7 @@ function startHops() {
   await document.fonts.ready.catch(() => null);
   await sleep(250);
   if (!pieces.length) return; // nothing picked yet
+  fitRow();
   do {
     await popIn();
     startHops();

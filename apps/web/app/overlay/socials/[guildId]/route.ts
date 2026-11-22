@@ -19,6 +19,8 @@ type Settings = {
 
 export async function GET(req: Request, { params }: { params: { guildId: string } }) {
   const q = new URLSearchParams({ g: params.guildId, api: API_URL });
+  // ?vert=1 is the link for a 1080x1920 (TikTok) canvas: names stacked.
+  if (new URL(req.url).searchParams.get("vert") === "1") q.set("vert", "1");
   let file = "sticker";
   try {
     const res = await fetch(`${API_URL}/public/socials-overlay/${encodeURIComponent(params.guildId)}`, { cache: "no-store" });

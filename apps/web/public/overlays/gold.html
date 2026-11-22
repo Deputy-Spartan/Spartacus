@@ -22,6 +22,10 @@ body.preview { background: repeating-conic-gradient(#2a2c31 0 25%, #222428 0 50%
 .lt.left { left: 70px; transform-origin: bottom left; }
 .lt.right { right: 70px; transform-origin: bottom right; }
 .lt.center { left: 50%; transform-origin: bottom center; }
+.vert .lt { bottom: auto; top: 270px; }
+.vert .lt.left { left: 50px; transform-origin: top left; }
+.vert .lt.right { right: 50px; transform-origin: top right; }
+.vert .lt.center { transform-origin: top center; }
 
 /* Silver circle with the logo */
 .badge { position: absolute; left: 0; top: 10px; width: 104px; height: 104px; border-radius: 50%; z-index: 4; display: grid; place-items: center;
@@ -95,6 +99,10 @@ const gap = 900;
 const pos = ["left", "center", "right"].includes(q.get("pos")) ? q.get("pos") : "left";
 const size = Math.min(200, Math.max(40, Number(q.get("size")) || 100)) / 100;
 if (q.get("preview") === "1") document.body.classList.add("preview");
+// vert=1: a 1080x1920 (TikTok) canvas. Same bar, up near the top so TikTok's
+// comments and buttons at the bottom don't cover it.
+const vert = q.get("vert") === "1";
+if (vert) document.body.classList.add("vert");
 
 const $ = (id) => document.getElementById(id);
 const lt = $("lt");
@@ -109,7 +117,7 @@ if (q.get("g") && q.get("api")) {
   setInterval(() => {
     fetch(`${q.get("api")}/public/socials-overlay/${q.get("g")}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((s) => { if (s && s.updatedAt !== q.get("v")) location.replace(`/overlay/socials/${q.get("g")}`); })
+      .then((s) => { if (s && s.updatedAt !== q.get("v")) location.replace(`/overlay/socials/${q.get("g")}${vert ? "?vert=1" : ""}`); })
       .catch(() => null);
   }, 20000);
 }

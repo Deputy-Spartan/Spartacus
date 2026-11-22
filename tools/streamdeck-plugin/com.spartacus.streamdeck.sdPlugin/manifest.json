@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.spartacus.streamdeck",
   "Name": "Spartacus",
-  "Version": "1.0.0.0",
+  "Version": "1.2.0.0",
   "Author": "Spartacus",
   "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   "Category": "Spartacus",
@@ -524,6 +524,25 @@
       "UserTitleEnabled": false
     },
     {
+      "UUID": "com.spartacus.streamdeck.money",
+      "Name": "Money Counter",
+      "Icon": "imgs/actions/money",
+      "Tooltip": "Adds the amount to your money counter on stream (a minus amount takes away), or sets it.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/money",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
       "UUID": "com.spartacus.streamdeck.botstat",
       "Name": "Bot Status",
       "Icon": "imgs/actions/botstat",
@@ -729,6 +748,33 @@
         "TriggerDescription": {
           "Rotate": "How many",
           "Push": "Clear (press twice)"
+        }
+      },
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.dmoney",
+      "Name": "Money Dial",
+      "Icon": "imgs/actions/dmoney",
+      "Tooltip": "Turn to add or take away the amount per click. Press twice to reset to 0.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/dmoney",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "Icon": "imgs/actions/dmoney",
+        "TriggerDescription": {
+          "Rotate": "Add or take away",
+          "Push": "Reset to 0 (press twice)"
         }
       },
       "UserTitleEnabled": false

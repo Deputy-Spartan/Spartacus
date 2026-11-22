@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Guild, type GuildMember, type GuildTextBasedChannel, type VoiceBasedChannel } from "discord.js";
-import { MODULE_KEYS, MODULE_LABELS, cleanTempGameChoices, type ModuleKey } from "@spartacus/shared";
+import { MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
@@ -79,6 +79,20 @@ function myVoice(m: GuildMember | null): VoiceBasedChannel | null {
 }
 async function lockedDown(guild: Guild) {
   return !!(await getState<{ on: boolean }>(guild.id, "lockdown"))?.on;
+}
+
+// Streaming › Money Counter (the OBS overlay reads the same row).
+// "100,000" and "$5000" work too; empty uses the default (0 is kept).
+const moneyAmount = (s: Settings, d: number) => {
+  const t = String(s.amount ?? "").replace(/[^0-9-]/g, "");
+  return t && Number.isFinite(Number(t)) ? Number(t) : d;
+};
+const getMoney = async (guildId: string) => cleanMoney(await getState(guildId, MONEY_STATE_KEY));
+async function changeMoney(guildId: string, f: (cur: number) => number) {
+  const m = await getMoney(guildId);
+  m.amount = clampMoney(f(m.amount));
+  await setState(guildId, MONEY_STATE_KEY, m);
+  return m;
 }
 
 // ---- Options for the plugin's settings (dropdowns) ----
@@ -240,6 +254,16 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
     }
     case "botstat":
       return { title: "Spartacus", line: `Online · ${Math.max(0, Math.round(g.client.ws.ping))}ms`, tone: "green" };
+    case "money": {
+      const m = await getMoney(g.id);
+      const by = moneyAmount(s, 100);
+      const title = s.moneyMode === "set" ? `Set ${shortMoney(by, m.prefix)}` : `${by < 0 ? "−" : "+"}${shortMoney(Math.abs(by), m.prefix)}`;
+      return { title, line: shortMoney(m.amount, m.prefix), tone: s.moneyMode === "set" ? "warn" : by < 0 ? "red" : "green" };
+    }
+    case "dmoney": {
+      const m = await getMoney(g.id);
+      return { title: `Money ±${shortMoney(Math.abs(moneyAmount(s, 1000)), m.prefix)}`, line: shortMoney(m.amount, m.prefix), tone: "green" };
+    }
   }
   return { title: action, line: "", tone: "" };
 }
@@ -534,6 +558,18 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
     }
     case "botstat":
       return { ok: true, message: `Online. Ping ${Math.round(g.client.ws.ping)} ms, up ${clock(g.client.uptime ?? 0)}.` };
+    // Money Counter: the key adds its amount (or sets it); the dial adds
+    // amount × clicks when turned, and resets to 0 when pressed (twice).
+    case "money":
+    case "dmoney": {
+      const by = moneyAmount(s, action === "money" ? 100 : 1000);
+      let m;
+      if (action === "money") m = await changeMoney(g.id, (cur) => (s.moneyMode === "set" ? by : cur + by));
+      else if (op === "turn") m = await changeMoney(g.id, (cur) => cur + by * Math.round(value ?? 0));
+      else if (op === "press") m = await changeMoney(g.id, () => 0);
+      else return { ok: true, message: "" };
+      return { ok: true, message: `Money: ${formatMoney(m.amount, m.prefix, m.suffix)}.` };
+    }
   }
   return { ok: false, message: "Spartacus doesn't know that button yet. Update the plugin." };
 }

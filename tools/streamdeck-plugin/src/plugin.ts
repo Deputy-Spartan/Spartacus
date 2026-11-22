@@ -159,6 +159,7 @@ streamDeck.actions.onKeyDown<Settings>(async (ev) => {
 // Dials: turning only changes what the screen shows, then the change is sent
 // a moment after you stop, so Discord isn't hit on every click of the dial.
 const DIAL_SLOW = [0, 5, 10, 15, 30, 60, 120, 300, 600];
+const moneyTicks = new Map<string, number>(); // Money Dial clicks not sent yet
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 streamDeck.actions.onDialRotate<Settings>(async (ev) => {
   const v = visible.get(ev.action.id);
@@ -192,6 +193,14 @@ streamDeck.actions.onDialRotate<Settings>(async (ev) => {
     const b = clamp((Number(s.boost) || 2) + t * 0.5, 1, 3);
     s.boost = b;
     await draw(v, { ...f, title: "XP Boost", line: `${b}x · press`, pct: (b - 1) / 2 });
+  } else if (v.id === "dmoney") {
+    // Clicks add up on screen, then go as one change when you stop turning.
+    const n = (moneyTicks.get(v.action.id) ?? 0) + t;
+    moneyTicks.set(v.action.id, n);
+    const step = Number(String(s.amount ?? "").replace(/[^0-9-]/g, "")) || 1000;
+    const total = step * n;
+    await draw(v, { ...f, line: `${total < 0 ? "−" : "+"}${Math.abs(total).toLocaleString("en-US")}`, tone: total < 0 ? "red" : "green" });
+    send = n;
   } else if (v.id === "dpurge") {
     const c = clamp((Number(s.count) || 10) + t * 5, 5, 100);
     s.count = c;
@@ -202,6 +211,7 @@ streamDeck.actions.onDialRotate<Settings>(async (ev) => {
   turnTimers.set(
     v.action.id,
     setTimeout(() => {
+      moneyTicks.delete(v.action.id);
       if (send !== null) void run(v, "turn", send);
       else void refreshAll();
     }, 700),

@@ -237,6 +237,17 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
       "Remove an item, or press Reset, and run /prestream again.",
     ],
   },
+  "/money-counter": {
+    prepared: "Nothing is set up for you. It starts at $0.",
+    tryIt: [
+      "Type 100000 and press + Add. Check the total and the preview roll up to $100,000.",
+      "Press − Take away, then Set to this, then Reset to 0.",
+      "Change the words on top and the size, and check the preview changes.",
+      "Copy the OBS link, open it in a new browser tab, press + Add here, and check it changes there within a second.",
+      "With the Stream Deck plugin 1.2: add a Money Counter key with 5000, press it, and check the total goes up.",
+    ],
+    needs: "OBS and a Stream Deck to try it on a real stream.",
+  },
   "/socials-overlay": {
     prepared: "Nothing is set up for you. Pick this channel on the Discord post tab.",
     tryIt: [

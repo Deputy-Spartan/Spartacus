@@ -439,6 +439,22 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Ticks aren't saved. Every /prestream starts fresh.",
     ],
   },
+  "/money-counter": {
+    title: "Money Counter",
+    purpose: "A TOTAL MONEY box on stream that you change with a Stream Deck button or from this page.",
+    steps: [
+      "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set Width 1000 and Height 320. Drag it where you want it.",
+      "Change the words on top, the $ and the size under the preview if you want.",
+      "Use Add, Take away or Set to this to change the total from here.",
+      "For the Stream Deck: get plugin 1.2 or newer on the Stream Deck page, drag Spartacus → Money Counter onto a key, type an amount and pick Add or Set.",
+    ],
+    members: ["Viewers see the total on your stream. It rolls up to the new number and shows the change floating up."],
+    tips: [
+      "Make one key per amount, like +100000, +1000000 and -100000. A key set to 0 is a reset button.",
+      "On a Stream Deck +, the Money Dial adds or takes away the amount per click. Press it twice to reset.",
+      "Make it bigger with the Size slider instead of stretching it in OBS, so it stays sharp.",
+    ],
+  },
   "/socials-overlay": {
     title: "Socials",
     purpose: "Your names on Twitch, Kick, YouTube, TikTok, X, Discord and Instagram in one place. Show them on stream with an OBS overlay, and post them in Discord as one clean message.",

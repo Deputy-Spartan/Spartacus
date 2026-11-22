@@ -66,7 +66,7 @@ function GuidePanel({ guide, onClose }: { guide: PageGuide; onClose: () => void 
 
 // Pages that put the Guide button in their own header (next to the title),
 // so the layout doesn't also show it on a row of its own.
-const PLACED_BY_PAGE = new Set(["/socials-overlay"]);
+const PLACED_BY_PAGE = new Set(["/socials-overlay", "/money-counter"]);
 
 // Shown on every dashboard page, so each one has its own step-by-step help.
 // inline = the page placed it itself; otherwise it's the layout's own row.

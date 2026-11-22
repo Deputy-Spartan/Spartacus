@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Money Counter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
+<style>
+/* OBS browser source (Streaming › Money Counter), see-through background.
+   The box sits in the top-left corner; move it around in OBS.
+   From the dashboard: g=<server id>&api=<api url>, and it checks every second.
+   Preview: preview=1&amount=..&label=..&prefix=..&suffix=..&size=.. and the
+   dashboard sends changes with postMessage so they animate. */
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+body.preview { background: repeating-conic-gradient(#3a3d44 0 25%, #30333a 0 50%) 0 0 / 40px 40px; }
+.wrap { position: fixed; left: 24px; top: 24px; transform-origin: top left; }
+.box {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 12px 36px 16px; border-radius: 20px;
+  background: linear-gradient(180deg, #2a2a2a 0%, #151515 100%);
+  border: 3px solid #050505;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.09), 0 10px 22px rgba(0,0,0,.5);
+  font-family: "Lilita One", "Arial Black", sans-serif; line-height: 1; white-space: nowrap;
+  opacity: 0;
+}
+.label { font-size: 30px; letter-spacing: .1em; color: #fff; text-transform: uppercase;
+  -webkit-text-stroke: 6px #000; paint-order: stroke fill; }
+.label:empty { display: none; }
+.num { font-size: 104px; margin-top: 2px; color: #f9c933; font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 12px #111; paint-order: stroke fill;
+  text-shadow: 0 6px 0 #111; }
+/* The +$5,000 that floats up when it changes */
+.delta { position: absolute; right: -10px; top: -6px; font-family: "Lilita One", "Arial Black", sans-serif; font-size: 46px;
+  -webkit-text-stroke: 8px #000; paint-order: stroke fill; pointer-events: none; }
+.delta.up { color: #4ade80; }
+.delta.down { color: #f87171; }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"><div class="box" id="box"><div class="label" id="label"></div><div class="num" id="num"></div></div></div>
+<script>
+const q = new URLSearchParams(location.search);
+if (q.get("preview") === "1") document.body.classList.add("preview");
+const box = document.getElementById("box");
+const wrap = document.getElementById("wrap");
+const labelEl = document.getElementById("label");
+const numEl = document.getElementById("num");
+
+let s = { amount: Number(q.get("amount")) || 0, label: q.get("label") ?? "TOTAL MONEY", prefix: q.get("prefix") ?? "$", suffix: q.get("suffix") ?? "", size: Number(q.get("size")) || 100 };
+let shown = s.amount; // the number on screen right now (it rolls toward s.amount)
+let started = false;
+
+const fmt = (n) => `${n < 0 ? "-" : ""}${s.prefix}${Math.abs(Math.round(n)).toLocaleString("en-US")}${s.suffix}`;
+
+function drawLook() {
+  labelEl.textContent = s.label;
+  wrap.style.transform = `scale(${Math.max(0.3, Math.min(2.5, s.size / 100))})`;
+}
+
+// Roll from the old number to the new one, pop the box, and float the change.
+let rolling = null;
+function rollTo(to) {
+  const from = shown;
+  if (from === to) return;
+  cancelAnimationFrame(rolling);
+  const t0 = performance.now();
+  const ms = 900;
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / ms);
+    shown = from + (to - from) * (1 - Math.pow(1 - k, 3));
+    numEl.textContent = fmt(k === 1 ? to : shown);
+    if (k < 1) rolling = requestAnimationFrame(step);
+    else shown = to;
+  };
+  rolling = requestAnimationFrame(step);
+  numEl.animate([{ transform: "scale(1)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }], { duration: 420, easing: "ease-out" });
+  const d = document.createElement("div");
+  const diff = to - from;
+  d.className = `delta ${diff > 0 ? "up" : "down"}`;
+  d.textContent = `${diff > 0 ? "+" : "-"}${s.prefix}${Math.abs(Math.round(diff)).toLocaleString("en-US")}`;
+  box.parentElement.appendChild(d);
+  d.animate([{ opacity: 0, transform: "translateY(10px) scale(.8)" }, { opacity: 1, transform: "translateY(-14px) scale(1)", offset: 0.25 }, { opacity: 0, transform: "translateY(-50px) scale(1)" }], { duration: 1600, easing: "ease-out", fill: "forwards" }).finished.then(() => d.remove());
+}
+
+function apply(next) {
+  const old = s;
+  s = { ...s, ...next };
+  drawLook();
+  if (!started) {
+    shown = s.amount;
+    numEl.textContent = fmt(shown);
+    return;
+  }
+  if (old.prefix !== s.prefix || old.suffix !== s.suffix) numEl.textContent = fmt(shown);
+  rollTo(s.amount);
+}
+
+function start() {
+  started = true;
+  box.animate([{ opacity: 0, transform: "translateY(-16px) scale(.9)" }, { opacity: 1, transform: "translateY(2px) scale(1.03)", offset: 0.7 }, { opacity: 1, transform: "none" }], { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" });
+}
+
+// The dashboard preview sends changes this way, so you see the roll.
+window.addEventListener("message", (e) => {
+  if (e.origin === location.origin && e.data && e.data.type === "money") apply(e.data.value);
+});
+
+(async () => {
+  apply({});
+  await document.fonts.ready.catch(() => null);
+  if (q.get("g") && q.get("api")) {
+    const url = `${q.get("api")}/public/money-counter/${q.get("g")}`;
+    const load = () => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((v) => v && apply(v)).catch(() => null);
+    await load();
+    start();
+    setInterval(load, 1000);
+  } else {
+    start();
+  }
+})();
+</script>
+</body>
+</html>

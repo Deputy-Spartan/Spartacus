@@ -11,9 +11,30 @@ export interface MoneyCounter {
   prefix: string; // before the number, e.g. $
   suffix: string; // after it, e.g. " coins"
   size: number; // percent
+  anim: MoneyAnim; // how it moves when the number changes
+  spot: MoneySpot; // where the green +$ / red -$ amount shows
 }
 
-export const MONEY_DEFAULTS: MoneyCounter = { amount: 0, label: "TOTAL MONEY", prefix: "$", suffix: "", size: 100 };
+export const MONEY_ANIMS = [
+  ["bounce", "Bounce", "The box hops and the amount bounces in, then floats away."],
+  ["float", "Float", "The box gently floats all the time. The amount drifts up and wobbles."],
+  ["slam", "Slam", "The amount slams down, the box shakes and flashes green or red."],
+  ["burst", "Money burst", "$ signs pop out of the number, and the amount pops up."],
+  ["slot", "Slot machine", "Each digit spins like a slot machine. The amount floats up."],
+] as const;
+export type MoneyAnim = (typeof MONEY_ANIMS)[number][0];
+
+export const MONEY_SPOTS = [
+  ["right", "→ Right"],
+  ["left", "← Left"],
+  ["above", "↑ Above"],
+  ["below", "↓ Below"],
+  ["over", "On the number"],
+  ["corner", "↗ Corner"],
+] as const;
+export type MoneySpot = (typeof MONEY_SPOTS)[number][0];
+
+export const MONEY_DEFAULTS: MoneyCounter = { amount: 0, label: "TOTAL MONEY", prefix: "$", suffix: "", size: 100, anim: "bounce", spot: "right" };
 
 export const clampMoney = (n: number) => Math.max(-MONEY_MAX, Math.min(MONEY_MAX, Math.round(Number.isFinite(n) ? n : 0)));
 
@@ -27,6 +48,8 @@ export function cleanMoney(v: unknown): MoneyCounter {
     prefix: text(r.prefix, 6, MONEY_DEFAULTS.prefix),
     suffix: text(r.suffix, 12, MONEY_DEFAULTS.suffix),
     size: Number.isFinite(size) ? Math.max(30, Math.min(250, size)) : 100,
+    anim: MONEY_ANIMS.some(([id]) => id === r.anim) ? (r.anim as MoneyAnim) : MONEY_DEFAULTS.anim,
+    spot: MONEY_SPOTS.some(([id]) => id === r.spot) ? (r.spot as MoneySpot) : MONEY_DEFAULTS.spot,
   };
 }
 

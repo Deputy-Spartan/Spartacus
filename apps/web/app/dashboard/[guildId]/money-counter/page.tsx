@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MONEY_DEFAULTS, formatMoney } from "@spartacus/shared";
+import { MONEY_ANIMS, MONEY_DEFAULTS, MONEY_SPOTS, formatMoney } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
@@ -14,9 +14,10 @@ const field = "w-full min-w-0 bg-base-950 border border-white/10 rounded-lg p-2.
 const hint = "text-xs text-slate-500";
 const button = "text-sm px-3 py-2 rounded-lg border border-white/10 text-slate-300 hover:text-white hover:border-white/30 transition-colors disabled:opacity-40";
 
-// The overlay canvas size to set in OBS (the box sits in its top-left corner).
-const OBS_W = 1000;
-const OBS_H = 320;
+// The overlay canvas size to set in OBS. The box sits in the middle, with room
+// around it for the +$ / -$ amount.
+const OBS_W = 1400;
+const OBS_H = 500;
 
 type Look = Omit<MoneyCounterSettings, "amount">;
 
@@ -45,7 +46,7 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
         setAmount(a);
         setLook(rest);
         // Starts with the saved look; later changes are sent to it so they animate.
-        setSrc(`/overlays/money.html?${new URLSearchParams({ preview: "1", amount: String(a), label: rest.label, prefix: rest.prefix, suffix: rest.suffix, size: String(rest.size) })}`);
+        setSrc(`/overlays/money.html?${new URLSearchParams({ preview: "1", amount: String(a), label: rest.label, prefix: rest.prefix, suffix: rest.suffix, size: String(rest.size), anim: rest.anim, spot: rest.spot })}`);
       })
       .catch(() => setFailed(true));
   }, [guildId]);
@@ -86,6 +87,13 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
   if (!look) return <p className="text-slate-400">Loading…</p>;
 
   const update = (patch: Partial<Look>) => setLook({ ...look, ...patch });
+  // Plays the animation in the preview with a pretend amount.
+  const demo = (diff: number) => frame.current?.contentWindow?.postMessage({ type: "money-demo", diff }, window.location.origin);
+  // Picking an animation or spot plays it once so you can see it.
+  const pick = (patch: Partial<Look>) => {
+    update(patch);
+    setTimeout(() => demo(100000), 200);
+  };
   const typed = Number(entry.replace(/[^0-9-]/g, ""));
   const valid = entry.replace(/[^0-9-]/g, "") !== "" && Number.isFinite(typed);
   const obsLink = typeof window !== "undefined" ? `${window.location.origin}/overlay/money/${guildId}` : "";
@@ -163,6 +171,51 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
               />
             )}
           </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button className={button} onClick={() => demo(100000)}>
+              ▶ Try <span className="text-emerald-300">+ add</span>
+            </button>
+            <button className={button} onClick={() => demo(-100000)}>
+              ▶ Try <span className="text-rose-300">− take away</span>
+            </button>
+            <span className={`${hint} self-center`}>Only plays here. Your total doesn&apos;t change.</span>
+          </div>
+
+          <p className="text-sm mt-4 mb-1.5">Animation</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {MONEY_ANIMS.map(([id, name, desc]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => pick({ anim: id })}
+                aria-pressed={look.anim === id}
+                className={`text-left rounded-lg border p-2.5 transition-colors ${look.anim === id ? "border-neon-blue bg-neon-blue/10" : "border-white/10 hover:border-white/25"}`}
+              >
+                <p className="font-semibold text-sm">
+                  {name} {look.anim === id && <span className="text-neon-blue">✓</span>}
+                </p>
+                <p className={hint}>{desc}</p>
+              </button>
+            ))}
+          </div>
+
+          <p className="text-sm mt-4 mb-1.5">
+            Where the <span className="text-emerald-300">+$</span> / <span className="text-rose-300">−$</span> shows
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {MONEY_SPOTS.map(([id, name]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => pick({ spot: id })}
+                aria-pressed={look.spot === id}
+                className={`text-sm rounded-lg border px-2 py-2 transition-colors ${look.spot === id ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-300 hover:border-white/25"}`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-3 mt-4">
             <label className="block">
               <span className="text-sm">Words on top</span>
@@ -214,7 +267,7 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
             <li>
               Set Width {OBS_W} and Height {OBS_H}.
             </li>
-            <li>Drag it where you want it. Bigger? Use the Size slider here, not OBS, so it stays sharp.</li>
+            <li>Drag it where you want it. The box is in the middle, with room around it for the +$ / −$. Bigger? Use the Size slider here, not OBS, so it stays sharp.</li>
           </ol>
         </NeonCard>
 

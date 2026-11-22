@@ -242,6 +242,7 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     tryIt: [
       "Type 100000 and press + Add. Check the total and the preview roll up to $100,000.",
       "Press − Take away, then Set to this, then Reset to 0.",
+      "Pick each animation and each spot for the +$ / −$, and check it plays in the preview. Press ▶ Try − take away and check the amount is red.",
       "Change the words on top and the size, and check the preview changes.",
       "Copy the OBS link, open it in a new browser tab, press + Add here, and check it changes there within a second.",
       "With the Stream Deck plugin 1.2: add a Money Counter key with 5000, press it, and check the total goes up.",

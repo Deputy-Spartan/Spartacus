@@ -443,7 +443,8 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     title: "Money Counter",
     purpose: "A TOTAL MONEY box on stream that you change with a Stream Deck button or from this page.",
     steps: [
-      "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set Width 1000 and Height 320. Drag it where you want it.",
+      "Copy the OBS link. In OBS add a Browser source, untick Local file, paste the link, and set Width 1400 and Height 500. Drag it where you want it.",
+      "Pick an animation (Bounce, Float, Slam, Money burst or Slot machine) and where the green +$ / red −$ shows. Each one plays in the preview when you pick it.",
       "Change the words on top, the $ and the size under the preview if you want.",
       "Use Add, Take away or Set to this to change the total from here.",
       "For the Stream Deck: get plugin 1.2 or newer on the Stream Deck page, drag Spartacus → Money Counter onto a key, type an amount and pick Add or Set.",

@@ -1794,7 +1794,8 @@ export interface MilestoneSettingsRow {
 export type SocialsPlatformId = "twitch" | "kick" | "youtube" | "tiktok" | "x" | "discord" | "instagram";
 export interface SocialsOverlaySettings {
   // on = shown on stream, post = in the Discord post
-  platforms: Array<{ id: SocialsPlatformId; on: boolean; post: boolean; name: string }>;
+  // url = your own link; empty means it's built from the name
+  platforms: Array<{ id: SocialsPlatformId; on: boolean; post: boolean; name: string; url?: string }>;
   style: "sticker" | "gold";
   pos: "left" | "center" | "right";
   size: number;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SOCIAL_PLATFORMS, SOCIALS_POST_DEFAULTS } from "@spartacus/shared";
+import { SOCIAL_PLATFORMS, SOCIALS_POST_DEFAULTS, socialUrl } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { SaveStatus } from "../../../../components/ui/SaveStatus";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
@@ -237,6 +237,16 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                         ↓
                       </button>
                     </div>
+                    <div className="mt-2 pl-11">
+                      <input
+                        className={`${field} text-xs`}
+                        value={p.url ?? ""}
+                        maxLength={300}
+                        placeholder={p.name.trim() ? `Link (optional), e.g. ${meta.link(p.name)}` : "Link (optional)"}
+                        onChange={(e) => setPlatform(i, { url: e.target.value })}
+                        aria-label={`${meta.label} link`}
+                      />
+                    </div>
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-2 pl-11 text-sm">
                       <label className="flex items-center gap-2">
                         <input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={p.on} onChange={(e) => setPlatform(i, { on: e.target.checked })} />
@@ -246,13 +256,15 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                         <input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={p.post} onChange={(e) => setPlatform(i, { post: e.target.checked })} />
                         Post
                       </label>
-                      {p.name.trim() && <span className={`${hint} truncate`}>{meta.link(p.name)}</span>}
+                      {p.name.trim() && <span className={`${hint} truncate`}>Opens {socialUrl(p.id, p.name, p.url).replace(/^https?:\/\//, "")}</span>}
                     </div>
                   </li>
                 );
               })}
             </ul>
-            <p className={`${hint} mt-3`}>For Discord, type your server invite code (the part after discord.gg/). A ticked platform with no name is skipped.</p>
+            <p className={`${hint} mt-3`}>
+              The link is what opens when someone taps your name in the Discord post. Leave it empty and it&apos;s made from your name. For Discord, type your server invite code (the part after discord.gg/) or paste the full invite in the link box. A ticked platform with no name is skipped.
+            </p>
           </NeonCard>
         )}
 
@@ -459,7 +471,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                             <Tile id={p.id} size={20} radius={6} />
                             <b className="text-[#f2f3f5]">{SOCIAL_PLATFORMS[p.id].label}</b>
                             <span className="text-[#949ba4]">・</span>
-                            <span className="text-[#00a8fc] break-all">https://{SOCIAL_PLATFORMS[p.id].link(p.name)}</span>
+                            <span className="text-[#00a8fc] break-all">{socialUrl(p.id, p.name, p.url)}</span>
                           </p>
                         ))}
                         {text.trim() && <p className="text-xs text-[#949ba4] mt-2">{text}</p>}

@@ -14,7 +14,20 @@ const POSITIONS = ["left", "center", "right"];
 const POST_STYLES = ["embed", "plain"];
 
 // on = shown on stream, post = in the Discord post.
-type Platform = { id: string; on: boolean; post: boolean; name: string };
+// url = your own link (optional); empty means it's built from the name.
+type Platform = { id: string; on: boolean; post: boolean; name: string; url: string };
+
+// Only http(s) links, so nothing odd ends up behind a name in Discord.
+const cleanUrl = (v: unknown) => {
+  const u = String(v ?? "").trim().slice(0, 300);
+  if (!u) return "";
+  try {
+    const parsed = new URL(/^https?:\/\//i.test(u) ? u : `https://${u}`);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? u : "";
+  } catch {
+    return "";
+  }
+};
 
 const clampInt = (v: unknown, min: number, max: number, fallback: number) => {
   const n = Math.round(Number(v));
@@ -30,9 +43,9 @@ function cleanPlatforms(input: unknown): Platform[] {
     const id = String(r?.id ?? "");
     if (!(SOCIAL_PLATFORM_IDS as readonly string[]).includes(id) || seen.has(id)) continue;
     seen.add(id);
-    out.push({ id, on: !!r.on, post: r.post === undefined ? !!r.on : !!r.post, name: String(r.name ?? "").trim().slice(0, 60) });
+    out.push({ id, on: !!r.on, post: r.post === undefined ? !!r.on : !!r.post, name: String(r.name ?? "").trim().slice(0, 60), url: cleanUrl(r.url) });
   }
-  for (const id of SOCIAL_PLATFORM_IDS) if (!seen.has(id)) out.push({ id, on: false, post: false, name: "" });
+  for (const id of SOCIAL_PLATFORM_IDS) if (!seen.has(id)) out.push({ id, on: false, post: false, name: "", url: "" });
   return out;
 }
 

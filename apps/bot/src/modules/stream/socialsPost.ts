@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { EmbedBuilder, MessageFlags, type Client } from "discord.js";
 import { prisma } from "@spartacus/db";
-import { SOCIAL_PLATFORMS, SOCIAL_PLATFORM_IDS, SOCIALS_POST_DEFAULTS, socialEmojiName, type SocialPlatformId } from "@spartacus/shared";
+import { SOCIAL_PLATFORMS, SOCIAL_PLATFORM_IDS, SOCIALS_POST_DEFAULTS, socialEmojiName, socialUrl, type SocialPlatformId } from "@spartacus/shared";
 
 // Streaming › Socials › Discord post: one message listing your platforms with
 // an icon for each. Posted, updated in place, or removed from the dashboard.
@@ -35,13 +35,16 @@ async function socialEmojis(client: Client): Promise<Partial<Record<SocialPlatfo
   return out;
 }
 
-type Row = { id: string; on?: boolean; name?: string; post?: boolean };
+type Row = { id: string; on?: boolean; name?: string; post?: boolean; url?: string };
 
 function postedPlatforms(platforms: unknown) {
   const rows = (Array.isArray(platforms) ? platforms : []) as Row[];
   return rows
     .filter((r) => (SOCIAL_PLATFORM_IDS as readonly string[]).includes(r.id) && (r.post ?? r.on) && (r.name ?? "").trim())
-    .map((r) => ({ p: SOCIAL_PLATFORMS[r.id as SocialPlatformId], name: (r.name ?? "").trim() }));
+    .map((r) => {
+      const name = (r.name ?? "").trim();
+      return { p: SOCIAL_PLATFORMS[r.id as SocialPlatformId], name, url: socialUrl(r.id as SocialPlatformId, name, r.url) };
+    });
 }
 
 export async function buildSocialsPost(client: Client, guildId: string) {
@@ -56,7 +59,7 @@ export async function buildSocialsPost(client: Client, guildId: string) {
   const icon = (id: SocialPlatformId) => (emojis[id] ? `${emojis[id]} ` : "");
 
   if (s.postStyle === "plain") {
-    const lines = list.map(({ p, name }) => `${icon(p.id)}**${p.label}** ・ https://${p.link(name)}`);
+    const lines = list.map(({ p, url }) => `${icon(p.id)}**${p.label}** ・ ${url}`);
     const content = [`## ${title}`, ...lines, text.trim() ? `-# ${text.trim()}` : ""].filter(Boolean).join("\n");
     // Link previews off, so the list stays one clean message.
     return { settings: s, payload: { content: content.slice(0, 2000), embeds: [] as EmbedBuilder[], suppress: true } };
@@ -66,9 +69,9 @@ export async function buildSocialsPost(client: Client, guildId: string) {
     .setColor(GOLD)
     .setTitle(title.slice(0, 256))
     .addFields(
-      list.map(({ p, name }) => ({
+      list.map(({ p, name, url }) => ({
         name: `${icon(p.id)}${p.label}`,
-        value: `[${p.id === "discord" ? "Join the server" : name}](https://${p.link(name)})`,
+        value: `[${(p.id === "discord" ? "Join the server" : name).replace(/[[\]]/g, "")}](${url})`,
         inline: true,
       })),
     );

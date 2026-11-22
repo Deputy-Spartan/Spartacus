@@ -32,6 +32,14 @@ export const SOCIAL_PLATFORMS: Record<SocialPlatformId, SocialPlatform> = {
   instagram: { id: "instagram", label: "Instagram", placeholder: "Your Instagram name", link: (n) => `instagram.com/${clean(n)}` },
 };
 
+// The full link for a platform: your own link if you typed one, otherwise
+// built from the name. Returns "" when neither works.
+export function socialUrl(id: SocialPlatformId, name: string, url?: string | null): string {
+  const own = (url ?? "").trim();
+  if (own) return /^https?:\/\//i.test(own) ? own : `https://${own}`;
+  return name.trim() ? `https://${SOCIAL_PLATFORMS[id].link(name)}` : "";
+}
+
 // The bot's own emoji for each platform (uploaded once from apps/bot/assets/socials).
 export const socialEmojiName = (id: SocialPlatformId) => `sp_${id}`;
 

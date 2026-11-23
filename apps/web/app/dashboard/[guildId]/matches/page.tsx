@@ -1216,7 +1216,7 @@ function MessagesTab({ guildId, startKey }: { guildId: string; startKey?: MatchT
                             <textarea className={`${inputClass} min-h-14`} aria-label={`Field ${i + 1} text`} placeholder="Text" maxLength={1024} value={f.value} onChange={(e) => setField(i, { value: e.target.value })} />
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                               <label className="flex items-center gap-1.5">
-                                <input type="checkbox" checked={f.inline} onChange={(e) => setField(i, { inline: e.target.checked })} />
+                                <ToggleSwitch size="sm" enabled={f.inline} onChange={(v) => setField(i, { inline: v })} />
                                 Side by side
                               </label>
                               <button type="button" disabled={i === 0} onClick={() => moveField(i, -1)} className="hover:text-slate-200 disabled:opacity-30">

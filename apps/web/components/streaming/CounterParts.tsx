@@ -20,6 +20,7 @@ import {
 import { NeonCard } from "../ui/NeonCard";
 import { SaveStatus } from "../ui/SaveStatus";
 import type { AutoSaveStatus } from "../../lib/useAutoSave";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 
 // Streaming › Money Counter and K/D Counter: the parts both pages share.
 
@@ -148,7 +149,7 @@ export function CommonLook<L extends CounterLook>({ look, pick, sounds, colorTit
 export function Toggle({ on, onChange, name, desc }: { on: boolean; onChange: (v: boolean) => void; name: string; desc: string }) {
   return (
     <label className="flex items-start gap-3 rounded-lg border border-white/10 p-2.5 cursor-pointer">
-      <input type="checkbox" className="w-4 h-4 mt-0.5 accent-[rgb(var(--accent-rgb))]" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <ToggleSwitch size="sm" enabled={on} onChange={(v) => onChange(v)} />
       <span>
         <span className="text-sm font-medium block">{name}</span>
         <span className={hint}>{desc}</span>

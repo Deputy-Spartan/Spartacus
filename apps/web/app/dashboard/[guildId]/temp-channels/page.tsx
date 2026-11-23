@@ -359,11 +359,11 @@ function LobbyFields({
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-slate-400">
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={!!value.pairTextChannel} onChange={(e) => onChange({ pairTextChannel: e.target.checked })} />
+            <ToggleSwitch size="sm" enabled={!!value.pairTextChannel} onChange={(v) => onChange({ pairTextChannel: v })} />
             Pair a text channel
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={!!value.hideTextFromNonMembers} onChange={(e) => onChange({ hideTextFromNonMembers: e.target.checked })} />
+            <ToggleSwitch size="sm" enabled={!!value.hideTextFromNonMembers} onChange={(v) => onChange({ hideTextFromNonMembers: v })} />
             Hide text from non-members
           </label>
         </div>

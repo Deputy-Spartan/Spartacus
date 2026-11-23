@@ -6,6 +6,7 @@ import { NeonCard } from "../ui/NeonCard";
 import { ModuleHeader } from "../ui/ModuleHeader";
 import { ChannelSelect } from "../ui/ChannelSelect";
 import { api, type ProfileCardSettingsRow } from "../../lib/api";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 
 export default function ProfileCardsPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;
@@ -81,7 +82,7 @@ export default function ProfileCardsPage({ params }: { params: { guildId: string
                 const full = !on && settings.stats.length >= MAX_PROFILE_STATS;
                 return (
                   <label key={k} className={`flex items-center gap-2 text-sm ${full ? "text-slate-600" : "text-slate-300"}`}>
-                    <input type="checkbox" checked={on} disabled={full} onChange={() => toggle(k)} />
+                    <ToggleSwitch size="sm" enabled={on} onChange={() => toggle(k)} disabled={full} />
                     {PROFILE_STATS[k]}
                   </label>
                 );
@@ -159,7 +160,7 @@ export default function ProfileCardsPage({ params }: { params: { guildId: string
           <NeonCard>
             <p className="font-medium mb-3">Bios</p>
             <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input type="checkbox" checked={settings.allowBios} onChange={(e) => persist({ ...settings, allowBios: e.target.checked })} />
+              <ToggleSwitch size="sm" enabled={settings.allowBios} onChange={(v) => persist({ ...settings, allowBios: v })} />
               Let members write a short bio (up to 80 characters)
             </label>
             <p className="text-xs text-slate-500 mt-2">Bios can't have links or mentions, and are checked against AutoMod's banned words when Moderation is on.</p>

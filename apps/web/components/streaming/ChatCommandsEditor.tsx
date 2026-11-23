@@ -25,6 +25,7 @@ import { PageGuideButton } from "../nav/PageGuideButton";
 import { Toggle, button, field, hint } from "./CounterParts";
 import { useAutoSave } from "../../lib/useAutoSave";
 import { api, type ChatCommandsData } from "../../lib/api";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 
 // Streaming › Chat Commands. Commands, timed messages, the link to Lumia /
 // Streamer.bot / OBS, and counts & quotes. Saves by itself.
@@ -131,7 +132,7 @@ function Setup({ guildId, data, cfg, set }: { guildId: string; data: ChatCommand
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="font-medium">Setup</p>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={cfg.on} onChange={(e) => set({ on: e.target.checked })} />
+          <ToggleSwitch size="sm" enabled={cfg.on} onChange={(v) => set({ on: v })} />
           Chat commands on
         </label>
       </div>
@@ -147,7 +148,7 @@ function Setup({ guildId, data, cfg, set }: { guildId: string; data: ChatCommand
                   <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1.5 align-[-1px]" style={{ background: p === "kick" ? "#53fc18" : "#9146ff" }} />
                   {name} chat
                 </span>
-                <input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={cfg[p]} onChange={(e) => set({ [p]: e.target.checked })} aria-label={`Use commands in ${name} chat`} />
+                <ToggleSwitch size="sm" enabled={cfg[p]} onChange={(v) => set({ [p]: v })} label={`Use commands in ${name} chat`} />
               </label>
               <p className={`text-xs mt-1 ${ok ? "text-emerald-300" : "text-amber-300"}`}>
                 {ok ? (
@@ -191,7 +192,7 @@ function Commands({ guildId, cfg, set, setCmd, onEdit }: { guildId: string; cfg:
               <div className="space-y-1.5">
                 {list.map((c) => (
                   <div key={c.id} className={`flex items-center gap-3 rounded-lg border border-white/10 p-2.5 ${c.on ? "" : "opacity-50"}`}>
-                    <input type="checkbox" className="w-4 h-4 shrink-0 accent-[rgb(var(--accent-rgb))]" checked={c.on} onChange={(e) => setCmd({ ...c, on: e.target.checked })} aria-label={`Turn !${c.name} on or off`} />
+                    <ToggleSwitch size="sm" enabled={c.on} onChange={(v) => setCmd({ ...c, on: v })} label={`Turn !${c.name} on or off`} />
                     <button className="min-w-0 flex-1 text-left" onClick={() => onEdit(c, false)}>
                       <span className="font-mono text-sm text-neon-blue">!{c.name}</span>
                       {c.alias.length > 0 && <span className="text-xs text-slate-500"> · also !{c.alias.join(", !")}</span>}
@@ -385,7 +386,7 @@ function Timers({ cfg, set }: { cfg: ChatCommandsConfig; set: (p: Partial<ChatCo
         {cfg.timers.map((t) => (
           <div key={t.id} className={`rounded-lg border border-white/10 p-3 space-y-2 ${t.on ? "" : "opacity-60"}`}>
             <div className="flex items-center justify-between gap-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={t.on} onChange={(e) => up(t.id, { on: e.target.checked })} />On</label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer"><ToggleSwitch size="sm" enabled={t.on} onChange={(v) => up(t.id, { on: v })} />On</label>
               <button className={`${button} !py-1 text-rose-300`} onClick={() => set({ timers: cfg.timers.filter((k) => k.id !== t.id) })}>Delete</button>
             </div>
             <textarea className={`${field} min-h-[56px]`} value={t.text} maxLength={400} onChange={(e) => up(t.id, { text: e.target.value })} aria-label="Message" />

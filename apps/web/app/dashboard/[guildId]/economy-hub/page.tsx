@@ -531,7 +531,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
                 <span>Stock:</span>
                 {sel(draft.stock === null ? -1 : draft.stock, [[-1, "Unlimited"], [1, "1"], [5, "5"], [10, "10"], [25, "25"], [50, "50"], [100, "100"]], (v) => setDraft({ ...draft, stock: v < 0 ? null : v }), "Stock")}
                 <label className="flex items-center gap-1.5 ml-auto">
-                  <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} /> For sale
+                  <ToggleSwitch size="sm" enabled={draft.enabled} onChange={(v) => setDraft({ ...draft, enabled: v })} /> For sale
                 </label>
               </div>
               <div className="flex gap-2">
@@ -723,7 +723,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
           <div className="grid sm:grid-cols-2 gap-2">
             {(Object.keys(CHAMP_CATEGORIES) as Array<keyof typeof CHAMP_CATEGORIES>).map((c) => (
               <label key={c} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={s.champsCategories.includes(c)} onChange={(e) => save({ champsCategories: e.target.checked ? [...s.champsCategories, c] : s.champsCategories.filter((x) => x !== c) })} />
+                <ToggleSwitch size="sm" enabled={s.champsCategories.includes(c)} onChange={(v) => save({ champsCategories: v ? [...s.champsCategories, c] : s.champsCategories.filter((x) => x !== c) })} />
                 {CHAMP_CATEGORIES[c]}
               </label>
             ))}

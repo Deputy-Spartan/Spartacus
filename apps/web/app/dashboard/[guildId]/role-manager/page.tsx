@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import {
   api,
   type BulkRoleFilter,
@@ -374,7 +375,7 @@ function BulkTab({ guildId, info, roleMap }: { guildId: string; info: RoleManage
           <option value="90">In the last 90 days</option>
         </select>
         <label className="flex items-center gap-2 text-sm mt-4">
-          <input type="checkbox" checked={!!filter.includeBots} onChange={(e) => setFilter({ ...filter, includeBots: e.target.checked })} />
+          <ToggleSwitch size="sm" enabled={!!filter.includeBots} onChange={(v) => setFilter({ ...filter, includeBots: v })} />
           Include bots
         </label>
 

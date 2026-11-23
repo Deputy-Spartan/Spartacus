@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { MentionTextarea } from "../ui/MentionTextarea";
 import { StyleToggleInput } from "../ui/StyleToggleInput";
 import type { EmbedCreatorEmbed, EmbedCreatorField } from "../../lib/api";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 
 const COLOR_PRESETS = ["#7B99BC", "#5E7FA6", "#7CB88F", "#D8AE6B", "#C77B7B", "#B98AD1", "#5865F2"];
 
@@ -284,7 +285,7 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
                   </div>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <input type="checkbox" checked={!!f.inline} onChange={(e) => updateField(i, { inline: e.target.checked })} />
+                      <ToggleSwitch size="sm" enabled={!!f.inline} onChange={(v) => updateField(i, { inline: v })} />
                       Inline
                     </label>
                     <button type="button" onClick={() => removeField(i)} className="text-[11px] text-slate-500 hover:text-rose-400">
@@ -325,7 +326,7 @@ export function EmbedCard({ guildId, embed, index, onChange, onDuplicate, onRemo
               </div>
             </div>
             <label className="flex items-center gap-2 text-xs text-slate-400">
-              <input type="checkbox" checked={!!embed.timestamp} onChange={(e) => set("timestamp", e.target.checked)} />
+              <ToggleSwitch size="sm" enabled={!!embed.timestamp} onChange={(v) => set("timestamp", v)} />
               Show current timestamp in footer
             </label>
           </div>

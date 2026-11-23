@@ -6,6 +6,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
 import { api, type AiConfigRow } from "../../../../lib/api";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 
 const label = "text-xs uppercase tracking-wide text-slate-500 block mb-2";
 const select = "bg-base-950 border border-white/10 rounded-lg px-2.5 py-2 text-sm";
@@ -74,12 +75,7 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
               : "No channel picked, so Spartacus answers anywhere it's @mentioned."}
           </p>
           <label className={`flex items-center gap-2 text-sm mb-4 ${config.chatChannelId ? "text-slate-300" : "text-slate-600"}`}>
-            <input
-              type="checkbox"
-              checked={config.chatRequireMention}
-              disabled={!config.chatChannelId}
-              onChange={(e) => persist({ ...config, chatRequireMention: e.target.checked })}
-            />
+            <ToggleSwitch size="sm" enabled={config.chatRequireMention} onChange={(v) => persist({ ...config, chatRequireMention: v })} disabled={!config.chatChannelId} />
             Only answer when @mentioned
           </label>
 
@@ -137,7 +133,7 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
           </p>
 
           <label className="flex items-center gap-2 text-sm text-slate-300 mt-3">
-            <input type="checkbox" checked={config.chatStaffExempt} onChange={(e) => persist({ ...config, chatStaffExempt: e.target.checked })} />
+            <ToggleSwitch size="sm" enabled={config.chatStaffExempt} onChange={(v) => persist({ ...config, chatStaffExempt: v })} />
             Staff with Manage Server skip the limit
           </label>
 

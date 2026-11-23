@@ -338,7 +338,7 @@ function Editor({ guildId, start, onDone, onCancel }: { guildId: string; start: 
               </select>
               <input className={field} value={i.description} placeholder="Shown in Discord" onChange={(e) => set({ inputs: d.inputs.map((x, j) => (j === k ? { ...x, description: e.target.value } : x)) })} />
               <label className="flex items-center gap-1 text-xs text-slate-400">
-                <input type="checkbox" checked={i.required} onChange={(e) => set({ inputs: d.inputs.map((x, j) => (j === k ? { ...x, required: e.target.checked } : x)) })} /> Required
+                <ToggleSwitch size="sm" enabled={i.required} onChange={(v) => set({ inputs: d.inputs.map((x, j) => (j === k ? { ...x, required: v } : x)) })} /> Required
               </label>
               <button type="button" className="text-xs text-rose-400" onClick={() => set({ inputs: d.inputs.filter((_, j) => j !== k) })}>
                 Remove

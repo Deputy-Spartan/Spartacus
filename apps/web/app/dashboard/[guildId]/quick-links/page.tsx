@@ -6,6 +6,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { EmojiPicker } from "../../../../components/ui/EmojiPicker";
 import { api, type QuickLinksStatus } from "../../../../lib/api";
+import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 
 const field = "w-full bg-base-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm";
 const L = QUICK_LINK_LIMITS;
@@ -164,7 +165,7 @@ export default function QuickLinksPage({ params }: { params: { guildId: string }
                 </div>
                 <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/5">
                   <label className="flex items-center gap-1.5 text-xs text-slate-300 mr-auto">
-                    <input type="checkbox" checked={g.pinned} onChange={(e) => change(i, { pinned: e.target.checked })} /> 📌 Show in the sidebar
+                    <ToggleSwitch size="sm" enabled={g.pinned} onChange={(v) => change(i, { pinned: v })} /> 📌 Show in the sidebar
                   </label>
                   <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="text-xs text-slate-400 hover:text-white disabled:opacity-30" aria-label="Move up">
                     ▲

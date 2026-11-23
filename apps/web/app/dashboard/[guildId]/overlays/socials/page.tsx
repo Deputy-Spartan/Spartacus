@@ -10,6 +10,7 @@ import { ShowOnStream } from "../../../../../components/streaming/ShowOnStream";
 import { EditorSplit } from "../../../../../components/streaming/CounterParts";
 import { useAutoSave } from "../../../../../lib/useAutoSave";
 import { api, type SocialsOverlaySettings, type SocialsPlatformId } from "../../../../../lib/api";
+import { ToggleSwitch } from "../../../../../components/ui/ToggleSwitch";
 
 const field = "w-full min-w-0 bg-base-950 border border-white/10 rounded-lg p-2.5 text-sm";
 const hint = "text-xs text-slate-500";
@@ -256,11 +257,11 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                     </div>
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-2 pl-11 text-sm">
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={p.on} onChange={(e) => setPlatform(i, { on: e.target.checked })} />
+                        <ToggleSwitch size="sm" enabled={p.on} onChange={(v) => setPlatform(i, { on: v })} />
                         Stream
                       </label>
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" className="w-4 h-4 accent-[rgb(var(--accent-rgb))]" checked={p.post} onChange={(e) => setPlatform(i, { post: e.target.checked })} />
+                        <ToggleSwitch size="sm" enabled={p.post} onChange={(v) => setPlatform(i, { post: v })} />
                         Post
                       </label>
                       {p.name.trim() && <span className={`${hint} truncate`}>Opens {socialUrl(p.id, p.name, p.url).replace(/^https?:\/\//, "")}</span>}

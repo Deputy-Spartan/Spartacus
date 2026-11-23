@@ -462,7 +462,7 @@ function StreamForm({ guildId, tz, editing, onCancel, onSaved }: { guildId: stri
         {/* Category */}
         {f.on.length >= 2 && (
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" checked={f.same} onChange={(e) => set({ same: e.target.checked, cats: e.target.checked ? f.cats : Object.fromEntries(f.on.map((p) => [p, f.cats[p] || f.game])) })} />
+            <ToggleSwitch size="sm" enabled={f.same} onChange={(v) => set({ same: v, cats: v ? f.cats : Object.fromEntries(f.on.map((p) => [p, f.cats[p] || f.game])) })} />
             Same game or category on every platform
           </label>
         )}

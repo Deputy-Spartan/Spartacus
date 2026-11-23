@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { RoleSelect } from "../ui/RoleSelect";
 import { api, type EmbedActionConfig, type EmbedActionType, type EmbedCreatorPresetRow } from "../../lib/api";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 
 const ACTION_LABELS: Record<EmbedActionType, string> = {
   none: "No action",
@@ -100,7 +101,7 @@ export function ActionConfigEditor({ guildId, action, onChange, allowedTypes }: 
 
       {type !== "none" && type !== "self_role" && (
         <label className="flex items-center gap-2 text-[11px] text-slate-500 mt-2">
-          <input type="checkbox" checked={action?.ephemeral !== false} onChange={(e) => set({ ephemeral: e.target.checked })} />
+          <ToggleSwitch size="sm" enabled={action?.ephemeral !== false} onChange={(v) => set({ ephemeral: v })} />
           Only the person who clicked sees the reply
         </label>
       )}

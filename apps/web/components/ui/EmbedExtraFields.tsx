@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { EmbedExtra, EmbedFieldEntry } from "../../lib/embedExtra";
 import { ImageUrlField } from "./ImageUrlField";
+import { ToggleSwitch } from "./ToggleSwitch";
 
 interface EmbedExtraFieldsProps {
   guildId: string;
@@ -123,7 +124,7 @@ export function EmbedExtraFields({ guildId, value, onChange }: EmbedExtraFieldsP
           </div>
 
           <label className="flex items-center gap-2 text-xs text-slate-400">
-            <input type="checkbox" checked={!!value.timestamp} onChange={(e) => set("timestamp", e.target.checked || undefined)} />
+            <ToggleSwitch size="sm" enabled={!!value.timestamp} onChange={(v) => set("timestamp", v || undefined)} />
             Show current time in the footer
           </label>
 
@@ -152,7 +153,7 @@ export function EmbedExtraFields({ guildId, value, onChange }: EmbedExtraFieldsP
                     onChange={(e) => updateField(i, { value: e.target.value })}
                   />
                   <label className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0 px-1">
-                    <input type="checkbox" checked={f.inline} onChange={(e) => updateField(i, { inline: e.target.checked })} />
+                    <ToggleSwitch size="sm" enabled={f.inline} onChange={(v) => updateField(i, { inline: v })} />
                     Inline
                   </label>
                   <button type="button" onClick={() => removeField(i)} className="text-[11px] text-slate-500 hover:text-rose-400 shrink-0 px-1">

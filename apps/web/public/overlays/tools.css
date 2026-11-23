@@ -262,3 +262,7 @@
 @media (prefers-reduced-motion: reduce) { .bob, .pulse, .glowtxt, .sc-bg, .sc-grid, .sb-track, .cam-scan, .cam-fr, .cam-live { animation: none !important; } }
 
 @keyframes x-blink { 50% { opacity: .25; } }
+
+/* Hidden really means hidden, even on boxes that set their own display (the QR code's
+   pop-up timer, the wheel and dice results). */
+[hidden] { display: none !important; }

@@ -241,9 +241,12 @@
       layer.appendChild(q);
       try { new window.QRCode(q.querySelector(".qr-code"), { text: s.link || " ", width: 512, height: 512, colorDark: s.qrColor === "accent" ? s.color : "#000000", colorLight: "#ffffff", correctLevel: window.QRCode.CorrectLevel.M }); } catch { q.querySelector(".qr-code").textContent = "QR"; }
       const sz = Number(s.size) || 1;
+      // The dashboard preview always shows it, so you can see what you're
+      // changing; on stream it pops up on its timer.
+      const timed = Number(s.when) > 0 && !root.dataset.preview;
       let iv = 0, hideT = 0;
-      const showIt = () => { q.hidden = false; if (!reduce) q.animate([{ opacity: 0, transform: `scale(${sz * 0.6})` }, { opacity: 1, transform: `scale(${sz * 1.06})`, offset: 0.7 }, { opacity: 1, transform: `scale(${sz})` }], { duration: 500, easing: "ease-out" }); if (Number(s.when)) { clearTimeout(hideT); hideT = setTimeout(() => (q.hidden = true), 20000); } };
-      if (Number(s.when)) { q.hidden = true; iv = setInterval(showIt, s.when * 60000); }
+      const showIt = () => { q.hidden = false; if (!reduce) q.animate([{ opacity: 0, transform: `scale(${sz * 0.6})` }, { opacity: 1, transform: `scale(${sz * 1.06})`, offset: 0.7 }, { opacity: 1, transform: `scale(${sz})` }], { duration: 500, easing: "ease-out" }); if (timed) { clearTimeout(hideT); hideT = setTimeout(() => (q.hidden = true), 20000); } };
+      if (timed) { q.hidden = true; iv = setInterval(showIt, s.when * 60000); }
       return { fire() { showIt(); }, stop() { clearInterval(iv); clearTimeout(hideT); } };
     };
 

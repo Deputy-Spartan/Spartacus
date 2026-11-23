@@ -147,6 +147,11 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
               </div>
             )}
             {msg && <p className={`text-sm mt-2 ${msg.ok ? "text-emerald-300" : "text-rose-300"}`}>{msg.text}</p>}
+            {kind === "qr" && Number(settings.when) > 0 && (
+              <p className={`${hint} mt-2`}>
+                The preview always shows it. On stream it pops up every {String(settings.when)} minutes for 20 seconds, and 👀 Show now brings it up any time.
+              </p>
+            )}
             {kind === "squad" && <p className={`${hint} mt-2`}>It shows the voice channel you&apos;re in. Join one in Discord to see it in the preview.</p>}
             {kind === "clip" && (
               <div className="mt-4">

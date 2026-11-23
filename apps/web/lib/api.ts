@@ -2823,6 +2823,7 @@ export const api = {
   saveChatCommands: (guildId: string, config: Omit<ChatCommandsData["config"], "runKey">) => request<{ config: ChatCommandsData["config"] }>(`/guilds/${guildId}/chat-commands`, { method: "PUT", body: JSON.stringify(config) }),
   saveChatCommandsState: (guildId: string, state: ChatCommandsData["state"]) => request<{ state: ChatCommandsData["state"] }>(`/guilds/${guildId}/chat-commands/state`, { method: "PUT", body: JSON.stringify(state) }),
   newChatCommandsKey: (guildId: string) => request<{ config: ChatCommandsData["config"] }>(`/guilds/${guildId}/chat-commands/new-key`, { method: "POST" }),
+  uploadChatSound: (guildId: string, file: File) => uploadFile(`/guilds/${guildId}/chat-commands/sound`, file) as Promise<{ url: string; name: string }>,
   runChatCommand: (guildId: string, name: string, args = "") => request<{ ok: boolean; message: string }>(`/guilds/${guildId}/chat-commands/run`, { method: "POST", body: JSON.stringify({ name, args }) }),
   getTool: (guildId: string, kind: string) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`),
   saveTool: (guildId: string, kind: string, settings: ToolRowData["settings"]) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`, { method: "PUT", body: JSON.stringify({ settings }) }),

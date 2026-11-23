@@ -41,7 +41,8 @@ export interface ChatCommand {
   who: ChatRank;
   cd: number; // seconds between uses (mods and you skip it)
   sound: string;
-  soundUrl: string; // your own sound: a link to an mp3 / wav / ogg
+  soundUrl: string; // your own sound: a link to an mp3 / wav / ogg (or a file you picked, kept on the server)
+  soundName: string; // the picked file's name, to show on the dashboard
   ov: string;
   style: string;
   emoji: string;
@@ -72,7 +73,7 @@ export interface ChatCommandsState {
 }
 
 const C = (name: string, reply: string, o: Partial<ChatCommand> = {}): ChatCommand => ({
-  id: name, name, alias: [], reply, who: 0, cd: 5, sound: "none", soundUrl: "", ov: "none", style: "pop", emoji: "", atext: "", app: "none", appv: "", on: true, group: "Info", ...o,
+  id: name, name, alias: [], reply, who: 0, cd: 5, sound: "none", soundUrl: "", soundName: "", ov: "none", style: "pop", emoji: "", atext: "", app: "none", appv: "", on: true, group: "Info", ...o,
 });
 
 export const STARTER_COMMANDS: ChatCommand[] = [
@@ -137,6 +138,7 @@ export function cleanChatCommand(raw: unknown, i = 0): ChatCommand | null {
     cd: num(r.cd, 0, 3600, 5),
     sound: oneOf(r.sound, CHAT_SOUNDS, "none"),
     soundUrl: soundLink(r.soundUrl),
+    soundName: soundLink(r.soundUrl) ? str(r.soundName, 60) : "",
     ov: oneOf(r.ov, CHAT_OVERLAY_ACTIONS, "none"),
     style: oneOf(r.style, CHAT_POPUP_STYLES, "pop"),
     emoji: str(r.emoji, 8),

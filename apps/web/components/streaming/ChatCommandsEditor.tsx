@@ -45,7 +45,7 @@ const APPS_KEY = "spartacus-cmdfx-apps";
 type Apps = { lumia: string; lumiaport: string; sbport: string; obsport: string; obs: string };
 const NO_APPS: Apps = { lumia: "", lumiaport: "39231", sbport: "8080", obsport: "4455", obs: "" };
 
-const blank = (group = "Mine"): ChatCommand => ({ id: `c${Date.now().toString(36)}`, name: "", alias: [], reply: "", who: 0, cd: 5, sound: "none", soundUrl: "", ov: "none", style: "pop", emoji: "", atext: "", app: "none", appv: "", on: true, group });
+const blank = (group = "Mine"): ChatCommand => ({ id: `c${Date.now().toString(36)}`, name: "", alias: [], reply: "", who: 0, cd: 5, sound: "none", soundUrl: "", soundName: "", ov: "none", style: "pop", emoji: "", atext: "", app: "none", appv: "", on: true, group });
 
 export function ChatCommandsEditor({ guildId }: { guildId: string }) {
   const [data, setData] = useState<ChatCommandsData | null>(null);
@@ -108,6 +108,7 @@ export function ChatCommandsEditor({ guildId }: { guildId: string }) {
 
       {editing && (
         <EditCommand
+          guildId={guildId}
           cmd={editing}
           isNew={isNew}
           cfg={cfg}
@@ -280,7 +281,61 @@ function TryIt({ guildId, cfg }: { guildId: string; cfg: ChatCommandsConfig }) {
 }
 
 // ---- One command ----
-function EditCommand({ cmd, isNew, cfg, onClose, onSave, onDelete }: { cmd: ChatCommand; isNew: boolean; cfg: ChatCommandsConfig; onClose: () => void; onSave: (c: ChatCommand) => void; onDelete: () => void }) {
+// Your own sound: pick a file from your PC (it's uploaded once and played on
+// stream), or paste a link. ▶ plays it here.
+function OwnSound({ guildId, url, name, onChange }: { guildId: string; url: string; name: string; onChange: (url: string, name: string) => void }) {
+  const pick = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [link, setLink] = useState(false);
+  const playing = useRef<HTMLAudioElement | null>(null);
+  const play = () => {
+    playing.current?.pause();
+    const a = new Audio(url);
+    playing.current = a;
+    a.play().catch(() => setErr("Couldn't play that sound."));
+  };
+  const upload = async (f: File | undefined) => {
+    if (!f) return;
+    setErr("");
+    if (!f.type.startsWith("audio/")) return setErr("That isn't a sound file. Pick an mp3, wav or ogg.");
+    if (f.size > 1024 * 1024) return setErr("That sound is too big. Keep it under 1 MB (a few seconds of mp3).");
+    setBusy(true);
+    try {
+      const r = await api.uploadChatSound(guildId, f);
+      onChange(r.url, r.name || f.name);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't upload it. Try again.");
+    } finally {
+      setBusy(false);
+      if (pick.current) pick.current.value = "";
+    }
+  };
+  return (
+    <div className="block">
+      <span className="text-sm">Or your own sound</span>
+      <input ref={pick} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
+      {url ? (
+        <div className="flex items-center gap-2 mt-1 rounded-lg border border-white/10 bg-base-950 p-1.5 pl-2.5">
+          <span className="text-sm truncate flex-1 min-w-0" title={name || url}>🎵 {name || url.split("/").pop()}</span>
+          <button type="button" className={`${button} !py-1 !px-2`} onClick={play} aria-label="Play the sound">▶</button>
+          <button type="button" className={`${button} !py-1 !px-2`} onClick={() => pick.current?.click()} disabled={busy}>{busy ? "…" : "Change"}</button>
+          <button type="button" className={`${button} !py-1 !px-2 text-rose-300`} onClick={() => { playing.current?.pause(); onChange("", ""); }} aria-label="Remove the sound">✕</button>
+        </div>
+      ) : link ? (
+        <input className={`${field} mt-1`} autoFocus maxLength={400} placeholder="https://…/sound.mp3" onBlur={(e) => { const v = e.target.value.trim(); if (v) onChange(v, ""); else setLink(false); }} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+      ) : (
+        <div className="flex gap-2 mt-1">
+          <button type="button" className={`${button} flex-1`} onClick={() => pick.current?.click()} disabled={busy}>{busy ? "Uploading…" : "📁 Pick a file"}</button>
+          <button type="button" className={button} onClick={() => setLink(true)}>Paste a link</button>
+        </div>
+      )}
+      {err ? <p className="text-xs text-rose-300 mt-1">{err}</p> : <p className={`${hint} mt-1`}>mp3, wav or ogg, under 1 MB. It plays instead of the sound on the left.</p>}
+    </div>
+  );
+}
+
+function EditCommand({ guildId, cmd, isNew, cfg, onClose, onSave, onDelete }: { guildId: string; cmd: ChatCommand; isNew: boolean; cfg: ChatCommandsConfig; onClose: () => void; onSave: (c: ChatCommand) => void; onDelete: () => void }) {
   const [c, setC] = useState<ChatCommand>(cmd);
   const [aliases, setAliases] = useState(cmd.alias.join(", "));
   const [err, setErr] = useState("");
@@ -340,7 +395,7 @@ function EditCommand({ cmd, isNew, cfg, onClose, onSave, onDelete }: { cmd: Chat
           {sel("Who can use it", c.who, CHAT_WHO.map((n, i) => [i, n]), (v) => up({ who: Number(v) as ChatRank }))}
           <label className="block"><span className="text-sm">Wait between uses (seconds)</span><input type="number" min={0} max={3600} className={`${field} mt-1`} value={c.cd} onChange={(e) => up({ cd: Math.max(0, Math.min(3600, Number(e.target.value) || 0)) })} /></label>
           {sel("Sound", c.sound, CHAT_SOUNDS, (sound) => up({ sound }))}
-          <label className="block"><span className="text-sm">Or your own sound (link to an mp3)</span><input className={`${field} mt-1`} value={c.soundUrl} maxLength={400} placeholder="https://…/sound.mp3" onChange={(e) => up({ soundUrl: e.target.value.trim() })} /></label>
+          <OwnSound guildId={guildId} url={c.soundUrl} name={c.soundName} onChange={(soundUrl, soundName) => up({ soundUrl, soundName })} />
           {sel("On stream", c.ov, CHAT_OVERLAY_ACTIONS, (ov) => up({ ov }))}
           {c.ov === "alert" && sel("Pop-up style", c.style, CHAT_POPUP_STYLES, (style) => up({ style }))}
           {c.ov === "alert" && <label className="block"><span className="text-sm">Pop-up emoji</span><input className={`${field} mt-1`} value={c.emoji} maxLength={8} placeholder="🔥" onChange={(e) => up({ emoji: e.target.value })} /></label>}

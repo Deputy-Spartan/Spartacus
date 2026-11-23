@@ -1,5 +1,6 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
+import multer from "multer";
 import { prisma } from "@spartacus/db";
 import { CHAT_COMMANDS_KEY, CHAT_COMMANDS_STATE_KEY, cleanChatCommands, cleanChatCommandsState, type ChatCommandsConfig } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
@@ -81,6 +82,49 @@ router.post("/guilds/:guildId/chat-commands/run", requireAuth, requireGuildPermi
   if (!name) return res.status(400).json({ error: "Pick a command." });
   const r = await (await bot()).runChatCommandFrom(req.params.guildId, name, "Dashboard", undefined, args);
   res.status(r.ok ? 200 : 400).json(r.ok ? r : { error: r.message });
+});
+
+// ---- Your own sound files (picked from your computer) ----
+// Kept in the database (one row each, up to SOUND_MAX per server) and played
+// by the Command alerts overlay from /public/chat-sound/<server>/<id>.
+const SOUND_MAX = 30;
+const SOUND_BYTES = 1024 * 1024;
+const soundUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: SOUND_BYTES },
+  fileFilter: (_req, file, cb) => cb(null, /^audio\//.test(file.mimetype)),
+});
+router.post("/guilds/:guildId/chat-commands/sound", requireAuth, requireGuildPermission, (req, res, next) => {
+  soundUpload.single("file")(req, res, (err: unknown) => {
+    if (err) return res.status(400).json({ error: (err as { code?: string }).code === "LIMIT_FILE_SIZE" ? "That sound is too big. Keep it under 1 MB (a few seconds of mp3)." : "Couldn't read that file." });
+    next();
+  });
+}, async (req, res) => {
+  const guildId = req.params.guildId;
+  if (!req.file) return res.status(400).json({ error: "Pick a sound file (mp3, wav or ogg)." });
+  // Full: make room by removing the oldest sound no command uses.
+  const rows = await prisma.streamDeckState.findMany({ where: { guildId, key: { startsWith: "chatsound:" } }, select: { key: true, id: true }, orderBy: { id: "asc" } }).catch(() => [] as Array<{ key: string; id: string }>);
+  if (rows.length >= SOUND_MAX) {
+    const cfg = cleanChatCommands(await getRow(guildId, CHAT_COMMANDS_KEY));
+    const used = new Set(cfg.cmds.map((c) => c.soundUrl.split("/").pop()));
+    const spare = rows.filter((r) => !used.has(r.key.slice(10)))[0]; // oldest first (ids grow over time)
+    if (!spare) return res.status(400).json({ error: `You have ${SOUND_MAX} sounds in use. Remove one from a command first.` });
+    await prisma.streamDeckState.delete({ where: { guildId_key: { guildId, key: spare.key } } }).catch(() => null);
+  }
+  const id = randomBytes(9).toString("base64url");
+  const name = (req.file.originalname || "sound").replace(/[^\w .()-]/g, "").slice(0, 60) || "sound";
+  await putRow(guildId, `chatsound:${id}`, { type: req.file.mimetype, name, data: req.file.buffer.toString("base64") });
+  const base = (await bot().catch(() => null))?.apiBase() ?? `${req.protocol}://${req.get("host")}`;
+  res.status(201).json({ url: `${base}/public/chat-sound/${guildId}/${id}`, name });
+});
+
+router.get("/public/chat-sound/:guildId/:id", async (req, res) => {
+  const { guildId, id } = req.params;
+  if (!/^\d{5,25}$/.test(guildId) || !/^[\w-]{6,20}$/.test(id)) return res.status(404).end();
+  const v = (await getRow(guildId, `chatsound:${id}`)) as { type?: string; data?: string } | undefined;
+  if (!v?.data) return res.status(404).end();
+  res.set({ "Content-Type": /^audio\/[\w.+-]+$/.test(v.type ?? "") ? v.type! : "audio/mpeg", "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" });
+  res.send(Buffer.from(v.data, "base64"));
 });
 
 // ---- Run links: /public/chat-command/<server>/<command>?key=… ----

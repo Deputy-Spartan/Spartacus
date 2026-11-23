@@ -24,6 +24,7 @@
       .sp-chip i { width: 7px; height: 7px; border-radius: 50%; background: #6b7280; display: inline-block; }
       .sp-chip.ok { color: #4ade80; } .sp-chip.ok i { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
       .sp-chip.bad { color: #f87171; } .sp-chip.bad i { background: #f87171; }
+      .sp-inline { color: #60a5fa; cursor: pointer; text-decoration: none; }
       .sp-link { margin-left: auto; font-size: 11px; color: #60a5fa; cursor: pointer; text-decoration: none; }
       .sp-note { font-size: 11px; color: var(--sp-muted); margin: 2px 0 10px; line-height: 1.45; }
       .sp-tip { font-size: 11px; color: var(--sp-muted); margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--sp-line); line-height: 1.45; }
@@ -42,6 +43,14 @@
       <a class="sp-link" id="change" hidden>Change key</a>
     </div>
 
+    <!-- Which server every Spartacus key controls. Shown once a key works. -->
+    <div id="serverBox" hidden>
+      <sdpi-item label="Server">
+        <sdpi-select id="serverPick" setting="apiKey" global datasource="servers" hot-reload></sdpi-select>
+      </sdpi-item>
+      <p class="sp-note">Switches every Spartacus key to that server. <a class="sp-inline" id="addServer">Add another server</a> · <a class="sp-inline" id="forget">Forget this one</a></p>
+    </div>
+
     <!-- The connection key is stored once for every Spartacus key. Hidden once it works. -->
     <div id="keyBox">
       <sdpi-item label="Connection key">
@@ -50,7 +59,7 @@
       <sdpi-item>
         <sdpi-button id="test">Test connection</sdpi-button>
       </sdpi-item>
-      <p class="sp-note">Get a key on the dashboard: Owner Only → 🎛️ Stream Deck → Make a Key. Paste it here once; every Spartacus key uses it.</p>
+      <p class="sp-note">Get a key on the dashboard: Owner Only → 🎛️ Stream Deck → Make a Key. Paste it here once; every Spartacus key uses it. For another server, make a key on that server's dashboard and paste it here: both are remembered, and the Server list switches between them.</p>
     </div>
 
     <!-- Only the fields the current action uses are shown. -->
@@ -98,13 +107,24 @@
         document.getElementById("tip").textContent = TIPS[id] ?? "";
       });
 
+      const serverBox = document.getElementById("serverBox");
       function setStatus(ok, text) {
         chip.className = "sp-chip " + (ok === true ? "ok" : ok === false ? "bad" : "");
         chipText.textContent = text;
-        // Once connected, the key field folds away; Change key brings it back.
+        // Once connected, the key field folds away and the Server list shows;
+        // Change key (or Add another server) brings the key field back.
         keyBox.classList.toggle("hidden", ok === true);
         change.hidden = ok !== true;
+        serverBox.hidden = ok !== true;
       }
+      // Paste a key from another server's dashboard; Test adds it to the list.
+      document.getElementById("addServer").addEventListener("click", () => {
+        setStatus(true, chipText.textContent);
+        keyBox.classList.remove("hidden");
+        change.hidden = true;
+        chipText.textContent = "Paste the other server's key above, then press Test connection";
+      });
+      document.getElementById("forget").addEventListener("click", () => client.send("sendToPlugin", { event: "forget" }));
       function test() {
         setStatus(null, "Checking connection…");
         client.send("sendToPlugin", { event: "test" });
@@ -117,6 +137,7 @@
       client.sendToPropertyInspector.subscribe((ev) => {
         const p = ev.payload || {};
         if (p.event === "test") setStatus(!!p.ok, p.ok ? p.message : p.message || "Not connected");
+        if (p.event === "forgot") setTimeout(test, 300);
       });
       // Re-check after a new key is pasted.
       client.didReceiveGlobalSettings.subscribe(() => setTimeout(test, 300));

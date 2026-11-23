@@ -17419,6 +17419,7 @@ var KEYS = [
   { id: "ovtimer", name: "Timer", icon: "\u23F1\uFE0F", glyph: "timer-reset", tip: "Starts or pauses your Timer overlay, restarts it, or adds minutes (a minus takes away).", fields: ["timerOp", "amount"] },
   { id: "ovgoal", name: "Goal Bar", icon: "\u{1F4C8}", glyph: "chart-no-axes-column-increasing", tip: "Moves your Goal bar on stream by the amount, or sets it.", fields: ["amount", "moneyMode"] },
   { id: "ovchal", name: "Challenge", icon: "\u{1F3CB}\uFE0F", glyph: "dumbbell", tip: "Adds to your Challenge counter (a minus takes away), or sets it.", fields: ["amount", "moneyMode"] },
+  { id: "server", name: "Switch Server", icon: "\u{1F501}", glyph: "arrow-left-right", tip: "Shows which server your Spartacus keys control. Press to switch to the next server you've connected.", fields: [] },
   { id: "ovshow", name: "Show / Hide Overlay", icon: "\u{1F441}", glyph: "eye", tip: "Shows or hides one of your overlays on stream. The key shows if it is on stream right now.", fields: ["overlayId"] },
   { id: "clipit", name: "Clip It", icon: "\u{1F4CC}", glyph: "clapperboard", tip: "Saves this moment so you can find it later (and shows CLIPPED! if your Clip marker overlay is on).", fields: [] },
   { id: "tool", name: "Overlay Tool", icon: "\u{1F9F0}", glyph: "wand-sparkles", tip: "Runs one of your stream tools: clip it, spin the wheel, roll dice, flip a coin, polls, predictions and more.", fields: ["toolCmd"] },
@@ -17475,6 +17476,7 @@ var GLYPHS = {
   "timer-reset": '<path d="M10 2h4" /> <path d="M12 14v-4" /> <path d="M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6" /> <path d="M9 17H4v5" />',
   "chart-no-axes-column-increasing": '<line x1="12" x2="12" y1="20" y2="10" /> <line x1="18" x2="18" y1="20" y2="4" /> <line x1="6" x2="6" y1="20" y2="16" />',
   "dumbbell": '<path d="M14.4 14.4 9.6 9.6" /> <path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z" /> <path d="m21.5 21.5-1.4-1.4" /> <path d="M3.9 3.9 2.5 2.5" /> <path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z" />',
+  "arrow-left-right": '<path d="M8 3 4 7l4 4" /> <path d="M4 7h16" /> <path d="m16 21 4-4-4-4" /> <path d="M20 17H4" />',
   "eye": '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" />',
   "clapperboard": '<path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /> <path d="m6.2 5.3 3.1 3.9" /> <path d="m12.4 3.4 3.1 4" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />',
   "wand-sparkles": '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72" /> <path d="m14 7 3 3" /> <path d="M5 6v4" /> <path d="M19 14v4" /> <path d="M10 2v2" /> <path d="M7 8H3" /> <path d="M21 16h-4" /> <path d="M11 3H9" />',
@@ -17555,7 +17557,9 @@ async function refreshAll() {
       for (const v of visible.values()) await problem(v, "Set up");
       return;
     }
-    const items = [...visible.values()].map((v) => ({ id: v.action.id, action: v.id, settings: v.settings }));
+    for (const v of visible.values()) if (v.id === "server") await draw(v, serverFace());
+    const items = [...visible.values()].filter((v) => v.id !== "server").map((v) => ({ id: v.action.id, action: v.id, settings: v.settings }));
+    if (!items.length) return;
     const res = await api("/sd/v1/faces", { items });
     for (const v of visible.values()) {
       const f = res.faces[v.action.id];
@@ -17568,6 +17572,35 @@ async function refreshAll() {
   }
 }
 setInterval(() => void refreshAll(), 5e3);
+var servers = () => Array.isArray(globals.servers) ? globals.servers : [];
+var currentServer = () => servers().find((s) => s.key === globals.apiKey);
+function serverFace() {
+  const list = servers(), cur = currentServer();
+  if (!cur) return { title: "Server", line: globals.apiKey ? "Checking\u2026" : "Set up", tone: "off" };
+  return { title: list.length > 1 ? `Server ${list.indexOf(cur) + 1}/${list.length}` : "Server", line: clip(cur.name, 14), tone: "green" };
+}
+async function saveGlobals(next) {
+  globals = next;
+  await plugin_default.settings.setGlobalSettings(globals);
+  optionsCache = null;
+}
+async function rememberServer(name) {
+  if (!globals.apiKey) return;
+  const list = servers().filter((s) => s.key !== globals.apiKey);
+  const i = servers().findIndex((s) => s.key === globals.apiKey);
+  const entry = { key: globals.apiKey, name };
+  if (i >= 0) list.splice(i, 0, entry);
+  else list.push(entry);
+  if (JSON.stringify(list) !== JSON.stringify(servers())) await saveGlobals({ ...globals, servers: list });
+}
+async function nextServer() {
+  const list = servers();
+  if (list.length < 2) return false;
+  const i = list.findIndex((s) => s.key === globals.apiKey);
+  await saveGlobals({ ...globals, apiKey: list[(i + 1) % list.length].key });
+  await refreshAll();
+  return true;
+}
 async function run(v, op, value) {
   try {
     const r = await api("/sd/v1/run", { action: v.id, settings: v.settings, op, value });
@@ -17626,6 +17659,7 @@ plugin_default.settings.onDidReceiveGlobalSettings(async (ev) => {
 plugin_default.actions.onKeyDown(async (ev) => {
   const v = visible.get(ev.action.id);
   if (!v) return;
+  if (v.id === "server") return void await (await nextServer() ? ev.action.showOk() : ev.action.showAlert());
   if (!globals.apiKey) return void await ev.action.showAlert();
   if (await needsSecondPress(v)) return;
   await run(v, "press");
@@ -17715,7 +17749,16 @@ plugin_default.ui.onSendToPlugin(async (ev) => {
   try {
     if (event === "test") {
       const me = await api("/sd/v1/me");
-      return void await plugin_default.ui.sendToPropertyInspector({ event: "test", ok: true, message: `Connected to ${me.guild.name}` });
+      await rememberServer(me.guild.name);
+      await plugin_default.ui.sendToPropertyInspector({ event: "servers", items: servers().map((s) => ({ value: s.key, label: s.name })) });
+      return void await plugin_default.ui.sendToPropertyInspector({ event: "test", ok: true, message: `Connected to ${me.guild.name}`, servers: servers().length });
+    }
+    if (event === "servers") return void await plugin_default.ui.sendToPropertyInspector({ event, items: servers().map((s) => ({ value: s.key, label: s.name })) });
+    if (event === "forget") {
+      const list2 = servers().filter((s) => s.key !== globals.apiKey);
+      await saveGlobals({ ...globals, servers: list2, apiKey: list2[0]?.key ?? "" });
+      await refreshAll();
+      return void await plugin_default.ui.sendToPropertyInspector({ event: "forgot", servers: list2.length });
     }
     if (!optionsCache || Date.now() - optionsCache.at > 6e4) optionsCache = { at: Date.now(), data: await api("/sd/v1/options") };
     const list = optionsCache.data[event] ?? [];
@@ -17727,6 +17770,10 @@ plugin_default.ui.onSendToPlugin(async (ev) => {
 void (async () => {
   await plugin_default.connect();
   globals = await plugin_default.settings.getGlobalSettings();
+  if (globals.apiKey && !currentServer()) {
+    const me = await api("/sd/v1/me").catch(() => null);
+    if (me) await rememberServer(me.guild.name);
+  }
   await refreshAll();
 })();
 /*! Bundled license information:

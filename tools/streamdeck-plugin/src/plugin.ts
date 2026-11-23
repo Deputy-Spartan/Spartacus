@@ -7,9 +7,14 @@ import { clip, iconImage, keyImage, plain, type Face } from "./draw";
 // Spartacus and run their action on press. The connection key from the
 // dashboard is stored once, in the plugin's global settings.
 
+// apiKey is the server the keys control right now; servers is every server
+// connected so far (a key from each one's dashboard), for the Server dropdown
+// and the Switch Server key.
+type Server = { key: string; name: string };
 type Globals = JsonObject & {
   apiKey?: string;
   apiUrl?: string;
+  servers?: Server[];
 };
 type Settings = JsonObject & Record<string, string | number | boolean | undefined>;
 interface Visible {
@@ -67,7 +72,10 @@ async function refreshAll() {
       for (const v of visible.values()) await problem(v, "Set up");
       return;
     }
-    const items = [...visible.values()].map((v) => ({ id: v.action.id, action: v.id, settings: v.settings }));
+    // The Switch Server key is drawn here; everything else comes from Spartacus.
+    for (const v of visible.values()) if (v.id === "server") await draw(v, serverFace());
+    const items = [...visible.values()].filter((v) => v.id !== "server").map((v) => ({ id: v.action.id, action: v.id, settings: v.settings }));
+    if (!items.length) return;
     const res = await api<{ faces: Record<string, Face> }>("/sd/v1/faces", { items });
     for (const v of visible.values()) {
       const f = res.faces[v.action.id];
@@ -80,6 +88,39 @@ async function refreshAll() {
   }
 }
 setInterval(() => void refreshAll(), 5000);
+
+// ---- Servers ----
+const servers = () => (Array.isArray(globals.servers) ? globals.servers : []);
+const currentServer = () => servers().find((s) => s.key === globals.apiKey);
+function serverFace(): Face {
+  const list = servers(), cur = currentServer();
+  if (!cur) return { title: "Server", line: globals.apiKey ? "Checking…" : "Set up", tone: "off" };
+  return { title: list.length > 1 ? `Server ${list.indexOf(cur) + 1}/${list.length}` : "Server", line: clip(cur.name, 14), tone: "green" };
+}
+async function saveGlobals(next: Globals) {
+  globals = next;
+  await streamDeck.settings.setGlobalSettings(globals);
+  optionsCache = null;
+}
+// Remembers the server a working key belongs to.
+async function rememberServer(name: string) {
+  if (!globals.apiKey) return;
+  const list = servers().filter((s) => s.key !== globals.apiKey);
+  const i = servers().findIndex((s) => s.key === globals.apiKey);
+  const entry = { key: globals.apiKey, name };
+  if (i >= 0) list.splice(i, 0, entry);
+  else list.push(entry);
+  if (JSON.stringify(list) !== JSON.stringify(servers())) await saveGlobals({ ...globals, servers: list });
+}
+// The Switch Server key: on to the next connected server.
+async function nextServer() {
+  const list = servers();
+  if (list.length < 2) return false;
+  const i = list.findIndex((s) => s.key === globals.apiKey);
+  await saveGlobals({ ...globals, apiKey: list[(i + 1) % list.length].key });
+  await refreshAll();
+  return true;
+}
 
 // ---- Running ----
 interface RunResult {
@@ -151,6 +192,7 @@ streamDeck.settings.onDidReceiveGlobalSettings<Globals>(async (ev) => {
 streamDeck.actions.onKeyDown<Settings>(async (ev) => {
   const v = visible.get(ev.action.id);
   if (!v) return;
+  if (v.id === "server") return void (await ((await nextServer()) ? ev.action.showOk() : ev.action.showAlert()));
   if (!globals.apiKey) return void (await ev.action.showAlert());
   if (await needsSecondPress(v)) return;
   await run(v, "press");
@@ -247,7 +289,18 @@ streamDeck.ui.onSendToPlugin<{ event?: string }>(async (ev) => {
   try {
     if (event === "test") {
       const me = await api<{ guild: { name: string } }>("/sd/v1/me");
-      return void (await streamDeck.ui.sendToPropertyInspector({ event: "test", ok: true, message: `Connected to ${me.guild.name}` }));
+      await rememberServer(me.guild.name);
+      // Refresh the Server list in the panel too.
+      await streamDeck.ui.sendToPropertyInspector({ event: "servers", items: servers().map((s) => ({ value: s.key, label: s.name })) });
+      return void (await streamDeck.ui.sendToPropertyInspector({ event: "test", ok: true, message: `Connected to ${me.guild.name}`, servers: servers().length }));
+    }
+    // The Server dropdown: every server connected so far.
+    if (event === "servers") return void (await streamDeck.ui.sendToPropertyInspector({ event, items: servers().map((s) => ({ value: s.key, label: s.name })) }));
+    if (event === "forget") {
+      const list = servers().filter((s) => s.key !== globals.apiKey);
+      await saveGlobals({ ...globals, servers: list, apiKey: list[0]?.key ?? "" });
+      await refreshAll();
+      return void (await streamDeck.ui.sendToPropertyInspector({ event: "forgot", servers: list.length }));
     }
     if (!optionsCache || Date.now() - optionsCache.at > 60_000) optionsCache = { at: Date.now(), data: await api("/sd/v1/options") };
     const list = optionsCache.data[event] ?? [];
@@ -260,5 +313,10 @@ streamDeck.ui.onSendToPlugin<{ event?: string }>(async (ev) => {
 void (async () => {
   await streamDeck.connect();
   globals = await streamDeck.settings.getGlobalSettings<Globals>();
+  // A key saved before servers were remembered: add it to the list.
+  if (globals.apiKey && !currentServer()) {
+    const me = await api<{ guild: { name: string } }>("/sd/v1/me").catch(() => null);
+    if (me) await rememberServer(me.guild.name);
+  }
   await refreshAll();
 })();

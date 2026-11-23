@@ -35,6 +35,7 @@ const ACTIONS: Array<[string, Array<[string, string, string]>]> = [
       ["⏱️", "Timer", "Starts or pauses your Timer overlay, restarts it, or adds minutes."],
       ["📈", "Goal Bar", "Moves your Goal bar by an amount, or sets it."],
       ["🏋️", "Challenge", "Adds to your Challenge counter, or sets it."],
+      ["🔁", "Switch Server", "Shows which server your keys control; press to switch. Connect more servers from any key's settings: Add another server."],
       ["📌", "Clip It", "Saves this moment (and how far into the stream) so you can find it later."],
       ["🧰", "Overlay Tool", "Runs a stream tool: clip it, spin the wheel, roll dice, flip a coin, polls, predictions and more."],
     ],

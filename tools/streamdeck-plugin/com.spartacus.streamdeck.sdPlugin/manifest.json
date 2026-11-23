@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.spartacus.streamdeck",
   "Name": "Spartacus",
-  "Version": "1.7.0.0",
+  "Version": "1.8.0.0",
   "Author": "Spartacus",
   "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   "Category": "Spartacus",
@@ -649,6 +649,25 @@
       "States": [
         {
           "Image": "imgs/actions/ovchal",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.server",
+      "Name": "Switch Server",
+      "Icon": "imgs/actions/server",
+      "Tooltip": "Shows which server your Spartacus keys control. Press to switch to the next server you've connected.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/server",
           "TitleAlignment": "middle",
           "FontSize": 11,
           "ShowTitle": true

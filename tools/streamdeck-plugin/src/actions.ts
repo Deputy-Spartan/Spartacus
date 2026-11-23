@@ -50,7 +50,7 @@ export const KEYS: ActionDef[] = [
   { id: "ovchal", name: "Challenge", icon: "🏋️", glyph: "dumbbell", tip: "Adds to your Challenge counter (a minus takes away), or sets it.", fields: ["amount", "moneyMode"] },
   { id: "ovshow", name: "Show / Hide Overlay", icon: "👁", glyph: "eye", tip: "Shows or hides one of your overlays on stream. The key shows if it is on stream right now.", fields: ["overlayId"] },
   { id: "clipit", name: "Clip It", icon: "📌", glyph: "clapperboard", tip: "Saves this moment so you can find it later (and shows CLIPPED! if your Clip marker overlay is on).", fields: [] },
-  { id: "tool", name: "Overlay Tool", icon: "🧰", glyph: "wand-sparkles", tip: "Runs one of your stream tools: spin the wheel, roll dice, switch scenes, polls, predictions, giveaways and more.", fields: ["toolCmd"] },
+  { id: "tool", name: "Overlay Tool", icon: "🧰", glyph: "wand-sparkles", tip: "Runs one of your stream tools: clip it, spin the wheel, roll dice, flip a coin, polls, predictions and more.", fields: ["toolCmd"] },
   { id: "botstat", name: "Bot Status", icon: "💚", glyph: "heart-pulse", tip: "Is Spartacus online, and its ping.", fields: [] },
 ];
 

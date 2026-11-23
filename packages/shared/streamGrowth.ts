@@ -126,8 +126,7 @@ export function cleanKickLogin(input: string): string {
 // What the bot asks Twitch and Kick for when a streamer connects.
 export const TWITCH_SCOPES = ["channel:manage:broadcast", "moderator:read:followers"];
 export const KICK_SCOPES = ["user:read", "channel:read", "channel:write", "events:subscribe"];
-// Subs and gifted subs feed Overlays › Alerts and Subathon (bot/lib/streamTools.ts).
-export const KICK_EVENTS = ["chat.message.sent", "channel.followed", "channel.subscription.new", "channel.subscription.renewal", "channel.subscription.gifts"];
+export const KICK_EVENTS = ["chat.message.sent", "channel.followed"];
 
 // Rough time left, for the countdown posts.
 export function minutesText(min: number): string {

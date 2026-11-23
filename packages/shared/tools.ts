@@ -1,5 +1,4 @@
-// Streaming › Overlays › stream tools: Alerts, Chat box, Scenes, Stats bar,
-// Giveaway, Leaderboard, Next stream, Subathon, Webcam frame, Clip marker,
+// Streaming › Overlays › stream tools: Chat box, Stats bar, Clip marker,
 // Command tips, QR code, Squad box, Poll, Spin wheel, Dice & coin,
 // Predictions and First-time welcome.
 //
@@ -9,7 +8,7 @@
 // each new event once. The dashboard, Stream Deck, Kick events and stream chat
 // all change it through applyToolAction, so they always agree.
 
-export const TOOL_KINDS = ["alerts", "chat", "scenes", "stats", "giveaway", "leader", "next", "subathon", "cam", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome"] as const;
+export const TOOL_KINDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome"] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
 export const isToolKind = (k: unknown): k is ToolKind => TOOL_KINDS.includes(k as ToolKind);
 export const toolStateKey = (k: ToolKind) => `tool:${k}`;
@@ -55,23 +54,6 @@ const sound = (title: string, items: Item[]): ToolGroup => ({ title, kind: "four
 const IDLE: ToolGroup = { title: "While it's up", kind: "four", items: [["none", "Still"], ["float", "Float"], ["pulse", "Pulse"], ["glow", "Glow"]] };
 
 export const TOOLS: Record<ToolKind, ToolInfo> = {
-  alerts: {
-    kind: "alerts", title: "Alerts", icon: "🔔", section: "extras", line: "Big pop-ups for follows, subs, gifted subs and raids.",
-    settings: { ...COMMON, style: "slam", pos: "center", hold: 5, sound: "fanfare", followTitle: "NEW FOLLOWER!", subTitle: "NEW SUB!", giftTitle: "GIFTED SUBS!", raidTitle: "RAID!" },
-    state: {},
-    groups: {
-      style: { title: "How it comes in", kind: "big", items: [["slam", "Slam", "Slams down and shakes the screen."], ["slide", "Slide", "Slides in from the side with a bounce."], ["flip", "Flip", "Flips in like a card."], ["explode", "Explode", "Pops in with confetti bursting out."], ["bullets", "Bullets", "Bullets hit the wall, then it slams in."], ["glitch", "Glitch", "Glitches in with a red and blue split."]] },
-      pos: { title: "Where", kind: "small", items: [["top", "Top"], ["center", "Middle"], ["bottom", "Bottom"]] },
-      hold: { title: "Stays up for", kind: "small", items: [[3, "3 sec"], [5, "5 sec"], [8, "8 sec"]] },
-      ...LOOKS,
-      sound: sound("Sound", [["off", "Off"], ["fanfare", "Fanfare"], ["ding", "Ding"], ["airhorn", "Airhorn"]]),
-      volume: G.volume,
-    },
-    toggles: [],
-    words: [["followTitle", "Follower words"], ["subTitle", "Sub words"], ["giftTitle", "Gift words"], ["raidTitle", "Raid words"]],
-    buttons: [["💜 Test follower", { op: "test", type: "follow" }], ["⭐ Test sub", { op: "test", type: "sub" }], ["🎁 Test gift", { op: "test", type: "gift" }], ["🚀 Test raid", { op: "test", type: "raid" }]],
-    auto: "Kick follows and subs show by themselves (needs Kick set up in Stream Growth).",
-  },
   chat: {
     kind: "chat", title: "Chat box", icon: "💬", section: "extras", line: "Your live Kick and Twitch chat on screen.",
     settings: { ...COMMON, color: "#a78bfa", side: "left", max: 6, style: "bubbles", anim: "slide", names: "rainbow", badges: true, fade: 0, chatFont: "clean", sound: "off" },
@@ -93,28 +75,9 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
     buttons: [["💬 Test message", { op: "test" }], ["🧹 Clear", { op: "clear" }]],
     auto: "Messages come from your Kick and Twitch chat by themselves.",
   },
-  scenes: {
-    kind: "scenes", title: "Scenes", icon: "🎬", section: "extras", line: "Starting Soon, Be Right Back and Ending screens with a timer.",
-    settings: { ...COMMON, color: "#a78bfa", bg: "gradient", trans: "wipe", titleFx: "glow", showTimer: true, showGame: true, showSocials: true, showDiscord: true, timerLen: 300000,
-      startTitle: "STARTING SOON", brbTitle: "BE RIGHT BACK", endTitle: "THANKS FOR WATCHING", startLine: "Grab a drink, we're about to go live", brbLine: "Stretch break, back in a minute", endLine: "See you next stream!", sound: "off" },
-    state: { scene: "start", t0: 0, base: 300000 },
-    groups: {
-      bg: { title: "Background", kind: "small", items: [["gradient", "Moving colors"], ["embers", "Embers"], ["grid", "Retro grid"], ["dark", "Dark"], ["clear", "See-through"]] },
-      trans: { title: "Switching scenes", kind: "small", items: [["wipe", "Wipe"], ["fade", "Fade"], ["zoom", "Zoom"]] },
-      titleFx: { title: "Title while waiting", kind: "four", items: [["glow", "Glow"], ["float", "Float"], ["pulse", "Pulse"], ["none", "Still"]] },
-      timerLen: { title: "Timer", kind: "four", items: [[60000, "1 min"], [300000, "5 min"], [600000, "10 min"], [900000, "15 min"]] },
-      font: G.font, color: { ...G.color, title: "Accent color" }, outline: G.outline,
-      sound: sound("Sound when it hits 0", [["off", "Off"], ["fanfare", "Fanfare"], ["ding", "Ding"], ["airhorn", "Airhorn"]]),
-      volume: G.volume,
-    },
-    toggles: [["showTimer", "Timer", "A countdown under the title."], ["showGame", "Game", "From your Game overlay."], ["showSocials", "Socials", "From Overlays › Socials."], ["showDiscord", "Discord invite", "From your Discord box or Socials."]],
-    words: [["startTitle", "Starting title"], ["startLine", "Starting line"], ["brbTitle", "BRB title"], ["brbLine", "BRB line"], ["endTitle", "Ending title"], ["endLine", "Ending line"]],
-    buttons: [["▶ Starting", { op: "scene", scene: "start" }], ["☕ BRB", { op: "scene", scene: "brb" }], ["👋 Ending", { op: "scene", scene: "end" }], ["+1 min", { op: "add", ms: 60000 }]],
-    auto: "The game, socials and invite come from your other overlays. Next stream (on Ending) comes from your schedule.",
-  },
   stats: {
     kind: "stats", title: "Stats bar", icon: "📊", section: "extras", line: "One slim bar with your money, K/D, wins, goal and game.",
-    settings: { ...COMMON, mode: "cycle", pos: "bottom", every: 5, showMoney: true, showKd: true, showRatio: false, showWl: true, showWinrate: false, showGoal: true, showGame: true, showTimer: false, showChallenge: false, showSubathon: false, showLatest: false, showNext: false, sound: "off" },
+    settings: { ...COMMON, mode: "cycle", pos: "bottom", every: 5, showMoney: true, showKd: true, showRatio: false, showWl: true, showWinrate: false, showGoal: true, showGame: true, showTimer: false, showChallenge: false, showLatest: false, showNext: false, sound: "off" },
     state: {},
     groups: {
       mode: { title: "How it shows them", kind: "small", items: [["cycle", "One at a time"], ["row", "All in a row"], ["scroll", "Scrolling"]] },
@@ -132,87 +95,12 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
       ["showGame", "🎮 Game", "From your Game overlay."],
       ["showTimer", "⏱️ Timer", "From your Timer, counting live."],
       ["showChallenge", "🏋️ Challenge", "From your Challenge counter."],
-      ["showSubathon", "⏳ Subathon time", "From your Subathon, counting live."],
       ["showLatest", "💜 Latest follower", "From your Latest follower."],
       ["showNext", "📅 Next stream", "From your schedule."],
     ],
     words: [],
     buttons: [],
     auto: "It reads the numbers from your other overlays by itself.",
-  },
-  giveaway: {
-    kind: "giveaway", title: "Giveaway", icon: "🎁", section: "extras", line: "Prize, entries and time left, then a winner reveal.",
-    settings: { ...COMMON, source: "discord", label: "🎁 GIVEAWAY", prize: "Discord Nitro", how: "Type !join in chat to enter", showTimer: true, len: 300000, idle: "none", sound: "fanfare" },
-    state: { entries: 0, names: [], t0: 0, base: 300000 },
-    groups: {
-      source: { title: "Which giveaway", kind: "small", items: [["discord", "My Discord giveaway"], ["chat", "Chat !join"]] },
-      len: { title: "How long (Chat !join)", kind: "four", items: [[120000, "2 min"], [300000, "5 min"], [600000, "10 min"], [1800000, "30 min"]] },
-      idle: IDLE,
-      ...LOOKS,
-      sound: sound("Sound for the winner", [["off", "Off"], ["fanfare", "Fanfare"], ["ding", "Ding"], ["airhorn", "Airhorn"]]),
-      volume: G.volume,
-    },
-    toggles: [["showTimer", "Time left", "A countdown and a bar that empties."]],
-    words: [["label", "Top words"], ["prize", "Prize (Chat !join)"], ["how", "How to enter"]],
-    buttons: [["▶ Start (Chat !join)", { op: "start" }], ["🎲 Draw winner", { op: "draw" }]],
-    auto: "My Discord giveaway: follows the giveaway running in your server. Chat !join: people type !join in Kick or Twitch chat.",
-  },
-  leader: {
-    kind: "leader", title: "Leaderboard", icon: "🏅", section: "extras", line: "Top chatters, chat this week and top XP, switching between them.",
-    settings: { ...COMMON, rows: 5, every: 8, side: "right", bars: true, showChat: true, showVotw: true, showXp: true, sound: "off" },
-    state: { boards: {} },
-    groups: {
-      rows: { title: "Rows", kind: "small", items: [[3, "Top 3"], [5, "Top 5"], [8, "Top 8"]] },
-      every: { title: "Switch boards every", kind: "small", items: [[5, "5 sec"], [8, "8 sec"], [15, "15 sec"]] },
-      side: { title: "Side", kind: "small", items: [["left", "Left"], ["right", "Right"]] },
-      ...LOOKS,
-    },
-    toggles: [["showChat", "Top chatters", "Who talks the most this stream."], ["showVotw", "Chat this week", "Messages this week (Viewer of the Week)."], ["showXp", "Top XP", "Your server's levels."], ["bars", "Bars", "A bar behind each name."]],
-    words: [],
-    buttons: [["➡ Next board", { op: "next" }]],
-    auto: "Fills in by itself from stream chat and your server's levels.",
-  },
-  next: {
-    kind: "next", title: "Next stream", icon: "📅", section: "extras", line: "When you're live next, from your schedule, with a countdown.",
-    settings: { ...COMMON, label: "NEXT STREAM", showCountdown: true, showGame: true, idle: "float", sound: "off" },
-    state: {},
-    groups: { idle: IDLE, ...LOOKS },
-    toggles: [["showCountdown", "Countdown", "Shows how long until then, like in 2d 4h."], ["showGame", "What you'll play", "From the schedule."]],
-    words: [["label", "Top words"]],
-    buttons: [["▶ Show it again", { op: "again" }]],
-    auto: "Reads your next stream from the schedule in Stream Extras.",
-  },
-  subathon: {
-    kind: "subathon", title: "Subathon", icon: "⏳", section: "extras", line: "A timer that follows and subs add time to.",
-    settings: { ...COMMON, label: "SUBATHON", perFollow: 1, perSub: 5, cap: 0, finalFlash: true, sound: "coin" },
-    state: { t0: 0, base: 3 * 3600_000, running: false },
-    groups: {
-      perFollow: { title: "Each follow adds", kind: "small", items: [[0, "Nothing"], [1, "1 min"], [2, "2 min"]] },
-      perSub: { title: "Each sub adds", kind: "small", items: [[3, "3 min"], [5, "5 min"], [10, "10 min"]] },
-      cap: { title: "Longest it can go", kind: "small", items: [[0, "No limit"], [12, "12 hours"], [24, "24 hours"]] },
-      ...LOOKS,
-      sound: sound("Sound when time's added", [["off", "Off"], ["coin", "Coin"], ["ding", "Ding"], ["pop", "Pop"]]),
-      volume: G.volume,
-    },
-    toggles: [["finalFlash", "Last 10 seconds", "Turns red and pulses at the very end."]],
-    words: [["label", "Top words"]],
-    buttons: [["▶ / ⏸", { op: "toggle" }], ["+5 min", { op: "add", ms: 300000 }], ["+1 hour", { op: "add", ms: 3600000 }], ["−5 min", { op: "add", ms: -300000 }]],
-    auto: "Kick follows and subs add time by themselves.",
-  },
-  cam: {
-    kind: "cam", title: "Webcam frame", icon: "📷", section: "extras", line: "A frame for your camera with your name tag.",
-    settings: { ...COMMON, color: "#22d3ee", style: "hud", thick: 10, name: "DEPUTY SPARTAN", showTag: true, tagPos: "bl", liveDot: true, flashOnAlert: true, sound: "off" },
-    state: {},
-    groups: {
-      style: { title: "Frame", kind: "big", items: [["hud", "HUD corners", "Glowing corner brackets with a scan line."], ["neon", "Neon", "A glowing border that breathes."], ["gold", "Gold", "A thick shiny gold border."], ["tag", "Name tag", "A dark border with an accent edge."], ["army", "Army", "Olive stencil plate with bolts."], ["glass", "Glass", "Frosted see-through edge."], ["rainbow", "Rainbow", "A border that spins through colors."]] },
-      thick: { title: "Thickness", kind: "small", items: [[6, "Thin"], [10, "Medium"], [18, "Thick"]] },
-      tagPos: { title: "Name tag spot", kind: "small", items: [["bl", "Bottom left"], ["bc", "Bottom middle"], ["tl", "Top left"]] },
-      look: { ...G.look, title: "Name tag look" }, font: G.font, color: G.color, corners: G.corners, size: G.size,
-    },
-    toggles: [["showTag", "Name tag", "Your name on the frame."], ["liveDot", "Live dot", "A blinking red dot in the tag."], ["flashOnAlert", "Flash on alerts", "Flashes when a follow or sub comes in."]],
-    words: [["name", "Name on the tag"]],
-    buttons: [["⚡ Flash", { op: "flash" }]],
-    auto: "Put it over your camera in OBS (the middle is see-through) and resize it to fit.",
   },
   clip: {
     kind: "clip", title: "Clip marker", icon: "📌", section: "tools", line: "Press a key when something good happens; Spartacus saves the time.",
@@ -367,25 +255,14 @@ export const TOOL_COMMANDS: Array<[string, string, ToolKind, Record<string, unkn
   ["spin", "🎡 Spin the wheel", "wheel", { op: "spin" }],
   ["roll", "🎲 Roll dice", "dice", { op: "roll" }],
   ["flip", "🪙 Flip a coin", "dice", { op: "flip" }],
-  ["sceneStart", "▶ Scene: Starting", "scenes", { op: "scene", scene: "start" }],
-  ["sceneBrb", "☕ Scene: BRB", "scenes", { op: "scene", scene: "brb" }],
-  ["sceneEnd", "👋 Scene: Ending", "scenes", { op: "scene", scene: "end" }],
-  ["scenePlus", "+1 min on the scene timer", "scenes", { op: "add", ms: 60000 }],
   ["pollStart", "📊 Start poll", "poll", { op: "start" }],
   ["pollEnd", "🏁 End poll", "poll", { op: "end" }],
   ["predOpen", "🔮 Open betting", "predict", { op: "open" }],
   ["predLock", "🔒 Lock betting", "predict", { op: "lock" }],
   ["predYes", "✅ Prediction: Yes won", "predict", { op: "settle", side: 0 }],
   ["predNo", "❌ Prediction: No won", "predict", { op: "settle", side: 1 }],
-  ["gwStart", "🎁 Start giveaway (chat !join)", "giveaway", { op: "start" }],
-  ["gwDraw", "🎲 Draw giveaway winner", "giveaway", { op: "draw" }],
-  ["subToggle", "⏳ Subathon start / pause", "subathon", { op: "toggle" }],
-  ["subPlus", "⏳ Subathon +5 min", "subathon", { op: "add", ms: 300000 }],
-  ["camFlash", "📷 Flash webcam frame", "cam", { op: "flash" }],
   ["qrShow", "🔳 Show QR code", "qr", { op: "show" }],
   ["tipNext", "⌨️ Next command tip", "cmds", { op: "next" }],
-  ["boardNext", "🏅 Next leaderboard", "leader", { op: "next" }],
-  ["alertTest", "🔔 Test alert", "alerts", { op: "test", type: "follow" }],
 ];
 
 // ---- Saving ----
@@ -448,11 +325,6 @@ export function applyToolAction(kind: ToolKind, current: ToolRow, a: Record<stri
   const st = row.state as Record<string, any>;
   const op = String(a.op ?? "");
   switch (kind) {
-    case "alerts": {
-      const type = ["follow", "sub", "gift", "raid"].includes(String(a.type)) ? String(a.type) : "follow";
-      push(row, "alert", { type, name: str(a.name, 40) || pick(SAMPLE), count: Math.max(1, Math.min(9999, Number(a.count) || (type === "gift" ? 5 : type === "raid" ? 42 : 1))) }, now);
-      return row;
-    }
     case "chat": {
       if (op === "clear") return { ...row, state: { ...st, msgs: [] } };
       const text = str(a.text, 300) || (op === "test" ? "This is what chat looks like on stream 👋" : "");
@@ -461,53 +333,6 @@ export function applyToolAction(kind: ToolKind, current: ToolRow, a: Record<stri
       st.msgs = [...(Array.isArray(st.msgs) ? st.msgs : []), msg].slice(-20);
       return row;
     }
-    case "scenes": {
-      if (op === "scene" && ["start", "brb", "end"].includes(String(a.scene))) { st.scene = a.scene; st.t0 = now; st.base = Number(s.timerLen) || 300000; return row; }
-      if (op === "add") { const left = Math.max(0, (Number(st.base) || 0) - (now - (Number(st.t0) || now))); st.base = Math.max(0, left + Number(a.ms || 0)); st.t0 = now; return row; }
-      return { error: "Pick a scene." };
-    }
-    case "giveaway": {
-      if (op === "start") { st.entries = 0; st.names = []; st.t0 = now; st.base = Number(s.len) || 300000; st.running = true; st.winner = ""; push(row, "start", {}, now); return row; }
-      if (op === "join") {
-        const name = str(a.name, 40);
-        if (!name || !st.running || now - st.t0 > st.base) return row;
-        const names: string[] = Array.isArray(st.names) ? st.names : [];
-        if (names.some((n) => n.toLowerCase() === name.toLowerCase())) return row;
-        st.names = [...names, name].slice(-5000);
-        st.entries = st.names.length;
-        return row;
-      }
-      if (op === "draw") {
-        const names: string[] = Array.isArray(a.names) ? (a.names as string[]) : Array.isArray(st.names) ? st.names : [];
-        if (!names.length) return { error: "Nobody has entered yet." };
-        const winner = pick(names);
-        st.running = false; st.winner = winner;
-        push(row, "draw", { winner, names: names.slice(0, 40) }, now);
-        return row;
-      }
-      return { error: "Start or draw." };
-    }
-    case "leader":
-      if (op === "next") { push(row, "next", {}, now); return row; }
-      if (op === "chatTop" && Array.isArray(a.top)) { st.chatTop = (a.top as Array<[string, number]>).slice(0, 10).map(([n, v]) => [str(n, 40), Number(v) || 0]); return row; }
-      return { error: "Nothing to do." };
-    case "next":
-      push(row, "again", {}, now);
-      return row;
-    case "subathon": {
-      const left = () => Math.max(0, st.running ? (Number(st.base) || 0) - (now - (Number(st.t0) || now)) : Number(st.base) || 0);
-      const cap = (ms: number) => (Number(s.cap) ? Math.min(ms, Number(s.cap) * 3600_000) : ms);
-      if (op === "toggle") { const l = left(); st.running = !st.running; st.base = l; st.t0 = now; return row; }
-      if (op === "set") { st.base = cap(Math.max(0, Number(a.ms) || 0)); st.t0 = now; return row; }
-      let ms = Number(a.ms) || 0;
-      if (op === "event") ms = (a.type === "follow" ? Number(s.perFollow) : a.type === "gift" ? Number(s.perSub) * Math.max(1, Number(a.count) || 1) : Number(s.perSub)) * 60000;
-      if (!ms) return row;
-      const l = left();
-      st.base = cap(Math.max(0, l + ms)); st.t0 = now;
-      push(row, "add", { ms, type: str(a.type, 10) || "manual" }, now);
-      return row;
-    }
-    case "cam":
     case "qr":
     case "cmds":
       push(row, op || "flash", {}, now);

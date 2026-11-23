@@ -2,7 +2,7 @@ import { createPublicKey, verify, type KeyObject } from "node:crypto";
 import fetch from "node-fetch";
 import { LINK_CODE_PATTERN, cleanOverlay, overlayStateKey } from "@spartacus/shared";
 import { changeOverlay } from "../utility/streamDeck";
-import { onStreamChat, onStreamEvent } from "../../lib/streamTools";
+import { onStreamChat } from "../../lib/streamTools";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { recordChat } from "../../lib/chatActivity";
@@ -74,13 +74,6 @@ export async function handleKickEvent(type: string, messageId: string, payload: 
     } else if (type === "channel.followed") {
       await prisma.streamSubscription.updateMany({ where: { platform: "kick", channelName: { equals: slug, mode: "insensitive" }, isLive: true }, data: { streamFollows: { increment: 1 } } });
       await followToOverlays(slug, p.follower?.username ?? "");
-      await onStreamEvent("kick", slug, "follow", p.follower?.username ?? "Someone");
-    } else if (type === "channel.subscription.new" || type === "channel.subscription.renewal") {
-      const q = payload as { subscriber?: KickUser };
-      await onStreamEvent("kick", slug, "sub", q.subscriber?.username ?? "Someone");
-    } else if (type === "channel.subscription.gifts") {
-      const q = payload as { gifter?: KickUser; giftees?: KickUser[] };
-      await onStreamEvent("kick", slug, "gift", q.gifter?.username ?? "Someone", Math.max(1, q.giftees?.length ?? 1));
     }
   } catch (err) {
     logError("bot", err);

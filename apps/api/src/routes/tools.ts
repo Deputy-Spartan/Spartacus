@@ -4,7 +4,6 @@ import {
   DAY_NAMES,
   KD_STATE_KEY,
   MONEY_STATE_KEY,
-  SOCIAL_PLATFORMS,
   applyToolAction,
   cleanKd,
   cleanMoney,
@@ -15,7 +14,6 @@ import {
   isToolKind,
   overlayStateKey,
   toolStateKey,
-  type SocialPlatformId,
   type ToolKind,
   type ToolRow,
 } from "@spartacus/shared";
@@ -49,17 +47,12 @@ export async function changeTool(guildId: string, kind: ToolKind, action: Record
 
 // What the overlay needs from state (the big lists stay on the server).
 function publicState(kind: ToolKind, st: Record<string, unknown>) {
-  const { voters: _v, bets: _b, seen: _s, names, ...rest } = st;
-  if (kind === "giveaway") return { ...rest, entries: Array.isArray(names) ? names.length : 0 };
+  const { voters: _v, bets: _b, seen: _s, ...rest } = st;
+  void kind;
   return rest;
 }
 
 // ---- Live data (read fresh each time) ----
-const memberName = async (guildId: string, userId: string) => {
-  const g = getBotClient()?.guilds.cache.get(guildId);
-  const m = g?.members.cache.get(userId) ?? (await g?.members.fetch(userId).catch(() => null));
-  return m?.displayName ?? "Someone";
-};
 const cache = new Map<string, { at: number; v: unknown }>();
 async function cached<T>(key: string, ms: number, f: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
@@ -95,68 +88,42 @@ async function nextStream(guildId: string) {
 }
 const nextText = (n: Awaited<ReturnType<typeof nextStream>>) => (n ? n.whenText.replace(" · ", " ").toLowerCase().replace(/^\w|\s\w/g, (c) => c.toUpperCase()) : "");
 
-async function socials(guildId: string) {
-  const row = await prisma.socialsOverlay.findUnique({ where: { guildId } }).catch(() => null);
-  const platforms = (Array.isArray(row?.platforms) ? row!.platforms : []) as Array<{ id: string; on?: boolean; name?: string }>;
-  return platforms.filter((p) => p.on && p.name && p.id !== "discord" && SOCIAL_PLATFORMS[p.id as SocialPlatformId]).map((p) => `${SOCIAL_PLATFORMS[p.id as SocialPlatformId].label}: ${p.name}`);
-}
-async function discordInvite(guildId: string) {
-  const ov = cleanOverlay("discord", await getRow(guildId, overlayStateKey("discord")));
-  if (ov.invite) return String(ov.invite);
-  const row = await prisma.socialsOverlay.findUnique({ where: { guildId } }).catch(() => null);
-  const d = ((Array.isArray(row?.platforms) ? row!.platforms : []) as Array<{ id: string; name?: string; url?: string }>).find((p) => p.id === "discord");
-  if (!d?.name && !d?.url) return "";
-  return (d.url || `discord.gg/${String(d.name).replace(/^https?:\/\/(discord\.gg|discord\.com\/invite)\//, "")}`).replace(/^https?:\/\//, "");
-}
-
-const gwTotals = new Map<string, number>(); // how long each giveaway ran, from when we first saw it
 async function live(guildId: string, row: ToolRow, kind: ToolKind): Promise<Record<string, unknown>> {
   switch (kind) {
-    case "scenes":
-      return cached(`scenes:${guildId}`, 10_000, async () => {
-        const game = cleanOverlay("game", await getRow(guildId, overlayStateKey("game")));
-        const nx = await nextStream(guildId);
-        return { game: String(game.game || ""), socials: await socials(guildId), discord: await discordInvite(guildId), next: nextText(nx) };
-      });
     case "stats": {
       const money = cleanMoney(await getRow(guildId, MONEY_STATE_KEY));
       const kd = cleanKd(await getRow(guildId, KD_STATE_KEY));
       const wl = cleanOverlay("winloss", await getRow(guildId, overlayStateKey("winloss")));
       const goal = cleanOverlay("goal", await getRow(guildId, overlayStateKey("goal")));
       const game = cleanOverlay("game", await getRow(guildId, overlayStateKey("game")));
-      return {
+      const s = row.settings;
+      const wins = Number(wl.wins) || 0, losses = Number(wl.losses) || 0;
+      const out: Record<string, unknown> = {
         money: formatMoney(money.amount, money.prefix, money.suffix),
         kd: `${kd.kills} / ${kd.deaths}`,
-        wl: `${wl.wins} - ${wl.losses}`,
+        ratio: (kd.kills / Math.max(1, kd.deaths)).toFixed(2),
+        wl: `${wins} - ${losses}`,
+        winrate: `${wins + losses ? Math.round((wins / (wins + losses)) * 100) : 0}%`,
         goal: `${Number(goal.cur).toLocaleString()} / ${Number(goal.target).toLocaleString()}`,
         game: String(game.game || ""),
       };
+      // Only read the rest when they're switched on.
+      if (s.showTimer) {
+        const t = cleanOverlay("timer", await getRow(guildId, overlayStateKey("timer")));
+        out.timer = { ...(t.timer as object), up: t.timerMode === "up", label: String(t.timerLabel || "TIMER") };
+      }
+      if (s.showChallenge) {
+        const c = cleanOverlay("challenge", await getRow(guildId, overlayStateKey("challenge")));
+        out.challenge = Number(c.count).toLocaleString();
+        out.challengeLabel = String(c.chLabel || "CHALLENGE");
+      }
+      if (s.showLatest) {
+        const tk = cleanOverlay("ticker", await getRow(guildId, overlayStateKey("ticker")));
+        out.latest = tk.name && tk.name !== "—" ? String(tk.name) : "";
+      }
+      if (s.showNext) out.next = nextText(await cached(`next:${guildId}`, 30_000, () => nextStream(guildId)));
+      return out;
     }
-    case "giveaway": {
-      if (row.settings.source !== "discord") return {};
-      return cached(`gw:${guildId}`, 3000, async () => {
-        const gw = await prisma.giveaway.findFirst({ where: { guildId, OR: [{ ended: false }, { endsAt: { gt: new Date(Date.now() - 5 * 60000) } }] }, orderBy: { endsAt: "desc" }, include: { _count: { select: { entries: true } } } }).catch(() => null);
-        if (!gw) return {};
-        const endsAt = gw.endsAt.getTime();
-        if (!gwTotals.has(gw.id)) gwTotals.set(gw.id, Math.max(60000, endsAt - Date.now()));
-        return { gw: { prize: gw.prize, entries: gw._count.entries, endsAt, total: gwTotals.get(gw.id), ended: gw.ended || endsAt <= Date.now() } };
-      });
-    }
-    case "leader":
-      return cached(`leader:${guildId}`, 15_000, async () => {
-        const since = new Date(Date.now() - 7 * 86400_000).toISOString().slice(0, 10);
-        const week = await prisma.streamViewerDay.groupBy({ by: ["userId"], where: { guildId, day: { gte: since } }, _sum: { messages: true }, orderBy: { _sum: { messages: "desc" } }, take: 8 }).catch(() => []);
-        const xp = await prisma.memberXp.findMany({ where: { guildId }, orderBy: { xp: "desc" }, take: 8 }).catch(() => []);
-        return {
-          boards: {
-            chat: (row.state.chatTop as Array<[string, number]>) ?? [],
-            votw: await Promise.all(week.map(async (w) => [await memberName(guildId, w.userId), w._sum.messages ?? 0])),
-            xp: await Promise.all(xp.map(async (x) => [await memberName(guildId, x.userId), x.level])),
-          },
-        };
-      });
-    case "next":
-      return cached(`next:${guildId}`, 30_000, async () => ({ next: await nextStream(guildId) }));
     case "squad":
       return cached(`squad:${guildId}`, 2000, async () => {
         const g = getBotClient()?.guilds.cache.get(guildId);

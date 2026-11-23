@@ -36,7 +36,7 @@ const ACTIONS: Array<[string, Array<[string, string, string]>]> = [
       ["📈", "Goal Bar", "Moves your Goal bar by an amount, or sets it."],
       ["🏋️", "Challenge", "Adds to your Challenge counter, or sets it."],
       ["📌", "Clip It", "Saves this moment (and how far into the stream) so you can find it later."],
-      ["🧰", "Overlay Tool", "Runs a stream tool: spin the wheel, roll dice, switch scenes, polls, predictions, giveaways and more."],
+      ["🧰", "Overlay Tool", "Runs a stream tool: clip it, spin the wheel, roll dice, flip a coin, polls, predictions and more."],
     ],
   ],
   [

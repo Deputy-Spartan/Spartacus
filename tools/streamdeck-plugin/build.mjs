@@ -63,7 +63,7 @@ const manifest = {
   $schema: "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   UUID: PLUGIN_UUID,
   Name: "Spartacus",
-  Version: "1.6.0.0",
+  Version: "1.7.0.0",
   Author: "Spartacus",
   Description: "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   Category: "Spartacus",

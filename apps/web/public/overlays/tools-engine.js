@@ -628,14 +628,30 @@
         if (d.soundUrl) { try { const a = new Audio(d.soundUrl); a.volume = Math.min(1, vol); a.play().catch(() => null); } catch {} return; }
         if (d.sound && d.sound !== "none") sfx(d.sound);
       }
+      // More than one copy of this overlay in OBS (one per scene): only one
+      // plays the sound and sends to the apps. OBS tells each copy whether
+      // it's on stream right now; copies share this PC's storage.
+      let onAir = true;
+      addEventListener("obsSourceActiveChanged", (e) => { onAir = !!(e.detail && e.detail.active); });
+      const g = new URLSearchParams(location.search).get("g") || "";
+      function claim(id, what) {
+        if (preview || id == null) return true;
+        try {
+          const k = `sp-cmdfx:${g}:${id}:${what}`;
+          if (localStorage.getItem(k)) return false;
+          localStorage.setItem(k, String(Date.now()));
+          if (Math.random() < 0.05) for (let i = localStorage.length - 1; i >= 0; i--) { const key = localStorage.key(i); if (key && key.startsWith("sp-cmdfx:") && Date.now() - Number(localStorage.getItem(key)) > 600000) localStorage.removeItem(key); }
+          return true;
+        } catch { return true; }
+      }
       return {
         fire(t, d) {
           if (t !== "fire") return;
-          sound(d);
+          if (onAir && claim(d._id, "sound")) sound(d);
           if (s.popups && d.popup) { queue.push(d); if (queue.length > 5) queue.shift(); next(); }
           if (d.app && d.app !== "none") {
             if (preview) note(`Would send: ${appLabel(d.app, d.appv)}`);
-            else if (s.apps) sendToApp(d, H, note);
+            else if (s.apps && claim(d._id, "app")) sendToApp(d, H, note);
           }
         },
         stop() { queue.length = 0; },
@@ -674,7 +690,7 @@
       const list = Array.isArray(events) ? events : [];
       const top = list.reduce((m, e) => Math.max(m, e.id), 0);
       if (lastSeq === null) { lastSeq = top; return; }
-      for (const e of list) if (e.id > lastSeq) fire(e.type, e.data || {});
+      for (const e of list) if (e.id > lastSeq) fire(e.type, { ...(e.data || {}), _id: e.id });
       lastSeq = Math.max(lastSeq, top);
     }
     function fire(type, data) {

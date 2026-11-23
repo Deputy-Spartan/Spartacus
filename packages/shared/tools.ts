@@ -9,7 +9,7 @@
 // all change it through applyToolAction, so they always agree.
 import { cleanCanvas } from "./counters";
 
-export const TOOL_KINDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome"] as const;
+export const TOOL_KINDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx"] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
 export const isToolKind = (k: unknown): k is ToolKind => TOOL_KINDS.includes(k as ToolKind);
 export const toolStateKey = (k: ToolKind) => `tool:${k}`;
@@ -57,7 +57,7 @@ const IDLE: ToolGroup = { title: "While it's up", kind: "four", items: [["none",
 export const TOOLS: Record<ToolKind, ToolInfo> = {
   chat: {
     kind: "chat", title: "Chat box", icon: "💬", section: "extras", line: "Your live Kick and Twitch chat on screen.",
-    settings: { ...COMMON, color: "#a78bfa", side: "left", max: 6, style: "bubbles", anim: "slide", names: "rainbow", badges: true, fade: 0, chatFont: "clean", sound: "off" },
+    settings: { ...COMMON, color: "#a78bfa", side: "left", max: 6, style: "bubbles", anim: "slide", names: "rainbow", badges: true, platformIcons: true, fade: 0, chatFont: "clean", sound: "off" },
     state: { msgs: [] },
     groups: {
       style: { title: "Style", kind: "small", items: [["bubbles", "Bubbles"], ["panel", "One panel"], ["clean", "Just text"]] },
@@ -71,7 +71,7 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
       sound: sound("Sound", [["off", "Off"], ["blip", "Blip"], ["pop", "Pop"], ["ding", "Ding"]]),
       volume: G.volume,
     },
-    toggles: [["badges", "Badges", "🛡️ for mods, ⭐ for subs, 👑 for you."]],
+    toggles: [["badges", "Badges", "🛡️ for mods, ⭐ for subs, 👑 for you."], ["platformIcons", "Where they typed", "A Kick or Twitch icon next to each name."]],
     words: [],
     buttons: [["💬 Test message", { op: "test" }], ["🧹 Clear", { op: "clear" }]],
     auto: "Messages come from your Kick and Twitch chat by themselves.",
@@ -247,6 +247,25 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
     buttons: [["👋 Test", { op: "test" }]],
     auto: "Fires by itself the first time someone chats in your Kick or Twitch chat.",
   },
+  cmdfx: {
+    kind: "cmdfx", title: "Command alerts", icon: "📣", section: "tools", line: "The sounds and pop-ups from your chat commands, and the link to Lumia Stream, Streamer.bot and OBS.",
+    settings: { ...COMMON, color: "#fb923c", spot: "center", hold: 3, volume: 0.6, sounds: true, popups: true, apps: true, sound: "off" },
+    state: {},
+    groups: {
+      spot: { title: "Where pop-ups show", kind: "four", items: [["center", "Middle"], ["top", "Top"], ["bottom", "Bottom"], ["tl", "Top left"]] },
+      hold: { title: "Pop-ups stay for", kind: "small", items: [[2, "2 sec"], [3, "3 sec"], [5, "5 sec"]] },
+      ...LOOKS,
+      volume: G.volume,
+    },
+    toggles: [
+      ["sounds", "Sounds", "Play each command's sound."],
+      ["popups", "Pop-ups", "Show each command's pop-up."],
+      ["apps", "Other apps", "Send to Lumia Stream, Streamer.bot and OBS on this PC."],
+    ],
+    words: [],
+    buttons: [["📣 Test pop-up", { op: "test" }]],
+    auto: "Set the commands up on the Chat Commands page. This overlay must be open in OBS for sounds, pop-ups and other apps to work.",
+  },
 };
 
 // Stream Deck: the Overlay Tool key's choices. [value, label, kind, action]
@@ -421,6 +440,18 @@ export function applyToolAction(kind: ToolKind, current: ToolRow, a: Record<stri
         return row;
       }
       push(row, "welcome", { name, back: !!a.back }, now);
+      return row;
+    }
+    case "cmdfx": {
+      // One command going off: { sound, soundUrl, emoji, text, style, app, appv }.
+      const d = (x: unknown, n: number) => str(x, n);
+      if (op === "test") { push(row, "fire", { sound: "ding", emoji: "📣", text: "Command alerts work!", style: "pop", popup: true }, now); return row; }
+      if (op !== "fire") return { error: "Nothing to show." };
+      push(row, "fire", {
+        sound: d(a.sound, 20), soundUrl: /^https:\/\//i.test(String(a.soundUrl ?? "")) ? d(a.soundUrl, 400) : "",
+        emoji: d(a.emoji, 8), text: d(a.text, 120), style: d(a.style, 10), popup: !!a.popup,
+        app: d(a.app, 20), appv: d(a.appv, 80), user: d(a.user, 40), cmd: d(a.cmd, 30),
+      }, now);
       return row;
     }
     case "stats":

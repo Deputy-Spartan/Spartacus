@@ -508,7 +508,7 @@ function AccountsTab({ guildId, data, reload }: { guildId: string; data: StreamG
             In the same Kick app, switch on <b>Enable Webhooks</b> and paste this Webhook URL: <code className="break-all">{data.urls.kickWebhook}</code>
           </li>
           <li>
-            Tick the scopes: user:read, channel:read, channel:write, events:subscribe.
+            Tick the scopes: user:read, channel:read, channel:write, chat:write, events:subscribe.
           </li>
           <li>
             <b>Twitch:</b> at dev.twitch.tv/console, open your app and add this OAuth Redirect URL: <code className="break-all">{data.urls.twitch}</code>

@@ -1,4 +1,5 @@
-import { applyToolAction, cleanToolRow, toolStateKey, type ToolKind } from "@spartacus/shared";
+import { applyToolAction, cleanToolRow, toolStateKey, type ChatRank, type ToolKind } from "@spartacus/shared";
+import { countChatLine, isOwnEcho, onChatCommand } from "./chatCommands";
 import { logError } from "@spartacus/db";
 import { prisma } from "./prisma";
 
@@ -53,9 +54,15 @@ async function toolsOf(guildId: string) {
 const seenRows = new Map<string, Record<string, number>>(); // first-time welcome, kept in memory and saved now and then
 const seenSaved = new Map<string, number>();
 
-export async function onStreamChat(platform: string, channel: string, user: string, text: string, badge = "") {
+const BADGE_OF = ["", "⭐", "🛡️", "👑"];
+export async function onStreamChat(platform: "kick" | "twitch", channel: string, user: string, text: string, rank: ChatRank = 0) {
   try {
     const guilds = await guildsFor(platform, channel);
+    countChatLine(platform, channel);
+    // Spartacus's own replies come back through chat: don't show or run them twice.
+    if (rank === 3 && isOwnEcho(platform, channel, text)) return;
+    const badge = BADGE_OF[rank];
+    if (guilds.length) void onChatCommand(guilds, platform, channel, user, text, rank).catch((e) => logError("bot", e));
     for (const guildId of guilds) {
       const t = await toolsOf(guildId);
       const msg = text.trim();
@@ -68,7 +75,7 @@ export async function onStreamChat(platform: string, channel: string, user: stri
         const side = word === String(s.no ?? "no").toLowerCase() || word === "no" || word === "2" ? 1 : word === String(s.yes ?? "yes").toLowerCase() || word === "yes" || word === "1" ? 0 : -1;
         if (side >= 0) void changeTool(guildId, "predict", { op: "bet", user, side, amount: Number(bet[2]) });
       }
-      if (t.kinds.has("welcome")) await welcomeCheck(guildId, user, t.settings.get("welcome") ?? {});
+      if (t.kinds.has("welcome") && rank < 3) await welcomeCheck(guildId, user, t.settings.get("welcome") ?? {});
     }
   } catch (err) {
     logError("bot", err);

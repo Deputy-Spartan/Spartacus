@@ -307,6 +307,15 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
     needs: "A real stream for recaps and Viewer of the Week. A connected Twitch or Kick account for /title and follower counts.",
   },
+  "/chat-commands": {
+    prepared: "Nothing is set up here: chat commands answer in your Kick and Twitch chat, not in Discord.",
+    tryIt: [
+      "On the dashboard, open Chat Commands and use Try a command › Preview to see a reply.",
+      "Press Run for real with !hype while the Command alerts overlay is open: the sound and pop-up play.",
+      "Go live and type !discord, !uptime or !so name in your Kick or Twitch chat.",
+    ],
+    needs: "A connected Kick or Twitch account (connected again after Chat Commands came out), and the Command alerts overlay in OBS for sounds and pop-ups.",
+  },
   "/commands": {
     prepared: "A custom command !hello is created.",
     tryIt: ["Type !hello in any channel.", "Add another command on the dashboard and try it."],

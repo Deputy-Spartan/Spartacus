@@ -17,6 +17,101 @@
   const play = (el, frames, o) => el.animate(frames, { fill: "forwards", ...o });
   const gone = (a, el) => a.finished.then(() => el.remove()).catch(() => el.remove());
   const box = (s, extra = "") => `xb look-${s.look} ${extra}`;
+  // Where a chat message was typed: small platform marks for the Chat box.
+  const PLAT = {
+    kick: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#53fc18"/><path d="M9 7h5v7l5-7h5l-6 9 6 9h-5l-5-7v7H9z" fill="#0b0b0b"/></svg>',
+    twitch: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#9146ff"/><path fill-rule="evenodd" d="M9 6 7 10v15h5v3h3l3-3h4l5-5V6zm16 13-3 3h-5l-3 3v-3h-4V8h15z" fill="#fff"/><path d="M19 11h2v6h-2zm-5 0h2v6h-2z" fill="#fff"/></svg>',
+    youtube: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#ff0033"/><path d="M13 10.5v11l9-5.5z" fill="#fff"/></svg>',
+    tiktok: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#111"/><path d="M18 7h3.2c.3 2.4 1.8 3.9 4.1 4.1v3.3c-1.6 0-3-.5-4.1-1.3v6.6a5.6 5.6 0 1 1-5.6-5.6c.3 0 .6 0 .9.1v3.4a2.3 2.3 0 1 0 1.5 2.1z" fill="#25f4ee" transform="translate(-.8 -.6)"/><path d="M18 7h3.2c.3 2.4 1.8 3.9 4.1 4.1v3.3c-1.6 0-3-.5-4.1-1.3v6.6a5.6 5.6 0 1 1-5.6-5.6c.3 0 .6 0 .9.1v3.4a2.3 2.3 0 1 0 1.5 2.1z" fill="#fe2c55" transform="translate(.8 .6)"/><path d="M18 7h3.2c.3 2.4 1.8 3.9 4.1 4.1v3.3c-1.6 0-3-.5-4.1-1.3v6.6a5.6 5.6 0 1 1-5.6-5.6c.3 0 .6 0 .9.1v3.4a2.3 2.3 0 1 0 1.5 2.1z" fill="#fff"/></svg>',
+    discord: '<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#5865f2"/><path d="M23 10.5a14 14 0 0 0-3.5-1.1l-.4.9a13 13 0 0 0-6.2 0l-.4-.9A14 14 0 0 0 9 10.5c-2.2 3.3-2.8 6.5-2.5 9.7a14 14 0 0 0 4.3 2.2l.9-1.5-1.4-.7.3-.3a10 10 0 0 0 8.8 0l.3.3-1.4.7.9 1.5a14 14 0 0 0 4.3-2.2c.4-3.7-.6-6.9-2.5-9.7zM12.9 18.3c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.6 1.7-1.5 1.7zm6.2 0c-.8 0-1.5-.8-1.5-1.7s.7-1.7 1.5-1.7 1.5.8 1.5 1.7-.7 1.7-1.5 1.7z" fill="#fff"/></svg>',
+  };
+
+  // ---- Apps on this PC (Command alerts) ----
+  const appLabel = (app, v) => ({ lumia: `Lumia › run command "${v}"`, "lumia-alert": `Lumia › play alert "${v}"`, sbot: `Streamer.bot › run action "${v}"`, "obs-scene": `OBS › switch to scene "${v}"`, "obs-src": `OBS › show "${v}" for 5 seconds` })[app] || app;
+
+  async function lumia(H, type, value, note) {
+    const token = H.get("lumia");
+    if (!token) return note("Lumia: paste your Lumia token on the Chat Commands page, then copy the OBS link again.");
+    const url = `http://localhost:${Number(H.get("lumiaport")) || 39231}/api/send?token=${encodeURIComponent(token)}`;
+    const body = JSON.stringify({ type, params: { value } });
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+      note(r.ok ? `Lumia: sent "${value}"` : `Lumia said ${r.status}`);
+    } catch {
+      // Lumia may not allow other pages to read its answer: send it anyway.
+      fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain" }, body }).then(() => note(`Lumia: sent "${value}"`)).catch(() => note("Lumia: couldn't reach it. Is Lumia Stream open?"));
+    }
+  }
+
+  // Streamer.bot's WebSocket server (Servers › WebSocket Server › start it).
+  let sb = null, sbQueue = [];
+  function streamerbot(H, name, args, note) {
+    const send = (ws, n = name, a = args) => ws.send(JSON.stringify({ request: "DoAction", id: String(Date.now()) + Math.random(), action: { name: n }, args: a }));
+    if (sb && sb.readyState === 1) { send(sb); note(`Streamer.bot: ran "${name}"`); return; }
+    sbQueue.push([name, args]);
+    if (sb && sb.readyState === 0) return;
+    try { sb = new WebSocket(`ws://127.0.0.1:${Number(H.get("sbport")) || 8080}/`); } catch { return note("Streamer.bot: couldn't reach it."); }
+    sb.onopen = () => { for (const [n, a] of sbQueue.splice(0)) { send(sb, n, a); note(`Streamer.bot: ran "${n}"`); } };
+    sb.onerror = () => { sbQueue = []; note("Streamer.bot: couldn't reach it. Start its WebSocket Server."); };
+    sb.onclose = () => { sb = null; };
+  }
+
+  // OBS's own WebSocket (Tools › WebSocket Server Settings), version 5.
+  let obs = null, obsReady = null, obsWait = new Map(), obsN = 0;
+  const b64sha = async (t) => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))));
+  function obsConnect(H) {
+    if (obsReady) return obsReady;
+    obsReady = new Promise((ok, bad) => {
+      let ws;
+      try { ws = new WebSocket(`ws://127.0.0.1:${Number(H.get("obsport")) || 4455}`); } catch (e) { obsReady = null; return bad(e); }
+      ws.onmessage = async (ev) => {
+        const m = JSON.parse(ev.data);
+        if (m.op === 0) {
+          const id = { op: 1, d: { rpcVersion: 1 } };
+          if (m.d.authentication) {
+            const pw = H.get("obs") || "";
+            id.d.authentication = await b64sha((await b64sha(pw + m.d.authentication.salt)) + m.d.authentication.challenge);
+          }
+          ws.send(JSON.stringify(id));
+        } else if (m.op === 2) { obs = ws; ok(ws); }
+        else if (m.op === 7) { const w = obsWait.get(m.d.requestId); if (w) { obsWait.delete(m.d.requestId); w(m.d); } }
+      };
+      ws.onclose = (ev) => { obs = null; obsReady = null; bad(new Error(ev.code === 4009 ? "wrong password" : "closed")); };
+      ws.onerror = () => {};
+    });
+    return obsReady;
+  }
+  async function obsCall(H, requestType, requestData) {
+    const ws = await obsConnect(H);
+    const requestId = "r" + ++obsN;
+    return new Promise((ok) => { obsWait.set(requestId, ok); ws.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData } })); setTimeout(() => ok({ requestStatus: { result: false } }), 4000); });
+  }
+  async function obsDo(H, d, note) {
+    try {
+      if (d.app === "obs-scene") {
+        // A browser source with "Advanced access" can switch scenes with no password.
+        if (!H.get("obs") && window.obsstudio && window.obsstudio.setCurrentScene) { window.obsstudio.setCurrentScene(d.appv); return note(`OBS: switched to "${d.appv}"`); }
+        const r = await obsCall(H, "SetCurrentProgramScene", { sceneName: d.appv });
+        return note(r.requestStatus?.result ? `OBS: switched to "${d.appv}"` : `OBS: no scene called "${d.appv}"`);
+      }
+      const scene = (await obsCall(H, "GetCurrentProgramScene", {})).responseData?.currentProgramSceneName;
+      const item = (await obsCall(H, "GetSceneItemId", { sceneName: scene, sourceName: d.appv })).responseData?.sceneItemId;
+      if (item == null) return note(`OBS: "${d.appv}" isn't in the scene "${scene}"`);
+      await obsCall(H, "SetSceneItemEnabled", { sceneName: scene, sceneItemId: item, sceneItemEnabled: true });
+      note(`OBS: showing "${d.appv}"`);
+      setTimeout(() => obsCall(H, "SetSceneItemEnabled", { sceneName: scene, sceneItemId: item, sceneItemEnabled: false }).catch(() => null), 5000);
+    } catch (e) {
+      note(`OBS: couldn't connect (${e && e.message === "wrong password" ? "wrong password" : "turn on its WebSocket server"}).`);
+    }
+  }
+  function sendToApp(d, H, note) {
+    const v = String(d.appv || d.cmd || "").trim();
+    if (!v) return;
+    if (d.app === "lumia") lumia(H, "chat-command", v, note);
+    else if (d.app === "lumia-alert") lumia(H, "alert", v, note);
+    else if (d.app === "sbot") streamerbot(H, v, { user: d.user || "", command: d.cmd || "" }, note);
+    else if (d.app === "obs-scene" || d.app === "obs-src") obsDo(H, { ...d, appv: v }, note);
+  }
 
   function mount(root, kind) {
     root.classList.add("xs");
@@ -39,6 +134,13 @@
       tick() { tone(1000, 0, 0.05, "square", 0.08); },
       shot() { noise(0, 0.12, 0.5, "lowpass", 2500); },
       shutter() { noise(0, 0.04, 0.7, "highpass", 3000); noise(0.06, 0.09, 0.5, "bandpass", 1600); },
+      levelup() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.09, 0.25, "triangle", 0.3)); },
+      laser() { tone(1600, 0, 0.3, "sawtooth", 0.15, 140); },
+      boo() { tone(392, 0, 0.35, "sawtooth", 0.12); tone(370, 0.38, 0.35, "sawtooth", 0.12); tone(349, 0.76, 0.9, "sawtooth", 0.12, 300); },
+      buzzer() { tone(110, 0, 0.6, "square", 0.15); tone(116, 0, 0.6, "square", 0.12); },
+      whoosh() { noise(0, 0.6, 0.5, "bandpass", 900); },
+      drumroll() { for (let i = 0; i < 28; i++) noise(i * 0.045, 0.05, 0.3, "lowpass", 500); noise(1.3, 1.2, 0.4, "highpass", 4000); },
+      applause() { for (let i = 0; i < 70; i++) noise(Math.random() * 1.8, 0.04, 0.18, "bandpass", 1500 + Math.random() * 2000); },
     };
     const sfx = (name) => (SOUNDS[name] || SOUNDS.off)();
 
@@ -100,6 +202,7 @@
         drawn.add(m.id);
         const el = document.createElement("div");
         el.className = "ch-msg" + (s.style === "bubbles" ? " " + box(s) : "");
+        if (s.platformIcons !== false && PLAT[m.platform]) { const p = document.createElement("span"); p.className = "ch-plat"; p.title = m.platform; p.innerHTML = PLAT[m.platform]; el.appendChild(p); }
         if (s.badges && m.badge) { const b = document.createElement("span"); b.className = "ch-badge"; b.textContent = m.badge; el.appendChild(b); }
         const nm = document.createElement("span"); nm.className = "ch-name"; nm.style.color = col(m.name); nm.textContent = m.name + ":"; el.appendChild(nm);
         el.appendChild(document.createTextNode(m.text));
@@ -474,6 +577,68 @@
           setTimeout(() => gone(el.animate([{ opacity: 1 }, { opacity: 0, transform: `translateX(${fromX})` }], { duration: 400, fill: "forwards" }), el), (Number(s.hold) || 5) * 1000);
         },
         stop() {},
+      };
+    };
+
+    // Command alerts: chat commands' sounds and pop-ups, and the link to apps
+    // on this PC. Passwords come from the part of the OBS link after #
+    // (lumia=…&obs=…&obsport=4455&sbport=8080), which never leaves this PC.
+    M.cmdfx = (layer, s) => {
+      const wrap = document.createElement("div");
+      wrap.className = s.spot === "tl" ? "cf-wrap tl" : `al-wrap ${s.spot === "top" ? "top" : s.spot === "bottom" ? "bottom" : "center"}`;
+      layer.appendChild(wrap);
+      const preview = root.dataset.preview === "1";
+      const H = new URLSearchParams(location.hash.slice(1));
+      const note = (t) => {
+        if (!preview && !H.has("debug")) return;
+        const n = document.createElement("div"); n.className = "cf-note"; n.textContent = t; layer.appendChild(n);
+        setTimeout(() => n.remove(), 4000);
+      };
+      const queue = [];
+      let busy = false;
+      function popup(d) {
+        const el = document.createElement("div");
+        el.className = "al xt " + box(s);
+        el.innerHTML = `<div class="al-icon"></div><div class="al-name"></div>`;
+        el.firstElementChild.textContent = d.emoji || "✨";
+        el.lastElementChild.textContent = d.text || "";
+        el.lastElementChild.style.fontSize = `calc(var(--u) * ${String(d.text || "").length > 24 ? 64 : 96})`;
+        wrap.replaceChildren(el);
+        const A = {
+          pop: [{ opacity: 0, transform: "scale(.2)" }, { opacity: 1, transform: "scale(1.08)", offset: 0.7 }, { opacity: 1, transform: "none" }],
+          slide: [{ opacity: 0, transform: "translateX(-140%)" }, { opacity: 1, transform: "none" }],
+          bounce: [{ opacity: 0, transform: "translateY(-260%)" }, { opacity: 1, transform: "translateY(8%)", offset: 0.55 }, { opacity: 1, transform: "translateY(-4%)", offset: 0.75 }, { opacity: 1, transform: "none" }],
+          shake: [{ opacity: 0, transform: "scale(.6)" }, { opacity: 1, transform: "scale(1) rotate(-4deg)", offset: 0.3 }, { transform: "rotate(4deg)", offset: 0.5 }, { transform: "rotate(-3deg)", offset: 0.7 }, { opacity: 1, transform: "none" }],
+          spin: [{ opacity: 0, transform: "rotate(-360deg) scale(.2)" }, { opacity: 1, transform: "none" }],
+        }[d.style] || null;
+        if (A && !reduce) el.animate(A, { duration: d.style === "shake" ? 700 : 550, easing: "cubic-bezier(.2,.8,.2,1)" });
+        return new Promise((done) => setTimeout(() => {
+          const out = el.animate([{ opacity: 1 }, { opacity: 0, transform: "scale(.9)" }], { duration: 350, fill: "forwards" });
+          Promise.race([out.finished, new Promise((r) => setTimeout(r, 450))]).catch(() => null).then(() => { el.remove(); done(); });
+        }, (Number(s.hold) || 3) * 1000));
+      }
+      async function next() {
+        if (busy) return;
+        busy = true;
+        while (queue.length) await popup(queue.shift());
+        busy = false;
+      }
+      function sound(d) {
+        if (!s.sounds) return;
+        if (d.soundUrl) { try { const a = new Audio(d.soundUrl); a.volume = Math.min(1, vol); a.play().catch(() => null); } catch {} return; }
+        if (d.sound && d.sound !== "none") sfx(d.sound);
+      }
+      return {
+        fire(t, d) {
+          if (t !== "fire") return;
+          sound(d);
+          if (s.popups && d.popup) { queue.push(d); if (queue.length > 5) queue.shift(); next(); }
+          if (d.app && d.app !== "none") {
+            if (preview) note(`Would send: ${appLabel(d.app, d.appv)}`);
+            else if (s.apps) sendToApp(d, H, note);
+          }
+        },
+        stop() { queue.length = 0; },
       };
     };
 

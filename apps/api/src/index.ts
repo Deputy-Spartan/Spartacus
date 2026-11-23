@@ -25,6 +25,7 @@ import frontPageRouter from "./routes/frontPage";
 import socialsOverlayRouter from "./routes/socialsOverlay";
 import moneyCounterRouter from "./routes/moneyCounter";
 import toolsRouter from "./routes/tools";
+import chatCommandsRouter from "./routes/chatCommands";
 import matchesRouter from "./routes/matches";
 import activityRouter from "./routes/activity";
 import authRouter from "./routes/auth";
@@ -242,6 +243,7 @@ app.use(matchesRouter);
 app.use(socialsOverlayRouter);
 app.use(moneyCounterRouter);
 app.use(toolsRouter);
+app.use(chatCommandsRouter);
 
 // Last-resort safety net: an unhandled error in any route (a bad DB
 // constraint, an unexpected Discord API response, whatever) used to crash

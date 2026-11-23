@@ -1,7 +1,7 @@
 // Every Spartacus action: what it's called, its icon, which settings it uses,
 // and whether it's a key or a Stream Deck + dial.
 
-export type Field = "channel" | "voice" | "role" | "ping" | "module" | "embed" | "game" | "text" | "question" | "prize" | "minutes" | "count" | "streamer" | "link" | "note" | "slow" | "liveChannel" | "safeChannel" | "confirm" | "amount" | "moneyMode" | "stat" | "gameName" | "wlStat" | "timerOp" | "toolCmd" | "overlayId" | "msgOp" | "msgText";
+export type Field = "channel" | "voice" | "role" | "ping" | "module" | "embed" | "game" | "text" | "question" | "prize" | "minutes" | "count" | "streamer" | "link" | "note" | "slow" | "liveChannel" | "safeChannel" | "confirm" | "amount" | "moneyMode" | "stat" | "gameName" | "wlStat" | "timerOp" | "toolCmd" | "overlayId" | "msgOp" | "msgText" | "cmdName";
 
 export interface ActionDef {
   id: string;
@@ -44,6 +44,7 @@ export const KEYS: ActionDef[] = [
   { id: "money", name: "Money Counter", icon: "💰", glyph: "circle-dollar-sign", tip: "Adds the amount to your money counter on stream (a minus amount takes away), or sets it.", fields: ["amount", "moneyMode"] },
   { id: "kd", name: "Kill / Death", icon: "🎯", glyph: "crosshair", tip: "Adds to your kills or deaths on stream (a minus amount takes away), or sets them. Pick Both and Set with 0 for a reset key.", fields: ["stat", "amount", "moneyMode"] },
   { id: "ovgame", name: "Game", icon: "🎮", glyph: "gamepad-2", tip: "Shows this game on your Game overlay. Make one key per game.", fields: ["gameName"] },
+  { id: "chatcmd", name: "Chat Command", icon: "⌨️", glyph: "terminal", tip: "Runs one of your chat commands as if you typed it: replies in your Kick or Twitch chat, plays its sound and pop-up.", fields: ["cmdName"] },
   { id: "ovmsg", name: "Message Box", icon: "🪧", glyph: "message-square-text", tip: "Changes your Message box: next or last message, need 1 more or less, squad full, replay, cycle on or off, or show a message you type.", fields: ["msgOp", "msgText"] },
   { id: "ovwl", name: "Win / Loss", icon: "🏆", glyph: "trophy", tip: "Adds to your wins or losses on stream, or sets them. Pick Both and Set with 0 for a reset key.", fields: ["wlStat", "amount", "moneyMode"] },
   { id: "ovtimer", name: "Timer", icon: "⏱️", glyph: "timer-reset", tip: "Starts or pauses your Timer overlay, restarts it, or adds minutes (a minus takes away).", fields: ["timerOp", "amount"] },

@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const KINDS = ["game", "message", "winloss", "timer", "goal", "challenge", "discord", "ticker"];
 // Stream tools (packages/shared/tools.ts) use the full-screen tool page.
-const TOOLS = ["alerts", "chat", "scenes", "stats", "giveaway", "leader", "next", "subathon", "cam", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome"];
+const TOOLS = ["alerts", "chat", "scenes", "stats", "giveaway", "leader", "next", "subathon", "cam", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx"];
+// Command alerts keeps your Lumia / OBS passwords after a # in its link: the
+// browser never sends that part to any server, and redirects keep it.
 
 export async function GET(req: Request, { params }: { params: { kind: string; guildId: string } }) {
   const q = new URLSearchParams({ kind: params.kind, g: params.guildId, api: API_URL });

@@ -509,6 +509,28 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "The icons in the post are Spartacus's own emojis, so nothing needs uploading.",
     ],
   },
+  "/chat-commands": {
+    title: "Chat Commands",
+    purpose: "Commands like !discord, !uptime and !so in your Kick and Twitch chat. Spartacus answers as your own channel, can play a sound, show a pop-up, change your overlays, and set off Lumia Stream, Streamer.bot or OBS. Timed messages post by themselves while you're live.",
+    steps: [
+      "Connect Kick and/or Twitch on Stream Growth › Accounts. If you connected before Chat Commands, connect again so Spartacus can post in chat.",
+      "Kick only: in your Kick app settings, also tick the chat:write scope.",
+      "Commands: turn on the ones you want, tap Edit to change the reply, who can use it, the wait between uses, the sound, the pop-up, or what it sends to another app.",
+      "Sounds and pop-ups: add the Command alerts overlay to OBS (link on the Other apps tab).",
+      "Lumia Stream, Streamer.bot, OBS: fill in the Other apps tab, then copy the Command alerts link again and paste it into OBS.",
+      "Timed messages: write them and pick how often. They only post while you're live and chat is active.",
+    ],
+    members: [
+      "Viewers type the commands in your Kick or Twitch chat. Mods can use the mod ones (like !so name, !need 2, !win).",
+    ],
+    tips: [
+      "{user}, {target}, {uptime}, {game}, {count}, {random:1-6} and {pick:a|b|c} fill themselves in. Tap one under the reply box to add it.",
+      "Mods and you skip the wait between uses.",
+      "The Test button runs the command for real: it replies in your chat and plays on the Command alerts overlay.",
+      "Run links let Lumia, Streamer.bot or a Stream Deck run any command without anyone typing it.",
+      "Kick and Twitch chat only for now. TikTok and YouTube don't let other apps read their live chat yet.",
+    ],
+  },
   "/stream-growth": {
     title: "Stream Growth",
     purpose: "Help your streams grow: countdown pings, friends to raid and shout out, a who's-live board, a recap after each stream, Viewer of the Week, game nights, title updates and chat ranks.",

@@ -1,4 +1,4 @@
-import type { TempGameChoice, TextOverrides } from "@spartacus/shared";
+import type { ChatCommandsConfig, ChatCommandsState, TempGameChoice, TextOverrides } from "@spartacus/shared";
 import type { EmbedExtra } from "./embedExtra";
 import { cacheable, cachedGet, clearApiCache, forgetArea } from "./apiCache";
 
@@ -2150,6 +2150,12 @@ export interface StreamDeckLogRow {
   createdAt: string;
 }
 
+export interface ChatCommandsData {
+  config: ChatCommandsConfig;
+  state: ChatCommandsState;
+  accounts: Array<{ id: string; platform: "twitch" | "kick"; login: string; displayName?: string | null; canChat: boolean }>;
+  overlayOpened: boolean;
+}
 export const api = {
   getTournaments: (guildId: string) => request<TournamentsView>(`/guilds/${guildId}/tournaments`),
   createTournament: (guildId: string, t: import("@spartacus/shared").TournamentInput) => request<TournamentsView>(`/guilds/${guildId}/tournaments`, { method: "POST", body: JSON.stringify(t) }),
@@ -2813,6 +2819,11 @@ export const api = {
   getOverlayVisibility: (guildId: string) => request<Record<string, boolean>>(`/guilds/${guildId}/overlay-visibility`),
   setOverlayShown: (guildId: string, id: string, on: boolean) =>
     request<Record<string, boolean>>(`/guilds/${guildId}/overlay-visibility`, { method: "POST", body: JSON.stringify({ id, on }) }),
+  getChatCommands: (guildId: string) => request<ChatCommandsData>(`/guilds/${guildId}/chat-commands`),
+  saveChatCommands: (guildId: string, config: Omit<ChatCommandsData["config"], "runKey">) => request<{ config: ChatCommandsData["config"] }>(`/guilds/${guildId}/chat-commands`, { method: "PUT", body: JSON.stringify(config) }),
+  saveChatCommandsState: (guildId: string, state: ChatCommandsData["state"]) => request<{ state: ChatCommandsData["state"] }>(`/guilds/${guildId}/chat-commands/state`, { method: "PUT", body: JSON.stringify(state) }),
+  newChatCommandsKey: (guildId: string) => request<{ config: ChatCommandsData["config"] }>(`/guilds/${guildId}/chat-commands/new-key`, { method: "POST" }),
+  runChatCommand: (guildId: string, name: string, args = "") => request<{ ok: boolean; message: string }>(`/guilds/${guildId}/chat-commands/run`, { method: "POST", body: JSON.stringify({ name, args }) }),
   getTool: (guildId: string, kind: string) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`),
   saveTool: (guildId: string, kind: string, settings: ToolRowData["settings"]) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`, { method: "PUT", body: JSON.stringify({ settings }) }),
   toolAction: (guildId: string, kind: string, action: Record<string, unknown>) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}/action`, { method: "POST", body: JSON.stringify(action) }),

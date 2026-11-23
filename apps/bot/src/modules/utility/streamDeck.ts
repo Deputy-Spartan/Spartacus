@@ -334,6 +334,10 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
       const by = moneyAmount(s, 1);
       return { title: s.moneyMode === "set" ? `Set ${by}` : `${by < 0 ? "−" : "+"}${Math.abs(by)} goal`, line: `${o.cur} / ${o.target}`, tone: "green", pct: Math.min(1, Number(o.cur) / Math.max(1, Number(o.target))) };
     }
+    case "chatcmd": {
+      const name = str(s, "cmdName").replace(/^!/, "").trim();
+      return { title: name ? short("!" + name, 14) : "Pick a cmd", line: "Chat command", tone: name ? "" : "off" };
+    }
     case "ovmsg": {
       const o = await getOverlay(g.id, "message");
       const op = str(s, "msgOp") || "next";
@@ -684,6 +688,14 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
       const r = await changeTool(g.id, c[2], { ...c[3] });
       if ("error" in r && typeof r.error === "string") return { ok: false, message: r.error };
       return { ok: true, message: c[1] };
+    }
+    // Streaming › Chat Commands: runs one as if you typed it.
+    case "chatcmd": {
+      const name = str(s, "cmdName").replace(/^!/, "").trim().split(/\s+/);
+      if (!name[0]) return { ok: false, message: "Type the command, like hype." };
+      const { runChatCommandFrom } = await import("../../lib/chatCommands");
+      const r = await runChatCommandFrom(g.id, name[0], "Stream Deck", undefined, name.slice(1).join(" "));
+      return { ok: r.ok, message: r.message };
     }
     // Streaming › Overlays › Message box.
     case "ovmsg": {

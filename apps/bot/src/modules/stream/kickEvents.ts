@@ -1,6 +1,6 @@
 import { createPublicKey, verify, type KeyObject } from "node:crypto";
 import fetch from "node-fetch";
-import { LINK_CODE_PATTERN, cleanOverlay, overlayStateKey } from "@spartacus/shared";
+import { LINK_CODE_PATTERN, chatRankFrom, cleanOverlay, overlayStateKey } from "@spartacus/shared";
 import { changeOverlay } from "../utility/streamDeck";
 import { onStreamChat } from "../../lib/streamTools";
 import { logError } from "@spartacus/db";
@@ -56,6 +56,7 @@ interface KickUser {
   user_id?: number;
   username?: string;
   channel_slug?: string;
+  identity?: { badges?: Array<{ type?: string }> };
 }
 
 export async function handleKickEvent(type: string, messageId: string, payload: unknown) {
@@ -66,9 +67,13 @@ export async function handleKickEvent(type: string, messageId: string, payload: 
   try {
     if (type === "chat.message.sent" && p.sender?.username) {
       const user = p.sender.username.toLowerCase();
-      if (p.sender.user_id !== undefined && p.sender.user_id === p.broadcaster?.user_id) return;
+      const own = p.sender.user_id !== undefined && p.sender.user_id === p.broadcaster?.user_id;
+      const badges = (p.sender.identity?.badges ?? []).map((b) => String(b?.type ?? ""));
+      // The streamer's own messages run commands and show in the Chat box,
+      // but don't earn chat rewards or link codes.
+      void onStreamChat("kick", slug, p.sender.username, p.content ?? "", own ? 3 : chatRankFrom(badges));
+      if (own) return;
       recordChat("kick", slug, user);
-      void onStreamChat("kick", slug, p.sender.username, p.content ?? "", p.sender.user_id === p.broadcaster?.user_id ? "👑" : "");
       const code = p.content?.match(LINK_CODE_PATTERN);
       if (code) await verifyKickLink([user, (p.sender.channel_slug ?? "").toLowerCase()].filter(Boolean), code[0]);
     } else if (type === "channel.followed") {

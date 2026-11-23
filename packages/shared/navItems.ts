@@ -79,6 +79,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/stream-alerts", label: "Going Live", icon: "🔴", moduleKey: "STREAM_ALERTS" },
       { href: "/stream-extras", label: "Stream Extras", icon: "🎬", moduleKey: "STREAM_EXTRAS" },
       { href: "/stream-growth", label: "Stream Growth", icon: "📣", moduleKey: "STREAM_GROWTH" },
+      { href: "/chat-commands", label: "Chat Commands", icon: "⌨️" },
       { href: "/pre-stream", label: "Pre-Stream Checklist", icon: "📋", moduleKey: "PRE_STREAM" },
       // Socials, Money Counter and K/D Counter live inside it (/overlays/socials, /money, /kd).
       { href: "/overlays", label: "Overlays", icon: "🎨" },

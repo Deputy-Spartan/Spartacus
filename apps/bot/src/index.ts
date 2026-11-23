@@ -172,6 +172,8 @@ export { refreshBumpStatus, sendBumpStatusNow } from "./lib/bumpStatus";
 export { checkStreamerNow, sendTestAlert } from "./modules/community/goLive";
 export { removeSlot as removeStreamSlot, updateSchedule } from "./modules/stream/schedule";
 export { postClipOfTheWeek } from "./modules/stream/clips";
+export { forgetChatCommands, runChatCommandFrom } from "./lib/chatCommands";
+export { canChat as streamAccountCanChat } from "./modules/stream/accounts";
 export { finishConnect, startConnect, disconnect as disconnectStreamAccount, setTitle as setStreamTitle, subscribeKickEvents, platformKeys as streamAccountKeys, redirectUri as streamRedirectUri, apiBase } from "./modules/stream/accounts";
 export { verifyKickSignature, handleKickEvent } from "./modules/stream/kickEvents";
 export { sendCountdown, forceBoard, pickViewerOfTheWeek, topViewers, refreshClipChannels } from "./modules/stream/growth";
@@ -309,6 +311,7 @@ export function startBot() {
     startProfilePanelPosterJob(c);
     startPlayingNowJob(c);
     startCommandTimersJob(c);
+    import("./lib/chatCommands").then((m) => m.startChatTimersJob()).catch(() => null);
     startMessageActivityJob();
     startEconomyJobs(c);
 

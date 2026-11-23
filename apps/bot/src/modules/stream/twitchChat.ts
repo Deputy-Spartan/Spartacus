@@ -1,5 +1,5 @@
 import type { Client } from "discord.js";
-import { LINK_CODE_PATTERN } from "@spartacus/shared";
+import { LINK_CODE_PATTERN, chatRankFrom } from "@spartacus/shared";
 import { logError } from "@spartacus/db";
 import { prisma } from "../../lib/prisma";
 import { isLeader } from "../../lib/leader";
@@ -41,6 +41,8 @@ function connect() {
   const mine = ws;
   mine.addEventListener("open", () => {
     retry = 0;
+    // Tags say who's a mod or sub (for Chat Commands) and their shown name.
+    send("CAP REQ :twitch.tv/tags");
     send("PASS SCHMOOPIIE");
     send(`NICK justinfan${Math.floor(10000 + Math.random() * 80000)}`);
     joined.clear();
@@ -101,10 +103,19 @@ export function setChatChannels(logins: string[]) {
   forgetOldChatters(30 * 60_000);
 }
 
-function onLine(line: string) {
-  if (line.startsWith("PING")) {
+function onLine(raw: string) {
+  if (raw.startsWith("PING")) {
     send("PONG :tmi.twitch.tv");
     return;
+  }
+  // "@badges=moderator/1,subscriber/12;display-name=Nova;… :nova!nova@… PRIVMSG #chan :hi"
+  let tags: Record<string, string> = {};
+  let line = raw;
+  if (raw[0] === "@") {
+    const sp = raw.indexOf(" ");
+    if (sp < 0) return;
+    tags = Object.fromEntries(raw.slice(1, sp).split(";").map((kv) => { const i = kv.indexOf("="); return [kv.slice(0, i), kv.slice(i + 1)]; }));
+    line = raw.slice(sp + 1);
   }
   const at = line.indexOf(" PRIVMSG #");
   if (at < 0 || line[0] !== ":") return;
@@ -116,8 +127,13 @@ function onLine(line: string) {
   if (space < 0) return;
   const channel = rest.slice(0, space).toLowerCase();
   const text = rest.slice(space + 2);
+  const badges = (tags.badges ?? "").split(",").map((b) => b.split("/")[0]).filter(Boolean);
+  if (tags.mod === "1") badges.push("moderator");
+  const rank = user === channel ? 3 : chatRankFrom(badges);
+  const shown = tags["display-name"]?.replace(/\\s/g, " ").trim() || user;
+  void onStreamChat("twitch", channel, shown, text, rank);
+  if (user === channel) return;
   recordChat("twitch", channel, user);
-  void onStreamChat("twitch", channel, user, text);
   const code = text.match(LINK_CODE_PATTERN);
   if (code) void verifyLink(user, code[0]);
 }

@@ -266,6 +266,16 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
           </button>
         </NeonCard>
 
+        {kind === "cmdfx" && (
+          <NeonCard>
+            <p className="font-medium">⌨️ Your commands</p>
+            <p className="text-sm text-slate-300 mt-1">
+              Which commands play a sound or pop-up, and the Lumia Stream, Streamer.bot and OBS setup, are on the{" "}
+              <Link href={`/dashboard/${guildId}/chat-commands`} className="text-neon-blue underline">Chat Commands page</Link>. Use the OBS link from its Other apps tab if you use any of those apps.
+            </p>
+          </NeonCard>
+        )}
+
         <ObsCard path={`/overlay/${kind}/${guildId}`} w={W} h={H} note={<p className={`${hint} mt-3`}>This one is your full stream size, so it lines up with your stream. The see-through parts don&apos;t cover anything.</p>} />
 
         {deckCmds.length > 0 && (

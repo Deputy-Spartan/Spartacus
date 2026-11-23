@@ -283,6 +283,46 @@ export async function followerTotal(a: StreamerAccount): Promise<number | null> 
   return typeof j.total === "number" ? j.total : null;
 }
 
+// Can this sign-in post in chat? (Accounts connected before Chat Commands
+// need connecting again.)
+export function canChat(a: StreamerAccount): boolean {
+  const s = (a.scopes ?? "").split(/[\s,]+/);
+  return a.platform === "twitch" ? s.includes("user:write:chat") : s.includes("chat:write");
+}
+
+// Posts in the streamer's own chat, as their account. Returns a problem in
+// plain words, or null when it went through.
+export async function sendStreamChat(a: StreamerAccount, text: string): Promise<string | null> {
+  if (!canChat(a)) return `Connect ${a.platform === "twitch" ? "Twitch" : "Kick"} again on Stream Growth so Spartacus can post in chat.`;
+  const t = await token(a).catch(() => null);
+  if (!t) return `The ${a.platform === "twitch" ? "Twitch" : "Kick"} sign-in has run out. Connect it again on Stream Growth.`;
+  const message = text.slice(0, a.platform === "twitch" ? 500 : 500);
+  const res =
+    a.platform === "twitch"
+      ? await call("https://api.twitch.tv/helix/chat/messages", { method: "POST", headers: { ...twitchHeaders(t), "Content-Type": "application/json" }, body: JSON.stringify({ broadcaster_id: a.platformId, sender_id: a.platformId, message }) }).catch(() => null)
+      : await call("https://api.kick.com/public/v1/chat", { method: "POST", headers: { ...kickHeaders(t), "Content-Type": "application/json" }, body: JSON.stringify({ broadcaster_user_id: Number(a.platformId), content: message, type: "user" }) }).catch(() => null);
+  if (!res) return `${a.platform === "twitch" ? "Twitch" : "Kick"} didn't answer.`;
+  if (!res.ok) return `${a.platform === "twitch" ? "Twitch" : "Kick"} said ${res.status}: ${(await res.text().catch(() => "")).slice(0, 160)}`;
+  return null;
+}
+
+// How long a Twitch viewer has followed, like "1 year, 3 months".
+export async function twitchFollowage(a: StreamerAccount, login: string): Promise<string | null> {
+  if (a.platform !== "twitch") return null;
+  const t = await token(a).catch(() => null);
+  if (!t) return null;
+  const u = await call(`https://api.twitch.tv/helix/users?login=${encodeURIComponent(login)}`, { headers: twitchHeaders(t) }).catch(() => null);
+  const id = u?.ok ? ((await u.json()) as { data?: Array<{ id: string }> }).data?.[0]?.id : null;
+  if (!id) return null;
+  const r = await call(`https://api.twitch.tv/helix/channels/followers?broadcaster_id=${a.platformId}&user_id=${id}`, { headers: twitchHeaders(t) }).catch(() => null);
+  const at = r?.ok ? ((await r.json()) as { data?: Array<{ followed_at: string }> }).data?.[0]?.followed_at : null;
+  if (!at) return "not following yet";
+  const days = Math.floor((Date.now() - new Date(at).getTime()) / 86400_000);
+  const y = Math.floor(days / 365), m = Math.floor((days % 365) / 30), d = days % 30;
+  const part = (n: number, w: string) => (n ? `${n} ${w}${n === 1 ? "" : "s"}` : "");
+  return [part(y, "year"), part(m, "month"), y ? "" : part(d, "day")].filter(Boolean).join(", ") || "less than a day";
+}
+
 // The connected account behind a Going Live entry, if there is one.
 export async function accountFor(guildId: string, platform: string, login: string) {
   if (platform !== "twitch" && platform !== "kick") return null;

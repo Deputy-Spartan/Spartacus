@@ -29,3 +29,4 @@ export * from "./kdCounter";
 export * from "./overlays";
 export * from "./tools";
 export * from "./overlayVisibility";
+export * from "./chatCommands";

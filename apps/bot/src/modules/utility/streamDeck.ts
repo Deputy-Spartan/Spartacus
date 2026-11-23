@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Guild, type GuildMember, type GuildTextBasedChannel, type VoiceBasedChannel } from "discord.js";
-import { ALL_OVERLAYS, OVERLAY_VISIBILITY_KEY, cleanVisibility, isOverlayId, TOOL_COMMANDS, applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
+import { messageText, ALL_OVERLAYS, OVERLAY_VISIBILITY_KEY, cleanVisibility, isOverlayId, TOOL_COMMANDS, applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
@@ -333,6 +333,12 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
       const o = await getOverlay(g.id, "goal");
       const by = moneyAmount(s, 1);
       return { title: s.moneyMode === "set" ? `Set ${by}` : `${by < 0 ? "−" : "+"}${Math.abs(by)} goal`, line: `${o.cur} / ${o.target}`, tone: "green", pct: Math.min(1, Number(o.cur) / Math.max(1, Number(o.target))) };
+    }
+    case "ovmsg": {
+      const o = await getOverlay(g.id, "message");
+      const op = str(s, "msgOp") || "next";
+      const names: Record<string, string> = { next: "Next msg", prev: "Last msg", plus: "Need +1", minus: "Need −1", full: "Squad full", again: "Replay", cycle: o.cycle ? "Cycle: on" : "Cycle: off", say: short(str(s, "msgText") || "Type a msg", 14) };
+      return { title: names[op] ?? "Message", line: short(messageText(o) || "—", 14), tone: op === "cycle" ? (o.cycle ? "green" : "off") : op === "full" ? "green" : op === "say" && !str(s, "msgText") ? "off" : "" };
     }
     case "ovchal": {
       const o = await getOverlay(g.id, "challenge");
@@ -678,6 +684,14 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
       const r = await changeTool(g.id, c[2], { ...c[3] });
       if ("error" in r && typeof r.error === "string") return { ok: false, message: r.error };
       return { ok: true, message: c[1] };
+    }
+    // Streaming › Overlays › Message box.
+    case "ovmsg": {
+      const op = str(s, "msgOp") || "next";
+      if (!["next", "prev", "plus", "minus", "full", "again", "cycle", "say"].includes(op)) return { ok: false, message: "Pick what the key does." };
+      const r = await changeOverlay(g.id, "message", op === "say" ? { op, text: str(s, "msgText") } : { op });
+      if ("error" in r && typeof r.error === "string") return { ok: false, message: r.error };
+      return { ok: true, message: `Message box: ${messageText(r as Record<string, unknown>) || "updated"}.` };
     }
     // Streaming › Overlays keys.
     case "ovgame":

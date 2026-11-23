@@ -125,7 +125,22 @@ export interface CounterLook {
   sound: string;
   volume: number;
   layout: string;
+  canvasW?: number; // the OBS browser source size (preview and OBS link)
+  canvasH?: number;
 }
+
+// Canvas sizes for the OBS browser source: [width, height, name].
+export const CANVAS_SIZES = [
+  [1400, 500, "Wide"],
+  [1000, 400, "Medium"],
+  [700, 300, "Small"],
+  [1920, 1080, "Full screen"],
+  [1280, 720, "720p screen"],
+] as const;
+export const cleanCanvas = (w: unknown, h: unknown, dw: number, dh: number) => {
+  const n = (x: unknown, lo: number, hi: number, d: number) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Math.max(lo, Math.min(hi, Math.round(Number(x)))) : d);
+  return { canvasW: n(w, 200, 3840, dw), canvasH: n(h, 100, 2160, dh) };
+};
 
 const oneOf = <T extends string | number>(v: unknown, list: ReadonlyArray<readonly [T, ...unknown[]]>, d: T): T =>
   list.some(([id]) => id === v) ? (v as T) : list.some(([id]) => typeof id === "number" && id === Number(v)) ? (Number(v) as T) : d;
@@ -154,5 +169,6 @@ export function cleanCounterLook(
     sound: oneOf(r.sound, lists.sounds, d.sound),
     volume: oneOf(r.volume, COUNTER_VOLUMES, d.volume),
     layout: oneOf(r.layout, lists.layouts, d.layout),
+    ...cleanCanvas(r.canvasW, r.canvasH, d.canvasW ?? 1400, d.canvasH ?? 500),
   };
 }

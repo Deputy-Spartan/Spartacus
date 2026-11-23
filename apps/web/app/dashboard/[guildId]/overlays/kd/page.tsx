@@ -101,7 +101,7 @@ export default function KdCounterPage({ params }: { params: { guildId: string } 
   );
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-6xl">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">🎯 K/D Counter</h1>
@@ -113,7 +113,50 @@ export default function KdCounterPage({ params }: { params: { guildId: string } 
         </div>
       </div>
 
-      <div className="space-y-4">
+      <CounterPreview
+        kind="kd"
+        start={{ kills: String(start.kills), deaths: String(start.deaths) }}
+        settings={look}
+        values={nums}
+        status={autoSave}
+        frameRef={frame}
+        onCanvas={(canvasW, canvasH) => update({ canvasW, canvasH })}
+        tryBar={
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button className={button} onClick={() => demo("kills", 1)}>
+              ▶ Try <span className="text-emerald-300">+1 kill</span>
+            </button>
+            <button className={button} onClick={() => demo("deaths", 1)}>
+              ▶ Try <span className="text-rose-300">+1 death</span>
+            </button>
+            <button className={button} onClick={() => frame.current?.contentWindow?.postMessage({ type: "counter-streak" }, window.location.origin)}>
+              ▶ Try a kill streak
+            </button>
+          </div>
+        }
+        after={
+          <>
+            <ObsCard path={`/overlay/kd/${guildId}`} w={look.canvasW} h={look.canvasH} />
+            <NeonCard>
+              <p className="font-medium">🎛️ Stream Deck</p>
+              <p className={`${hint} mb-3`}>
+                Needs the Spartacus plugin, version 1.3 or newer. Get it on the{" "}
+                <Link href={`/dashboard/${guildId}/stream-deck`} className="text-neon-blue underline">
+                  Stream Deck page
+                </Link>
+                .
+              </p>
+              <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-300">
+                <li>In the Stream Deck app, drag Spartacus → 🎯 Kill / Death onto a key.</li>
+                <li>Pick Kills or Deaths and type the Amount (1 for most keys, -1 to take one away).</li>
+                <li>For a reset key: pick Both, type 0 and pick Set it to the amount.</li>
+                <li>Make one key for each: +1 kill, +1 death, and a reset.</li>
+              </ol>
+              <p className={`${hint} mt-3`}>On a Stream Deck +, the 🎯 Kill / Death Dial adds or takes away kills as you turn it, and adds a death when you press it.</p>
+            </NeonCard>
+          </>
+        }
+        before={
         <NeonCard>
           <div className="flex items-center justify-between gap-2 mb-3">
             <p className="font-medium">🎯 This session</p>
@@ -132,21 +175,8 @@ export default function KdCounterPage({ params }: { params: { guildId: string } 
           {err && <p className="text-sm text-rose-300 mt-2">{err}</p>}
           <p className={`${hint} mt-2`}>The stream shows the change within about a second.</p>
         </NeonCard>
-
-        <CounterPreview kind="kd" start={{ kills: String(start.kills), deaths: String(start.deaths) }} settings={look} values={nums} status={autoSave} frameRef={frame}>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button className={button} onClick={() => demo("kills", 1)}>
-              ▶ Try <span className="text-emerald-300">+1 kill</span>
-            </button>
-            <button className={button} onClick={() => demo("deaths", 1)}>
-              ▶ Try <span className="text-rose-300">+1 death</span>
-            </button>
-            <button className={button} onClick={() => frame.current?.contentWindow?.postMessage({ type: "counter-streak" }, window.location.origin)}>
-              ▶ Try a kill streak
-            </button>
-            <span className={`${hint} self-center`}>Only plays here. Your numbers don&apos;t change.</span>
-          </div>
-
+        }
+      >
           <AnimChoices items={KD_ANIMS} value={look.anim} onPick={(anim) => pick({ anim })} />
           <Choices title="Layout" items={KD_LAYOUTS} value={look.layout} onPick={(layout) => pick({ layout })} />
           <CommonLook look={look} pick={pick} sounds={KD_SOUNDS} colorTitle="Kills number color" />
@@ -215,28 +245,7 @@ export default function KdCounterPage({ params }: { params: { guildId: string } 
               Back to the default look
             </button>
           )}
-        </CounterPreview>
-
-        <ObsCard path={`/overlay/kd/${guildId}`} />
-
-        <NeonCard>
-          <p className="font-medium">🎛️ Stream Deck</p>
-          <p className={`${hint} mb-3`}>
-            Needs the Spartacus plugin, version 1.3 or newer. Get it on the{" "}
-            <Link href={`/dashboard/${guildId}/stream-deck`} className="text-neon-blue underline">
-              Stream Deck page
-            </Link>
-            .
-          </p>
-          <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-300">
-            <li>In the Stream Deck app, drag Spartacus → 🎯 Kill / Death onto a key.</li>
-            <li>Pick Kills or Deaths and type the Amount (1 for most keys, -1 to take one away).</li>
-            <li>For a reset key: pick Both, type 0 and pick Set it to the amount.</li>
-            <li>Make one key for each: +1 kill, +1 death, and a reset.</li>
-          </ol>
-          <p className={`${hint} mt-3`}>On a Stream Deck +, the 🎯 Kill / Death Dial adds or takes away kills as you turn it, and adds a death when you press it.</p>
-        </NeonCard>
-      </div>
+      </CounterPreview>
     </div>
   );
 }

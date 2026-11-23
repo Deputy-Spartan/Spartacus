@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const KINDS = ["game", "winloss", "timer", "goal", "challenge", "discord", "ticker"];
+const KINDS = ["game", "message", "winloss", "timer", "goal", "challenge", "discord", "ticker"];
 // Stream tools (packages/shared/tools.ts) use the full-screen tool page.
 const TOOLS = ["alerts", "chat", "scenes", "stats", "giveaway", "leader", "next", "subathon", "cam", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome"];
 

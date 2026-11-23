@@ -86,7 +86,7 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
   const changed = (Object.keys(defaults) as Array<keyof Look>).some((k) => look[k] !== defaults[k]);
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-6xl">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">💰 Money Counter</h1>
@@ -98,7 +98,26 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
         </div>
       </div>
 
-      <div className="space-y-4">
+      <CounterPreview
+        kind="money"
+        start={{ amount: String(start) }}
+        settings={look}
+        values={{ amount }}
+        status={autoSave}
+        frameRef={frame}
+        onCanvas={(canvasW, canvasH) => update({ canvasW, canvasH })}
+        tryBar={
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button className={button} onClick={() => demo(100000)}>
+              ▶ Try <span className="text-emerald-300">+ add</span>
+            </button>
+            <button className={button} onClick={() => demo(-100000)}>
+              ▶ Try <span className="text-rose-300">− take away</span>
+            </button>
+            <span className={`${hint} self-center hidden sm:inline`}>Only plays here. Your total doesn&apos;t change.</span>
+          </div>
+        }
+        before={
         <NeonCard>
           <div className="flex items-center justify-between gap-2">
             <p className="font-medium">💵 Total</p>
@@ -125,18 +144,30 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
           {err && <p className="text-sm text-rose-300 mt-2">{err}</p>}
           <p className={`${hint} mt-2`}>The stream shows the change within about a second.</p>
         </NeonCard>
-
-        <CounterPreview kind="money" start={{ amount: String(start) }} settings={look} values={{ amount }} status={autoSave} frameRef={frame}>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button className={button} onClick={() => demo(100000)}>
-              ▶ Try <span className="text-emerald-300">+ add</span>
-            </button>
-            <button className={button} onClick={() => demo(-100000)}>
-              ▶ Try <span className="text-rose-300">− take away</span>
-            </button>
-            <span className={`${hint} self-center`}>Only plays here. Your total doesn&apos;t change.</span>
-          </div>
-
+        }
+        after={
+          <>
+            <ObsCard path={`/overlay/money/${guildId}`} w={look.canvasW} h={look.canvasH} />
+            <NeonCard>
+              <p className="font-medium">🎛️ Stream Deck</p>
+              <p className={`${hint} mb-3`}>
+                Needs the Spartacus plugin, version 1.2 or newer. Get it on the{" "}
+                <Link href={`/dashboard/${guildId}/stream-deck`} className="text-neon-blue underline">
+                  Stream Deck page
+                </Link>
+                .
+              </p>
+              <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-300">
+                <li>In the Stream Deck app, drag Spartacus → 💰 Money Counter onto a key.</li>
+                <li>Type the Amount, like 100000. Use a minus, like -100000, to take money away.</li>
+                <li>Pick Add the amount, or Set it to the amount (an amount of 0 makes a reset key).</li>
+                <li>Make one key for each amount you use.</li>
+              </ol>
+              <p className={`${hint} mt-3`}>On a Stream Deck +, the 💰 Money Dial adds or takes away the amount with each click. Press it twice to reset to 0.</p>
+            </NeonCard>
+          </>
+        }
+      >
           <AnimChoices items={MONEY_ANIMS} value={look.anim} onPick={(anim) => pick({ anim })} />
           <Choices title="Layout" cols={2} items={MONEY_LAYOUTS} value={look.layout} onPick={(layout) => pick({ layout })} />
           <CommonLook look={look} pick={pick} sounds={MONEY_SOUNDS} />
@@ -177,28 +208,7 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
               Back to the default look
             </button>
           )}
-        </CounterPreview>
-
-        <ObsCard path={`/overlay/money/${guildId}`} />
-
-        <NeonCard>
-          <p className="font-medium">🎛️ Stream Deck</p>
-          <p className={`${hint} mb-3`}>
-            Needs the Spartacus plugin, version 1.2 or newer. Get it on the{" "}
-            <Link href={`/dashboard/${guildId}/stream-deck`} className="text-neon-blue underline">
-              Stream Deck page
-            </Link>
-            .
-          </p>
-          <ol className="list-decimal pl-5 space-y-1 text-sm text-slate-300">
-            <li>In the Stream Deck app, drag Spartacus → 💰 Money Counter onto a key.</li>
-            <li>Type the Amount, like 100000. Use a minus, like -100000, to take money away.</li>
-            <li>Pick Add the amount, or Set it to the amount (an amount of 0 makes a reset key).</li>
-            <li>Make one key for each amount you use.</li>
-          </ol>
-          <p className={`${hint} mt-3`}>On a Stream Deck +, the 💰 Money Dial adds or takes away the amount with each click. Press it twice to reset to 0.</p>
-        </NeonCard>
-      </div>
+      </CounterPreview>
     </div>
   );
 }

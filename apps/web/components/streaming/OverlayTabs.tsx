@@ -31,7 +31,7 @@ export function OverlayTabs({ guildId }: { guildId: string }) {
   const prev = i > 0 ? OVERLAYS[i - 1] : null;
   const next = i >= 0 && i < OVERLAYS.length - 1 ? OVERLAYS[i + 1] : null;
   return (
-    <nav aria-label="Overlays" className="max-w-4xl flex items-center gap-2 mb-4">
+    <nav aria-label="Overlays" className="max-w-6xl flex items-center gap-2 mb-4">
       <Link href={`${base}/overlays`} className="shrink-0 h-9 px-3 grid place-items-center rounded-lg border border-white/10 text-sm text-slate-300 hover:text-white hover:border-white/30">
         ‹ All overlays
       </Link>

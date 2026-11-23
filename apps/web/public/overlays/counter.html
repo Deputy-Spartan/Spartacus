@@ -7,7 +7,8 @@
 <style>
 /* OBS browser source for Streaming › Overlays (every counter and box).
    1400x500, see-through background: only the box and its animations show.
-   kind=money|kd|game|winloss|timer|goal|challenge|discord|ticker,
+   kind=money|kd|game|message|winloss|timer|goal|challenge|discord|ticker,
+   Any size works: smaller than 1400x500 shrinks it to fit.
    g=<server id>, api=<api url>: it checks every second.
    preview=1 (dashboard): takes everything by postMessage:
    {type:"counter", settings, values} to change, {type:"counter-demo", key, diff}
@@ -22,16 +23,21 @@ body.preview { background: repeating-conic-gradient(#3a3d44 0 25%, #30333a 0 50%
 <script src="/overlays/counter-engine.js"></script>
 <script>
 const q = new URLSearchParams(location.search);
-const KINDS = ["money", "kd", "game", "winloss", "timer", "goal", "challenge", "discord", "ticker"];
+const KINDS = ["money", "kd", "game", "message", "winloss", "timer", "goal", "challenge", "discord", "ticker"];
 const kind = KINDS.includes(q.get("kind")) ? q.get("kind") : "money";
 if (q.get("preview") === "1") document.body.classList.add("preview");
 const fx = CounterFX.mount(document.getElementById("root"));
+// Made for 1400x500. A bigger browser source just gives more room; a smaller
+// one shrinks everything to fit.
+const fitU = () => document.getElementById("root").style.setProperty("--u", `${Math.min(1, innerWidth / 1400, innerHeight / 500)}px`);
+fitU();
+addEventListener("resize", fitU);
 const START = { kd: { anim: "bullets", spot: "above", font: "blackops" } };
 fx.set({ kind, ...(START[kind] || {}) }, kind === "kd" ? { kills: Number(q.get("kills")) || 0, deaths: Number(q.get("deaths")) || 0, streak: 0 } : { amount: Number(q.get("amount")) || 0 });
 
 // The numbers for each kind; everything else is the look.
 const VALUES = {
-  money: ["amount"], kd: ["kills", "deaths", "streak"], game: ["game"], winloss: ["wins", "losses", "streak"], timer: ["timer"],
+  money: ["amount"], kd: ["kills", "deaths", "streak"], game: ["game"], message: ["idx", "need", "say", "seq", "cycle", "cycleAt"], winloss: ["wins", "losses", "streak"], timer: ["timer"],
   goal: ["cur", "target"], challenge: ["count"], discord: ["members", "online"], ticker: ["type", "name", "recent"],
 };
 function split(r) {
@@ -43,6 +49,8 @@ function split(r) {
   for (const k of VALUES[kind]) { values[k] = r[k]; delete look[k]; }
   // Line the timer up with the server's clock, in case this PC's clock is off.
   if (kind === "timer" && r.timer && r.now) values.timer = { ...r.timer, t0: r.timer.t0 + (Date.now() - r.now) };
+  // Same for when the message box started cycling (rounded so it doesn't wobble each check).
+  if (kind === "message" && r.cycleAt && r.now) values.cycleAt = r.cycleAt + Math.round((Date.now() - r.now) / 1000) * 1000;
   return [look, values];
 }
 

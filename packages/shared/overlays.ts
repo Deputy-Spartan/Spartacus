@@ -5,7 +5,7 @@
 // change them through applyOverlayAction, so they always agree.
 import { COUNTER_COLORS, COUNTER_DSIZES, type AnimChoice, type CounterLook, cleanColor, cleanCounterLook, cleanText } from "./counters";
 
-export const OVERLAY_KINDS = ["game", "winloss", "timer", "goal", "challenge", "discord", "ticker"] as const;
+export const OVERLAY_KINDS = ["game", "message", "winloss", "timer", "goal", "challenge", "discord", "ticker"] as const;
 export type OverlayKind = (typeof OVERLAY_KINDS)[number];
 export const isOverlayKind = (k: unknown): k is OverlayKind => OVERLAY_KINDS.includes(k as OverlayKind);
 export const overlayStateKey = (k: OverlayKind) => `ov:${k}`;
@@ -36,6 +36,60 @@ const ANIM_END: AnimChoice[] = [
 const anims = (slot: AnimChoice, rain: AnimChoice): AnimChoice[] => [...ANIM_START, slot, rain, ...ANIM_END];
 const SLOT: AnimChoice = ["slot", "Slot machine", "The digits spin like a slot machine."];
 const SCRAMBLE: AnimChoice = ["slot", "Scramble", "The letters scramble, then land one by one."];
+
+// Message box: how the words change from one message to the next.
+export const MESSAGE_ANIMS: AnimChoice[] = [
+  ["flip", "Flip", "Flips over like a scoreboard."],
+  ["scrollup", "Scroll up", "The old one scrolls up and out, the new one scrolls in."],
+  ["scrolldown", "Scroll down", "Scrolls down instead."],
+  ["slide", "Slide across", "Slides out to the side as the new one slides in."],
+  ["spin", "Spin", "Spins round fast, then lands."],
+  ["card", "Flip the box", "The whole box flips round like a card."],
+  ["cube", "Cube turn", "Turns like the side of a cube."],
+  ["typewriter", "Typewriter", "Deletes letter by letter, then types the new one."],
+  ["scramble", "Scramble", "The letters scramble, then land one by one."],
+  ["wave", "Letter wave", "The letters fall out and drop back in one by one."],
+  ["bounce", "Bounce", "Shrinks away and bounces back in."],
+  ["zoom", "Zoom", "Zooms out at you as the new one zooms in."],
+  ["slam", "Slam", "Slams down and the box shakes."],
+  ["glitch", "Glitch", "Jitters with a red and blue split, then snaps."],
+  ["fade", "Fade", "A soft blur fade."],
+];
+export const MESSAGE_EXTRAS = [
+  ["none", "Nothing"],
+  ["pop", "Box pops"],
+  ["shake", "Box shakes"],
+  ["sparks", "✨ Sparks"],
+  ["confetti", "🎉 Confetti"],
+] as const;
+export const MESSAGE_EVERY = [
+  [5, "5 s"],
+  [10, "10 s"],
+  [20, "20 s"],
+  [30, "30 s"],
+  [60, "1 min"],
+] as const;
+export const MESSAGE_PRESETS = ["NEED {n} TO JOIN", "NEED {n} MORE FOR SQUAD", "SQUAD FULL", "BE RIGHT BACK", "DROP A FOLLOW ❤️", "TYPE !discord TO JOIN", "CUSTOMS TONIGHT", "GG CHAT 🫡"];
+const msgList = (st: Record<string, unknown>) => (Array.isArray(st.msgs) ? (st.msgs as unknown[]).filter((m): m is string => typeof m === "string" && !!m.trim()) : []);
+// Cycling: how many messages it has moved on by itself since cycleAt.
+export function messageStep(st: Record<string, unknown>, now = Date.now()): number {
+  if (!st.cycle || msgList(st).length < 2 || (typeof st.say === "string" && st.say.trim())) return 0;
+  return Math.max(0, Math.floor((now - (Number(st.cycleAt) || now)) / (Math.max(1, Number(st.every) || 10) * 1000)));
+}
+// The words on stream right now: a typed one-off message, or the list one,
+// with {n} filled in. The engine (counter-engine.js msgText) does the same.
+export function messageText(st: Record<string, unknown>, now = Date.now()): string {
+  const say = typeof st.say === "string" ? st.say.trim() : "";
+  const list = msgList(st);
+  let t = say;
+  if (!t && list.length) {
+    const i = (Number(st.idx) || 0) + messageStep(st, now);
+    t = list[((i % list.length) + list.length) % list.length];
+    if (t.includes("{n}")) t = (Number(st.need) || 0) <= 0 ? String(st.fullText ?? "") : t.split("{n}").join(String(Number(st.need) || 0));
+  }
+  // ALL CAPS keeps chat commands like !discord as typed.
+  return st.uppercase ? t.replace(/(![^\s]+)|([^!]+)/g, (m, cmd) => (cmd ? m : m.toUpperCase())) : t;
+}
 
 const LABEL_LAYOUTS = [
   ["side", "Label on top"],
@@ -87,6 +141,21 @@ export const OVERLAYS: Record<OverlayKind, OverlayInfo> = {
     sounds: [["off", "Off"], ["whoosh", "Whoosh"], ["ding", "Ding"], ["pop", "Pop"]],
     layouts: LABEL_LAYOUTS,
     defaults: { ...look({ anim: "slot", spot: "corner" }), game: "Just Chatting", gameLabel: "NOW PLAYING", icon: "🎮", sub: "", uppercase: false, tag: "NEW GAME", showTag: true, recentGames: [] },
+  },
+  message: {
+    kind: "message",
+    title: "Message box",
+    icon: "🪧",
+    line: "A box with your message, like NEED 1 TO JOIN, that flips, spins or scrolls to the next one.",
+    anims: MESSAGE_ANIMS,
+    sounds: [["off", "Off"], ["pop", "Pop"], ["whoosh", "Whoosh"], ["ding", "Ding"], ["coin", "Coin"]],
+    layouts: LABEL_LAYOUTS,
+    defaults: {
+      ...look({ anim: "flip", spot: "corner", idle: "float" }),
+      msgs: ["NEED {n} TO JOIN", "DROP A FOLLOW ❤️", "TYPE !discord TO SQUAD UP"], idx: 0, need: 1, say: "", seq: 0, cycle: false, cycleAt: 0,
+      msgLabel: "LOOKING FOR GROUP", icon: "🪖", sub: "Ask in chat to hop in", tag: "LFG", showTag: true, uppercase: true,
+      fullText: "SQUAD FULL ✅", every: 10, ticker: false, extra: "pop",
+    },
   },
   winloss: {
     kind: "winloss",
@@ -162,8 +231,9 @@ export const OVERLAYS: Record<OverlayKind, OverlayInfo> = {
 };
 
 // Pick lists the dashboard shows for the kind-specific settings.
-export const OVERLAY_ICONS: Record<"game" | "challenge" | "ticker", string[]> = {
+export const OVERLAY_ICONS: Record<"game" | "message" | "challenge" | "ticker", string[]> = {
   game: ["🎮", "🔫", "⚔️", "🏎️", "⚽", ""],
+  message: ["🪖", "📢", "🎮", "👥", "⚠️", "💬", ""],
   challenge: ["🏋️", "🔥", "😡", "🍺", "💀", ""],
   ticker: ["💜", "⭐", "❤️", "🔔", "👑", ""],
 };
@@ -182,6 +252,7 @@ export const WIN_STREAKS = [
 // The fields that are numbers you change (kept when the look is saved).
 export const OVERLAY_VALUE_KEYS: Record<OverlayKind, string[]> = {
   game: ["game", "recentGames"],
+  message: ["idx", "need", "say", "seq", "cycle", "cycleAt"],
   winloss: ["wins", "losses", "streak"],
   timer: ["timer"],
   goal: ["cur"],
@@ -206,6 +277,15 @@ export function cleanOverlay(kind: OverlayKind, raw: unknown): OverlayState {
   switch (kind) {
     case "game":
       return { ...base, game: t("game", 60), gameLabel: t("gameLabel", 30), icon: t("icon", 8), sub: t("sub", 60), uppercase: b("uppercase"), tag: t("tag", 24), showTag: b("showTag"), recentGames: names(r.recentGames, 6, 60) };
+    case "message": {
+      const msgs = Array.isArray(r.msgs) ? names(r.msgs.filter((m) => typeof m === "string" && m.trim()), 10, 60) : (d.msgs as string[]);
+      return {
+        ...base, msgs, idx: clampN(r.idx, 0, 9), need: clampN(r.need ?? d.need, 0, 99), say: t("say", 60), seq: clampN(r.seq), cycle: b("cycle"), cycleAt: clampN(r.cycleAt, 0, Number.MAX_SAFE_INTEGER),
+        msgLabel: t("msgLabel", 30), icon: t("icon", 8), sub: t("sub", 60), tag: t("tag", 24), showTag: b("showTag"), uppercase: b("uppercase"),
+        fullText: t("fullText", 60), every: oneOfN(r.every, MESSAGE_EVERY, 10), ticker: b("ticker"),
+        extra: MESSAGE_EXTRAS.some(([v]) => v === r.extra) ? String(r.extra) : String(d.extra),
+      };
+    }
     case "winloss":
       return {
         ...base, wins: clampN(r.wins), losses: clampN(r.losses), streak: clampN(r.streak),
@@ -260,6 +340,7 @@ export const formatClock = (ms: number, up = false) => {
 //   timer:     { op: "toggle"|"restart"|"add"|"set", ms }
 //   goal / challenge: { add } or { set }
 //   ticker:    { type, name } (someone new) or { clear: true }
+//   message:   { op: "next"|"prev"|"go"|"plus"|"minus"|"full"|"need"|"say"|"clear"|"again"|"cycle", to?, n?, text?, on? }
 export type OverlayAction = Record<string, unknown>;
 export function applyOverlayAction(kind: OverlayKind, cur: OverlayState, a: OverlayAction, now = Date.now()): OverlayState | { error: string } {
   const st = { ...cur };
@@ -311,5 +392,40 @@ export function applyOverlayAction(kind: OverlayKind, cur: OverlayState, a: Over
     }
     case "discord":
       return { error: "The Discord box updates by itself." };
+    case "message": {
+      const list = (st.msgs as string[]) ?? [];
+      const len = Math.max(1, list.length);
+      // Lock in where cycling has got to, so every change starts from what's on stream.
+      st.idx = ((Number(st.idx) || 0) + messageStep(st, now)) % len;
+      st.cycleAt = now;
+      const toNumberLine = () => {
+        const i = list.findIndex((m) => m.includes("{n}"));
+        if (i >= 0) st.idx = i;
+        st.say = "";
+      };
+      switch (a.op) {
+        case "next": st.idx = ((Number(st.idx) || 0) + 1) % len; st.say = ""; break;
+        case "prev": st.idx = ((Number(st.idx) || 0) - 1 + len) % len; st.say = ""; break;
+        case "go":
+          if (!has("to") || Number(a.to) < 0 || Number(a.to) >= list.length) return { error: "Pick a message." };
+          st.idx = Number(a.to); st.say = ""; break;
+        case "plus": st.need = clampN((Number(st.need) || 0) + 1, 0, 99); toNumberLine(); break;
+        case "minus": st.need = clampN((Number(st.need) || 0) - 1, 0, 99); toNumberLine(); break;
+        case "full": st.need = 0; toNumberLine(); if (!list.some((m) => m.includes("{n}"))) st.say = String(st.fullText ?? ""); break;
+        case "need":
+          if (!has("n")) return { error: "Type a number." };
+          st.need = clampN(a.n, 0, 99); toNumberLine(); break;
+        case "say": {
+          const text = typeof a.text === "string" ? a.text.trim().slice(0, 60) : "";
+          if (!text) return { error: "Type a message." };
+          st.say = text; break;
+        }
+        case "clear": st.say = ""; break;
+        case "cycle": st.cycle = typeof a.on === "boolean" ? a.on : !st.cycle; if (st.cycle) st.say = ""; break;
+        case "again": st.seq = clampN((Number(st.seq) || 0) + 1); break;
+        default: return { error: "Pick what the button does." };
+      }
+      return st;
+    }
   }
 }

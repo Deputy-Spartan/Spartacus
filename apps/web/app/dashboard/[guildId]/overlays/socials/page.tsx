@@ -7,6 +7,7 @@ import { SaveStatus } from "../../../../../components/ui/SaveStatus";
 import { ChannelSelect } from "../../../../../components/ui/ChannelSelect";
 import { PageGuideButton } from "../../../../../components/nav/PageGuideButton";
 import { ShowOnStream } from "../../../../../components/streaming/ShowOnStream";
+import { EditorSplit } from "../../../../../components/streaming/CounterParts";
 import { useAutoSave } from "../../../../../lib/useAutoSave";
 import { api, type SocialsOverlaySettings, type SocialsPlatformId } from "../../../../../lib/api";
 
@@ -193,7 +194,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className={tab === "stream" ? "max-w-6xl" : "max-w-4xl"}>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">🏷️ Socials</h1>
@@ -275,10 +276,10 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
         )}
 
         {tab === "stream" && (
-          <>
-            {picker("on", "📺 What shows on stream", "Tap to turn one on or off. This doesn't change the Discord post.")}
-            <NeonCard>
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <EditorSplit
+            preview={
+            <NeonCard className="!p-3 sm:!p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <div>
                   <p className="font-medium">👀 Preview</p>
                   <p className={hint}>The checkered part is see-through on stream.</p>
@@ -299,7 +300,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
                   </button>
                 </div>
               </div>
-              <div ref={box} className={`relative overflow-hidden rounded-lg border border-white/10 bg-black ${tall ? "w-full max-w-[280px] mx-auto aspect-[9/16]" : "w-full aspect-video"}`}>
+              <div ref={box} className={`relative overflow-hidden rounded-lg border border-white/10 bg-black ${tall ? "w-full max-w-[150px] sm:max-w-[220px] lg:max-w-[280px] mx-auto aspect-[9/16]" : "w-full aspect-video"}`}>
                 <iframe
                   key={`${playKey}:${src}`}
                   src={src || undefined}
@@ -311,7 +312,9 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
               {tall && <p className={`${hint} mt-2 text-center`}>Names stack one per line, up near the top so TikTok&apos;s comments don&apos;t cover them.</p>}
               {onStream.length === 0 && <p className="text-xs text-amber-200 mt-2">Tick Stream on a platform in Your names and type its name to see it.</p>}
             </NeonCard>
-
+            }
+          >
+            {picker("on", "📺 What shows on stream", "Tap to turn one on or off. This doesn't change the Discord post.")}
             <NeonCard>
               <p className="font-medium mb-3">🎨 Look</p>
               <div className="grid grid-cols-2 gap-3 mb-4">
@@ -387,7 +390,7 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
               </ol>
               <p className={`${hint} mt-3`}>After you change something here, the overlay on stream updates within about 20 seconds.</p>
             </NeonCard>
-          </>
+          </EditorSplit>
         )}
 
         {tab === "discord" && (

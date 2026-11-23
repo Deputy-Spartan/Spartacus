@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  CANVAS_SIZES,
   COUNTER_COLORS,
   COUNTER_CORNERS,
   COUNTER_DSIZES,
@@ -156,7 +157,114 @@ export function Toggle({ on, onChange, name, desc }: { on: boolean; onChange: (v
   );
 }
 
-// The live preview: the real overlay in a frame, sent every change so it animates.
+// Every overlay page: the options scroll on the left, the preview stays put
+// on the right (on a phone it stays at the top while the options scroll under it).
+export function EditorSplit({ preview, children }: { preview: ReactNode; children: ReactNode }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] items-start">
+      <div className="lg:order-2 sticky top-14 sm:top-[68px] lg:top-20 z-[5] min-w-0 -mx-1 px-1 pt-1 bg-base-950/95 backdrop-blur lg:bg-transparent lg:backdrop-blur-none">{preview}</div>
+      <div className="lg:order-1 space-y-4 min-w-0">{children}</div>
+    </div>
+  );
+}
+
+// The preview card: the real overlay page in a frame, scaled to fit.
+export function PreviewPane({
+  src,
+  w,
+  h,
+  frameRef,
+  onLoad,
+  status,
+  note = "The checkered part is see-through on stream.",
+  children,
+  canvas,
+}: {
+  src: string;
+  w: number;
+  h: number;
+  frameRef: React.MutableRefObject<HTMLIFrameElement | null>;
+  onLoad?: () => void;
+  status: AutoSaveStatus;
+  note?: string;
+  children?: ReactNode;
+  canvas?: ReactNode;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.3);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => setScale(el.clientWidth / w);
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [w]);
+  return (
+    <NeonCard className="!p-3 sm:!p-4">
+      <link rel="stylesheet" href={FONT_LINK} />
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <p className="font-medium">👀 Preview</p>
+          <p className={`${hint} hidden sm:block`}>{note}</p>
+        </div>
+        <SaveStatus status={status} />
+      </div>
+      <div ref={box} className="relative overflow-hidden rounded-lg border border-white/10 bg-black w-full mx-auto" style={{ aspectRatio: `${w} / ${h}`, maxHeight: "55vh", maxWidth: `calc(55vh * ${w / h})` }}>
+        <iframe
+          ref={frameRef}
+          src={src}
+          onLoad={onLoad}
+          title="Overlay preview"
+          className="absolute left-0 top-0 border-0 pointer-events-none"
+          style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: "0 0" }}
+        />
+      </div>
+      {children}
+      {canvas}
+    </NeonCard>
+  );
+}
+
+// The OBS browser source size: a few ready sizes, or type your own.
+export function CanvasPicker({ w, h, sizes, onPick, note }: { w: number; h: number; sizes: ReadonlyArray<readonly [number, number, string]>; onPick: (w: number, h: number) => void; note: string }) {
+  const commit = (nw: number, nh: number) => {
+    if (Number.isFinite(nw) && Number.isFinite(nh) && nw >= 200 && nh >= 100 && nw <= 3840 && nh <= 2160 && (nw !== w || nh !== h)) onPick(Math.round(nw), Math.round(nh));
+  };
+  return (
+    <details className="mt-3 rounded-lg border border-white/10 px-2.5 py-2">
+      <summary className="text-sm cursor-pointer select-none">
+        🖼️ Canvas size <span className="text-slate-400 tabular-nums">{w} × {h}</span>
+      </summary>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+        {sizes.map(([sw, sh, name]) => (
+          <button
+            key={`${sw}x${sh}`}
+            type="button"
+            onClick={() => onPick(sw, sh)}
+            aria-pressed={sw === w && sh === h}
+            className={`text-sm rounded-lg border px-1.5 py-1.5 transition-colors min-w-0 ${sw === w && sh === h ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-300 hover:border-white/25"}`}
+          >
+            {name}
+            <span className="block text-[11px] text-slate-400 tabular-nums">
+              {sw} × {sh}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <input key={`w${w}`} className={`${field} !p-1.5 tabular-nums`} defaultValue={w} inputMode="numeric" aria-label="Canvas width" onBlur={(e) => commit(Number(e.target.value), h)} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
+        <span className="text-slate-400">×</span>
+        <input key={`h${h}`} className={`${field} !p-1.5 tabular-nums`} defaultValue={h} inputMode="numeric" aria-label="Canvas height" onBlur={(e) => commit(w, Number(e.target.value))} onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()} />
+      </div>
+      <p className={`${hint} mt-1.5`}>{note}</p>
+    </details>
+  );
+}
+
+// The live preview of a counter or box: the real overlay in a frame, sent every
+// change so it animates. `before` and `after` go in the options column.
 export function CounterPreview({
   kind,
   start,
@@ -164,55 +272,54 @@ export function CounterPreview({
   values,
   status,
   frameRef,
+  tryBar,
+  before,
+  after,
+  onCanvas,
   children,
 }: {
   kind: string;
   start: Record<string, string>;
-  settings: object;
+  settings: object & { canvasW?: number; canvasH?: number };
   values: object;
   status: AutoSaveStatus;
   frameRef: React.MutableRefObject<HTMLIFrameElement | null>;
+  tryBar?: ReactNode;
+  before?: ReactNode;
+  after?: ReactNode;
+  onCanvas?: (w: number, h: number) => void;
   children?: ReactNode;
 }) {
-  const box = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.5);
   const [src] = useState(() => `/overlays/counter.html?${new URLSearchParams({ kind, preview: "1", ...start })}`);
   const send = () => frameRef.current?.contentWindow?.postMessage({ type: "counter", settings, values }, window.location.origin);
-
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const fit = () => setScale(el.clientWidth / OBS_W);
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(send, [settings, values]);
+  const w = settings.canvasW ?? OBS_W, h = settings.canvasH ?? OBS_H;
 
   return (
-    <NeonCard>
-      <link rel="stylesheet" href={FONT_LINK} />
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div>
-          <p className="font-medium">👀 Preview</p>
-          <p className={hint}>The checkered part is see-through on stream.</p>
-        </div>
-        <SaveStatus status={status} />
-      </div>
-      <div ref={box} className="relative overflow-hidden rounded-lg border border-white/10 bg-black w-full" style={{ aspectRatio: `${OBS_W} / ${OBS_H}` }}>
-        <iframe
-          ref={frameRef}
+    <EditorSplit
+      preview={
+        <PreviewPane
           src={src}
+          w={w}
+          h={h}
+          frameRef={frameRef}
           onLoad={send}
-          title="Overlay preview"
-          className="absolute left-0 top-0 border-0 pointer-events-none"
-          style={{ width: OBS_W, height: OBS_H, transform: `scale(${scale})`, transformOrigin: "0 0" }}
-        />
-      </div>
-      {children}
-    </NeonCard>
+          status={status}
+          canvas={onCanvas && <CanvasPicker w={w} h={h} sizes={CANVAS_SIZES} onPick={onCanvas} note="Use the same Width and Height in OBS. Smaller than 1400 × 500 shrinks it to fit. Bigger gives the animations more room." />}
+        >
+          {tryBar}
+        </PreviewPane>
+      }
+    >
+      {before}
+      <NeonCard>
+        <p className="font-medium">🎨 Look and animation</p>
+        <p className={hint}>Each pick plays in the preview.</p>
+        {children}
+      </NeonCard>
+      {after}
+    </EditorSplit>
   );
 }
 

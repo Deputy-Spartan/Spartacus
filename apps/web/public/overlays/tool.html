@@ -26,7 +26,8 @@ const kind = q.get("kind") || "clip";
 const root = document.getElementById("root");
 if (q.get("preview") === "1") { document.body.classList.add("preview"); root.dataset.preview = "1"; }
 // Sizes are in --u: 1px on a 1920-wide canvas.
-const fit = () => root.style.setProperty("--u", innerWidth / 1920 + "px");
+// Any 16:9 size scales the same; other shapes fit inside.
+const fit = () => root.style.setProperty("--u", Math.min(innerWidth / 1920, innerHeight / 1080) + "px");
 fit();
 addEventListener("resize", fit);
 const fx = ToolsFX.mount(root, kind);

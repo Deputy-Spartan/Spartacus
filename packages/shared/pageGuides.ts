@@ -775,6 +775,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
 function overlayGuides(): Record<string, PageGuide> {
   const extra: Record<OverlayKind, { step: string; tips: string[] }> = {
     game: { step: "Type a game and press Show it, or tap one of your recent games.", tips: ["Make a Stream Deck key for each game you play: Spartacus → Game, type the game.", "Scramble makes the letters jumble, then land one by one."] },
+    message: { step: "Type your messages, one per line. Put {n} where a number goes (like NEED {n} TO JOIN), then use Next, + and − to change it.", tips: ["Turn on Cycle through all messages to have it step through every message by itself.", "Stream Deck: Spartacus → Message Box, pick what the key does (next, +1, squad full, say a message, cycle on/off)."] },
     winloss: { step: "Press +1 under Wins or Losses after each match.", tips: ["A loss ends the win streak.", "Stream Deck: Spartacus → Win / Loss. For a reset key pick Both, type 0 and Set."] },
     timer: { step: "Pick Down (countdown) or Up (stopwatch), then press Start. +1 min, +5 min and −1 min change it while it runs.", tips: ["In the last 10 seconds it turns red and pulses each second, then your words show.", "Stream Deck: Spartacus → Timer, pick Start / pause, Restart or Add minutes."] },
     goal: { step: "Type your goal, then use +1 or +10 as you go. Turn on Count Kick follows to have it move by itself.", tips: ["Reaching the goal shows a banner and confetti.", "Stream Deck: Spartacus → Goal Bar."] },

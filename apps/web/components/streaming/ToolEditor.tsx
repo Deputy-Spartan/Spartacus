@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { TOOLS, TOOL_COMMANDS, type ToolKind, type ToolRow } from "@spartacus/shared";
 import { NeonCard } from "../ui/NeonCard";
-import { SaveStatus } from "../ui/SaveStatus";
 import { PageGuideButton } from "../nav/PageGuideButton";
 import { ShowOnStream } from "./ShowOnStream";
-import { ObsCard, Swatch, Toggle, button, field, hint } from "./CounterParts";
+import { CanvasPicker, EditorSplit, ObsCard, PreviewPane, Swatch, Toggle, button, field, hint } from "./CounterParts";
 import { useAutoSave } from "../../lib/useAutoSave";
 import { api } from "../../lib/api";
 
@@ -16,10 +15,13 @@ import { api } from "../../lib/api";
 // data and every event) using the settings on this page, saved by themselves.
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
-const W = 1920;
-const H = 1080;
-const FONT_LINK =
-  "https://fonts.googleapis.com/css2?family=Lilita+One&family=Bangers&family=Russo+One&family=Black+Ops+One&family=Bebas+Neue&family=Luckiest+Guy&display=swap";
+// The tools are made for a 1920x1080 stream; any 16:9 size scales the same.
+const TOOL_CANVASES = [
+  [1920, 1080, "1080p"],
+  [1280, 720, "720p"],
+  [2560, 1440, "1440p"],
+  [3840, 2160, "4K"],
+] as const;
 const FONT_NAME: Record<string, string> = { lilita: "Lilita One", bangers: "Bangers", russo: "Russo One", blackops: "Black Ops One", bebas: "Bebas Neue", luckiest: "Luckiest Guy" };
 type Settings = ToolRow["settings"];
 type Feed = { state: Record<string, unknown>; live: Record<string, unknown>; events: ToolRow["events"]; now: number };
@@ -33,8 +35,6 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const feed = useRef<Feed | null>(null);
   const frame = useRef<HTMLIFrameElement | null>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.3);
 
   useEffect(() => {
     api
@@ -81,16 +81,6 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guildId, kind, settings]);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const fit = () => setScale(el.clientWidth / W);
-    fit();
-    const ro = new ResizeObserver(fit);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [settings === null]);
-
   if (failed) return <p className="text-rose-300">Couldn&apos;t load this tool. Refresh the page to try again.</p>;
   if (!settings || !row) return <p className="text-slate-400">Loading…</p>;
 
@@ -117,9 +107,11 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
   };
   const deckCmds = TOOL_COMMANDS.filter((c) => c[2] === kind);
 
+  const W = Number(settings.canvasW) || 1920;
+  const H = Number(settings.canvasH) || 1080;
+
   return (
-    <div className="max-w-4xl">
-      <link rel="stylesheet" href={FONT_LINK} />
+    <div className="max-w-6xl">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">
@@ -133,7 +125,28 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
         </div>
       </div>
 
-      <div className="space-y-4">
+      <EditorSplit
+        preview={
+          <PreviewPane
+            src={`/overlays/tool.html?${new URLSearchParams({ kind, preview: "1" })}`}
+            w={W}
+            h={H}
+            frameRef={frame}
+            onLoad={send}
+            status={autoSave}
+            note="The checkered part is see-through on stream. Buttons play here too."
+            canvas={
+              <CanvasPicker
+                w={W}
+                h={H}
+                sizes={TOOL_CANVASES}
+                onPick={(canvasW, canvasH) => update({ canvasW, canvasH })}
+                note="Match your OBS canvas (OBS Settings → Video → Base resolution) and use the same Width and Height on the browser source."
+              />
+            }
+          />
+        }
+      >
         {(info.buttons.length > 0 || info.auto) && (
           <NeonCard>
             {info.auto && <p className="text-sm text-slate-300">{info.auto}</p>}
@@ -175,23 +188,8 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
         )}
 
         <NeonCard>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div>
-              <p className="font-medium">👀 Preview</p>
-              <p className={hint}>The checkered part is see-through on stream. Buttons above play here too.</p>
-            </div>
-            <SaveStatus status={autoSave} />
-          </div>
-          <div ref={box} className="relative overflow-hidden rounded-lg border border-white/10 bg-black w-full" style={{ aspectRatio: `${W} / ${H}` }}>
-            <iframe
-              ref={frame}
-              src={`/overlays/tool.html?${new URLSearchParams({ kind, preview: "1" })}`}
-              onLoad={send}
-              title="Overlay preview"
-              className="absolute left-0 top-0 border-0 pointer-events-none"
-              style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0" }}
-            />
-          </div>
+          <p className="font-medium">🎨 Look and words</p>
+          <p className={hint}>Each change shows in the preview.</p>
 
           {kind === "stats" && (
             <div className="mt-4">
@@ -263,12 +261,12 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
               ))}
             </div>
           )}
-          <button className={`${button} mt-4`} onClick={() => setSettings({ ...info.settings, ...(kind === "squad" ? { followUserId: settings.followUserId } : {}) })}>
+          <button className={`${button} mt-4`} onClick={() => setSettings({ ...info.settings, canvasW: W, canvasH: H, ...(kind === "squad" ? { followUserId: settings.followUserId } : {}) })}>
             Back to the default look
           </button>
         </NeonCard>
 
-        <ObsCard path={`/overlay/${kind}/${guildId}`} w={W} h={H} note={<p className={`${hint} mt-3`}>This one is the full screen size, so it lines up with your stream. The see-through parts don&apos;t cover anything.</p>} />
+        <ObsCard path={`/overlay/${kind}/${guildId}`} w={W} h={H} note={<p className={`${hint} mt-3`}>This one is your full stream size, so it lines up with your stream. The see-through parts don&apos;t cover anything.</p>} />
 
         {deckCmds.length > 0 && (
           <NeonCard>
@@ -286,7 +284,7 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
             </p>
           </NeonCard>
         )}
-      </div>
+      </EditorSplit>
     </div>
   );
 }

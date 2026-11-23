@@ -4,6 +4,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   COUNTER_COLORS,
+  MESSAGE_EVERY,
+  MESSAGE_EXTRAS,
+  MESSAGE_PRESETS,
+  messageStep,
+  messageText,
   OVERLAYS,
   OVERLAY_ICONS,
   OVERLAY_VALUE_KEYS,
@@ -44,6 +49,7 @@ function splitState(kind: OverlayKind, st: OverlayState): [OverlayState, Vals] {
 // What the preview's "Try it" plays, and which stat it's on.
 const DEMO: Record<OverlayKind, [string, number]> = {
   game: ["game", 1],
+  message: ["message", 1],
   winloss: ["wins", 1],
   timer: ["timer", 300000],
   goal: ["goal", 1],
@@ -63,6 +69,7 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
   const [err, setErr] = useState("");
   const [text, setText] = useState("");
   const [tickType, setTickType] = useState("follow");
+  const [draft, setDraft] = useState<string | null>(null); // message list being typed
   const [, setTick] = useState(0);
   const frame = useRef<HTMLIFrameElement | null>(null);
 
@@ -97,10 +104,10 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
     return () => clearInterval(t);
   }, [guildId, kind]);
 
-  // The timer card counts by itself.
+  // The timer card counts by itself, and a cycling message box moves on by itself.
   useEffect(() => {
-    if (kind !== "timer") return;
-    const t = setInterval(() => setTick((n) => n + 1), 250);
+    if (kind !== "timer" && kind !== "message") return;
+    const t = setInterval(() => setTick((n) => n + 1), kind === "timer" ? 250 : 1000);
     return () => clearInterval(t);
   }, [kind]);
   useEffect(() => {
@@ -199,6 +206,76 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
             ))}
           </div>
         )}
+      </>
+    );
+  } else if (kind === "message") {
+    const list = (look.msgs as string[]) ?? [];
+    const say = String(vals.say || "");
+    const cycling = !!vals.cycle;
+    const at = list.length ? (n("idx") + messageStep({ ...look, ...vals })) % list.length : 0;
+    controls = (
+      <>
+        <p className="text-sm text-slate-400">On stream now</p>
+        <p className="text-3xl font-extrabold text-[#f9c933] my-1 break-words">{messageText({ ...look, ...vals }) || "—"}</p>
+        {cycling && (
+          <p className={hint}>
+            🔁 Cycling every {String(look.every)} seconds{say ? ". Paused while your typed message shows." : "."}
+          </p>
+        )}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-3">
+          <button className={button} disabled={busy} onClick={() => act({ op: "prev" })}>
+            ⏮ Last
+          </button>
+          <button className="neon-button" disabled={busy} onClick={() => act({ op: "next" })}>
+            ⏭ Next
+          </button>
+          <button className={button} disabled={busy} onClick={() => act({ op: "again" })}>
+            🔁 Replay
+          </button>
+          <button className={button} disabled={busy || n("need") === 0} onClick={() => act({ op: "minus" })} aria-label="Need 1 less">
+            ➖ 1
+          </button>
+          <button className={button} disabled={busy} onClick={() => act({ op: "plus" })} aria-label="Need 1 more">
+            ➕ 1
+          </button>
+          <button className={button} disabled={busy} onClick={() => act({ op: "full" })}>
+            ✅ Full
+          </button>
+        </div>
+        <p className="text-sm text-slate-300 mt-2">
+          The number in {"{n}"} is <b className="tabular-nums">{n("need")}</b>. At 0 it shows &ldquo;{str("fullText")}&rdquo;.
+        </p>
+        {list.length > 1 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className={`${hint} self-center`}>Jump to:</span>
+            {list.map((m, i) => (
+              <button key={`${i}-${m}`} className={`${button} ${!say && at === i ? "!border-neon-blue text-white" : ""}`} disabled={busy} onClick={() => act({ op: "go", to: i })}>
+                {m.split("{n}").join(String(n("need")))}
+              </button>
+            ))}
+          </div>
+        )}
+        <form
+          className="flex gap-2 mt-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (text.trim() && (await act({ op: "say", text: text.trim() }))) setText("");
+          }}
+        >
+          <input className={field} value={text} maxLength={60} placeholder="Type a one-off message" onChange={(e) => setText(e.target.value)} aria-label="One-off message" />
+          <button className="neon-button shrink-0" disabled={busy || !text.trim()}>
+            Show it
+          </button>
+        </form>
+        {say && (
+          <button className={`${button} mt-2`} disabled={busy} onClick={() => act({ op: "clear" })}>
+            ↩ Back to my list
+          </button>
+        )}
+        <div className="mt-3">
+          <Toggle on={cycling} name="Cycle through all messages" desc="Steps through every message in your list by itself." onChange={(on) => act({ op: "cycle", on })} />
+        </div>
+        <Choices title="Next message every" cols={3} items={MESSAGE_EVERY} value={Number(look.every)} onPick={(every) => update({ every })} />
       </>
     );
   } else if (kind === "winloss") {
@@ -344,10 +421,11 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
   }
 
   // ---- Settings only some have ----
-  const iconChoices = kind === "game" || kind === "challenge" || kind === "ticker" ? OVERLAY_ICONS[kind].map((i) => [i, i || "None"] as const) : null;
+  const iconChoices = kind === "game" || kind === "message" || kind === "challenge" || kind === "ticker" ? OVERLAY_ICONS[kind].map((i) => [i, i || "None"] as const) : null;
   const words: Array<[string, string, number]> =
     ({
       game: [["gameLabel", "Words on top", 30], ["sub", "Second line (optional)", 60], ["tag", "Tag words", 24]],
+      message: [["msgLabel", "Words on top", 30], ["sub", "Second line (optional)", 60], ["tag", "Tag words", 24]],
       winloss: [["winsLabel", "Wins word", 24], ["lossesLabel", "Losses word", 24], ["rateLabel", "Win % word", 24]],
       timer: [["timerLabel", "Words on top", 30], ["doneText", "When it hits 0", 30]],
       goal: [["goalLabel", "Words on top", 30], ["goalDone", "When you reach it", 30]],
@@ -358,6 +436,11 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
   const toggles: Array<[string, string, string]> =
     ({
       game: [["showTag", "NEW GAME tag", "A tag pops up each time the game changes."], ["uppercase", "All capitals", "Shows the name in capital letters."]],
+      message: [
+        ["showTag", "Pop-up tag", "Your tag words (like LFG) pop up each time the message changes."],
+        ["uppercase", "All capitals", "Shows messages in capital letters. Chat commands like !discord stay as typed."],
+        ["ticker", "Ticker scroll", "The message slides across the box non-stop, like a news ticker."],
+      ],
       winloss: [["ratio", "Show win %", "A third box with your win rate."], ["streakOn", "Win streak", "A big WIN STREAK banner. A loss starts it over."]],
       timer: [["finalFlash", "Last 10 seconds", "The time turns red and pulses each second, then the words below show."]],
       goal: [["showPct", "Show %", "Adds how far along you are, like 82%."]],
@@ -367,6 +450,7 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
     } as Record<OverlayKind, Array<[string, string, string]>>)[kind];
   const deckNote: Record<OverlayKind, string> = {
     game: "Drag Spartacus → 🎮 Game onto a key and type the game. Make one key per game you play.",
+    message: "Drag Spartacus → 🪧 Message Box onto a key and pick what it does: Next message, Last message, Need 1 more, Need 1 less, Squad full, Replay, Cycle on / off, or Show this message (type it in Message).",
     winloss: "Drag Spartacus → 🏆 Win / Loss onto a key, pick Wins or Losses and type 1. For a reset key pick Both, type 0 and Set.",
     timer: "Drag Spartacus → ⏱️ Timer onto a key and pick Start / pause, Restart, or Add minutes (type 5, or -1 to take away).",
     goal: "Drag Spartacus → 📈 Goal Bar onto a key and type how much each press moves it.",
@@ -376,7 +460,7 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
   };
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-6xl">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">
@@ -390,14 +474,15 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
         </div>
       </div>
 
-      <div className="space-y-4">
-        <NeonCard>
-          {controls}
-          {err && <p className="text-sm text-rose-300 mt-2">{err}</p>}
-          {kind !== "discord" && <p className={`${hint} mt-2`}>The stream shows the change within about a second.</p>}
-        </NeonCard>
-
-        <CounterPreview kind={kind} start={{}} settings={previewLook} values={previewValues} status={autoSave} frameRef={frame}>
+      <CounterPreview
+        kind={kind}
+        start={{}}
+        settings={previewLook}
+        values={previewValues}
+        status={autoSave}
+        frameRef={frame}
+        onCanvas={(canvasW, canvasH) => update({ canvasW, canvasH })}
+        tryBar={
           <div className="flex flex-wrap gap-2 mt-3">
             <button className={button} onClick={() => demo()}>
               ▶ Try it
@@ -412,9 +497,77 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
                 ▶ Try the banner
               </button>
             )}
-            <span className={`${hint} self-center`}>Only plays here. Nothing on stream changes.</span>
+            <span className={`${hint} self-center hidden sm:inline`}>Only plays here. Nothing on stream changes.</span>
           </div>
-
+        }
+        before={
+          <>
+            <NeonCard>
+              {controls}
+              {err && <p className="text-sm text-rose-300 mt-2">{err}</p>}
+              {kind !== "discord" && <p className={`${hint} mt-2`}>The stream shows the change within about a second.</p>}
+            </NeonCard>
+            {kind === "message" && (
+              <NeonCard>
+                <p className="font-medium">📝 Your messages</p>
+                <p className={`${hint} mb-2`}>
+                  One per line, up to 10. Put {"{n}"} where the number goes, like NEED {"{n}"} TO JOIN. Saves when you click away.
+                </p>
+                <textarea
+                  className={`${field} min-h-[120px] leading-relaxed`}
+                  value={draft ?? ((look.msgs as string[]) ?? []).join("\n")}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => {
+                    if (draft === null) return;
+                    update({ msgs: draft.split("\n").map((m) => m.trim().slice(0, 60)).filter(Boolean).slice(0, 10) });
+                    setDraft(null);
+                  }}
+                  aria-label="Your messages, one per line"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {MESSAGE_PRESETS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`${button} !px-2 !py-1 text-xs`}
+                      disabled={((look.msgs as string[]) ?? []).length >= 10}
+                      onClick={() => {
+                        setDraft(null);
+                        update({ msgs: [...((look.msgs as string[]) ?? []), p].slice(0, 10) });
+                      }}
+                    >
+                      + {p}
+                    </button>
+                  ))}
+                </div>
+                <label className="block mt-3">
+                  <span className="text-sm">When the number hits 0, show</span>
+                  <input className={`${field} mt-1`} value={str("fullText")} maxLength={60} onChange={(e) => update({ fullText: e.target.value })} />
+                </label>
+              </NeonCard>
+            )}
+          </>
+        }
+        after={
+          <>
+            <ObsCard path={`/overlay/${kind}/${guildId}`} w={look.canvasW} h={look.canvasH} />
+            <NeonCard>
+              <p className="font-medium">🎛️ Stream Deck</p>
+              <p className={`${hint} mb-2`}>
+                Needs the Spartacus plugin, version {kind === "message" ? "1.9" : "1.4"} or newer. Get it on the{" "}
+                <Link href={`/dashboard/${guildId}/stream-deck`} className="text-neon-blue underline">
+                  Stream Deck page
+                </Link>
+                .
+              </p>
+              <p className="text-sm text-slate-300">{deckNote[kind]}</p>
+            </NeonCard>
+          </>
+        }
+      >
+          {kind === "message" && (
+            <Choices title="Extra when it changes" cols={3} items={MESSAGE_EXTRAS} value={str("extra")} onPick={(extra) => pick({ extra })} />
+          )}
           {kind === "timer" && (
             <>
               <Choices title="Counts" cols={2} items={[["down", "Down (countdown)"], ["up", "Up (stopwatch)"]] as const} value={str("timerMode")} onPick={(timerMode) => update({ timerMode })} />
@@ -428,7 +581,7 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
             look={look}
             pick={pick}
             sounds={info.sounds}
-            colorTitle={({ winloss: "Wins number color", timer: "Time color", goal: "Bar and number color", game: "Name color", ticker: "Name color", discord: "Invite color", challenge: "Number color" } as Record<OverlayKind, string>)[kind]}
+            colorTitle={({ winloss: "Wins number color", timer: "Time color", goal: "Bar and number color", game: "Name color", message: "Message color", ticker: "Name color", discord: "Invite color", challenge: "Number color" } as Record<OverlayKind, string>)[kind]}
           />
           {kind === "winloss" && (
             <>
@@ -474,22 +627,7 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
               Back to the default look
             </button>
           )}
-        </CounterPreview>
-
-        <ObsCard path={`/overlay/${kind}/${guildId}`} />
-
-        <NeonCard>
-          <p className="font-medium">🎛️ Stream Deck</p>
-          <p className={`${hint} mb-2`}>
-            Needs the Spartacus plugin, version 1.4 or newer. Get it on the{" "}
-            <Link href={`/dashboard/${guildId}/stream-deck`} className="text-neon-blue underline">
-              Stream Deck page
-            </Link>
-            .
-          </p>
-          <p className="text-sm text-slate-300">{deckNote[kind]}</p>
-        </NeonCard>
-      </div>
+      </CounterPreview>
     </div>
   );
 }

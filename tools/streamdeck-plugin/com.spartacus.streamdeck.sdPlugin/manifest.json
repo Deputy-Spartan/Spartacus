@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.spartacus.streamdeck",
   "Name": "Spartacus",
-  "Version": "1.8.0.0",
+  "Version": "1.9.0.0",
   "Author": "Spartacus",
   "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   "Category": "Spartacus",
@@ -573,6 +573,25 @@
       "States": [
         {
           "Image": "imgs/actions/ovgame",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovmsg",
+      "Name": "Message Box",
+      "Icon": "imgs/actions/ovmsg",
+      "Tooltip": "Changes your Message box: next or last message, need 1 more or less, squad full, replay, cycle on or off, or show a message you type.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovmsg",
           "TitleAlignment": "middle",
           "FontSize": 11,
           "ShowTitle": true

@@ -64,7 +64,18 @@
 .ow-0 .cfx-num, .ow-0 .cfx-label, .ow-0 .cfx-sub { filter: drop-shadow(0 calc(var(--u) * 4) calc(var(--u) * 6) rgba(0,0,0,.7)); }
 .cfx-stat.deaths .cfx-num, .cfx-stat.losses .cfx-num { color: var(--dc); }
 .cfx-stat.ratio .cfx-num, .cfx-stat.winrate .cfx-num { color: #fff; }
-.cfx-stat.game .cfx-num, .cfx-stat.ticker .cfx-num, .cfx-stat.discord .cfx-num { font-size: calc(var(--u) * 84); }
+.cfx-stat.game .cfx-num, .cfx-stat.ticker .cfx-num, .cfx-stat.discord .cfx-num, .cfx-stat.message .cfx-num { font-size: calc(var(--u) * 84); }
+/* Message box: a window the words change inside. */
+.cfx-num.cfx-mwin { display: block; position: relative; height: 1.12em; transition: width .4s cubic-bezier(.3,1.4,.5,1); }
+.cfx-mwin.clip, .cfx-mwin.ticker { overflow: hidden; }
+.cfx-mtxt { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; white-space: pre; backface-visibility: hidden; }
+.cfx-mt { display: inline-block; line-height: 1.12em; white-space: pre; }
+.cfx-mt i { font-style: normal; display: inline-block; white-space: pre; }
+.cfx-mt.typing::after { content: ""; display: inline-block; width: .08em; height: .9em; margin-left: .06em; vertical-align: -.08em; background: var(--kc); animation: cfx-caret .5s steps(2) infinite; }
+@keyframes cfx-caret { 50% { opacity: 0; } }
+.cfx-mwin.ticker .cfx-mtxt { justify-content: flex-start; }
+.cfx-mwin.ticker .cfx-mt { animation: cfx-tick var(--tickdur, 10s) linear infinite; }
+@keyframes cfx-tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .cfx-num.flash-up { color: var(--up) !important; }
 .cfx-num.flash-down { color: var(--down) !important; }
 .cfx-num.glitch { animation: cfx-glitch .1s steps(2) infinite; }
@@ -156,9 +167,11 @@
     discordLabel: "JOIN THE DISCORD", invite: "discord.gg/yourcode", showOnline: true,
     // latest follower / sub / raid
     followLabel: "LATEST FOLLOWER", subLabel: "LATEST SUB", raidLabel: "LATEST RAID", showRecent: true,
+    // message box
+    msgs: ["NEED {n} TO JOIN"], msgLabel: "LOOKING FOR GROUP", fullText: "SQUAD FULL ✅", every: 10, ticker: false, extra: "pop",
   };
-  const TEXT_KINDS = ["game", "ticker"];
-  const ICON_KINDS = ["game", "ticker", "challenge", "discord"];
+  const TEXT_KINDS = ["game", "ticker", "message"];
+  const ICON_KINDS = ["game", "ticker", "challenge", "discord", "message"];
 
   function injectCSS() {
     if (document.getElementById("cfx-css")) return;
@@ -178,7 +191,7 @@
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let s = { ...DEFAULTS };
-    let v = { amount: 0, kills: 0, deaths: 0, wins: 0, losses: 0, streak: 0, count: 0, cur: 0, target: 1000, members: 0, online: 0, game: "", type: "follow", name: "", recent: [], timer: { running: false, base: 0, t0: 0 } };
+    let v = { amount: 0, kills: 0, deaths: 0, wins: 0, losses: 0, streak: 0, count: 0, cur: 0, target: 1000, members: 0, online: 0, game: "", type: "follow", name: "", recent: [], timer: { running: false, base: 0, t0: 0 }, idx: 0, need: 1, say: "", seq: 0 };
     let cells = {};
     let built = "";
     let started = false;
@@ -205,7 +218,7 @@
         case "kd": return ["kills", "deaths", ...(s.ratio ? ["ratio"] : [])];
         case "winloss": return ["wins", "losses", ...(s.ratio ? ["winrate"] : [])];
         case "money": return ["amount"];
-        default: return [{ challenge: "count", timer: "timer", goal: "goal", game: "game", discord: "discord", ticker: "ticker" }[s.kind] || "amount"];
+        default: return [{ challenge: "count", timer: "timer", goal: "goal", game: "game", discord: "discord", ticker: "ticker", message: "message" }[s.kind] || "amount"];
       }
     }
     function timerMs(T) {
@@ -213,8 +226,23 @@
       const run = t.running ? Date.now() - (Number(t.t0) || Date.now()) : 0;
       return s.timerMode === "up" ? (Number(t.base) || 0) + run : Math.max(0, (Number(t.base) || 0) - run);
     }
+    // The message on stream now (same as messageText in packages/shared/overlays.ts).
+    function msgText(vals) {
+      const say = String(vals.say || "").trim();
+      const list = (Array.isArray(s.msgs) ? s.msgs : []).filter((m) => typeof m === "string" && m.trim());
+      let t = say;
+      if (!t && list.length) {
+        // Cycling: steps since cycleAt (already lined up with this PC's clock).
+        const step = vals.cycle && list.length > 1 ? Math.max(0, Math.floor((Date.now() - (Number(vals.cycleAt) || Date.now())) / (Math.max(1, Number(s.every) || 10) * 1000))) : 0;
+        const i = (Number(vals.idx) || 0) + step;
+        t = list[((i % list.length) + list.length) % list.length];
+        if (t.includes("{n}")) t = (Number(vals.need) || 0) <= 0 ? String(s.fullText || "") : t.split("{n}").join(String(Number(vals.need) || 0));
+      }
+      return s.uppercase ? t.replace(/(![^\s]+)|([^!]+)/g, (m, cmd) => (cmd ? m : m.toUpperCase())) : t;
+    }
     function valueOf(k, vals = v) {
       switch (k) {
+        case "message": return msgText(vals);
         case "game": return String(vals.game ?? "");
         case "ticker": return String(vals.name ?? "");
         case "ratio": return vals.kills / Math.max(1, vals.deaths);
@@ -228,7 +256,7 @@
     function labelOf(k) {
       if (k === "ticker") return v.type === "sub" ? s.subLabel : v.type === "raid" ? s.raidLabel : s.followLabel;
       return ({ amount: s.label, kills: s.killsLabel, deaths: s.deathsLabel, ratio: s.ratioLabel, wins: s.winsLabel, losses: s.lossesLabel, winrate: s.rateLabel,
-        count: s.chLabel, timer: s.timerLabel, goal: s.goalLabel, game: s.gameLabel, discord: s.discordLabel })[k] ?? "";
+        count: s.chLabel, timer: s.timerLabel, goal: s.goalLabel, game: s.gameLabel, discord: s.discordLabel, message: s.msgLabel })[k] ?? "";
     }
     function shortNum(n) {
       const a = Math.abs(n);
@@ -243,6 +271,7 @@
     }
     function textOf(k, n) {
       switch (k) {
+        case "message": return String(n);
         case "game": case "ticker": return s.uppercase ? String(n).toUpperCase() : String(n);
         case "discord": return s.invite;
         case "ratio": return n.toFixed(2);
@@ -257,7 +286,7 @@
       }
     }
     function subOf(k) {
-      if (k === "game") return s.sub;
+      if (k === "game" || k === "message") return s.sub;
       if (k === "discord") return `👥 ${num(v.members)} members${s.showOnline ? `  ·  🟢 ${num(v.online)} online` : ""}`;
       if (k === "ticker") return s.showRecent && v.recent?.length ? `Also: ${v.recent.slice(0, 3).join(" · ")}` : "";
       return "";
@@ -273,6 +302,7 @@
       const sign = diff > 0 ? "+" : "-";
       switch (k) {
         case "game": return s.tag || "NEW GAME";
+        case "message": return s.tag || "NEW";
         case "ticker": return v.type === "sub" ? "NEW SUB!" : v.type === "raid" ? "RAID!" : "NEW FOLLOWER!";
         case "discord": return diff > 0 ? `+${Math.abs(diff)} 👋` : `-${Math.abs(diff)}`;
         case "amount": return `${sign}${s.prefix}${moneyBody(diff)}${s.suffix}`;
@@ -328,7 +358,8 @@
         n.className = "cfx-num";
         const cell = { cell: c, num: n, label: l, shown: valueOf(k), raf: 0, sub: null, fill: null };
         const hasIcon = ICON_KINDS.includes(k === "count" ? "challenge" : k) && (k === "discord" || s.icon);
-        const hasSub = ["game", "discord", "ticker"].includes(k);
+        const hasSub = ["game", "discord", "ticker", "message"].includes(k);
+        if (k === "message") n.className = "cfx-num cfx-mwin";
         if (hasIcon || hasSub || k === "goal") {
           const main = document.createElement("div");
           main.className = "cfx-main";
@@ -368,6 +399,16 @@
     function paint(k, val) {
       const c = cells[k];
       if (!c) return;
+      if (k === "message") {
+        if (c.sub) c.sub.textContent = subOf(k);
+        if (c.mbusy) return;
+        c.num.textContent = "";
+        c.cur = mtxt(String(val));
+        c.num.appendChild(c.cur);
+        c.target = String(val);
+        mfit(c, String(val));
+        return;
+      }
       c.num.textContent = textOf(k, val);
       if (c.fill) {
         const t = Number(v.target) || 0;
@@ -591,6 +632,200 @@
       sound("shot");
     }
 
+    // ---- Message box: the words change inside a window ----
+    function mtxt(text) {
+      const e = document.createElement("div");
+      e.className = "cfx-mtxt";
+      const sp = document.createElement("span");
+      sp.className = "cfx-mt";
+      sp.textContent = text;
+      e.appendChild(sp);
+      return e;
+    }
+    function mwidth(c, text) {
+      const e = mtxt(text);
+      e.style.cssText = "position:absolute;visibility:hidden;inset:auto;";
+      c.num.appendChild(e);
+      const w = e.offsetWidth;
+      e.remove();
+      return w;
+    }
+    function mfit(c, text) {
+      c.num.classList.toggle("ticker", !!s.ticker);
+      if (s.ticker) {
+        const sp = c.cur?.firstChild;
+        if (sp) sp.textContent = `${text}     •     ${text}     •     `;
+        c.num.style.width = `${720 * U()}px`;
+        c.num.style.setProperty("--tickdur", `${Math.max(6, text.length * 0.42) / speed()}s`);
+        return;
+      }
+      c.num.style.width = `${Math.max(10, mwidth(c, text))}px`;
+    }
+    const mine = (el) => el.getAnimations().forEach((a) => { if (!(window.CSSAnimation && a instanceof CSSAnimation)) a.cancel(); });
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    // Waits for the animation, but never longer than it should take (OBS can
+    // pause animations in a hidden source, and the next message must not wait forever).
+    const go = (el, kf, dur, ease = "ease", delay = 0) => Promise.race([el.animate(kf, { duration: dur, easing: ease, fill: "both", delay }).finished.catch(() => null), wait(dur + delay + 150)]);
+    function letters(el) {
+      const sp = el.firstChild, t = sp.textContent;
+      sp.textContent = "";
+      return [...t].map((ch) => { const i = document.createElement("i"); i.textContent = ch; sp.appendChild(i); return i; });
+    }
+    const P = () => `perspective(${Math.round(600 * U())}px)`;
+    // (old words or null, new words, ms) -> done
+    const MSG = {
+      async scrollup(o, n, d, w) { w.classList.add("clip"); await Promise.all([o && go(o, [{ transform: "translateY(0)" }, { transform: "translateY(-115%)" }], d, "cubic-bezier(.5,0,.2,1)"), go(n, [{ transform: "translateY(115%)" }, { transform: "translateY(0)" }], d, "cubic-bezier(.3,1.4,.5,1)")]); },
+      async scrolldown(o, n, d, w) { w.classList.add("clip"); await Promise.all([o && go(o, [{ transform: "translateY(0)" }, { transform: "translateY(115%)" }], d, "cubic-bezier(.5,0,.2,1)"), go(n, [{ transform: "translateY(-115%)" }, { transform: "translateY(0)" }], d, "cubic-bezier(.3,1.4,.5,1)")]); },
+      async slide(o, n, d, w) { w.classList.add("clip"); await Promise.all([o && go(o, [{ transform: "translateX(0)" }, { transform: "translateX(-120%)" }], d, "cubic-bezier(.5,0,.2,1)"), go(n, [{ transform: "translateX(120%)" }, { transform: "translateX(0)" }], d, "cubic-bezier(.3,1.2,.5,1)")]); },
+      async spin(o, n, d) {
+        n.style.opacity = 0;
+        if (o) { await go(o, [{ transform: `${P()} rotateY(0)` }, { transform: `${P()} rotateY(450deg)` }], d * 0.55, "ease-in"); o.style.opacity = 0; }
+        n.style.opacity = 1;
+        await go(n, [{ transform: `${P()} rotateY(-450deg)` }, { transform: `${P()} rotateY(0)` }], d * 0.7, "cubic-bezier(.2,.8,.3,1.1)");
+      },
+      async flip(o, n, d) {
+        n.style.opacity = 0;
+        if (o) { await go(o, [{ transform: `${P()} rotateX(0)` }, { transform: `${P()} rotateX(90deg)` }], d * 0.4, "ease-in"); o.style.opacity = 0; }
+        n.style.opacity = 1;
+        await go(n, [{ transform: `${P()} rotateX(-90deg)` }, { transform: `${P()} rotateX(12deg)`, offset: 0.75 }, { transform: `${P()} rotateX(0)` }], d * 0.6, "ease-out");
+      },
+      async card(o, n, d, w, c, text) {
+        n.style.opacity = 0;
+        const p = `perspective(${Math.round(1400 * U())}px)`;
+        await go(box, [{ transform: `${p} rotateY(0)` }, { transform: `${p} rotateY(90deg)` }], d * 0.45, "ease-in");
+        if (o) o.style.opacity = 0;
+        n.style.opacity = 1;
+        mfit(c, text);
+        await go(box, [{ transform: `${p} rotateY(-90deg)` }, { transform: `${p} rotateY(0)` }], d * 0.55, "cubic-bezier(.2,.9,.3,1.2)");
+        mine(box);
+      },
+      async cube(o, n, d) {
+        const org = "50% 50% -0.56em";
+        if (o) o.style.transformOrigin = org;
+        n.style.transformOrigin = org;
+        await Promise.all([
+          o && go(o, [{ transform: `${P()} rotateX(0)`, opacity: 1 }, { transform: `${P()} rotateX(90deg)`, opacity: 0 }], d, "cubic-bezier(.5,0,.3,1)"),
+          go(n, [{ transform: `${P()} rotateX(-90deg)`, opacity: 0 }, { transform: `${P()} rotateX(0)`, opacity: 1 }], d, "cubic-bezier(.5,0,.3,1)"),
+        ]);
+      },
+      async typewriter(o, n) {
+        const step = 38 / speed(), target = n.firstChild.textContent;
+        n.style.opacity = 0;
+        if (o) {
+          const sp = o.firstChild;
+          sp.classList.add("typing");
+          while (sp.textContent.length) { sp.textContent = [...sp.textContent].slice(0, -1).join(""); await wait(step * 0.6); }
+          o.style.opacity = 0;
+        }
+        const sp = n.firstChild;
+        sp.textContent = "";
+        sp.classList.add("typing");
+        n.style.opacity = 1;
+        const chars = [...target];
+        for (let i = 0; i < chars.length; i++) { sp.textContent += chars[i]; if (i % 2 === 0 && s.sound !== "off") SOUNDS.tick(); await wait(step); }
+        await wait(400);
+        sp.classList.remove("typing");
+      },
+      async scramble(o, n) {
+        const target = [...n.firstChild.textContent], pool = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#$%&@!?";
+        if (o) await go(o, [{ opacity: 1 }, { opacity: 0 }], 120);
+        const frames = Math.round(22 / Math.sqrt(speed())), sp = n.firstChild;
+        for (let f = 0; f <= frames; f++) {
+          sp.textContent = target.map((ch, i) => (/\s/.test(ch) || f / frames > i / target.length ? ch : pool[Math.floor(Math.random() * pool.length)])).join("");
+          await wait(40);
+        }
+        sp.textContent = target.join("");
+      },
+      async wave(o, n, d) {
+        n.style.opacity = 0;
+        if (o) {
+          const ol = letters(o);
+          await Promise.all(ol.map((l, i) => go(l, [{ transform: "translateY(0)", opacity: 1 }, { transform: "translateY(70%) rotate(12deg)", opacity: 0 }], d * 0.4, "ease-in", (i * 14) / speed())));
+          o.style.opacity = 0;
+        }
+        const nl = letters(n);
+        n.style.opacity = 1;
+        await Promise.all(nl.map((l, i) => go(l, [{ transform: "translateY(-90%) scale(.6)", opacity: 0 }, { transform: "translateY(12%) scale(1.1)", opacity: 1, offset: 0.6 }, { transform: "translateY(0) scale(1)", opacity: 1 }], d * 0.7, "ease-out", (i * 34) / speed())));
+      },
+      async bounce(o, n, d) {
+        n.style.opacity = 0;
+        if (o) { await go(o, [{ transform: "scale(1)" }, { transform: "scale(0)" }], d * 0.3, "ease-in"); o.style.opacity = 0; }
+        n.style.opacity = 1;
+        await go(n, [{ transform: "scale(0)" }, { transform: "scale(1.3)", offset: 0.45 }, { transform: "scale(.9)", offset: 0.7 }, { transform: "scale(1.05)", offset: 0.85 }, { transform: "scale(1)" }], d * 0.9, "ease-out");
+      },
+      async zoom(o, n, d) {
+        await Promise.all([
+          o && go(o, [{ transform: "scale(1)", opacity: 1, filter: "blur(0)" }, { transform: "scale(2.2)", opacity: 0, filter: "blur(6px)" }], d * 0.7, "ease-in"),
+          go(n, [{ transform: "scale(.2)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], d * 0.8, "cubic-bezier(.2,1.3,.4,1)", d * 0.15),
+        ]);
+      },
+      async slam(o, n, d, w, c) {
+        n.style.opacity = 0;
+        if (o) await go(o, [{ opacity: 1 }, { opacity: 0 }], d * 0.2);
+        n.style.opacity = 1;
+        await go(n, [{ transform: "scale(3) rotate(-6deg)", opacity: 0 }, { transform: "scale(1) rotate(0)", opacity: 1 }], d * 0.35, "cubic-bezier(.6,0,1,1)");
+        shake(c.cell);
+        await wait(300);
+      },
+      async glitch(o, n, d, w) {
+        n.style.opacity = 0;
+        w.classList.add("glitch");
+        await wait(d * 0.35);
+        if (o) o.style.opacity = 0;
+        n.style.opacity = 1;
+        await wait(d * 0.35);
+        w.classList.remove("glitch");
+      },
+      async fade(o, n, d) {
+        await Promise.all([
+          o && go(o, [{ opacity: 1, filter: "blur(0)" }, { opacity: 0, filter: "blur(8px)" }], d * 0.6),
+          go(n, [{ opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0)" }], d * 0.8, "ease", d * 0.3),
+        ]);
+      },
+    };
+    let mq = Promise.resolve();
+    function msgChange(text, replay) {
+      const c0 = cells.message;
+      if (!c0 || (!replay && c0.target === text)) return;
+      c0.target = text;
+      mq = mq.then(async () => {
+        const c = cells.message;
+        if (!c) return;
+        const w = c.num, old = c.cur && c.cur.parentNode === w ? c.cur : null;
+        const n = mtxt(text);
+        w.appendChild(n);
+        c.cur = n;
+        w.classList.remove("clip", "glitch");
+        if (s.showTag) popIn("message", 1);
+        sound(s.sound);
+        if (s.extra === "pop") play(box, [{ transform: "scale(1)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }], { duration: 420, easing: "cubic-bezier(.3,1.6,.5,1)", fill: "none" });
+        else if (s.extra === "shake") shake(box);
+        else if (s.extra === "sparks") sparkles(c.cell, "✨");
+        else if (s.extra === "confetti") { sparkles(c.cell, "🎉", 10); sparkles(c.cell, "🎊", 8); }
+        const a = reduce ? null : s.ticker ? MSG.fade : MSG[s.anim] || MSG.flip;
+        c.mbusy = true;
+        if (s.anim !== "card" || s.ticker) mfit(c, text);
+        try { if (a) await Promise.race([a(old, n, 700 / speed(), w, c, text), wait(12000)]); } catch { /* cut short */ }
+        c.mbusy = false;
+        if (old) old.remove();
+        w.classList.remove("clip", "glitch");
+        mine(n);
+        n.querySelectorAll("*").forEach(mine);
+        n.firstChild.textContent = text;
+        n.firstChild.classList.remove("typing");
+        n.style.opacity = "";
+        n.style.transformOrigin = "";
+        // Anything that came in while it played: show the latest.
+        if (c.target !== text) return;
+        mfit(c, text);
+      }).catch(() => null);
+    }
+    // Cycling: move on when the clock says so.
+    setInterval(() => {
+      if (s.kind === "message" && started && cells.message && v.cycle) msgChange(valueOf("message"));
+    }, 250);
+    addEventListener("resize", () => { const c = cells.message; if (c && !c.mbusy) mfit(c, c.target || ""); });
+
     // ---- The animations ----
     const ANIM = {
       bounce(k, diff) {
@@ -774,6 +1009,7 @@
 
     function celebrate(k, diff, prevText) {
       if (!cells[k]) return;
+      if (s.kind === "message") return msgChange(valueOf("message"), true);
       (ANIM[s.anim] || ANIM.bounce)(k, diff, prevText);
       if (s.anim !== "bullets") sound(isGood(k, diff) ? s.sound : "down");
       else if (!isGood(k, diff)) sound("down");
@@ -811,7 +1047,7 @@
       drawLook();
       const shape = JSON.stringify([s.kind, s.ratio, s.layout, s.label, s.killsLabel, s.deathsLabel, s.ratioLabel, s.winsLabel, s.lossesLabel, s.rateLabel,
         s.prefix, s.suffix, s.short, s.gameLabel, s.icon, s.sub, s.uppercase, s.chLabel, s.timerLabel, s.goalLabel, s.discordLabel, s.invite, s.showOnline, s.showPct, s.showRecent,
-        s.followLabel, s.subLabel, s.raidLabel, s.timerMode]);
+        s.followLabel, s.subLabel, s.raidLabel, s.timerMode, s.msgLabel, s.ticker]);
       if (shape !== built || !started) {
         built = shape;
         build();
@@ -819,6 +1055,11 @@
       }
       const old = (k) => valueOf(k, oldV);
       switch (s.kind) {
+        case "message": {
+          if (cells.message?.sub) cells.message.sub.textContent = subOf("message");
+          msgChange(valueOf("message"), v.seq !== oldV.seq);
+          return;
+        }
         case "game":
           if (old("game") !== valueOf("game")) celebrate("game", 1, textOf("game", old("game")));
           return;

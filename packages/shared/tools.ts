@@ -7,6 +7,7 @@
 // The OBS page (apps/web/public/overlays/tool.html) draws `state` and plays
 // each new event once. The dashboard, Stream Deck, Kick events and stream chat
 // all change it through applyToolAction, so they always agree.
+import { cleanCanvas } from "./counters";
 
 export const TOOL_KINDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome"] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
@@ -296,6 +297,8 @@ export function cleanToolSettings(kind: ToolKind, raw: unknown): ToolRow["settin
     else if (typeof d[k] === "number") out[k] = Number(out[k]);
   }
   if (out.color && !/^#[0-9a-f]{6}$/i.test(String(out.color))) out.color = d.color;
+  // The OBS browser source size (the tools are made for 1920x1080).
+  Object.assign(out, cleanCanvas(r.canvasW, r.canvasH, 1920, 1080));
   return out;
 }
 export function cleanToolRow(kind: ToolKind, raw: unknown): ToolRow {

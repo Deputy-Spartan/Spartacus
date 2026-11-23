@@ -19,6 +19,7 @@ import {
 import { NeonCard } from "../ui/NeonCard";
 import { useConfirm } from "../ui/ConfirmDialog";
 import { PageGuideButton } from "../nav/PageGuideButton";
+import { ShowOnStream } from "./ShowOnStream";
 import { AnimChoices, Choices, CommonLook, CounterPreview, ObsCard, Swatch, Toggle, button, demoIn, field, hint } from "./CounterParts";
 import { useAutoSave } from "../../lib/useAutoSave";
 import { api } from "../../lib/api";
@@ -383,7 +384,10 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
           </h1>
           <p className="text-slate-400 text-sm mt-1">{info.line}</p>
         </div>
-        <PageGuideButton guildId={guildId} inline />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ShowOnStream guildId={guildId} id={kind} />
+          <PageGuideButton guildId={guildId} inline />
+        </div>
       </div>
 
       <div className="space-y-4">

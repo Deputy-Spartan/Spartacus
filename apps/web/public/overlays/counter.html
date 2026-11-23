@@ -14,7 +14,7 @@
    to play an animation without changing it, {type:"counter-streak"} for a banner. */
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body.preview { background: repeating-conic-gradient(#3a3d44 0 25%, #30333a 0 50%) 0 0 / 40px 40px; }
-#root { position: fixed; inset: 0; }
+#root { position: fixed; inset: 0; transition: opacity .4s; }
 </style>
 </head>
 <body>
@@ -35,7 +35,10 @@ const VALUES = {
   goal: ["cur", "target"], challenge: ["count"], discord: ["members", "online"], ticker: ["type", "name", "recent"],
 };
 function split(r) {
+  // Hidden on stream (dashboard or Stream Deck): fade out, keep everything.
+  document.getElementById("root").style.opacity = r.hidden ? "0" : "1";
   const look = { ...r, kind };
+  delete look.hidden;
   const values = {};
   for (const k of VALUES[kind]) { values[k] = r[k]; delete look[k]; }
   // Line the timer up with the server's clock, in case this PC's clock is off.

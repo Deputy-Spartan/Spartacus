@@ -1,7 +1,7 @@
 // Every Spartacus action: what it's called, its icon, which settings it uses,
 // and whether it's a key or a Stream Deck + dial.
 
-export type Field = "channel" | "voice" | "role" | "ping" | "module" | "embed" | "game" | "text" | "question" | "prize" | "minutes" | "count" | "streamer" | "link" | "note" | "slow" | "liveChannel" | "safeChannel" | "confirm" | "amount" | "moneyMode" | "stat" | "gameName" | "wlStat" | "timerOp" | "toolCmd";
+export type Field = "channel" | "voice" | "role" | "ping" | "module" | "embed" | "game" | "text" | "question" | "prize" | "minutes" | "count" | "streamer" | "link" | "note" | "slow" | "liveChannel" | "safeChannel" | "confirm" | "amount" | "moneyMode" | "stat" | "gameName" | "wlStat" | "timerOp" | "toolCmd" | "overlayId";
 
 export interface ActionDef {
   id: string;
@@ -48,6 +48,7 @@ export const KEYS: ActionDef[] = [
   { id: "ovtimer", name: "Timer", icon: "⏱️", glyph: "timer-reset", tip: "Starts or pauses your Timer overlay, restarts it, or adds minutes (a minus takes away).", fields: ["timerOp", "amount"] },
   { id: "ovgoal", name: "Goal Bar", icon: "📈", glyph: "chart-no-axes-column-increasing", tip: "Moves your Goal bar on stream by the amount, or sets it.", fields: ["amount", "moneyMode"] },
   { id: "ovchal", name: "Challenge", icon: "🏋️", glyph: "dumbbell", tip: "Adds to your Challenge counter (a minus takes away), or sets it.", fields: ["amount", "moneyMode"] },
+  { id: "ovshow", name: "Show / Hide Overlay", icon: "👁", glyph: "eye", tip: "Shows or hides one of your overlays on stream. The key shows if it is on stream right now.", fields: ["overlayId"] },
   { id: "clipit", name: "Clip It", icon: "📌", glyph: "clapperboard", tip: "Saves this moment so you can find it later (and shows CLIPPED! if your Clip marker overlay is on).", fields: [] },
   { id: "tool", name: "Overlay Tool", icon: "🧰", glyph: "wand-sparkles", tip: "Runs one of your stream tools: spin the wheel, roll dice, switch scenes, polls, predictions, giveaways and more.", fields: ["toolCmd"] },
   { id: "botstat", name: "Bot Status", icon: "💚", glyph: "heart-pulse", tip: "Is Spartacus online, and its ping.", fields: [] },

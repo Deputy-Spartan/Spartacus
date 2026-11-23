@@ -218,13 +218,26 @@
       bar.className = `sb ${s.pos} ` + box(s);
       layer.appendChild(bar);
       let L = live;
+      // Timers count on their own between updates.
+      const clockOf = (t, down = true) => { if (!t) return ""; const run = t.running ? Date.now() - (Number(t.t0) || Date.now()) : 0; return fmtClock(t.up || !down ? (Number(t.base) || 0) + run : Math.max(0, (Number(t.base) || 0) - run), !!t.up); };
       const items = () => [
         s.showMoney && L.money != null && ["money", "💰", "MONEY", L.money],
-        s.showKd && L.kd != null && ["kd", "🎯", "K/D", L.kd],
+        s.showKd && L.kd != null && ["kd", "🎯", "K / D", L.kd],
+        s.showRatio && L.ratio != null && ["ratio", "🎯", "K/D RATIO", L.ratio],
         s.showWl && L.wl != null && ["wl", "🏆", "W / L", L.wl],
+        s.showWinrate && L.winrate != null && ["winrate", "🏆", "WIN %", L.winrate],
         s.showGoal && L.goal != null && ["goal", "📈", "GOAL", L.goal],
         s.showGame && L.game && ["game", "🎮", "PLAYING", L.game],
+        s.showTimer && L.timer && ["timer", "⏱️", String(L.timer.label || "TIMER"), clockOf(L.timer)],
+        s.showChallenge && L.challenge != null && ["challenge", "🏋️", String(L.challengeLabel || "CHALLENGE"), L.challenge],
+        s.showSubathon && L.subathon && ["subathon", "⏳", "SUBATHON", clockOf(L.subathon)],
+        s.showLatest && L.latest && ["latest", "💜", "LATEST", L.latest],
+        s.showNext && L.next && ["next", "📅", "NEXT STREAM", L.next],
       ].filter(Boolean);
+      const tick = setInterval(() => {
+        for (const e of bar.querySelectorAll('[data-id="timer"] .sb-v')) e.textContent = clockOf(L.timer);
+        for (const e of bar.querySelectorAll('[data-id="subathon"] .sb-v')) e.textContent = clockOf(L.subathon);
+      }, 500);
       const itemEl = ([id, icon, label, val]) => { const e = document.createElement("span"); e.className = "sb-item xt"; e.dataset.id = id; e.innerHTML = `<span>${icon}</span><span class="sb-l acc"></span><span class="sb-v"></span>`; e.querySelector(".sb-l").textContent = label; e.querySelector(".sb-v").textContent = val; return e; };
       let iv = null, idx = 0;
       function draw() {
@@ -246,16 +259,16 @@
       }, (Number(s.every) || 5) * 1000);
       return {
         sync(nst, nlive) {
-          const changed = ["money", "kd", "wl", "goal", "game"].filter((k) => nlive[k] !== L[k]);
+          const changed = ["money", "kd", "ratio", "wl", "winrate", "goal", "game", "challenge", "latest", "next", "timer", "subathon"].filter((k) => JSON.stringify(nlive[k]) !== JSON.stringify(L[k]));
           if (!changed.length) return;
           L = nlive;
           const list = items(), i = list.findIndex((x) => x[0] === changed[0]);
           if (s.mode === "cycle" && i >= 0) idx = i;
           draw();
-          for (const id of changed) for (const e of bar.querySelectorAll(`[data-id="${id}"] .sb-v`)) e.classList.add("sb-flash");
-          sfx(s.sound);
+          for (const id of changed) if (id !== "timer" && id !== "subathon") for (const e of bar.querySelectorAll(`[data-id="${id}"] .sb-v`)) e.classList.add("sb-flash");
+          if (changed.some((k) => k !== "timer" && k !== "subathon")) sfx(s.sound);
         },
-        stop() { clearInterval(iv); },
+        stop() { clearInterval(iv); clearInterval(tick); },
       };
     };
 

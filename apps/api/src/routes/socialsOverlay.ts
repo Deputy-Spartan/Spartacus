@@ -4,6 +4,7 @@ import { SOCIAL_PLATFORM_IDS } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
+import { isHidden } from "../lib/overlayVisibility";
 
 const router = Router();
 
@@ -125,6 +126,7 @@ router.get("/public/socials-overlay/:guildId", async (req, res) => {
     hold: s.hold,
     every: s.every,
     updatedAt: s.updatedAt,
+    hidden: await isHidden(req.params.guildId, "socials"),
   });
 });
 

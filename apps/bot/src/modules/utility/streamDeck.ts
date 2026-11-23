@@ -1,5 +1,5 @@
 import { ChannelType, EmbedBuilder, PermissionFlagsBits, type Client, type Guild, type GuildMember, type GuildTextBasedChannel, type VoiceBasedChannel } from "discord.js";
-import { TOOL_COMMANDS, applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
+import { ALL_OVERLAYS, OVERLAY_VISIBILITY_KEY, cleanVisibility, isOverlayId, TOOL_COMMANDS, applyOverlayAction, cleanOverlay, formatClock, overlayStateKey, timerNow, type OverlayAction, type OverlayKind, KD_STATE_KEY, changeKd, cleanKd, MODULE_KEYS, MODULE_LABELS, MONEY_STATE_KEY, cleanMoney, clampMoney, cleanTempGameChoices, formatMoney, shortMoney, type ModuleKey } from "@spartacus/shared";
 import { prisma } from "../../lib/prisma";
 import { invalidateModuleCache } from "../../lib/moduleGate";
 import { resolveSavedEmbed, buildSavedEmbedPayload } from "../../lib/savedEmbedRender";
@@ -300,6 +300,13 @@ export async function streamDeckFace(a: SdActor, action: string, s: Settings): P
     }
     case "clipit":
       return { title: "Clip it", line: "📌 Saves the time", tone: "" };
+    case "ovshow": {
+      const id = str(s, "overlayId");
+      const name = ALL_OVERLAYS.find(([k]) => k === id)?.[1];
+      if (!name) return { title: "Show / Hide", line: "Pick an overlay", tone: "off" };
+      const shown = cleanVisibility(await getState(g.id, OVERLAY_VISIBILITY_KEY))[id] !== false;
+      return { title: short(name.replace(/^\S+\s/, ""), 14), line: shown ? "👁 On stream" : "🚫 Hidden", tone: shown ? "green" : "off" };
+    }
     case "tool": {
       const c = TOOL_COMMANDS.find(([v]) => v === (str(s, "toolCmd") || "clip"));
       return { title: c ? short(c[1].replace(/^\S+\s/, ""), 14) : "Pick a tool", line: c ? c[1].split(" ")[0] : "", tone: c ? "" : "off" };
@@ -650,6 +657,17 @@ export async function runStreamDeck(a: SdActor, action: string, s: Settings, op:
       else if (op === "press") k = await changeKdState(g.id, "deaths", { add: 1 });
       else return { ok: true, message: "" };
       return { ok: true, message: `Kills ${k.kills}, deaths ${k.deaths}.` };
+    }
+    // Show or hide any overlay on stream.
+    case "ovshow": {
+      const id = str(s, "overlayId");
+      if (!isOverlayId(id)) return { ok: false, message: "Pick an overlay." };
+      const vis = cleanVisibility(await getState(g.id, OVERLAY_VISIBILITY_KEY));
+      const on = vis[id] === false;
+      if (on) delete vis[id];
+      else vis[id] = false;
+      await setState(g.id, OVERLAY_VISIBILITY_KEY, vis);
+      return { ok: true, message: `${ALL_OVERLAYS.find(([k]) => k === id)?.[1] ?? id} ${on ? "shown" : "hidden"} on stream.` };
     }
     // Streaming › Overlays › stream tools.
     case "clipit":

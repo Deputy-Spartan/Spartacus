@@ -22,6 +22,8 @@ import {
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
+import { isHidden, loadVisibility, setShown } from "../lib/overlayVisibility";
+import { isOverlayId } from "@spartacus/shared";
 
 const router = Router();
 
@@ -209,8 +211,19 @@ router.get("/public/tool/:kind/:guildId", async (req, res) => {
     state: publicState(kind, row.state),
     events: row.events.filter((e) => Date.now() - e.at < 60_000),
     live: await live(req.params.guildId, row, kind).catch(() => ({})),
+    hidden: await isHidden(req.params.guildId, kind),
     now: Date.now(),
   });
+});
+
+// ---- Show or hide any overlay on stream ----
+router.get("/guilds/:guildId/overlay-visibility", requireAuth, requireGuildPermission, async (req, res) => {
+  res.json(await loadVisibility(req.params.guildId));
+});
+router.post("/guilds/:guildId/overlay-visibility", requireAuth, requireGuildPermission, async (req, res) => {
+  const { id, on } = (req.body ?? {}) as { id?: unknown; on?: unknown };
+  if (!isOverlayId(id)) return res.status(400).json({ error: "No overlay like that." });
+  res.json(await setShown(req.params.guildId, id, on !== false));
 });
 
 export default router;

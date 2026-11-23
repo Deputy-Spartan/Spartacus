@@ -6,6 +6,7 @@ import { MONEY_ANIMS, MONEY_DEFAULTS, MONEY_LAYOUTS, MONEY_SOUNDS, formatMoney, 
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../../components/ui/ConfirmDialog";
 import { PageGuideButton } from "../../../../../components/nav/PageGuideButton";
+import { ShowOnStream } from "../../../../../components/streaming/ShowOnStream";
 import { AnimChoices, Choices, CommonLook, CounterPreview, ObsCard, Toggle, button, demoIn, field, hint } from "../../../../../components/streaming/CounterParts";
 import { useAutoSave } from "../../../../../lib/useAutoSave";
 import { api, type MoneyCounterSettings } from "../../../../../lib/api";
@@ -91,7 +92,10 @@ export default function MoneyCounterPage({ params }: { params: { guildId: string
           <h1 className="text-2xl font-bold">💰 Money Counter</h1>
           <p className="text-slate-400 text-sm mt-1">A money total on stream. Change it here or with a Stream Deck button.</p>
         </div>
-        <PageGuideButton guildId={guildId} inline />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ShowOnStream guildId={guildId} id="money" />
+          <PageGuideButton guildId={guildId} inline />
+        </div>
       </div>
 
       <div className="space-y-4">

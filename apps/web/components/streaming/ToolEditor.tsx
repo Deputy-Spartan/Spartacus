@@ -6,6 +6,7 @@ import { TOOLS, TOOL_COMMANDS, type ToolKind, type ToolRow } from "@spartacus/sh
 import { NeonCard } from "../ui/NeonCard";
 import { SaveStatus } from "../ui/SaveStatus";
 import { PageGuideButton } from "../nav/PageGuideButton";
+import { ShowOnStream } from "./ShowOnStream";
 import { ObsCard, Swatch, Toggle, button, field, hint } from "./CounterParts";
 import { useAutoSave } from "../../lib/useAutoSave";
 import { api } from "../../lib/api";
@@ -126,7 +127,10 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
           </h1>
           <p className="text-slate-400 text-sm mt-1">{info.line}</p>
         </div>
-        <PageGuideButton guildId={guildId} inline />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ShowOnStream guildId={guildId} id={kind} />
+          <PageGuideButton guildId={guildId} inline />
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -184,6 +188,27 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
             />
           </div>
 
+          {kind === "stats" && (
+            <div className="mt-4">
+              <p className="text-sm font-medium mb-1.5">What it shows</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {info.toggles.map(([k, name]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="switch"
+                    aria-checked={!!settings[k]}
+                    onClick={() => update({ [k]: !settings[k] })}
+                    className={`text-sm text-left rounded-lg border px-2.5 py-2 transition-colors ${settings[k] ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-400 hover:border-white/25"}`}
+                  >
+                    {settings[k] ? "✓ " : ""}
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <p className={`${hint} mt-1.5`}>Tap to turn each one on or off. Only the ones you turn on show on stream.</p>
+            </div>
+          )}
           {Object.entries(info.groups).map(([key, g]) => (
             <div key={key} className="mt-4">
               <p className="text-sm mb-1.5">{g.title}</p>
@@ -216,7 +241,7 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
             </div>
           ))}
 
-          {info.toggles.length > 0 && (
+          {info.toggles.length > 0 && kind !== "stats" && (
             <div className="grid sm:grid-cols-2 gap-2 mt-4">
               {info.toggles.map(([k, name, desc]) => (
                 <Toggle key={k} on={!!settings[k]} name={name} desc={desc} onChange={(on) => update({ [k]: on })} />

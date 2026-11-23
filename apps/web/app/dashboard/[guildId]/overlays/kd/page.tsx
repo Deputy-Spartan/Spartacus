@@ -6,6 +6,7 @@ import { COUNTER_COLORS, KD_ANIMS, KD_COLOR_MODES, KD_DEFAULTS, KD_DTEXTS, KD_LA
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../../components/ui/ConfirmDialog";
 import { PageGuideButton } from "../../../../../components/nav/PageGuideButton";
+import { ShowOnStream } from "../../../../../components/streaming/ShowOnStream";
 import { AnimChoices, Choices, CommonLook, CounterPreview, ObsCard, Swatch, Toggle, button, demoIn, field, hint } from "../../../../../components/streaming/CounterParts";
 import { useAutoSave } from "../../../../../lib/useAutoSave";
 import { api, type KdCounterSettings } from "../../../../../lib/api";
@@ -106,7 +107,10 @@ export default function KdCounterPage({ params }: { params: { guildId: string } 
           <h1 className="text-2xl font-bold">🎯 K/D Counter</h1>
           <p className="text-slate-400 text-sm mt-1">Kills and deaths on stream. Change them here or with Stream Deck buttons.</p>
         </div>
-        <PageGuideButton guildId={guildId} inline />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ShowOnStream guildId={guildId} id="kd" />
+          <PageGuideButton guildId={guildId} inline />
+        </div>
       </div>
 
       <div className="space-y-4">

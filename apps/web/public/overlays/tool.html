@@ -12,7 +12,7 @@
    preview=1 (dashboard): {type:"tool", settings, state, live, events} by postMessage. */
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 body.preview { background: repeating-conic-gradient(#3a3d44 0 25%, #30333a 0 50%) 0 0 / 40px 40px; }
-#root { position: fixed; inset: 0; }
+#root { position: fixed; inset: 0; transition: opacity .4s; }
 #root.see { background: transparent; }
 </style>
 </head>
@@ -38,8 +38,11 @@ function fixClock(state, now) {
   return state.t0 ? { ...state, t0: state.t0 + off } : state;
 }
 function fixLive(live, now) {
-  if (live && live.gw && now) return { ...live, gw: { ...live.gw, endsAt: live.gw.endsAt + (Date.now() - now) } };
-  return live;
+  if (!live || !now) return live;
+  const off = Date.now() - now, out = { ...live };
+  if (live.gw) out.gw = { ...live.gw, endsAt: live.gw.endsAt + off };
+  for (const k of ["timer", "subathon"]) if (live[k] && live[k].t0) out[k] = { ...live[k], t0: live[k].t0 + off };
+  return out;
 }
 
 addEventListener("message", (e) => {
@@ -52,7 +55,12 @@ addEventListener("message", (e) => {
   await document.fonts.ready.catch(() => null);
   if (q.get("g") && q.get("api")) {
     const url = `${q.get("api")}/public/tool/${kind}/${q.get("g")}`;
-    const load = () => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((r) => r && fx.set(r.settings, fixClock(r.state, r.now), fixLive(r.live, r.now), r.events)).catch(() => null);
+    const load = () => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((r) => {
+      if (!r) return;
+      // Hidden on stream (dashboard or Stream Deck): fade out, keep everything.
+      root.style.opacity = r.hidden ? "0" : "1";
+      fx.set(r.settings, fixClock(r.state, r.now), fixLive(r.live, r.now), r.events);
+    }).catch(() => null);
     await load();
     setInterval(load, 1000);
   }

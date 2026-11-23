@@ -2,7 +2,7 @@
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "UUID": "com.spartacus.streamdeck",
   "Name": "Spartacus",
-  "Version": "1.5.0.0",
+  "Version": "1.6.0.0",
   "Author": "Spartacus",
   "Description": "Control your Spartacus Discord bot: lockdowns, going live, squads, timers and live counts.",
   "Category": "Spartacus",
@@ -649,6 +649,25 @@
       "States": [
         {
           "Image": "imgs/actions/ovchal",
+          "TitleAlignment": "middle",
+          "FontSize": 11,
+          "ShowTitle": true
+        }
+      ],
+      "UserTitleEnabled": false
+    },
+    {
+      "UUID": "com.spartacus.streamdeck.ovshow",
+      "Name": "Show / Hide Overlay",
+      "Icon": "imgs/actions/ovshow",
+      "Tooltip": "Shows or hides one of your overlays on stream. The key shows if it is on stream right now.",
+      "PropertyInspectorPath": "ui/settings.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/ovshow",
           "TitleAlignment": "middle",
           "FontSize": 11,
           "ShowTitle": true

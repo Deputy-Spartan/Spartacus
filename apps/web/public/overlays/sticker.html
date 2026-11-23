@@ -186,5 +186,16 @@ function startHops() {
   } while (every);
 })();
 </script>
+<script>
+// Streaming › Overlays: hidden on stream (dashboard or Stream Deck) fades it out.
+(() => {
+  const q = new URLSearchParams(location.search);
+  if (!q.get("g") || !q.get("api")) return;
+  document.documentElement.style.transition = "opacity .4s";
+  const check = () => fetch(`${q.get("api")}/public/socials-overlay/${q.get("g")}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((s) => { if (s) document.documentElement.style.opacity = s.hidden ? "0" : "1"; }).catch(() => null);
+  check();
+  setInterval(check, 2000);
+})();
+</script>
 </body>
 </html>

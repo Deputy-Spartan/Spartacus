@@ -15,6 +15,7 @@ import {
   type OverlayKind,
 } from "@spartacus/shared";
 import { getBotClient } from "../lib/botClient";
+import { isHidden } from "../lib/overlayVisibility";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -63,7 +64,7 @@ router.post("/guilds/:guildId/money-counter/amount", requireAuth, requireGuildPe
 
 router.get("/public/money-counter/:guildId", async (req, res) => {
   if (!validGuild(req.params.guildId)) return res.status(404).json({ error: "Not found" });
-  res.set("Cache-Control", "no-store").json(await loadMoney(req.params.guildId));
+  res.set("Cache-Control", "no-store").json({ ...(await loadMoney(req.params.guildId)), hidden: await isHidden(req.params.guildId, "money") });
 });
 
 // ---- Kills & deaths ----
@@ -93,7 +94,7 @@ router.post("/guilds/:guildId/kd-counter/change", requireAuth, requireGuildPermi
 
 router.get("/public/kd-counter/:guildId", async (req, res) => {
   if (!validGuild(req.params.guildId)) return res.status(404).json({ error: "Not found" });
-  res.set("Cache-Control", "no-store").json(await loadKd(req.params.guildId));
+  res.set("Cache-Control", "no-store").json({ ...(await loadKd(req.params.guildId)), hidden: await isHidden(req.params.guildId, "kd") });
 });
 
 // ---- Game, Win/Loss, Timer, Goal, Challenge, Discord box, Latest follower ----
@@ -145,7 +146,7 @@ async function socialsInvite(guildId: string) {
 router.get("/public/overlay/:kind/:guildId", async (req, res) => {
   const kind = req.params.kind;
   if (!isOverlayKind(kind) || !validGuild(req.params.guildId)) return res.status(404).json({ error: "Not found" });
-  const st: Record<string, unknown> = { ...(await loadOverlay(req.params.guildId, kind)), now: Date.now() };
+  const st: Record<string, unknown> = { ...(await loadOverlay(req.params.guildId, kind)), now: Date.now(), hidden: await isHidden(req.params.guildId, kind) };
   if (kind === "discord") {
     const c = await discordCounts(req.params.guildId);
     st.members = c.members;

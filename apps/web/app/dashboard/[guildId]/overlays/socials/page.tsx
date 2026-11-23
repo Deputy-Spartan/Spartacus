@@ -6,6 +6,7 @@ import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { SaveStatus } from "../../../../../components/ui/SaveStatus";
 import { ChannelSelect } from "../../../../../components/ui/ChannelSelect";
 import { PageGuideButton } from "../../../../../components/nav/PageGuideButton";
+import { ShowOnStream } from "../../../../../components/streaming/ShowOnStream";
 import { useAutoSave } from "../../../../../lib/useAutoSave";
 import { api, type SocialsOverlaySettings, type SocialsPlatformId } from "../../../../../lib/api";
 
@@ -198,7 +199,10 @@ export default function SocialsPage({ params }: { params: { guildId: string } })
           <h1 className="text-2xl font-bold">🏷️ Socials</h1>
           <p className="text-slate-400 text-sm mt-1">Your names in one place. Show them on stream and post them in Discord.</p>
         </div>
-        <PageGuideButton guildId={guildId} inline />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ShowOnStream guildId={guildId} id="socials" />
+          <PageGuideButton guildId={guildId} inline />
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {TABS.map(([id, label]) => (

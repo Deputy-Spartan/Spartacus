@@ -17419,6 +17419,7 @@ var KEYS = [
   { id: "ovtimer", name: "Timer", icon: "\u23F1\uFE0F", glyph: "timer-reset", tip: "Starts or pauses your Timer overlay, restarts it, or adds minutes (a minus takes away).", fields: ["timerOp", "amount"] },
   { id: "ovgoal", name: "Goal Bar", icon: "\u{1F4C8}", glyph: "chart-no-axes-column-increasing", tip: "Moves your Goal bar on stream by the amount, or sets it.", fields: ["amount", "moneyMode"] },
   { id: "ovchal", name: "Challenge", icon: "\u{1F3CB}\uFE0F", glyph: "dumbbell", tip: "Adds to your Challenge counter (a minus takes away), or sets it.", fields: ["amount", "moneyMode"] },
+  { id: "ovshow", name: "Show / Hide Overlay", icon: "\u{1F441}", glyph: "eye", tip: "Shows or hides one of your overlays on stream. The key shows if it is on stream right now.", fields: ["overlayId"] },
   { id: "clipit", name: "Clip It", icon: "\u{1F4CC}", glyph: "clapperboard", tip: "Saves this moment so you can find it later (and shows CLIPPED! if your Clip marker overlay is on).", fields: [] },
   { id: "tool", name: "Overlay Tool", icon: "\u{1F9F0}", glyph: "wand-sparkles", tip: "Runs one of your stream tools: spin the wheel, roll dice, switch scenes, polls, predictions, giveaways and more.", fields: ["toolCmd"] },
   { id: "botstat", name: "Bot Status", icon: "\u{1F49A}", glyph: "heart-pulse", tip: "Is Spartacus online, and its ping.", fields: [] }
@@ -17474,6 +17475,7 @@ var GLYPHS = {
   "timer-reset": '<path d="M10 2h4" /> <path d="M12 14v-4" /> <path d="M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6" /> <path d="M9 17H4v5" />',
   "chart-no-axes-column-increasing": '<line x1="12" x2="12" y1="20" y2="10" /> <line x1="18" x2="18" y1="20" y2="4" /> <line x1="6" x2="6" y1="20" y2="16" />',
   "dumbbell": '<path d="M14.4 14.4 9.6 9.6" /> <path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z" /> <path d="m21.5 21.5-1.4-1.4" /> <path d="M3.9 3.9 2.5 2.5" /> <path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z" />',
+  "eye": '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /> <circle cx="12" cy="12" r="3" />',
   "clapperboard": '<path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /> <path d="m6.2 5.3 3.1 3.9" /> <path d="m12.4 3.4 3.1 4" /> <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />',
   "wand-sparkles": '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72" /> <path d="m14 7 3 3" /> <path d="M5 6v4" /> <path d="M19 14v4" /> <path d="M10 2v2" /> <path d="M7 8H3" /> <path d="M21 16h-4" /> <path d="M11 3H9" />',
   "heart-pulse": '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /> <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />',

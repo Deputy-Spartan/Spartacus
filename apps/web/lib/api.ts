@@ -2810,6 +2810,9 @@ export const api = {
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter`, { method: "PUT", body: JSON.stringify(input) }),
   changeMoney: (guildId: string, change: { add: number } | { set: number }) =>
     request<MoneyCounterSettings>(`/guilds/${guildId}/money-counter/amount`, { method: "POST", body: JSON.stringify(change) }),
+  getOverlayVisibility: (guildId: string) => request<Record<string, boolean>>(`/guilds/${guildId}/overlay-visibility`),
+  setOverlayShown: (guildId: string, id: string, on: boolean) =>
+    request<Record<string, boolean>>(`/guilds/${guildId}/overlay-visibility`, { method: "POST", body: JSON.stringify({ id, on }) }),
   getTool: (guildId: string, kind: string) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`),
   saveTool: (guildId: string, kind: string, settings: ToolRowData["settings"]) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`, { method: "PUT", body: JSON.stringify({ settings }) }),
   toolAction: (guildId: string, kind: string, action: Record<string, unknown>) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}/action`, { method: "POST", body: JSON.stringify(action) }),

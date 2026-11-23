@@ -5,6 +5,7 @@ import { NeonCard } from "../../../../components/ui/NeonCard";
 import { AppIcon } from "../../../../components/ui/AppIcon";
 import { PageGuideButton } from "../../../../components/nav/PageGuideButton";
 import { OVERLAYS } from "../../../../components/streaming/OverlayTabs";
+import { ShowOnStreamSmall } from "../../../../components/streaming/ShowOnStream";
 
 // Streaming › Overlays: one card for each thing you put on stream with OBS,
 // in three groups.
@@ -21,7 +22,7 @@ export default function OverlaysPage({ params }: { params: { guildId: string } }
       <div className="flex items-start justify-between gap-3 mb-5">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">🎨 Overlays</h1>
-          <p className="text-slate-400 text-sm mt-1">Everything you put on stream with OBS. Each one has its own OBS link.</p>
+          <p className="text-slate-400 text-sm mt-1">Everything you put on stream with OBS. Each one has its own OBS link. The switch on each card shows or hides it on stream.</p>
         </div>
         <PageGuideButton guildId={guildId} inline />
       </div>
@@ -39,7 +40,8 @@ export default function OverlaysPage({ params }: { params: { guildId: string } }
                     <span className="flex-1 min-w-0 font-semibold truncate">{o.label}</span>
                   </div>
                   <p className="relative text-sm text-slate-400 leading-snug pointer-events-none">{o.line}</p>
-                  <div className="relative mt-auto flex items-center justify-end gap-2 pointer-events-none">
+                  <div className="relative mt-auto flex items-center justify-between gap-2 pointer-events-none">
+                    <ShowOnStreamSmall guildId={guildId} id={o.href.replace("/overlays/", "")} label={o.label} />
                     <span className="sp-card-open text-xs font-semibold text-neon-blue">Open ›</span>
                   </div>
                 </NeonCard>

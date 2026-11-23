@@ -425,9 +425,19 @@ function AccountsTab({ guildId, data, reload }: { guildId: string; data: StreamG
       <NeonCard>
         <Header title="🔑 Connected accounts" text="Connect your own Twitch or Kick so you can change your title and game from Discord (/title) or here, and so recaps can count new followers. Kick also sends its chat and follows to the bot." />
         <div className="flex flex-wrap gap-3 mb-3">
-          {(["kick", "twitch"] as const).map((p) => (
-            <ActionButton key={p} text={`${platformInfo(p).emoji} Connect ${platformInfo(p).name}`} run={async () => void (await connect(p))} />
-          ))}
+          {(["kick", "twitch"] as const).map((p) => {
+            const acc = data.accounts.find((a) => a.platform === p);
+            return (
+              <div key={p} className="flex flex-col items-start gap-1">
+                <ActionButton text={`${platformInfo(p).emoji} ${acc ? "Reconnect" : "Connect"} ${platformInfo(p).name}`} run={async () => void (await connect(p))} />
+                {acc ? (
+                  <span className="text-xs font-semibold text-emerald-400">✓ Connected as {acc.displayName || acc.login}</span>
+                ) : (
+                  <span className="text-xs text-slate-500">Not connected</span>
+                )}
+              </div>
+            );
+          })}
         </div>
         {!data.keys.kick && <p className={`${warn} mb-1`}>Kick isn't set up on the bot yet (KICK_CLIENT_ID and KICK_CLIENT_SECRET).</p>}
         {!data.keys.twitch && <p className={`${warn} mb-1`}>Twitch isn't set up on the bot yet (TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET).</p>}

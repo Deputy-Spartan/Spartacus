@@ -258,6 +258,7 @@
 .wl.tr, .wl.br { align-items: flex-end; }
 .wl-msg { display: flex; align-items: center; gap: calc(var(--u) * 16); font-size: calc(var(--u) * 44); padding: calc(var(--u) * 14) calc(var(--u) * 34); white-space: nowrap; }
 .wl-wave { display: inline-block; font-size: calc(var(--u) * 56); transform-origin: 70% 80%; }
- .glowtxt, .sc-bg, .sc-grid, .sb-track, .cam-scan, .cam-fr, .cam-live { animation: none !important; } }
+ 
+@media (prefers-reduced-motion: reduce) { .bob, .pulse, .glowtxt, .sc-bg, .sc-grid, .sb-track, .cam-scan, .cam-fr, .cam-live { animation: none !important; } }
 
 @keyframes x-blink { 50% { opacity: .25; } }

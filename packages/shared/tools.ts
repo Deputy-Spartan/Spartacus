@@ -134,7 +134,7 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
     auto: "Type your own tips, like !discord — join the server.",
   },
   qr: {
-    kind: "qr", title: "QR code", icon: "🔳", section: "tools", line: "Scan to join your Discord or follow you.",
+    kind: "qr", title: "QR code", icon: "📲", section: "tools", line: "Scan to join your Discord or follow you.",
     settings: { ...COMMON, color: "#5865f2", link: "https://discord.gg/yourcode", label: "SCAN TO JOIN", caption: "discord.gg/yourcode", spot: "br", when: 0, idle: "float", qrColor: "dark", sound: "off" },
     state: {},
     groups: {
@@ -261,7 +261,7 @@ export const TOOL_COMMANDS: Array<[string, string, ToolKind, Record<string, unkn
   ["predLock", "🔒 Lock betting", "predict", { op: "lock" }],
   ["predYes", "✅ Prediction: Yes won", "predict", { op: "settle", side: 0 }],
   ["predNo", "❌ Prediction: No won", "predict", { op: "settle", side: 1 }],
-  ["qrShow", "🔳 Show QR code", "qr", { op: "show" }],
+  ["qrShow", "📲 Show QR code", "qr", { op: "show" }],
   ["tipNext", "⌨️ Next command tip", "cmds", { op: "next" }],
 ];
 

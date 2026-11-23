@@ -4,16 +4,11 @@ import Link from "next/link";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { AppIcon } from "../../../../components/ui/AppIcon";
 import { PageGuideButton } from "../../../../components/nav/PageGuideButton";
-import { OVERLAYS } from "../../../../components/streaming/OverlayTabs";
+import { OVERLAYS, OVERLAY_SECTIONS as SECTIONS } from "../../../../components/streaming/OverlayTabs";
 import { ShowOnStreamSmall } from "../../../../components/streaming/ShowOnStream";
 
 // Streaming › Overlays: one card for each thing you put on stream with OBS,
 // in three groups.
-const SECTIONS: Array<[string, string, "counters" | "extras" | "tools"]> = [
-  ["Counters & boxes", "Numbers and boxes you change with buttons or a Stream Deck.", "counters"],
-  ["Stream extras", "Alerts, chat, scenes and more that fill in from your stream.", "extras"],
-  ["Tools", "Handy helpers and fun extras for chat.", "tools"],
-];
 
 export default function OverlaysPage({ params }: { params: { guildId: string } }) {
   const guildId = params.guildId;

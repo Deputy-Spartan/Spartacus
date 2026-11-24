@@ -378,9 +378,10 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   }
 
   if (partOn(opts, "roles")) {
-    // Roles, created bottom-up so the first in the list ends up highest.
+    // Roles, created in blueprint order. Discord puts each new role at the bottom of the list,
+    // so creating top-down leaves the first one highest even before sorting.
     let createdRoles = 0, renamedRoles = 0;
-    for (const { spec, existing } of [...plan.roles].reverse()) {
+    for (const { spec, existing } of plan.roles) {
       if (existing) {
         ids.roles.set(spec.key, existing.id);
         if (existing.name !== spec.name && existing.position < topPosition) {

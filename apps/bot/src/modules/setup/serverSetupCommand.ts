@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
   EmbedBuilder,
   PermissionFlagsBits,
   StringSelectMenuBuilder,
@@ -37,7 +38,57 @@ function missingBotPerms(guild: Guild): string[] {
   return needed.filter(([flag]) => !me.permissions.has(flag)).map(([, name]) => name);
 }
 
+// Start fresh (HQ): what gets deleted, what gets built. With `confirm`, the last-chance screen.
+async function wipeScreen(guild: Guild, confirm = false): Promise<InteractionEditReplyOptions> {
+  await Promise.all([guild.channels.fetch(), guild.roles.fetch(), guild.members.fetch()].map((p) => (p as Promise<unknown>).catch(() => null)));
+  const top = guild.members.me?.roles.highest;
+  const all = [...guild.channels.cache.values()].filter((c) => !c.isThread());
+  const categories = all.filter((c) => c.type === ChannelType.GuildCategory).length;
+  const channels = all.length - categories;
+  const deletable = [...guild.roles.cache.values()].filter((r) => r.id !== guild.id && !r.managed && !!top && top.comparePositionTo(r) > 0);
+  const stuck = [...guild.roles.cache.values()].filter((r) => r.id !== guild.id && !r.managed && !!top && top.comparePositionTo(r) <= 0);
+  const people = new Set(deletable.flatMap((r) => [...r.members.keys()])).size;
+  const hq = blueprintCategories([], "hq");
+  const built = hq.reduce((n, c) => n + c.channels.length, 0);
+  const lines = [
+    confirm
+      ? `This **permanently deletes everything** in **${guild.name}** and builds Spartacus HQ from scratch. It can't be undone.`
+      : "Starts fresh, then builds **Spartacus HQ**: one clean server for testing Spartacus and supporting store customers.",
+    "",
+    `**🧹 Deleted first:** ${channels} channel${channels === 1 ? "" : "s"}, ${categories} categor${categories === 1 ? "y" : "ies"}, ${deletable.length} role${deletable.length === 1 ? "" : "s"}${people ? ` (taken off ${people} member${people === 1 ? "" : "s"}, staff included)` : ""}, and the onboarding questions. Messages in deleted channels are gone for good.`,
+    `**🏗️ Then built:** 12 roles, ${hq.length} categories, ${built} channels, the rules, role and ticket panels, and 3 onboarding questions. The last question is the rules agreement.`,
+    `**Stays:** @everyone, bot and booster roles${stuck.length ? `, and ${stuck.length} role${stuck.length === 1 ? "" : "s"} above Spartacus (${names(stuck.map((r) => r.name), 6)})` : ""}.`,
+    "",
+    "🗄️ A backup is saved first. It can rebuild channels and roles, **not messages or who had a role**.",
+    "👥 Everyone already here keeps their place but loses their roles. They agree to the rules again in #📜・rules, and you give staff their roles back.",
+    "📬 This message may vanish when its channel is deleted, so Spartacus also DMs you the result.",
+  ];
+  const embed = new EmbedBuilder()
+    .setColor(confirm ? 0xed4245 : 0xf0b232)
+    .setTitle(confirm ? `Delete everything in ${guild.name}?` : "🏗️ Server Setup · 🛠️ Spartacus HQ (start fresh)")
+    .setDescription(lines.join("\n").slice(0, 4000))
+    .setFooter({ text: confirm ? "Only you can see this." : "Only you can see this. Turn off Start fresh to keep what's here and only add or fix." });
+  const buttons = confirm
+    ? [
+        new ButtonBuilder().setCustomId("srvsetup:confirm").setLabel("Yes, delete everything and build").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId("srvsetup:back").setLabel("Go back").setStyle(ButtonStyle.Secondary),
+      ]
+    : [
+        new ButtonBuilder().setCustomId("srvsetup:build").setLabel("Delete everything and build").setEmoji("🧨").setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId("srvsetup:cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary),
+      ];
+  const toggle = new StringSelectMenuBuilder()
+    .setCustomId("srvsetup:part")
+    .setPlaceholder("✅ Start fresh: delete everything first")
+    .addOptions({ label: "Turn off Start fresh", value: "wipe", emoji: "🧨", description: "Keep what's here and only add or fix what's missing" });
+  return {
+    embeds: [embed],
+    components: [...(confirm ? [] : [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(toggle)]), new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)],
+  };
+}
+
 async function planScreen(guild: Guild, opts: SetupOptions): Promise<InteractionEditReplyOptions> {
+  if (opts.wipe) return wipeScreen(guild);
   const plan = await planSetup(guild, opts);
   const layout = BLUEPRINT_LAYOUTS.find((l) => l.id === (opts.layout ?? "gaming"))!;
   const del = deleteOn(opts);
@@ -58,7 +109,9 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
     .setTitle(`🏗️ Server Setup · ${layout.emoji} ${layout.label}`)
     .setDescription(
       [
-        opts.layout === "streaming"
+        opts.layout === "hq"
+          ? "Builds **Spartacus HQ**: one clean server for testing Spartacus and supporting store customers. New people see only 📌 Start Here. Onboarding makes them agree to the rules, then asks what they're here for, and each answer opens its own section: 🛒 Store, 🤖 Spartacus Help or 🧪 Test Lab. 🎭・get-roles lets them change it later. Tickets open privately in 🗂️ Open Tickets, next to the store's website tickets."
+          : opts.layout === "streaming"
           ? "Builds an open streaming community: stream alerts, clips, hangout, Matchmaking, supporters and creators, with nearly every module set up. Pick what to build below. Parts you skip stay as they are, and the parts you build reuse what's already there."
           : "Builds a clean layout for an FPS gaming community. Pick what to build below: everything, or only some parts and categories. Parts you skip stay as they are, and the parts you build use what's already there.",
         "",
@@ -80,7 +133,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
         fresh
           ? `**🎭 Fresh roles:** ${plan.deleteRoles.length} old role${plan.deleteRoles.length === 1 ? "" : "s"} not in the new layout get deleted, even if people have them (number of people in brackets)${plan.deleteRoles.length ? `: ${names(plan.deleteRoles.map(roleLabel), 12)}` : ""}. Roles that match the layout are reused, so people keep them. Roles with admin powers, bot roles and Discord's booster and Twitch roles stay.`
           : null,
-        `**Games:** ${games.map((g) => `${g.emoji} ${g.name}`).join(", ")}`,
+        opts.layout === "hq" ? null : `**Games:** ${games.map((g) => `${g.emoji} ${g.name}`).join(", ")}`,
         "",
         del
           ? "🗄️ A backup is saved first. It can rebuild deleted channels and roles, but not the messages that were in them. Running it again only fixes what's missing."
@@ -122,6 +175,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
         description: `${opts.deleteUnused ? "Tap to archive them instead" : "Tap to delete"} · No posts in 30+ days, or nobody has the role`.slice(0, 100),
       },
       { label: "Build everything", value: "all", emoji: "🏗️", description: "Switch every part and category on" },
+      ...(opts.layout === "hq" ? [{ label: "⬜ Start fresh: delete everything first", value: "wipe", emoji: "🧨", description: "Delete every channel, category, role and onboarding question, then build" }] : []),
     );
   const categoryMenu = new StringSelectMenuBuilder()
     .setCustomId("srvsetup:cat")
@@ -143,7 +197,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
     components: [
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(partMenu),
       ...(partOn(opts, "channels") ? [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(categoryMenu)] : []),
-      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(gameMenu),
+      ...(opts.layout === "hq" ? [] : [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(gameMenu)]),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("srvsetup:build").setLabel("Build").setEmoji("🏗️").setStyle(ButtonStyle.Success).setDisabled(on.length === 0 && !archiveOn(opts)),
         new ButtonBuilder().setCustomId("srvsetup:cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary),
@@ -183,19 +237,22 @@ function confirmScreen(plan: Awaited<ReturnType<typeof planSetup>>, opts: SetupO
   };
 }
 
-export async function runServerSetupCommand(interaction: ChatInputCommandInteraction) {
+// `forced` is the layout a dedicated command always builds (/hq-setup builds "hq").
+export async function runServerSetupCommand(interaction: ChatInputCommandInteraction, forced?: BlueprintLayout) {
   const guild = interaction.guild;
   if (!guild) return void (await interaction.reply({ content: "Run this inside a server.", ephemeral: true }));
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return void (await interaction.reply({ content: "You need Manage Server to run this.", ephemeral: true }));
   await interaction.deferReply({ ephemeral: true });
   const missing = missingBotPerms(guild);
   if (missing.length) return void (await interaction.editReply(`Spartacus needs these permissions first: ${missing.join(", ")}. Give its role Administrator, or those, in Server Settings → Roles.`));
-  const layout = (interaction.options.getString("layout") ?? "gaming") as BlueprintLayout;
+  const layout = forced ?? ((interaction.options.getString("layout") ?? "gaming") as BlueprintLayout);
   const freshRoles = interaction.options.getBoolean("fresh-roles") ?? false;
-  const games = layout === "streaming" ? DEFAULT_STREAMING_GAMES : DEFAULT_BLUEPRINT_GAMES;
+  const games: BlueprintGameId[] = layout === "hq" ? [] : layout === "streaming" ? DEFAULT_STREAMING_GAMES : DEFAULT_BLUEPRINT_GAMES;
   const opts: SetupOptions & { expires: number } = {
     games: [...games],
     layout,
+    // Spartacus HQ starts fresh unless that's switched off on the screen.
+    wipe: layout === "hq",
     archiveOthers: true,
     // The streaming rebuild clears out what's unused by default; the gaming one only archives.
     deleteUnused: layout === "streaming",
@@ -236,6 +293,10 @@ export async function handleServerSetupInteraction(interaction: Interaction) {
         opts.parts = SETUP_PARTS.map((p) => p.id);
         opts.categories = blueprintCategories(opts.games, opts.layout).map((cat) => cat.key);
         opts.archiveOthers = true;
+      } else if (pick === "wipe") {
+        opts.wipe = !opts.wipe;
+        opts.parts = SETUP_PARTS.map((p) => p.id);
+        opts.categories = blueprintCategories(opts.games, opts.layout).map((cat) => cat.key);
       } else if (pick === "archive") opts.archiveOthers = !opts.archiveOthers;
       else if (pick === "fresh") opts.freshRoles = !opts.freshRoles;
       else if (pick === "delete") {
@@ -263,6 +324,11 @@ export async function handleServerSetupInteraction(interaction: Interaction) {
       return void (await interaction.editReply(await planScreen(guild, opts)));
     }
     if (interaction.isButton() && action === "build") {
+      // Start fresh always asks a second time.
+      if (opts.wipe) {
+        await interaction.deferUpdate();
+        return void (await interaction.editReply(await wipeScreen(guild, true)));
+      }
       // Anything to delete? Ask once more first.
       if (deleteOn(opts) || opts.freshRoles) {
         await interaction.deferUpdate();
@@ -294,15 +360,23 @@ async function build(interaction: ButtonInteraction, opts: SetupOptions, key: st
   const starting = { embeds: [new EmbedBuilder().setColor(0xf0b232).setTitle("🏗️ Building…").setDescription("Starting. This takes a minute or two.")], components: [] };
   await (deferred ? interaction.editReply(starting) : interaction.update(starting));
   const lines: string[] = [];
-  const show = (title: string, color: number, extra: string[] = []) =>
-    interaction.editReply({ embeds: [new EmbedBuilder().setColor(color).setTitle(title).setDescription([...lines, ...extra].join("\n").slice(0, 4000))] });
+  const embedOf = (title: string, color: number, extra: string[] = []) => new EmbedBuilder().setColor(color).setTitle(title).setDescription([...lines, ...extra].join("\n").slice(0, 4000));
+  // Start fresh deletes the channel this message lives in, so updates can fail; the result is DMed too.
+  const show = (title: string, color: number, extra: string[] = []) => {
+    const embed = embedOf(title, color, extra);
+    if (opts.wipe && title !== "🏗️ Building…") void interaction.user.send({ content: `**${guild.name}**`, embeds: [embed] }).catch(() => null);
+    return interaction.editReply({ embeds: [embed] }).catch(() => null);
+  };
   try {
     const result = await runSetup(guild, opts, async (line) => {
       lines.push(line);
       await show("🏗️ Building…", 0xf0b232);
     });
     const notes = result.notes.length ? ["", "**Worth a look:**", ...result.notes.map((n) => `• ${n}`)] : [];
-    await show("✅ Server Setup finished", 0x3ba55d, ["", "Panels for rules, roles, support and Matchmaking post themselves within a minute. Every module's settings are on the dashboard now.", ...notes]);
+    const after = opts.layout === "hq"
+      ? `The rules, role and ticket panels post themselves within a minute. Try it from a second account: you should see only 📌 Start Here until onboarding's last question, the rules.${opts.wipe ? " Give your staff 🎟️ Support Team, 🛡️ Moderator or ⚙️ Admin again." : ""}`
+      : "Panels for rules, roles, support and Matchmaking post themselves within a minute.";
+    await show("✅ Server Setup finished", 0x3ba55d, ["", `${after} Every module's settings are on the dashboard now.`, ...notes]);
   } catch (err) {
     logError("bot", err, guild.id);
     await show("⚠️ Server Setup stopped", 0xed4245, ["", "Something went wrong partway. Run /server-setup again to finish: it picks up where it stopped. Details are on the dashboard's Errors page."]);

@@ -164,6 +164,7 @@ export const OWNER_NAV_SECTION: NavSection = {
     { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
     { href: "/owner-panel", label: "Command Center", icon: "🔑" },
     { href: "/quick-links", label: "Quick Links", icon: "🔗" },
+    { href: "/og-store", label: "Store", icon: "🛒" },
     { href: "/front-page", label: "Front Page", icon: "🏠" },
     { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],

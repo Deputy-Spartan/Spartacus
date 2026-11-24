@@ -8,9 +8,13 @@ import { THEMES, useUserPrefs } from "../../lib/userPrefs";
 import { Icon } from "../ui/AppIcon";
 import { ThemePreview } from "../ui/ThemePreview";
 
+// The Outpost Gaming store (a separate site). Override with NEXT_PUBLIC_STORE_URL on Vercel.
+const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || "https://outpostgaming.netlify.app";
+
 // The avatar in the top bar opens this: who you're signed in as, a Theme row
-// (opens preview cards to pick from), Profile, Account settings and Log out.
-export function AccountMenu({ user, guildId }: { user: { username: string; avatar: string | null }; guildId: string }) {
+// (opens preview cards to pick from), Profile, Account settings, the store link
+// (plus the store's admin page, for the owner only) and Log out.
+export function AccountMenu({ user, guildId, isOwner = false }: { user: { username: string; avatar: string | null }; guildId: string; isOwner?: boolean }) {
   const router = useRouter();
   const { prefs, save } = useUserPrefs();
   const [open, setOpen] = useState(false);
@@ -133,6 +137,14 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
           <Link role="menuitem" href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className={item}>
             <Icon name="settings" /> Account settings
           </Link>
+          <a role="menuitem" href={STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={item}>
+            <Icon name="gift" /> Store
+          </a>
+          {isOwner && (
+            <a role="menuitem" href={`${STORE_URL}/admin`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={item}>
+              <Icon name="settings" /> Store admin
+            </a>
+          )}
           {statusUrl && (
             <a role="menuitem" href={statusUrl} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={item}>
               <Icon name="heart-pulse" /> Status page

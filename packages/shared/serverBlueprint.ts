@@ -120,6 +120,7 @@ const staffTalk: Access = { see: "staff", talk: true };
 
 export function blueprintCategories(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintCategory[] {
   if (layout === "streaming") return streamingCategories(games);
+  if (layout === "hq") return hqCategories();
   const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
   return [
     { key: "stats", name: "📊 Server Stats", aliases: ["server-stats", "stats"], access: readOnlyEveryone, channels: [
@@ -181,10 +182,12 @@ export interface BlueprintPicker {
   name: string;
   description: string;
   options: Array<{ role?: RoleKey; channel?: string; label: string; emoji?: string }>;
+  buttons?: boolean; // posted as buttons instead of a dropdown
 }
 
 export function blueprintPickers(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintPicker[] {
   if (layout === "streaming") return streamingPickers(games);
+  if (layout === "hq") return HQ_PICKERS;
   const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
   return [
     { name: "🎮 Pick your games", description: "Each game opens its channel.", options: picked.map((g) => ({ role: `game:${g.id}`, label: g.name, emoji: g.emoji })) },
@@ -195,7 +198,10 @@ export function blueprintPickers(games: BlueprintGameId[], layout: BlueprintLayo
 }
 
 // Discord onboarding: the same choices as the pickers.
-export function blueprintOnboarding(games: BlueprintGameId[], layout: BlueprintLayout = "gaming") {
+export interface BlueprintOnboardingOption { role?: RoleKey; channel?: string; channels?: string[]; label: string; emoji?: string; description?: string }
+export interface BlueprintOnboardingPrompt { title: string; singleSelect: boolean; required?: boolean; options: BlueprintOnboardingOption[] }
+export function blueprintOnboarding(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintOnboardingPrompt[] {
+  if (layout === "hq") return HQ_ONBOARDING;
   if (layout === "streaming") {
     const picked = BLUEPRINT_GAMES.filter((g) => games.includes(g.id));
     return [
@@ -252,10 +258,11 @@ export function blueprintSlug(name: string): string {
 // An open server: anyone who joins can see and chat right away. Discord's
 // onboarding hands out roles and shows the rules; there's no verify button.
 
-export type BlueprintLayout = "gaming" | "streaming";
+export type BlueprintLayout = "gaming" | "streaming" | "hq";
 export const BLUEPRINT_LAYOUTS: Array<{ id: BlueprintLayout; label: string; emoji: string; description: string }> = [
   { id: "gaming", label: "Gaming community", emoji: "🎮", description: "Rules gate, game channels, squads and Matchmaking" },
   { id: "streaming", label: "Streaming community", emoji: "🔴", description: "Open door: stream alerts, clips, hangout, supporters, Matchmaking" },
+  { id: "hq", label: "Spartacus HQ & store support", emoji: "🛠️", description: "Bot testing, Spartacus help and store support, opened by rules and onboarding" },
 ];
 export const DEFAULT_STREAMING_GAMES: BlueprintGameId[] = ["r6", "cod", "other"];
 
@@ -280,7 +287,7 @@ const STREAMING_ROLES: BlueprintRole[] = [
 ];
 
 export function blueprintRoles(games: BlueprintGameId[], layout: BlueprintLayout = "gaming"): BlueprintRole[] {
-  const list = layout === "streaming" ? STREAMING_ROLES : BLUEPRINT_ROLES;
+  const list = layout === "streaming" ? STREAMING_ROLES : layout === "hq" ? HQ_ROLES : BLUEPRINT_ROLES;
   return list.filter((r) => !r.game || games.includes(r.game));
 }
 
@@ -377,6 +384,7 @@ export const STREAMING_RULES = [
 ].join("\n");
 
 export function blueprintTicketTypes(layout: BlueprintLayout = "gaming") {
+  if (layout === "hq") return HQ_TICKET_TYPES;
   return layout === "streaming"
     ? [
         { name: "Get Help", emoji: "🙋", description: "Questions or problems with the server." },
@@ -387,6 +395,7 @@ export function blueprintTicketTypes(layout: BlueprintLayout = "gaming") {
 }
 
 export function blueprintApplications(layout: BlueprintLayout = "gaming") {
+  if (layout === "hq") return HQ_APPLICATIONS;
   return layout === "streaming"
     ? [
         { name: "Moderator", emoji: "🛡️", description: "Help keep chat and the server running.", questions: ["How old are you?", "What timezone are you in?", "Why do you want to be a mod?", "Any moderation experience?"] },
@@ -395,3 +404,154 @@ export function blueprintApplications(layout: BlueprintLayout = "gaming") {
       ]
     : BLUEPRINT_APPLICATIONS;
 }
+
+// ---- The Spartacus HQ layout (/hq-setup, or /server-setup layout: Spartacus HQ) ----
+// One server for testing Spartacus and for store support. New people see only
+// 📌 Start Here. Onboarding asks what they want to see (each answer opens one section), their
+// pings, and last, a required rules agreement (gives ✅ Member). 🎭・get-roles changes it later.
+// The command starts fresh: it deletes every channel, category, role and onboarding question
+// first (after a backup), then builds all of this.
+
+const HQ_ROLES: BlueprintRole[] = [
+  { key: "admin", name: "⚙️ Admin", color: 0xed4245, hoist: true, aliases: ["admins", "admin", "administrator"], perms: "admin-lite" },
+  { key: "mod", name: "🛡️ Moderator", color: 0x5865f2, hoist: true, aliases: ["mods", "mod", "moderator", "moderators"], perms: "moderator" },
+  { key: "support", name: "🎟️ Support Team", color: 0x3ba55d, hoist: true, aliases: ["support", "support-team", "helper", "helpers"], perms: "support" },
+  { key: "tester", name: "🧪 Bot Tester", color: 0x3cc8ff, hoist: true, aliases: ["bot-tester", "tester", "testers", "beta-tester", "beta"] },
+  { key: "buyer", name: "💎 Verified Buyer", color: 0xe7bb5f, hoist: true, aliases: ["verified-buyer", "buyer", "customer-verified", "og-supporter"] },
+  { key: "member", name: "✅ Member", color: 0, aliases: ["member", "members", "verified", "community-member"] },
+  { key: "customer", name: "🛒 Store Customer", color: 0, aliases: ["store-customer", "customer", "customers", "store"] },
+  { key: "spartacus", name: "🤖 Spartacus User", color: 0, aliases: ["spartacus-user", "spartacus-users", "bot-user"] },
+  { key: "ping:ann", name: "📢 Announcements", color: 0, aliases: ["announcements", "announcement-pings"] },
+  { key: "ping:deals", name: "🛍️ Store Deals", color: 0, aliases: ["store-deals", "deals", "sales"] },
+  { key: "ping:updates", name: "🔧 Spartacus Updates", color: 0, aliases: ["spartacus-updates", "bot-updates", "updates", "patch-notes"] },
+  { key: "ping:status", name: "🟢 Status Alerts", color: 0, aliases: ["status-alerts", "status", "outages"] },
+];
+
+function hqCategories(): BlueprintCategory[] {
+  const ro = readOnlyEveryone;
+  const store: Access = { see: "roles", roles: ["customer", "buyer"], talk: true };
+  const storeRead: Access = { see: "roles", roles: ["customer", "buyer"], talk: false };
+  const sp: Access = { see: "role", role: "spartacus", talk: true };
+  const lab: Access = { see: "role", role: "tester", talk: true };
+  return [
+    { key: "start", name: "📌 Start Here", aliases: ["start-here", "information-center", "welcome"], access: ro, channels: [
+      { key: "rules", name: "📜・rules", kind: "text", topic: "Read the rules and agree to unlock the server.", aliases: ["rules", "server-rules"] },
+      { key: "welcome", name: "👋・welcome", kind: "text", topic: "What's here and how to find your way around.", aliases: ["welcome", "welcomes", "start-here"] },
+    ]},
+    { key: "info", name: "📢 Information", aliases: ["information", "info", "news"], access: memberRead, channels: [
+      { key: "announcements", name: "📢・announcements", kind: "announcement", topic: "News about Spartacus and the store.", aliases: ["announcements", "news"] },
+      { key: "roles", name: "🎭・get-roles", kind: "text", topic: "Open or hide sections and choose your pings. Change it any time.", aliases: ["get-roles", "roles", "self-roles", "role-select", "pick-roles"] },
+      { key: "bot-status", name: "🟢・status", kind: "text", topic: "Live status for Spartacus and the store.", aliases: ["status", "bot-status", "uptime"] },
+    ]},
+    { key: "community", name: "💬 Community", aliases: ["community", "general", "chat"], access: memberTalk, channels: [
+      { key: "general", name: "💬・general", kind: "text", topic: "Chat about anything.", aliases: ["general", "general-chat", "chat", "lounge"] },
+      { key: "botcmds", name: "🤖・bot-commands", kind: "text", topic: "Use Spartacus commands here: /store, /license, /rank and more.", aliases: ["bot-commands", "commands", "bots", "bot-spam"] },
+    ]},
+    { key: "store", name: "🛒 Store", aliases: ["og-armory-store", "og-armory", "store", "shop"], access: store, channels: [
+      { key: "store-news", name: "🛍️・store-news", kind: "text", topic: "New products, sales and drops from outpostgaming.netlify.app.", aliases: ["store-news", "deals", "drops", "shop-news"], access: storeRead },
+      { key: "store-chat", name: "💬・store-chat", kind: "text", topic: "Talk about the bots, overlays and dashboards.", aliases: ["store-chat", "shop-chat"] },
+      { key: "store-help", name: "❓・store-help", kind: "text", topic: "Quick questions about orders, keys and downloads. Anything private goes in a ticket.", aliases: ["store-help", "order-help", "shop-help"] },
+      { key: "buyers", name: "💎・verified-buyers", kind: "text", topic: "For customers with a purchase. The store gives you the role automatically.", aliases: ["verified-buyers", "buyers", "customers-only"], access: { see: "role", role: "buyer", talk: true } },
+    ]},
+    { key: "spartacus", name: "🤖 Spartacus Help", aliases: ["spartacus-help", "spartacus", "bot-help"], access: sp, channels: [
+      { key: "guides", name: "📖・guides", kind: "text", topic: "How to set up and use Spartacus in your server.", aliases: ["guides", "docs", "how-to"], access: { see: "role", role: "spartacus", talk: false } },
+      { key: "sp-help", name: "❓・spartacus-help", kind: "text", topic: "Ask anything about setting up or using Spartacus.", aliases: ["spartacus-help", "bot-help", "help"] },
+      { key: "requests", name: "💡・feature-requests", kind: "text", topic: "Ideas for new Spartacus features. Use /suggest.", aliases: ["feature-requests", "suggestions", "ideas"] },
+    ]},
+    { key: "lab", name: "🧪 Test Lab", aliases: ["test-lab", "testing", "beta"], access: lab, channels: [
+      { key: "test-notes", name: "📋・what-to-test", kind: "text", topic: "What's new and what needs testing.", aliases: ["what-to-test", "test-notes", "changelog"], access: { see: "role", role: "tester", talk: false } },
+      { key: "testing", name: "🧪・testing", kind: "text", topic: "Try commands and features here. Breaking things is the point.", aliases: ["testing", "test", "sandbox"] },
+      { key: "bugs", name: "🐞・bug-reports", kind: "text", topic: "What you did, what happened, what you expected. Screenshots help.", aliases: ["bug-reports", "bugs", "issues"] },
+      { key: "squad", name: "➕ Create a Test VC", kind: "voice", aliases: ["create-a-test-vc", "create-a-vc", "join-to-create"] },
+    ]},
+    { key: "support", name: "🎫 Support", aliases: ["support", "help-desk", "help"], access: memberRead, channels: [
+      { key: "support", name: "🎫・open-a-ticket", kind: "text", topic: "Private help from the team: store orders, Spartacus, or anything else.", aliases: ["open-a-ticket", "support", "tickets", "create-ticket"] },
+    ]},
+    { key: "tickets", name: "🗂️ Open Tickets", aliases: ["open-tickets", "store-tickets", "tickets-open"], access: staffTalk, channels: [] },
+    { key: "staff", name: "🛡️ Staff", aliases: ["staff", "mods", "moderators", "staff-only"], access: staffTalk, channels: [
+      { key: "staff-chat", name: "🛡️・staff-chat", kind: "text", aliases: ["staff-chat", "mod-chat", "staff"] },
+      { key: "store-alerts", name: "🛒・store-alerts", kind: "text", topic: "Orders, refunds, failed renewals and new ticket alerts from the store.", aliases: ["store-alerts", "order-log", "orders"] },
+      { key: "mod-log", name: "📋・mod-log", kind: "text", topic: "Moderation actions, edits and deletes.", aliases: ["mod-log", "mod-logs", "logs"] },
+      { key: "server-log", name: "📤・server-log", kind: "text", topic: "Joins, leaves, rules accepted and security alerts.", aliases: ["server-log", "join-leave", "member-log"] },
+      { key: "staff-desk", name: "🧾・transcripts", kind: "text", topic: "Closed tickets, applications and the weekly report.", aliases: ["transcripts", "ticket-logs", "tickets-and-applications"] },
+      { key: "staff-voice", name: "🔊 Staff Voice", kind: "voice", aliases: ["staff-voice", "staff-vc"] },
+    ]},
+  ];
+}
+
+const HQ_PICKERS: BlueprintPicker[] = [
+  { name: "🧭 What do you want to see?", description: "Each one opens its own section. Tap again to hide it.", buttons: true, options: [
+    { role: "customer", label: "Store & orders", emoji: "🛒" },
+    { role: "spartacus", label: "Spartacus help", emoji: "🤖" },
+    { role: "tester", label: "Test Lab", emoji: "🧪" },
+  ]},
+  { name: "🔔 Notifications", description: "Choose what you get pinged for.", buttons: true, options: [
+    { role: "ping:ann", label: "Announcements", emoji: "📢" },
+    { role: "ping:deals", label: "Store deals", emoji: "🛍️" },
+    { role: "ping:updates", label: "Spartacus updates", emoji: "🔧" },
+    { role: "ping:status", label: "Status alerts", emoji: "🟢" },
+  ]},
+];
+
+// The rules agreement is the last question and required, so nobody gets in (or gets any
+// section role) without agreeing. Discord hands out every answer's roles at the end.
+const HQ_ONBOARDING: BlueprintOnboardingPrompt[] = [
+  { title: "What are you here for?", singleSelect: false, required: true, options: [
+    { role: "customer", channels: ["store-news", "store-chat", "store-help"], label: "Help with a store order", emoji: "🛒", description: "Orders, license keys, downloads and billing" },
+    { role: "spartacus", channels: ["guides", "sp-help", "requests"], label: "Help using Spartacus", emoji: "🤖", description: "Setting it up and using it in your server" },
+    { role: "tester", channels: ["test-notes", "testing", "bugs"], label: "Testing new Spartacus features", emoji: "🧪", description: "Try things early and report bugs" },
+    { role: "ping:ann", channels: ["announcements"], label: "Just news and updates", emoji: "📢", description: "Announcements only" },
+  ]},
+  { title: "What should we ping you for?", singleSelect: false, options: HQ_PICKERS[1].options },
+  { title: "Last step: do you agree to the server rules?", singleSelect: true, required: true, options: [
+    { role: "member", channels: ["rules", "announcements", "roles", "general", "botcmds", "support"], label: "I've read the rules and I agree", emoji: "✅", description: "Required to join. Read #📜・rules first" },
+  ]},
+];
+
+export const HQ_RULES = [
+  "**1. Be respectful.** No harassment, hate or slurs, toward members or staff.",
+  "**2. Keep private things private.** Never post license keys, order numbers, emails or payment details in public channels. Open a ticket instead.",
+  "**3. Use the right place.** Store questions in 🛒 Store, bot questions in 🤖 Spartacus Help, testing in 🧪 Test Lab.",
+  "**4. No spam or self-promo.** No unsolicited DMs or ads.",
+  "**5. Report bugs, don't abuse them.** Found an exploit in Spartacus or the store? Report it in 🐞・bug-reports or a ticket.",
+  "**6. Staff decisions are final.** Disagree? Open a ticket, calmly.",
+  "**7. Follow Discord's Terms of Service.**",
+  "",
+  "Tap **I Agree** below to unlock the server.",
+].join("\n");
+
+// The 👋・welcome guide: one message that maps the whole server.
+export const HQ_GUIDE = {
+  title: "👋 Welcome to Spartacus HQ",
+  description: "The home of the **Spartacus** bot and the **Outpost Gaming** store. Here's how it's laid out. You only see the sections you picked; change them any time in 🎭・get-roles.",
+  fields: [
+    { name: "📢 Information", value: "Announcements, your roles and live status." },
+    { name: "💬 Community", value: "General chat and a channel for bot commands." },
+    { name: "🛒 Store", value: "Store news, chat and quick order questions. Buyers get 💎・verified-buyers automatically." },
+    { name: "🤖 Spartacus Help", value: "Guides, help with your setup, and feature requests." },
+    { name: "🧪 Test Lab", value: "Try new features early and report bugs." },
+    { name: "🎫 Support", value: "Private tickets for orders, keys, billing, Spartacus or anything else. Store tickets opened on the website show up here too." },
+  ],
+};
+
+export const HQ_TEST_GUIDE = {
+  title: "🧪 How testing works",
+  description: [
+    "1. Check this channel for what's new and what needs testing.",
+    "2. Try it in 🧪・testing. Use commands, click buttons, try to break it.",
+    "3. Found something? Post in 🐞・bug-reports: **what you did**, **what happened**, **what you expected**, and a screenshot.",
+    "4. Security problems or anything with real orders go in a ticket, not in public.",
+  ].join("\n"),
+};
+
+const HQ_TICKET_TYPES = [
+  { name: "Store Order Help", emoji: "🛒", description: "Orders, license keys, downloads, roles and billing." },
+  { name: "Spartacus Help", emoji: "🤖", description: "Setting up or using Spartacus in your server." },
+  { name: "Report a Bug", emoji: "🐞", description: "Something in Spartacus or the store isn't working." },
+  { name: "Something Else", emoji: "🙋", description: "Anything else for the team." },
+];
+
+const HQ_APPLICATIONS = [
+  { name: "Support Team", emoji: "🎟️", description: "Help customers with orders and Spartacus questions.", questions: ["How old are you?", "What timezone are you in?", "Why do you want to help with support?", "Any support or moderation experience?"] },
+  { name: "Bot Tester", emoji: "🧪", description: "Get early access to new Spartacus features.", questions: ["Do you run a Discord server? Which one?", "What Spartacus features do you use most?", "How much time can you give to testing each week?"] },
+];

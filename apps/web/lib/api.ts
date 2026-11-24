@@ -2188,6 +2188,13 @@ export const api = {
     return URL.createObjectURL(await res.blob());
   },
   getFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean; statusUrl: string | null }>("/owner/front-page"),
+  // Owner Only → Store (talks to the store website through the API).
+  getOgStore: () => request<import("./ogStore").OgSummary>("/owner/og-store"),
+  saveOgStoreRouting: (routing: import("./ogStore").OgRouting) => request<{ routing: import("./ogStore").OgRouting }>("/owner/og-store/routing", { method: "PUT", body: JSON.stringify({ routing }) }),
+  saveOgStoreTickets: (tickets: import("./ogStore").OgTickets) => request<{ tickets: import("./ogStore").OgTickets }>("/owner/og-store/tickets", { method: "PUT", body: JSON.stringify(tickets) }),
+  saveOgStoreBanner: (announcement: string) => request<{ banner: { announcement: string } }>("/owner/og-store/banner", { method: "PUT", body: JSON.stringify({ announcement }) }),
+  testOgStoreAlert: (key: import("./ogStore").OgAlertKey) => request<{ ok: boolean }>("/owner/og-store/test", { method: "POST", body: JSON.stringify({ key }) }),
+  postOgStore: (post: import("./ogStore").OgPost) => request<{ posted: number; errors: string[] }>("/owner/og-store/post", { method: "POST", body: JSON.stringify(post) }),
   saveStatusPage: (url: string) => request<{ statusUrl: string | null }>("/owner/status-page", { method: "PUT", body: JSON.stringify({ url }) }),
   saveFrontPage: (cards: import("@spartacus/shared").FrontPageCard[]) => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page", { method: "PUT", body: JSON.stringify({ cards }) }),
   resetFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean }>("/owner/front-page", { method: "DELETE" }),

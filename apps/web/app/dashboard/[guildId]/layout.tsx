@@ -129,6 +129,7 @@ export default function DashboardLayout({
             onSelectGuild={(id) => router.push(`/dashboard/${id}`)}
             onMenuClick={() => setSidebarOpen((v) => !v)}
             sidebarOpen={sidebarOpen}
+            isOwner={isOwner}
           />
           {/* overflow-x-clip, not -hidden — "hidden" implicitly makes this a
               scroll container even with nothing to scroll, which breaks

@@ -58,7 +58,9 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
     .setTitle(`🏗️ Server Setup · ${layout.emoji} ${layout.label}`)
     .setDescription(
       [
-        opts.layout === "streaming"
+        opts.layout === "hq"
+          ? "Builds **Spartacus HQ**: one clean server for testing Spartacus and supporting OG Armory customers. New people see only 📌 Start Here. Onboarding makes them agree to the rules, then asks what they're here for, and each answer opens its own section: 🛒 Store, 🤖 Spartacus Help or 🧪 Test Lab. 🎭・get-roles lets them change it later. Tickets open privately in 🗂️ Open Tickets, next to the store's website tickets."
+          : opts.layout === "streaming"
           ? "Builds an open streaming community: stream alerts, clips, hangout, Matchmaking, supporters and creators, with nearly every module set up. Pick what to build below. Parts you skip stay as they are, and the parts you build reuse what's already there."
           : "Builds a clean layout for an FPS gaming community. Pick what to build below: everything, or only some parts and categories. Parts you skip stay as they are, and the parts you build use what's already there.",
         "",
@@ -80,7 +82,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
         fresh
           ? `**🎭 Fresh roles:** ${plan.deleteRoles.length} old role${plan.deleteRoles.length === 1 ? "" : "s"} not in the new layout get deleted, even if people have them (number of people in brackets)${plan.deleteRoles.length ? `: ${names(plan.deleteRoles.map(roleLabel), 12)}` : ""}. Roles that match the layout are reused, so people keep them. Roles with admin powers, bot roles and Discord's booster and Twitch roles stay.`
           : null,
-        `**Games:** ${games.map((g) => `${g.emoji} ${g.name}`).join(", ")}`,
+        opts.layout === "hq" ? null : `**Games:** ${games.map((g) => `${g.emoji} ${g.name}`).join(", ")}`,
         "",
         del
           ? "🗄️ A backup is saved first. It can rebuild deleted channels and roles, but not the messages that were in them. Running it again only fixes what's missing."
@@ -143,7 +145,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
     components: [
       new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(partMenu),
       ...(partOn(opts, "channels") ? [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(categoryMenu)] : []),
-      new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(gameMenu),
+      ...(opts.layout === "hq" ? [] : [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(gameMenu)]),
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("srvsetup:build").setLabel("Build").setEmoji("🏗️").setStyle(ButtonStyle.Success).setDisabled(on.length === 0 && !archiveOn(opts)),
         new ButtonBuilder().setCustomId("srvsetup:cancel").setLabel("Cancel").setStyle(ButtonStyle.Secondary),
@@ -183,16 +185,17 @@ function confirmScreen(plan: Awaited<ReturnType<typeof planSetup>>, opts: SetupO
   };
 }
 
-export async function runServerSetupCommand(interaction: ChatInputCommandInteraction) {
+// `forced` is the layout a dedicated command always builds (/hq-setup builds "hq").
+export async function runServerSetupCommand(interaction: ChatInputCommandInteraction, forced?: BlueprintLayout) {
   const guild = interaction.guild;
   if (!guild) return void (await interaction.reply({ content: "Run this inside a server.", ephemeral: true }));
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) return void (await interaction.reply({ content: "You need Manage Server to run this.", ephemeral: true }));
   await interaction.deferReply({ ephemeral: true });
   const missing = missingBotPerms(guild);
   if (missing.length) return void (await interaction.editReply(`Spartacus needs these permissions first: ${missing.join(", ")}. Give its role Administrator, or those, in Server Settings → Roles.`));
-  const layout = (interaction.options.getString("layout") ?? "gaming") as BlueprintLayout;
+  const layout = forced ?? ((interaction.options.getString("layout") ?? "gaming") as BlueprintLayout);
   const freshRoles = interaction.options.getBoolean("fresh-roles") ?? false;
-  const games = layout === "streaming" ? DEFAULT_STREAMING_GAMES : DEFAULT_BLUEPRINT_GAMES;
+  const games: BlueprintGameId[] = layout === "hq" ? [] : layout === "streaming" ? DEFAULT_STREAMING_GAMES : DEFAULT_BLUEPRINT_GAMES;
   const opts: SetupOptions & { expires: number } = {
     games: [...games],
     layout,
@@ -302,7 +305,10 @@ async function build(interaction: ButtonInteraction, opts: SetupOptions, key: st
       await show("🏗️ Building…", 0xf0b232);
     });
     const notes = result.notes.length ? ["", "**Worth a look:**", ...result.notes.map((n) => `• ${n}`)] : [];
-    await show("✅ Server Setup finished", 0x3ba55d, ["", "Panels for rules, roles, support and Matchmaking post themselves within a minute. Every module's settings are on the dashboard now.", ...notes]);
+    const after = opts.layout === "hq"
+      ? "The rules, role and ticket panels post themselves within a minute. Try it from a second account: you should see only 📌 Start Here until you agree to the rules."
+      : "Panels for rules, roles, support and Matchmaking post themselves within a minute.";
+    await show("✅ Server Setup finished", 0x3ba55d, ["", `${after} Every module's settings are on the dashboard now.`, ...notes]);
   } catch (err) {
     logError("bot", err, guild.id);
     await show("⚠️ Server Setup stopped", 0xed4245, ["", "Something went wrong partway. Run /server-setup again to finish: it picks up where it stopped. Details are on the dashboard's Errors page."]);

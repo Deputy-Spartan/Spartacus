@@ -16,7 +16,7 @@ import { commands } from "../../commands";
 
 const CATEGORIES: Array<{ emoji: string; name: string; color: number; names: string[] }> = [
   { emoji: "🛡️", name: "Moderation & safety", color: 0xc0504d, names: ["ban", "kick", "mute", "warn", "purge", "purge-user", "quarantine", "release", "report", "verify"] },
-  { emoji: "👋", name: "Community", color: 0x4f9d69, names: ["birthday", "confess", "suggest", "approve-suggestion", "deny-suggestion", "role", "sticky", "remindme", "server-setup"] },
+  { emoji: "👋", name: "Community", color: 0x4f9d69, names: ["birthday", "confess", "suggest", "approve-suggestion", "deny-suggestion", "role", "sticky", "remindme", "server-setup", "hq-setup"] },
   { emoji: "🔴", name: "Streaming", color: 0x9146ff, names: ["golive", "mystream", "schedule", "link", "prestream", "so", "title", "raidlist", "gamenight"] },
   { emoji: "💰", name: "Economy & levels", color: 0xe8c547, names: ["balance", "daily", "pay", "shop", "crates", "rank", "profile", "leaderboard", "prestige", "levelroles"] },
   { emoji: "🎮", name: "Games & fun", color: 0x3ba7d9, names: ["trivia", "coinflip", "slots", "match"] },

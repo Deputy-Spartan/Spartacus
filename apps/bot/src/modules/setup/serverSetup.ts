@@ -20,6 +20,9 @@ import {
   BLUEPRINT_LEVEL_ROLES,
   BLUEPRINT_RULES,
   STREAMING_RULES,
+  HQ_GUIDE,
+  HQ_RULES,
+  HQ_TEST_GUIDE,
   blueprintApplications,
   blueprintCategories,
   blueprintRoles,
@@ -324,7 +327,14 @@ const STREAMING_MODULES_ON: ModuleKey[] = [
   "VOICE_ACTIVITY", "ACHIEVEMENTS", "RANK_CARDS", "PROFILE_CARDS", "PRESTIGE", "GROWTH_ANALYTICS", "SUGGESTION_ANALYTICS", "CUSTOM_COMMANDS", "SCHEDULED_MESSAGES", "EMBED_CREATOR",
   "STICKY_MESSAGES", "CHANNEL_LOCKS", "SLOW_MODE", "ROLE_MANAGER", "SERVER_TEMPLATES", "BAN_APPEALS",
 ];
-const modulesOn = (opts: SetupOptions) => (opts.layout === "streaming" ? STREAMING_MODULES_ON : MODULES_ON);
+// Spartacus HQ (bot testing + store support): the rules gate, tickets, roles and
+// safety modules. No games, levels or Matchmaking, to keep it uncluttered.
+const HQ_MODULES_ON: ModuleKey[] = [
+  "WELCOME", "RULES_GATE", "REACTION_ROLES", "ANNOUNCEMENTS", "SUGGESTIONS", "TEMP_CHANNELS", "TICKETS", "APPLICATIONS", "MODERATION", "WARN_ESCALATION",
+  "ANTI_RAID", "ANTI_NUKE", "PERM_WATCH", "STATUS_CHANNEL", "SERVER_BACKUP", "MOD_DIGEST", "MODMAIL", "SUPPORT_INTAKE", "ROLE_PERSISTENCE", "QUARANTINE",
+  "EMBED_CREATOR", "SCHEDULED_MESSAGES", "STICKY_MESSAGES", "ROLE_MANAGER",
+];
+const modulesOn = (opts: SetupOptions) => (opts.layout === "streaming" ? STREAMING_MODULES_ON : opts.layout === "hq" ? HQ_MODULES_ON : MODULES_ON);
 
 const MODULES_ON: ModuleKey[] = [
   "WELCOME", "RULES_GATE", "REACTION_ROLES", "ANNOUNCEMENTS", "EVENTS", "GIVEAWAYS", "STREAM_ALERTS", "LEVELING", "POLLS", "SUGGESTIONS",
@@ -566,7 +576,15 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
   const role = (key: string) => ids.roles.get(key) ?? null;
   const cat = (key: string) => ids.categories.get(key) ?? null;
   const streaming = opts.layout === "streaming";
-  const staffRoles = (streaming ? ["mod", "admin"] : ["staff", "support"]).map(role).filter(Boolean) as string[];
+  const hq = opts.layout === "hq";
+  const staffRoles = (streaming ? ["mod", "admin"] : hq ? ["admin", "mod", "support"] : ["staff", "support"]).map(role).filter(Boolean) as string[];
+  // Posts an embed in a channel the first time only, so running setup again never doubles it.
+  const postOnce = async (key: string, embed: object) => {
+    const c = ch(key) ? await guild.channels.fetch(ch(key)!).catch(() => null) : null;
+    if (!c || !c.isTextBased()) return;
+    const last = await (c as TextChannel).messages.fetch({ limit: 1 }).catch(() => null);
+    if (!last?.size) await (c as TextChannel).send({ embeds: [embed] });
+  };
 
   const tasks: Array<[string, () => Promise<unknown>]> = [
     ["Welcome", () =>
@@ -577,11 +595,13 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
         embedEnabled: true,
         welcomeText: streaming
           ? `Welcome to **{server}**, {user}! Say hi in <#${ch("general")}>, check <#${ch("events")}> for the next stream, and pick your pings in <#${ch("roles")}>.`
+          : hq
+          ? `Welcome to **{server}**, {user}! Agree to <#${ch("rules")}> to unlock the server, then open the sections you want in <#${ch("roles")}>. Need help with an order? <#${ch("support")}>.`
           : `Welcome to **{server}**, {user}! Read and accept <#${ch("rules")}>, then pick your games in <#${ch("roles")}>.`,
         goodbyeText: "{user} left {server}.",
       })],
     ["Rules", async () => {
-      if (!streaming) return fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: BLUEPRINT_RULES });
+      if (!streaming) return fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: hq ? HQ_RULES : BLUEPRINT_RULES });
       // Open door: just post the rules in the rules channel if it's empty.
       const rulesCh = ch("rules") ? await guild.channels.fetch(ch("rules")!).catch(() => null) : null;
       if (!rulesCh || !rulesCh.isTextBased()) return;
@@ -592,8 +612,9 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
     ["Anti-Raid", () => fillSettings("antiRaidConfig", g, { alertChannelId: ch("server-log") })],
     ["Anti-Nuke", () => fillSettings("antiNukeConfig", g, { alertChannelId: ch("server-log") })],
     ["Perm Watch", () => fillSettings("permWatchConfig", g, { alertChannelId: ch("server-log") })],
-    ["Events", () => fillSettings("eventSettings", g, { defaultChannelId: ch("events"), mentionRoleId: role("ping:events") })],
+    ["Events", async () => { if (!hq) await fillSettings("eventSettings", g, { defaultChannelId: ch("events"), mentionRoleId: role("ping:events") }); }],
     ["Leveling", async () => {
+      if (hq) return;
       await fillSettings("levelingSettings", g, { channelId: ch("botcmds") });
       for (const { level, role: key } of BLUEPRINT_LEVEL_ROLES) {
         const roleId = role(key);
@@ -602,18 +623,27 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
     }],
     ["Warn Escalation", () => fillSettings("warnEscalationSettings", g, {})],
     ["Weekly Staff Report", () => fillSettings("modDigestSettings", g, { channelId: ch(streaming ? "staff-chat" : "staff-desk") })],
-    ["Player Reports", () => fillSettings("playerReportSettings", g, { staffRoleId: role(streaming ? "mod" : "staff") })],
+    ["Player Reports", () => fillSettings("playerReportSettings", g, { staffRoleId: role(streaming || hq ? "mod" : "staff") })],
     ["Tickets", async () => {
       await fillSettings("ticketSettings", g, { logChannelId: ch(streaming ? "transcripts" : "staff-desk"), transcriptChannelId: ch(streaming ? "transcripts" : "staff-desk"), supportRoleIds: staffRoles });
+      // HQ tickets open in the staff-only 🗂️ Open Tickets category, next to the store's website tickets.
+      const ticketCat = cat(hq ? "tickets" : "support");
       const typeIds: string[] = [];
       for (const t of blueprintTicketTypes(opts.layout)) {
         const found = await prisma.ticketType.findFirst({ where: { guildId: g, name: t.name } });
-        const type = found ?? (await prisma.ticketType.create({ data: { guildId: g, name: t.name, emoji: t.emoji, description: t.description, categoryId: cat("support"), staffRoleIds: staffRoles } }));
+        const type = found ?? (await prisma.ticketType.create({ data: { guildId: g, name: t.name, emoji: t.emoji, description: t.description, categoryId: ticketCat, staffRoleIds: staffRoles } }));
         typeIds.push(type.id);
       }
       const support = ch("support");
       if (support && !(await prisma.ticketPanel.findFirst({ where: { guildId: g, channelId: support } }))) {
-        await prisma.ticketPanel.create({ data: { guildId: g, name: "Support", channelId: support, typeIds, description: "Open a private ticket and staff will reply there.", categoryId: cat("support"), supportRoleId: role("support") } });
+        await prisma.ticketPanel.create({
+          data: {
+            guildId: g, name: "Support", channelId: support, typeIds, categoryId: ticketCat, supportRoleId: role("support"),
+            description: hq
+              ? "Pick what you need help with. A private channel opens that only you and the team can see. Never post license keys or payment details in public."
+              : "Open a private ticket and staff will reply there.",
+          },
+        });
       }
     }],
     ["Applications", async () => {
@@ -640,7 +670,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
         if (await prisma.rolePanel.findFirst({ where: { guildId: g, name: picker.name } })) continue;
         const options = picker.options.map((o) => ({ roleIds: [o.role ? role(o.role) : null].filter(Boolean), channelIds: [], label: o.label, emoji: o.emoji })).filter((o) => o.roleIds.length);
         if (options.length) markChange(); // the role panel job posts it straight away
-        if (options.length) await prisma.rolePanel.create({ data: { guildId: g, name: picker.name, channelId: rolesChannel, description: picker.description, layout: "DROPDOWN", options } });
+        if (options.length) await prisma.rolePanel.create({ data: { guildId: g, name: picker.name, channelId: rolesChannel, description: picker.description, layout: picker.buttons ? "BUTTONS" : "DROPDOWN", options } });
       }
     }],
     ["Temp Channels", async () => {
@@ -648,6 +678,10 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       if (!lobby) return;
       const gameChoices = blueprintGameChoices(opts.games);
       const existing = await prisma.tempChannelLobby.findFirst({ where: { guildId: g, lobbyChannelId: lobby } });
+      if (hq) {
+        if (!existing) await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a Test VC", lobbyChannelId: lobby, categoryId: cat("lab"), nameFormat: "🧪 {user}'s Test VC", userLimit: 0, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000) } });
+        return;
+      }
       if (streaming) {
         if (!existing) await prisma.tempChannelLobby.create({ data: { guildId: g, name: "Create a VC", lobbyChannelId: lobby, categoryId: cat("voice"), nameFormat: "🔊 {user}'s VC", userLimit: 0, bitrate: Math.min(128000, guild.maximumBitrate ?? 96000) } });
         return;
@@ -666,7 +700,14 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       const status = ch("bot-status");
       if (status && !(await prisma.statusChannel.findUnique({ where: { channelId: status } }))) await prisma.statusChannel.create({ data: { guildId: g, channelId: status } });
     }],
+    ...(hq
+      ? ([
+          ["Server guide", () => postOnce("welcome", { color: 0x3cc8ff, ...HQ_GUIDE })],
+          ["Test Lab guide", () => postOnce("test-notes", { color: 0x3cc8ff, ...HQ_TEST_GUIDE })],
+        ] as Array<[string, () => Promise<unknown>]>)
+      : []),
     ["Matchmaking", async () => {
+      if (hq) return;
       const games = BLUEPRINT_GAMES.filter((x) => opts.games.includes(x.id) && x.id !== "other").map((x) => x.name);
       await fillSettings("matchmakingConfig", g, {
         channelId: ch("mm-board"),
@@ -717,7 +758,10 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
     });
   }
   for (const key of modulesOn(opts)) invalidateModuleCache(g, key);
-  notes.push("LFG needs its command made on the dashboard (LFG page), since it picks a trigger word for your server.");
+  if (hq) {
+    notes.push(`To connect the OG Armory store: in the store's admin › Staff & roles, pick 🗂️ Open Tickets as the ticket category and #🛒・store-alerts as the alert channel, and link 🎟️ Support Team, 🛡️ Moderator and ⚙️ Admin.`);
+    notes.push("Give 💎 Verified Buyer to each product on the store's Products page so buyers unlock 💎・verified-buyers automatically.");
+  } else notes.push("LFG needs its command made on the dashboard (LFG page), since it picks a trigger word for your server.");
 }
 
 // Discord's own join questions. Default channels must be ones anyone can see.
@@ -741,10 +785,17 @@ async function setupOnboarding(guild: Guild, opts: SetupOptions, ids: Ids, notes
     type: 0,
     title: q.title,
     single_select: q.singleSelect,
-    required: false,
+    required: q.required ?? false,
     in_onboarding: true,
     options: q.options
-      .map((o) => ({ id: newId(), title: o.label, emoji_name: o.emoji, role_ids: [o.role ? ids.roles.get(o.role) : undefined].filter(usable), channel_ids: [o.channel ? ids.channels.get(o.channel) : undefined].filter(Boolean) }))
+      .map((o) => ({
+        id: newId(),
+        title: o.label,
+        ...(o.description ? { description: o.description } : {}),
+        emoji_name: o.emoji,
+        role_ids: [o.role ? ids.roles.get(o.role) : undefined].filter(usable),
+        channel_ids: [...new Set([o.channel, ...(o.channels ?? [])].map((k) => (k ? ids.channels.get(k) : undefined)).filter(Boolean))],
+      }))
       .filter((o) => o.role_ids.length || o.channel_ids.length),
   })).filter((p) => p.options.length);
   const moveNote = `Spartacus's role has to be above these roles for onboarding to give them out: ${[...blocked].slice(0, 15).join(", ")}. Drag Spartacus to the top in Server Settings → Roles, then run /server-setup again with Onboarding.`;
@@ -754,9 +805,14 @@ async function setupOnboarding(guild: Guild, opts: SetupOptions, ids: Ids, notes
   }
   if (blocked.size) notes.push(moveNote);
   // The streaming layout is open, so new people start with the main channels.
-  const defaultKeys = opts.layout === "streaming" ? ["rules", "welcome", "announcements", "events", "live", "general", "memes", "media", "clips", "lfg"] : ["welcome", "rules", "roles"];
+  const defaultKeys =
+    opts.layout === "streaming" ? ["rules", "welcome", "announcements", "events", "live", "general", "memes", "media", "clips", "lfg"]
+    : opts.layout === "hq" ? ["rules", "welcome"]
+    : ["welcome", "rules", "roles"];
   const defaults = defaultKeys.map((k) => ids.channels.get(k)).filter(Boolean);
-  const body = { prompts, default_channel_ids: defaults, enabled: true, mode: 0 };
+  // HQ starts people with only 📌 Start Here; its sections come from the answers, so it
+  // uses Discord's advanced mode, which counts channels the answers open.
+  const body = { prompts, default_channel_ids: defaults, enabled: true, mode: opts.layout === "hq" ? 1 : 0 };
   const path = `/guilds/${guild.id}/onboarding` as `/${string}`;
   let reason = "";
   const put = (data: object) =>

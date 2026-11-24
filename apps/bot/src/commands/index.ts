@@ -30,6 +30,7 @@ import giveawayReroll from "./engagement/giveawayReroll";
 import prestige from "./leveling/prestige";
 import remindme from "./utility/remindme";
 import serverSetup from "./utility/serverSetup";
+import hqSetup from "./utility/hqSetup";
 import role from "./utility/role";
 import golive from "./community/golive";
 import schedule from "./community/schedule";
@@ -78,6 +79,7 @@ for (const command of [
   prestige,
   remindme,
   serverSetup,
+  hqSetup,
   role,
   golive,
   schedule,

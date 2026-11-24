@@ -19,9 +19,10 @@ interface TopHeaderProps {
   onSelectGuild: (guildId: string) => void;
   onMenuClick: () => void;
   sidebarOpen?: boolean;
+  isOwner?: boolean;
 }
 
-export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick, sidebarOpen }: TopHeaderProps) {
+export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuClick, sidebarOpen, isOwner }: TopHeaderProps) {
   const installedGuilds = guilds.filter((g) => g.botInstalled);
   const unseenChangelog = useChangelogUnseenCount();
 
@@ -71,7 +72,7 @@ export function TopHeader({ user, guilds, activeGuildId, onSelectGuild, onMenuCl
           <span>Search</span>
           <kbd className="text-[10px] border border-white/10 rounded px-1">⌘K</kbd>
         </button>
-        <AccountMenu user={user} guildId={activeGuildId} />
+        <AccountMenu user={user} guildId={activeGuildId} isOwner={isOwner} />
       </div>
     </header>
   );

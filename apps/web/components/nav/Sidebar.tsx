@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { pressNav, setPendingNav, usePendingNav } from "../../lib/pendingNav";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, TIER_INFO, quickLinkMain, tierForPath, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, TIER_INFO, featureForPath, quickLinkMain, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
 import { isLocked, useGuildPlan } from "../../lib/useGuildPlan";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api } from "../../lib/api";
@@ -186,8 +186,9 @@ export function Sidebar({
       const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
       const pinned = isPinned(item.href);
       const isQuick = item.href === "/quick-links" && sectionName === "Owner Only";
-      const needs = tierForPath(item.href, (h) => NAV_MODULE_KEYS[h]);
-      const locked = isLocked(plan, needs, isOwner);
+      const need = featureForPath(item.href, (h) => NAV_MODULE_KEYS[h]);
+      const needs = need?.tier ?? null;
+      const locked = isLocked(plan, needs, isOwner, need?.feature ?? null);
       return (
         <Fragment key={`${sectionName ?? "top"}:${item.href}`}>
         <div

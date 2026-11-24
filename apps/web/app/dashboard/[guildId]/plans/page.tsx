@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PLAN_TIERS, TIER_INFO, type PlanPurchase, type PlanTier } from "@spartacus/shared";
+import { PLAN_TIERS, SINGLE_ITEMS, TIER_INFO, type PlanPurchase, type PlanTier } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
 import { useConfirm } from "../../../../components/ui/ConfirmDialog";
@@ -90,6 +90,18 @@ export default function PlansPage({ params }: { params: { guildId: string } }) {
             );
           })}
         </div>
+        {!!plan?.features?.length && (
+          <div>
+            <p className="text-xs text-slate-400 mb-1.5">Single features unlocked here:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {plan.features.map((f) => (
+                <span key={f} className="text-xs rounded-full border border-emerald-500/40 bg-emerald-500/5 text-emerald-300 px-2.5 py-1">
+                  ✓ {SINGLE_ITEMS.find((s) => s.feature === f)?.name ?? f}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         {plan?.reason === "owner" && <p className="text-xs text-slate-500">This is your own server, so everything is always unlocked.</p>}
         {plan?.reason === "gift" && <p className="text-xs text-slate-500">This server was given a free plan by the bot owner.</p>}
       </NeonCard>
@@ -110,7 +122,7 @@ export default function PlansPage({ params }: { params: { guildId: string } }) {
               <div className="flex-1 min-w-[200px]">
                 <p className="font-semibold">{p.productName}</p>
                 <p className="text-xs text-slate-400">
-                  {p.tiers.map((t) => TIER_INFO[t].name).join(" + ")}
+                  {p.tiers.length ? p.tiers.map((t) => TIER_INFO[t].name).join(" + ") : "Single feature"}
                   {p.interval ? ` · ${p.interval === "year" ? "yearly" : "monthly"}` : ""}
                   {p.periodEnd ? ` · ${live ? "renews" : "ended"} ${fmtDate(p.periodEnd)}` : ""}
                 </p>
@@ -140,6 +152,9 @@ export default function PlansPage({ params }: { params: { guildId: string } }) {
             ))}
             <a href={`${store}/p/all-access`} target="_blank" rel="noreferrer" className="neon-button-sm">
               💎 Get All Access
+            </a>
+            <a href={`${store}/products`} target="_blank" rel="noreferrer" className="neon-button-sm">
+              🛒 Buy single features
             </a>
             <a href={`${store}/library`} target="_blank" rel="noreferrer" className="text-xs text-slate-400 underline self-center">
               Billing and receipts

@@ -97,10 +97,107 @@ export function tiersForProducts(productIds: readonly string[]): PlanTier[] {
   return PLAN_TIERS.filter((t) => out.has(t));
 }
 
+// ---------------------------------------------------------------------------
+// Single features. Each paid feature can also be bought on its own, unlocking
+// just that one thing on one server. A feature id is:
+//   m:<MODULE_KEY>   a paid module (the Economy Hub's tabs go with m:ECONOMY)
+//   p:partnerships   Server Partnerships (no module switch)
+//   o:<kind>         one overlay: money, kd, socials, or an OVERLAY_KINDS box
+//   t:<kind>         one stream tool (TOOL_KINDS)
+//   cc               Chat Commands (the Kick/Twitch chat bot)
+// A plan covers every feature in it; a single covers only itself.
+// ---------------------------------------------------------------------------
+const ECONOMY_TABS: readonly ModuleKey[] = ["LEVELING", "PRESTIGE", "VOICE_ACTIVITY", "ACHIEVEMENTS", "PROFILE_CARDS", "RANK_CARDS"];
+export const moduleFeature = (key: ModuleKey) => `m:${ECONOMY_TABS.includes(key) ? "ECONOMY" : key}`;
+
+const COUNTER_KINDS = ["money", "kd", "socials", "game", "message", "winloss", "timer", "goal", "challenge", "discord", "ticker"] as const;
+const TOOL_IDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx"] as const;
+
+/** Every single item for sale: [store product id, feature, the plan that also includes it, name]. */
+export const SINGLE_ITEMS: ReadonlyArray<{ product: string; feature: string; tier: PlanTier; name: string }> = [
+  ...([
+    ["anti-raid", "ANTI_RAID", "Anti-Raid"], ["anti-nuke", "ANTI_NUKE", "Anti-Nuke"], ["ai-moderation", "AI_MODERATION", "AI Moderation"],
+    ["perm-watch", "PERM_WATCH", "Perm Watch"], ["honeypot", "HONEYPOT", "Honeypot"], ["server-backup", "SERVER_BACKUP", "Server Backup"],
+    ["warn-escalation", "WARN_ESCALATION", "Warn Escalation"], ["ban-appeals", "BAN_APPEALS", "Ban Appeals"], ["weekly-staff-report", "MOD_DIGEST", "Weekly Staff Report"],
+    ["applications", "APPLICATIONS", "Applications"], ["support-dm", "SUPPORT_INTAKE", "Support DM"], ["server-config-templates", "SERVER_TEMPLATES", "Server Config Templates"],
+    ["economy-hub", "ECONOMY", "Economy Hub"], ["ai-chat", "AI_CHAT", "AI Chat"], ["event-scheduler", "EVENTS", "Event Scheduler"],
+    ["matchmaking", "MATCHES", "Matchmaking"], ["anonymous-posts", "CONFESSIONS", "Anonymous Posts"], ["sticky-messages", "STICKY_MESSAGES", "Sticky Messages"],
+    ["weekly-recap", "WEEKLY_RECAP", "Weekly Recap"], ["growth-analytics", "GROWTH_ANALYTICS", "Growth Analytics"], ["suggestion-analytics", "SUGGESTION_ANALYTICS", "Suggestion Analytics"],
+    ["member-milestones", "MEMBER_MILESTONES", "Member Milestones"],
+  ] as const).map(([product, key, name]) => ({ product, feature: `m:${key}`, tier: "pro" as const, name })),
+  { product: "server-partnerships", feature: "p:partnerships", tier: "pro", name: "Server Partnerships" },
+  ...([
+    ["stream-extras", "STREAM_EXTRAS", "Stream Extras"], ["stream-growth", "STREAM_GROWTH", "Stream Growth"], ["pre-stream-checklist", "PRE_STREAM", "Pre-Stream Checklist"],
+  ] as const).map(([product, key, name]) => ({ product, feature: `m:${key}`, tier: "kit" as const, name })),
+  { product: "chat-commands", feature: "cc", tier: "kit", name: "Chat Commands" },
+  ...([
+    ["money-counter", "money", "Money Counter"], ["kd-counter", "kd", "K/D Counter"], ["socials-overlay", "socials", "Socials Overlay"],
+    ["game-overlay", "game", "Game Box"], ["message-box", "message", "Message Box"], ["win-loss-counter", "winloss", "Win/Loss Counter"],
+    ["timer-overlay", "timer", "Stream Timer"], ["goal-bar", "goal", "Goal Bar"], ["challenge-counter", "challenge", "Challenge Counter"],
+    ["discord-box", "discord", "Discord Box"], ["event-ticker", "ticker", "Follower Ticker"],
+  ] as const).map(([product, kind, name]) => ({ product, feature: `o:${kind}`, tier: "kit" as const, name })),
+  ...([
+    ["chat-box", "chat", "Chat Box"], ["stats-bar", "stats", "Stats Bar"], ["clip-marker", "clip", "Clip Marker"], ["command-tips", "cmds", "Command Tips"],
+    ["qr-code", "qr", "QR Code"], ["squad-box", "squad", "Squad Box"], ["stream-poll", "poll", "Stream Poll"], ["spin-wheel", "wheel", "Spin Wheel"],
+    ["dice-and-coin", "dice", "Dice & Coin"], ["predictions", "predict", "Predictions"], ["first-time-welcome", "welcome", "First-Time Welcome"], ["command-alerts", "cmdfx", "Command Alerts"],
+  ] as const).map(([product, kind, name]) => ({ product, feature: `t:${kind}`, tier: "kit" as const, name })),
+];
+const SINGLE_BY_PRODUCT = new Map(SINGLE_ITEMS.map((s) => [s.product, s]));
+const TIER_OF_FEATURE = new Map(SINGLE_ITEMS.map((s) => [s.feature, s.tier]));
+
+/** What store products unlock in Spartacus: whole plans plus single features, as one list (stored on GuildPlan.tiers). */
+export function unlocksForProducts(productIds: readonly string[]): string[] {
+  const out = new Set<string>(tiersForProducts(productIds));
+  for (const id of productIds) {
+    const s = SINGLE_BY_PRODUCT.get(id);
+    if (s) out.add(s.feature);
+  }
+  return [...out];
+}
+
+/** Does a list of unlocks (plans + single features) cover this feature? */
+export function covers(unlocks: readonly string[], feature: string | null, tier: PlanTier | null): boolean {
+  if (!tier) return true;
+  if (unlocks.includes(tier)) return true;
+  if (!feature) return false;
+  if (feature === "o:*") return unlocks.some((u) => u.startsWith("o:") || u.startsWith("t:"));
+  if (feature === "t:*") return unlocks.some((u) => u.startsWith("t:"));
+  return unlocks.includes(feature);
+}
+
+/** The single feature (and its plan) a dashboard page belongs to, or null if it's free. */
+export function featureForPath(path: string, moduleKeyForHref?: (href: string) => ModuleKey | undefined): { feature: string | null; tier: PlanTier } | null {
+  const ov = /^\/overlays\/([\w-]+)/.exec(path);
+  if (ov) {
+    const k = ov[1];
+    if ((TOOL_IDS as readonly string[]).includes(k)) return { feature: `t:${k}`, tier: "kit" };
+    if ((COUNTER_KINDS as readonly string[]).includes(k)) return { feature: `o:${k}`, tier: "kit" };
+    return { feature: "o:*", tier: "kit" };
+  }
+  if (path === "/overlays") return { feature: "o:*", tier: "kit" };
+  if (path === "/chat-commands" || path.startsWith("/chat-commands/")) return { feature: "cc", tier: "kit" };
+  if (path === "/partnerships" || path.startsWith("/partnerships/")) return { feature: "p:partnerships", tier: "pro" };
+  const tier = tierForPath(path, moduleKeyForHref);
+  if (!tier) return null;
+  const key = moduleKeyForHref?.("/" + (path.split("/")[1] ?? ""));
+  return { feature: key ? moduleFeature(key) : null, tier };
+}
+
+/** The feature a Stream Deck key drives (besides needing the Stream Deck plan). */
+export const SD_ACTION_FEATURE: Record<string, string> = {
+  money: "o:money", dmoney: "o:money", kd: "o:kd", dkd: "o:kd", ovgame: "o:game", ovmsg: "o:message", ovwl: "o:winloss", ovtimer: "o:timer",
+  ovgoal: "o:goal", ovchal: "o:challenge", ovshow: "o:*", clipit: "t:clip", tool: "t:*", chatcmd: "cc",
+  apps: "m:APPLICATIONS", event: "m:EVENTS", sticky: "m:STICKY_MESSAGES", dxp: "m:ECONOMY", dmm: "m:MATCHES",
+};
+
+export const featureTier = (feature: string): PlanTier | null => TIER_OF_FEATURE.get(feature) ?? null;
+
 /** What the dashboard gets for a server. `enforced: false` means plans aren't switched on yet: everything is open. */
 export interface GuildPlanState {
   enforced: boolean;
   tiers: PlanTier[];
+  /** Single features bought on their own (see SINGLE_ITEMS). */
+  features: string[];
   /** "owner" = the bot owner's own server (always everything), "gift" = given free by the owner. */
   reason?: "owner" | "gift" | "paid";
   storeUrl: string | null;
@@ -112,6 +209,8 @@ export interface PlanPurchase {
   productId: string;
   productName: string;
   tiers: PlanTier[];
+  /** Single features (when the purchase is one item, not a plan). */
+  features: string[];
   interval: "month" | "year" | null;
   status: string;
   periodEnd: string | null;

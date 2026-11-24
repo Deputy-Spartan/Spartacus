@@ -61,7 +61,7 @@ export function entitlementLive(status: string, periodEnd: Date | string | null)
   return false;
 }
 
-const cache = new Map<string, { at: number; tiers: Tier[]; reason: "owner" | "gift" | "paid" | undefined }>();
+const cache = new Map<string, { at: number; tiers: Tier[]; features: string[]; reason: "owner" | "gift" | "paid" | undefined }>();
 const refreshing = new Set<string>();
 
 export function forgetGuildPlan(guildId?: string) {
@@ -84,13 +84,14 @@ export async function refreshBuyers(discordIds: string[]): Promise<StoreEntitlem
   return list;
 }
 
-/** The plans a server has right now, and why. */
-export async function guildPlanState(guildId: string): Promise<{ tiers: Tier[]; reason?: "owner" | "gift" | "paid" }> {
-  if (!plansEnforced()) return { tiers: ALL };
+/** The plans (and single features) a server has right now, and why. */
+export async function guildPlanState(guildId: string): Promise<{ tiers: Tier[]; features: string[]; reason?: "owner" | "gift" | "paid" }> {
+  if (!plansEnforced()) return { tiers: ALL, features: [] };
   const hit = cache.get(guildId);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit;
 
   let tiers: Tier[] = [];
+  let features: string[] = [];
   let reason: "owner" | "gift" | "paid" | undefined;
   if (isBotOwner(ownerOf(guildId))) {
     tiers = ALL;
@@ -98,13 +99,16 @@ export async function guildPlanState(guildId: string): Promise<{ tiers: Tier[]; 
   } else {
     const rows = await prisma.guildPlan.findMany({ where: { guildId } }).catch(() => []);
     const got = new Set<Tier>();
+    const singles = new Set<string>();
     for (const r of rows) {
       const gift = r.entitlementId.startsWith("gift:");
       if (!gift && !entitlementLive(r.status, r.periodEnd)) continue;
-      for (const t of r.tiers) if (ALL.includes(t as Tier)) got.add(t as Tier);
+      // GuildPlan.tiers holds whole plans ("pro") and single features ("m:ANTI_RAID", "o:money") together.
+      for (const t of r.tiers) (ALL.includes(t as Tier) ? got.add(t as Tier) : singles.add(t));
       reason = gift && reason !== "paid" ? "gift" : "paid";
     }
     tiers = ALL.filter((t) => got.has(t));
+    features = [...singles];
     // Out of date? Ask the store in the background; the next check uses the answer.
     const stale = [...new Set(rows.filter((r) => !r.entitlementId.startsWith("gift:") && Date.now() - r.checkedAt.getTime() > CHECK_EVERY).map((r) => r.ownerDiscordId))];
     for (const buyer of stale) {
@@ -115,11 +119,25 @@ export async function guildPlanState(guildId: string): Promise<{ tiers: Tier[]; 
         .finally(() => refreshing.delete(buyer));
     }
   }
-  const out = { at: Date.now(), tiers, reason };
+  const out = { at: Date.now(), tiers, features, reason };
   cache.set(guildId, out);
   return out;
 }
 
 export async function guildHasTier(guildId: string, tier: Tier): Promise<boolean> {
   return (await guildPlanState(guildId)).tiers.includes(tier);
+}
+
+/**
+ * Has this server got a feature, either through its whole plan (tier) or
+ * bought on its own? feature "o:*" = any single overlay or tool, "t:*" = any tool.
+ */
+export async function guildHasFeature(guildId: string, feature: string | null, tier: Tier | null): Promise<boolean> {
+  if (!tier) return true;
+  const s = await guildPlanState(guildId);
+  if (s.tiers.includes(tier)) return true;
+  if (!feature) return false;
+  if (feature === "o:*") return s.features.some((f) => f.startsWith("o:") || f.startsWith("t:"));
+  if (feature === "t:*") return s.features.some((f) => f.startsWith("t:"));
+  return s.features.includes(feature);
 }

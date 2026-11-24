@@ -1,6 +1,6 @@
 import { Router, type Response } from "express";
 import { prisma, entitlementLive, forgetGuildPlan, guildPlanState, plansEnforced, refreshBuyers, storeUrl } from "@spartacus/db";
-import { PLAN_TIERS, tiersForProducts, type GuildPlanState, type PlanPurchase, type PlanTier } from "@spartacus/shared";
+import { PLAN_TIERS, tiersForProducts, unlocksForProducts, type GuildPlanState, type PlanPurchase, type PlanTier } from "@spartacus/shared";
 import { requireAuth, isOwner, type AuthedRequest } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
@@ -30,7 +30,7 @@ function storeDown(res: Response, e: unknown) {
 
 router.get("/guilds/:guildId/plan", requireAuth, requireGuildPermission, async (req: AuthedRequest, res) => {
   const state = await guildPlanState(req.params.guildId);
-  const out: GuildPlanState = { enforced: plansEnforced(), tiers: state.tiers, reason: state.reason, storeUrl: storeUrl() };
+  const out: GuildPlanState = { enforced: plansEnforced(), tiers: state.tiers, features: state.features, reason: state.reason, storeUrl: storeUrl() };
   res.json(out);
 });
 
@@ -44,7 +44,7 @@ router.get("/me/plans", requireAuth, async (req: AuthedRequest, res) => {
   }
   const rows = await prisma.guildPlan.findMany({ where: { ownerDiscordId: uid(req) } });
   const purchases: PlanPurchase[] = list
-    .filter((e) => tiersForProducts([e.productId]).length && !["refunded", "revoked"].includes(e.status))
+    .filter((e) => unlocksForProducts([e.productId]).length && !["refunded", "revoked"].includes(e.status))
     .map((e) => {
       const row = rows.find((r) => r.entitlementId === e.id);
       return {
@@ -52,6 +52,7 @@ router.get("/me/plans", requireAuth, async (req: AuthedRequest, res) => {
         productId: e.productId,
         productName: e.productName,
         tiers: tiersForProducts([e.productId]),
+        features: unlocksForProducts([e.productId]).filter((u) => !(PLAN_TIERS as readonly string[]).includes(u)),
         interval: e.interval,
         status: entitlementLive(e.status, e.periodEnd) ? "active" : e.status,
         periodEnd: e.periodEnd,
@@ -75,7 +76,7 @@ router.post("/me/plans/:entitlementId/assign", requireAuth, async (req: AuthedRe
   }
   const e = list.find((x) => x.id === req.params.entitlementId);
   if (!e) return res.status(404).json({ error: "That purchase isn't on your account." });
-  const tiers = tiersForProducts([e.productId]);
+  const tiers = unlocksForProducts([e.productId]);
   if (!tiers.length) return res.status(400).json({ error: "That purchase doesn't unlock anything in Spartacus." });
   if (!entitlementLive(e.status, e.periodEnd)) return res.status(400).json({ error: "That plan isn't active. Check My Library on the store." });
 

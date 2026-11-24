@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { MODULE_LABELS, MODULE_TIER, NAV_MODULE_KEYS, NAV_SECTIONS, TIER_INFO, UNLISTED_MODULES, tierForPath } from "@spartacus/shared";
+import { MODULE_LABELS, MODULE_TIER, NAV_MODULE_KEYS, NAV_SECTIONS, TIER_INFO, UNLISTED_MODULES, featureForPath, moduleFeature } from "@spartacus/shared";
 import { isLocked, useGuildPlan } from "../../../../lib/useGuildPlan";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ToggleSwitch } from "../../../../components/ui/ToggleSwitch";
@@ -64,9 +64,9 @@ function ModulesContent({ guildId }: { guildId: string }) {
   // Paid plans: a page this server's plan doesn't cover shows 🔒 instead of its switch.
   const plan = useGuildPlan(guildId);
   const lockFor = (href: string) => {
-    const tier = tierForPath(href, (h) => NAV_MODULE_KEYS[h]);
+    const need = featureForPath(href, (h) => NAV_MODULE_KEYS[h]);
     // (Before plans are switched on, only the page itself guards the Stream Deck.)
-    return tier && isLocked(plan, tier, true) ? tier : null;
+    return need && isLocked(plan, need.tier, true, need.feature) ? need.tier : null;
   };
 
   return (
@@ -174,7 +174,7 @@ function ModulesContent({ guildId }: { guildId: string }) {
                       <span className="block text-sm text-slate-200 truncate">{MODULE_LABELS[key]}</span>
                       <span className="block text-xs text-slate-500 truncate">{description}</span>
                     </span>
-                    {MODULE_TIER[key] && isLocked(plan, MODULE_TIER[key]!) ? (
+                    {MODULE_TIER[key] && isLocked(plan, MODULE_TIER[key]!, true, moduleFeature(key)) ? (
                       <Link href={`/dashboard/${guildId}/plans`} className="shrink-0 text-xs text-amber-300 hover:text-amber-200">
                         🔒 {TIER_INFO[MODULE_TIER[key]!].name}
                       </Link>

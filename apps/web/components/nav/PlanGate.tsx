@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_MODULE_KEYS, TIER_INFO, tierForPath, type PlanTier } from "@spartacus/shared";
+import { NAV_MODULE_KEYS, SINGLE_ITEMS, TIER_INFO, featureForPath, type PlanTier } from "@spartacus/shared";
 import { NeonCard } from "../ui/NeonCard";
 import { isLocked, useGuildPlan } from "../../lib/useGuildPlan";
 
@@ -13,13 +13,14 @@ export function PlanGate({ guildId, isOwner, children }: { guildId: string; isOw
   const pathname = usePathname();
   const plan = useGuildPlan(guildId);
   const path = pathname.replace(`/dashboard/${guildId}`, "") || "/";
-  const tier = tierForPath(path, (href) => NAV_MODULE_KEYS[href]);
-  if (!isLocked(plan, tier, isOwner)) return <>{children}</>;
-  return <LockedPage guildId={guildId} tier={tier!} storeUrl={plan?.storeUrl ?? null} enforced={!!plan?.enforced} />;
+  const need = featureForPath(path, (href) => NAV_MODULE_KEYS[href]);
+  if (!need || !isLocked(plan, need.tier, isOwner, need.feature)) return <>{children}</>;
+  return <LockedPage guildId={guildId} tier={need.tier} feature={need.feature} storeUrl={plan?.storeUrl ?? null} enforced={!!plan?.enforced} />;
 }
 
-export function LockedPage({ guildId, tier, storeUrl, enforced }: { guildId: string; tier: PlanTier; storeUrl: string | null; enforced: boolean }) {
+export function LockedPage({ guildId, tier, feature, storeUrl, enforced }: { guildId: string; tier: PlanTier; feature?: string | null; storeUrl: string | null; enforced: boolean }) {
   const info = TIER_INFO[tier];
+  const single = feature ? SINGLE_ITEMS.find((s) => s.feature === feature) : undefined;
   if (!enforced) {
     return (
       <NeonCard className="max-w-xl mx-auto mt-10 text-center space-y-3">
@@ -37,9 +38,14 @@ export function LockedPage({ guildId, tier, storeUrl, enforced }: { guildId: str
         <p className="text-slate-400 text-sm mt-1">{info.blurb}</p>
       </div>
       <div className="flex flex-wrap justify-center gap-2">
+        {storeUrl && single && (
+          <a href={`${storeUrl}/p/${single.product}`} target="_blank" rel="noreferrer" className="neon-button">
+            🔓 Get just {single.name}
+          </a>
+        )}
         {storeUrl && (
-          <a href={`${storeUrl}/p/${info.product}`} target="_blank" rel="noreferrer" className="neon-button">
-            {info.icon} Unlock {info.name}
+          <a href={`${storeUrl}/p/${info.product}`} target="_blank" rel="noreferrer" className={single ? "neon-button-sm self-center" : "neon-button"}>
+            {info.icon} Unlock all of {info.name}
           </a>
         )}
         <Link href={`/dashboard/${guildId}/plans`} className="neon-button-sm self-center">

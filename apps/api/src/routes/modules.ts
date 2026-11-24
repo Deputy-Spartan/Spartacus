@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { guildHasTier, prisma } from "@spartacus/db";
-import { MODULE_KEYS, MODULE_TIER, type ModuleKey } from "@spartacus/shared";
+import { guildHasFeature, prisma } from "@spartacus/db";
+import { MODULE_KEYS, MODULE_TIER, moduleFeature, type ModuleKey } from "@spartacus/shared";
 import { lockedMessage } from "../middleware/planGate";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
@@ -37,7 +37,7 @@ router.patch(
 
     // Paid modules can be switched off any time, but only switched on with the plan.
     const tier = MODULE_TIER[key as ModuleKey];
-    if (enabled && tier && !(await guildHasTier(guildId, tier))) {
+    if (enabled && tier && !(await guildHasFeature(guildId, moduleFeature(key as ModuleKey), tier))) {
       return res.status(402).json({ error: lockedMessage(tier), locked: tier });
     }
 

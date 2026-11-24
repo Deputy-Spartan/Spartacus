@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useReducer } from "react";
-import type { GuildPlanState, PlanTier } from "@spartacus/shared";
+import { covers, type GuildPlanState, type PlanTier } from "@spartacus/shared";
 import { api } from "./api";
 
 // Which paid plans this server has (Outpost Gaming store). One copy per
@@ -40,8 +40,8 @@ export function useGuildPlan(guildId: string): GuildPlanState | null {
  * Is this plan missing here? Before paid plans are switched on, nothing is
  * locked except the Stream Deck, which stays the bot owner's until then.
  */
-export function isLocked(state: GuildPlanState | null, tier: PlanTier | null, isOwner = false): boolean {
+export function isLocked(state: GuildPlanState | null, tier: PlanTier | null, isOwner = false, feature: string | null = null): boolean {
   if (!tier || !state) return false;
   if (!state.enforced) return tier === "deck" && !isOwner;
-  return !state.tiers.includes(tier);
+  return !covers([...state.tiers, ...(state.features ?? [])], feature, tier);
 }

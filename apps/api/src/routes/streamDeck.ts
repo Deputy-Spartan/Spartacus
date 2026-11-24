@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { createHash, randomBytes } from "node:crypto";
-import { guildHasTier, plansEnforced, prisma } from "@spartacus/db";
-import { SD_ACTION_TIER, TIER_INFO } from "@spartacus/shared";
+import { guildHasFeature, guildHasTier, plansEnforced, prisma } from "@spartacus/db";
+import { SD_ACTION_FEATURE, SD_ACTION_TIER, TIER_INFO } from "@spartacus/shared";
 import { lockedMessage } from "../middleware/planGate";
 import { requireAuth, isOwner, type AuthedRequest } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
@@ -108,7 +108,7 @@ router.post("/sd/v1/faces", sdAuth, async (req: SdRequest, res) => {
   await Promise.all(
     items.map(async (it) => {
       const need = SD_ACTION_TIER[String(it.action)];
-      if (need && plansEnforced() && !(await guildHasTier(ctx.guild.id, need))) {
+      if (need && plansEnforced() && !(await guildHasFeature(ctx.guild.id, SD_ACTION_FEATURE[String(it.action)] ?? null, need))) {
         faces[it.id] = { title: String(it.action), line: `🔒 ${need === "kit" ? "Kit" : "Pro"}`, tone: "red" };
         return;
       }
@@ -128,7 +128,8 @@ router.post("/sd/v1/run", sdAuth, async (req: SdRequest, res) => {
   presses.set(req.sd!.keyId, [...recent, now]);
   const { action, settings, op, value } = req.body ?? {};
   const need = SD_ACTION_TIER[String(action)];
-  if (need && plansEnforced() && !(await guildHasTier(ctx.guild.id, need))) return res.json({ ok: false, message: `Needs ${TIER_INFO[need].name}` });
+  if (need && plansEnforced() && !(await guildHasFeature(ctx.guild.id, SD_ACTION_FEATURE[String(action)] ?? null, need)))
+    return res.json({ ok: false, message: `Needs ${TIER_INFO[need].name}` });
   const result = await ctx.bot
     .runStreamDeck(ctx.actor, String(action), (settings ?? {}) as never, op === "turn" || op === "tap" ? op : "press", Number.isFinite(Number(value)) ? Number(value) : undefined)
     .catch((e: unknown) => ({ ok: false, message: e instanceof Error ? e.message : "That didn't work." }));

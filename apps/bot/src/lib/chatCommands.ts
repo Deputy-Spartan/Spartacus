@@ -12,7 +12,7 @@ import {
   type ChatCommandsState,
   type ChatRank,
 } from "@spartacus/shared";
-import { guildHasTier, logError } from "@spartacus/db";
+import { guildHasFeature, logError } from "@spartacus/db";
 import { prisma } from "./prisma";
 import { changeTool } from "./streamTools";
 import { changeOverlay } from "../modules/utility/streamDeck";
@@ -110,7 +110,7 @@ export async function runChatCommand(input: RunInput): Promise<{ ok: boolean; me
   const cfg = await chatCommandsOf(guildId);
   if (!cfg.on || !cfg[platform]) return { ok: false, message: "Chat commands are off." };
   // The Kick/Twitch chat bot is part of the Streamer Kit.
-  if (!(await guildHasTier(guildId, "kit"))) return { ok: false, message: "Chat commands need the Streamer Kit." };
+  if (!(await guildHasFeature(guildId, "cc", "kit"))) return { ok: false, message: "Chat commands need the Streamer Kit." };
   const found = findChatCommand(cfg, input.text);
   if (!found) return { ok: false, message: "No command like that." };
   const { cmd, parts } = found;
@@ -224,7 +224,7 @@ async function timersTick() {
     const cfg = cleanChatCommands(row.value);
     const timers = cfg.timers.filter((t) => t.on);
     if (!cfg.on || !timers.length) continue;
-    if (!(await guildHasTier(row.guildId, "kit"))) continue;
+    if (!(await guildHasFeature(row.guildId, "cc", "kit"))) continue;
     const accounts = await prisma.streamerAccount.findMany({ where: { guildId: row.guildId } });
     for (const a of accounts) {
       const platform = a.platform as Platform;

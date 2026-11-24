@@ -409,13 +409,16 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
       .map(({ spec }) => guild.roles.cache.get(ids.roles.get(spec.key) ?? ""))
       .filter((r): r is Role => !!r && !!me && me.roles.highest.comparePositionTo(r) > 0);
     if (ordered.length > 1) {
-      const sorted = await guild.roles
-        .setPositions(ordered.map((role, i) => ({ role, position: ordered.length - i })))
-        .then(() => true, (err) => {
-          logError("bot", err, guild.id);
-          return false;
-        });
-      if (!sorted) notes.push("Couldn't sort the roles. Move Spartacus's role to the top in Server Settings → Roles, then run this again.");
+      const why = await sortRoles(guild, ordered);
+      if (why !== null) {
+        // Only blame Spartacus's spot when a role really is above it.
+        const above = [...guild.roles.cache.values()].some((r) => r.id !== guild.id && !r.managed && !!me && me.roles.highest.comparePositionTo(r) <= 0);
+        notes.push(
+          above
+            ? "Couldn't sort the roles. Move Spartacus's role to the top in Server Settings → Roles, then run this again."
+            : `Couldn't sort the roles${why ? ` (Discord said: “${why.slice(0, 160)}”)` : ""}. Drag them into order in Server Settings → Roles, or run this again.`,
+        );
+      }
     }
     if (ordered.length < ids.roles.size) notes.push("Some roles are above Spartacus's role, so they keep their place. Move Spartacus's role to the top in Server Settings → Roles, then run this again to sort them.");
   } else {
@@ -572,6 +575,36 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   const mods = guild.roles.cache.filter((r) => !r.managed && r.permissions.has(PermissionFlagsBits.Administrator) && r.members.some((m) => !m.user.bot));
   if (mods.size) notes.push(`These roles give people Administrator: ${mods.map((r) => r.name).join(", ")}. Consider giving them only the permissions they need.`);
   return { done, notes };
+}
+
+// Puts the layout's roles in blueprint order (first = highest). It only swaps them among the
+// positions they already hold, so it never pushes into other roles' spots or above Spartacus.
+// Returns null when they're in order, or Discord's reason when it couldn't.
+async function sortRoles(guild: Guild, ordered: Role[]): Promise<string | null> {
+  await guild.roles.fetch().catch(() => null);
+  const fresh = ordered.map((r) => guild.roles.cache.get(r.id) ?? r);
+  if (fresh.every((r, i) => i === 0 || fresh[i - 1].position > r.position)) return null;
+  const slots = fresh.map((r) => r.position).sort((a, b) => b - a);
+  let reason = "";
+  const batch = await guild.roles
+    .setPositions(fresh.map((role, i) => ({ role, position: slots[i] })))
+    .then(() => true, (err: unknown) => {
+      reason = err instanceof Error ? err.message : String(err);
+      logError("bot", err, guild.id);
+      return false;
+    });
+  if (batch) return null;
+  // One at a time, lowest first, as a fallback.
+  let failed = 0;
+  for (let i = fresh.length - 1; i >= 0; i--) {
+    await fresh[i].setPosition(slots[i], { reason: "Server Setup" }).catch((err: unknown) => {
+      failed++;
+      reason = err instanceof Error ? err.message : String(err);
+    });
+  }
+  await guild.roles.fetch().catch(() => null);
+  const after = fresh.map((r) => guild.roles.cache.get(r.id) ?? r);
+  return failed && !after.every((r, i) => i === 0 || after[i - 1].position > r.position) ? reason : null;
 }
 
 // ---- Start fresh: everything Spartacus is allowed to remove goes, after the backup ----

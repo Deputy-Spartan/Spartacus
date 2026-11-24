@@ -163,6 +163,7 @@ export const OWNER_NAV_SECTION: NavSection = {
     { href: "/owner-panel", label: "Command Center", icon: "🔑" },
     { href: "/stream-deck", label: "Stream Deck", icon: "🎛️" },
     { href: "/quick-links", label: "Quick Links", icon: "🔗" },
+    { href: "/og-store", label: "OG Armory Store", icon: "🛒" },
     { href: "/front-page", label: "Front Page", icon: "🏠" },
     { href: "/whats-new", label: "What's New", icon: "🔔" },
   ],

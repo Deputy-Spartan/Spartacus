@@ -3,7 +3,7 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 import { ActivityType, Client, Events, GatewayIntentBits, Options, Partials, type PresenceStatusData } from "discord.js";
-import { logError, prisma } from "@spartacus/db";
+import { logError, prisma, setGuildOwnerLookup } from "@spartacus/db";
 import { commands } from "./commands";
 import { registerCommands } from "./lib/registerCommands";
 import { isLeader, startLeaderLoop, takeLeadership } from "./lib/leader";
@@ -248,6 +248,8 @@ export function startBot() {
   });
 
   client.commands = commands;
+  // Paid plans: the bot owner's own servers always have every plan.
+  setGuildOwnerLookup((guildId) => client.guilds.cache.get(guildId)?.ownerId ?? null);
 
   // Only the active copy acts on Discord events (see lib/leader.ts). During a
   // deploy the old copy keeps its connection but stops answering, so nothing

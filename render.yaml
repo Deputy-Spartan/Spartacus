@@ -48,6 +48,10 @@ services:
         sync: false
       - key: VERCEL_TEAM_ID
         sync: false
+      # Paid plans (Outpost Gaming store). The same value as STORE_BRIDGE_SECRET on
+      # the store's Netlify site. Leave it unset and nothing is locked.
+      - key: STORE_BRIDGE_SECRET
+        sync: false
 
   # Dashboard — deploy separately to Vercel (recommended for Next.js) or as
   # a second Render static/web service pointed at apps/web.

@@ -490,6 +490,16 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     ],
     tips: ["The tabs at the top of each overlay page switch between them.", "The Money and K/D counters work with the Spartacus Stream Deck plugin."],
   },
+  "/stream-deck": {
+    title: "Stream Deck",
+    purpose: "Control Spartacus from an Elgato Stream Deck: 50 keys and dials for raids, slowmode, squads, tickets, your overlays and more.",
+    steps: [
+      "Download the Spartacus plugin here and double-click it. The Stream Deck app adds a Spartacus section.",
+      "Make a connection key on this page and paste it into any Spartacus key's settings.",
+      "Drag keys and dials onto your Stream Deck. Each one shows its live state.",
+    ],
+    tips: ["Needs the Stream Deck plan. Keys for overlays need the Streamer Kit, and keys for Pro features need Spartacus Pro.", "Cancel a key here any time; that Stream Deck stops working straight away."],
+  },
   ...overlayGuides(),
   ...toolGuides(),
   "/overlays/socials": {

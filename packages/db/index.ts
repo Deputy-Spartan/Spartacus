@@ -50,6 +50,7 @@ prisma.$use(async (params, next) => {
 
 export * from "@prisma/client";
 export * from "./embedComponents";
+export * from "./plans";
 
 // "Something was just changed": set by the API on every save from the
 // dashboard (the bot runs in the same process), and by the bot when it queues

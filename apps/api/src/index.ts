@@ -116,6 +116,8 @@ import rulesGateSettingsRouter from "./routes/rulesGateSettings";
 import lfgCommandsRouter from "./routes/lfgCommands";
 import embedCreatorRouter from "./routes/embedCreator";
 import { setLeaderCheck } from "./lib/jobGate";
+import { planGate } from "./middleware/planGate";
+import plansRouter from "./routes/plans";
 
 const app = express();
 
@@ -150,12 +152,14 @@ app.use(healthRouter);
 app.use(publicStatsRouter);
 app.use(activityRouter);
 
+app.use(planGate); // paid plans for overlays and the chat bot (Streamer Kit)
 app.use(commandListWatcher); // updates the posted command list after commands or modules change
 app.use(authRouter);
 app.use(commandListRouter);
 app.use(replyEmbedsRouter);
 app.use(guildsRouter);
 app.use(modulesRouter);
+app.use(plansRouter);
 app.use(eventsRouter);
 app.use(customCommandsRouter);
 app.use(levelingRouter);

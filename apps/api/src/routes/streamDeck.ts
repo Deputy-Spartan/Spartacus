@@ -1,6 +1,8 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { createHash, randomBytes } from "node:crypto";
-import { prisma } from "@spartacus/db";
+import { guildHasTier, plansEnforced, prisma } from "@spartacus/db";
+import { SD_ACTION_TIER, TIER_INFO } from "@spartacus/shared";
+import { lockedMessage } from "../middleware/planGate";
 import { requireAuth, isOwner, type AuthedRequest } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { getBotClient } from "../lib/botClient";
@@ -8,9 +10,16 @@ import { getBotClient } from "../lib/botClient";
 const router = Router();
 const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
-// ---- Dashboard (Owner Only): make, list and cancel connection keys ----
-function ownerOnly(req: AuthedRequest, res: Response, next: NextFunction) {
-  if (!isOwner(req.user?.id ?? req.session?.id)) return res.status(403).json({ error: "The Stream Deck page is for the bot owner only." });
+// Who can use the Stream Deck on a server: anyone who manages a server with
+// the Stream Deck plan. Until paid plans are switched on, only the bot owner.
+async function deckAllowed(guildId: string, userId: string | undefined) {
+  return plansEnforced() ? guildHasTier(guildId, "deck") : isOwner(userId);
+}
+
+// ---- Dashboard: make, list and cancel connection keys ----
+async function ownerOnly(req: AuthedRequest, res: Response, next: NextFunction) {
+  if (!(await deckAllowed(req.params.guildId, req.user?.id ?? req.session?.id)))
+    return res.status(402).json({ error: plansEnforced() ? lockedMessage("deck") : "The Stream Deck page is for the bot owner only.", locked: "deck" });
   next();
 }
 
@@ -53,7 +62,8 @@ async function sdAuth(req: SdRequest, res: Response, next: NextFunction) {
   if (!raw.startsWith("sd_live_")) return res.status(401).json({ error: "Paste your Stream Deck key from the dashboard into the plugin." });
   const key = await prisma.streamDeckKey.findUnique({ where: { hash: sha(raw) } });
   if (!key || key.revokedAt) return res.status(401).json({ error: "That key was cancelled or doesn't exist. Make a new one on the dashboard." });
-  if (!isOwner(key.userId)) return res.status(403).json({ error: "Stream Deck keys only work for the bot owner." });
+  if (!(await deckAllowed(key.guildId, key.userId)))
+    return res.status(402).json({ error: plansEnforced() ? "This server's Stream Deck plan has ended. Renew it on the Outpost Gaming store." : "Stream Deck keys only work for the bot owner." });
   req.sd = { keyId: key.id, guildId: key.guildId, userId: key.userId };
   // Note the last use at most once a minute.
   if (Date.now() - (lastUsed.get(key.id) ?? 0) > 60_000) {
@@ -97,6 +107,11 @@ router.post("/sd/v1/faces", sdAuth, async (req: SdRequest, res) => {
   const faces: Record<string, unknown> = {};
   await Promise.all(
     items.map(async (it) => {
+      const need = SD_ACTION_TIER[String(it.action)];
+      if (need && plansEnforced() && !(await guildHasTier(ctx.guild.id, need))) {
+        faces[it.id] = { title: String(it.action), line: `🔒 ${need === "kit" ? "Kit" : "Pro"}`, tone: "red" };
+        return;
+      }
       faces[it.id] = await ctx.bot.streamDeckFace(ctx.actor, String(it.action), (it.settings ?? {}) as never).catch((e: unknown) => ({ title: String(it.action), line: "Error", tone: "red", error: e instanceof Error ? e.message : String(e) }));
     }),
   );
@@ -112,6 +127,8 @@ router.post("/sd/v1/run", sdAuth, async (req: SdRequest, res) => {
   if (recent.length >= 30) return res.status(429).json({ ok: false, message: "Slow down: 30 presses a minute." });
   presses.set(req.sd!.keyId, [...recent, now]);
   const { action, settings, op, value } = req.body ?? {};
+  const need = SD_ACTION_TIER[String(action)];
+  if (need && plansEnforced() && !(await guildHasTier(ctx.guild.id, need))) return res.json({ ok: false, message: `Needs ${TIER_INFO[need].name}` });
   const result = await ctx.bot
     .runStreamDeck(ctx.actor, String(action), (settings ?? {}) as never, op === "turn" || op === "tap" ? op : "press", Number.isFinite(Number(value)) ? Number(value) : undefined)
     .catch((e: unknown) => ({ ok: false, message: e instanceof Error ? e.message : "That didn't work." }));

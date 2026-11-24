@@ -4,7 +4,8 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { pressNav, setPendingNav, usePendingNav } from "../../lib/pendingNav";
 import { usePathname, useSearchParams } from "next/navigation";
-import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, quickLinkMain, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
+import { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF, OWNER_NAV_SECTION, QUICK_LINKS_EVENT, TIER_INFO, quickLinkMain, tierForPath, type NavItem, type QuickLinkGroup } from "@spartacus/shared";
+import { isLocked, useGuildPlan } from "../../lib/useGuildPlan";
 import { useBotAvatar } from "../../lib/useBotAvatar";
 import { api } from "../../lib/api";
 import { useModules } from "../../lib/useModules";
@@ -75,6 +76,7 @@ export function Sidebar({
   // Shared with the group tabs and the Modules page: one copy, one refresh
   // timer, and a switch flipped on any page shows here straight away.
   const modules = useModules(guildId);
+  const plan = useGuildPlan(guildId);
   const setup = useSetupStatus(guildId);
   const { isPinned, togglePin } = usePinnedModules(guildId);
   // The owner's own names, order and hidden pages (Edit Mode).
@@ -184,6 +186,8 @@ export function Sidebar({
       const enabled = moduleKey && modules ? (modules[moduleKey]?.enabled ?? false) : null;
       const pinned = isPinned(item.href);
       const isQuick = item.href === "/quick-links" && sectionName === "Owner Only";
+      const needs = tierForPath(item.href, (h) => NAV_MODULE_KEYS[h]);
+      const locked = isLocked(plan, needs, isOwner);
       return (
         <Fragment key={`${sectionName ?? "top"}:${item.href}`}>
         <div
@@ -196,7 +200,11 @@ export function Sidebar({
           <Link href={href} onClick={(e) => { pressNav(e, href); onNavigate(); }} {...hoverPrefetch(guildId, href)} className={`flex items-center gap-3 flex-1 min-w-0 px-3 ${small ? "py-1.5" : "py-2"}`}>
             <AppIcon emoji={item.icon} size={small ? 18 : 22} />
             <span className="flex-1 min-w-0 truncate">{item.label}</span>
-            {enabled !== null && (
+            {locked ? (
+              <span className="text-[11px] shrink-0" title={`Needs ${TIER_INFO[needs!].name}`} aria-label={`Needs ${TIER_INFO[needs!].name}`}>
+                🔒
+              </span>
+            ) : enabled !== null && (
               <span
                 className={`h-2 w-2 rounded-full shrink-0 ${!enabled ? "bg-rose-500" : setup?.[moduleKey!]?.length ? "bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]" : "bg-emerald-400 shadow-[0_0_5px_rgba(52,211,153,0.8)]"}`}
                 title={!enabled ? "Disabled" : setup?.[moduleKey!]?.length ? "Needs setup" : "Enabled"}

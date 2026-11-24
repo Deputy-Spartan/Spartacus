@@ -263,6 +263,11 @@ export const TEST_GUIDES: Record<string, TestGuide> = {
     ],
     needs: "OBS and a Stream Deck to try it on a real stream.",
   },
+  "/stream-deck": {
+    prepared: "Nothing is set up for you.",
+    tryIt: ["Open Streaming → Stream Deck. Download the plugin and install it.", "Make a key, paste it into a Spartacus key on your Stream Deck, and press Slowmode. Check the channel's slowmode changes.", "Cancel the key here and check the Stream Deck shows it stopped working."],
+    needs: "An Elgato Stream Deck and the Stream Deck plan.",
+  },
   "/overlays": {
     prepared: "Nothing to set up here. It lists your stream overlays.",
     tryIt: ["Open Streaming → Overlays and check you see Socials, Money Counter and K/D Counter.", "Open each one, then use the tabs at the top to switch between them."],

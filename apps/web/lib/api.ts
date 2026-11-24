@@ -2199,6 +2199,16 @@ export const api = {
   createStreamDeckKey: (guildId: string, name: string) => request<StreamDeckKeyRow>(`/guilds/${guildId}/stream-deck/keys`, { method: "POST", body: JSON.stringify({ name }) }),
   revokeStreamDeckKey: (guildId: string, id: string) => request(`/guilds/${guildId}/stream-deck/keys/${id}`, { method: "DELETE" }),
   getStreamDeckLog: (guildId: string) => request<StreamDeckLogRow[]>(`/guilds/${guildId}/stream-deck/log`),
+  // Paid plans (Outpost Gaming store)
+  getGuildPlan: (guildId: string) => request<import("@spartacus/shared").GuildPlanState>(`/guilds/${guildId}/plan`),
+  getMyPlans: () =>
+    request<{ enforced: boolean; storeUrl: string; owner: boolean; purchases: import("@spartacus/shared").PlanPurchase[] }>("/me/plans"),
+  assignPlan: (entitlementId: string, guildId: string) =>
+    request<{ ok: true; guildId: string; guildName: string | null }>(`/me/plans/${encodeURIComponent(entitlementId)}/assign`, { method: "POST", body: JSON.stringify({ guildId }) }),
+  unassignPlan: (entitlementId: string) => request(`/me/plans/${encodeURIComponent(entitlementId)}/assign`, { method: "DELETE" }),
+  getPlanGift: (guildId: string) => request<{ tiers: import("@spartacus/shared").PlanTier[] }>(`/guilds/${guildId}/plan/gift`),
+  setPlanGift: (guildId: string, tiers: import("@spartacus/shared").PlanTier[]) =>
+    request<{ tiers: import("@spartacus/shared").PlanTier[] }>(`/guilds/${guildId}/plan/gift`, { method: "PUT", body: JSON.stringify({ tiers }) }),
   getRoleManager: (guildId: string) => request<RoleManagerInfo>(`/guilds/${guildId}/role-manager`),
   setRoleManager: (guildId: string, config: RoleManagerInfo["config"]) =>
     request(`/guilds/${guildId}/role-manager`, { method: "PUT", body: JSON.stringify(config) }),

@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { prisma } from "@spartacus/db";
-import { MODULE_KEYS } from "@spartacus/shared";
+import { guildHasTier, prisma } from "@spartacus/db";
+import { MODULE_KEYS, MODULE_TIER, type ModuleKey } from "@spartacus/shared";
+import { lockedMessage } from "../middleware/planGate";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 
@@ -32,6 +33,12 @@ router.patch(
 
     if (!MODULE_KEYS.includes(key as any)) {
       return res.status(400).json({ error: "Unknown module key" });
+    }
+
+    // Paid modules can be switched off any time, but only switched on with the plan.
+    const tier = MODULE_TIER[key as ModuleKey];
+    if (enabled && tier && !(await guildHasTier(guildId, tier))) {
+      return res.status(402).json({ error: lockedMessage(tier), locked: tier });
     }
 
     const updated = await prisma.moduleToggle.upsert({

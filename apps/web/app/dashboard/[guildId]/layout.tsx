@@ -13,6 +13,7 @@ import { api, refreshSessionIfOld, type CurrentUser } from "../../../lib/api";
 import { rememberLastGuild } from "../../../lib/lastGuild";
 import { SpartacusLoader } from "../../../components/ui/SpartacusLoader";
 import { PageGate } from "../../../components/nav/PageGate";
+import { PlanGate } from "../../../components/nav/PlanGate";
 import { preloadGuild } from "../../../lib/prefetch";
 import { UserPrefsProvider } from "../../../lib/userPrefs";
 import { PhoneTabBar } from "../../../components/nav/PhoneTabBar";
@@ -137,7 +138,9 @@ export default function DashboardLayout({
           <main data-edit-root className="p-3 sm:p-6 pb-36 md:pb-6 overflow-x-clip">
             <HubTabs guildId={params.guildId} />
             <PageGuideButton guildId={params.guildId} />
-            <PageGate>{children}</PageGate>
+            <PageGate>
+              <PlanGate guildId={params.guildId} isOwner={isOwner}>{children}</PlanGate>
+            </PageGate>
           </main>
         </div>
         <PhoneTabBar guildId={params.guildId} />

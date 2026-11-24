@@ -1,0 +1,125 @@
+import { prisma } from "./index";
+
+// Paid plans (Outpost Gaming store) — the one place that decides which plans
+// a server has. Bot and API run in the same process, so they share this cache.
+//
+// Plans are switched on by setting STORE_BRIDGE_SECRET on the API (the same
+// value as on the store). Until then nothing is locked, so a deploy can never
+// lock anyone out by surprise.
+//
+// The store owns every purchase. A GuildPlan row remembers which server a
+// purchase is on and the store's last word on it (status + periodEnd). Rows
+// are re-checked with the store when they are more than CHECK_EVERY old, so a
+// cancel, refund or renewal shows up within the hour without asking the store
+// on every message.
+
+type Tier = "pro" | "kit" | "deck";
+const ALL: Tier[] = ["pro", "kit", "deck"];
+const CHECK_EVERY = 60 * 60_000;
+const GRACE = 3 * 24 * 60 * 60_000; // a late renewal payment doesn't lock anyone out straight away
+const CACHE_MS = 60_000;
+
+export const storeUrl = () => (process.env.STORE_URL || "https://outpostgaming.netlify.app").replace(/\/+$/, "");
+export const plansEnforced = () => (process.env.STORE_BRIDGE_SECRET || "").length >= 32;
+
+// The bot tells us who owns each server (it has the Discord cache); the bot
+// owner's own servers always have everything.
+let ownerOf: (guildId: string) => string | null = () => null;
+export function setGuildOwnerLookup(fn: (guildId: string) => string | null) {
+  ownerOf = fn;
+}
+const isBotOwner = (id: string | null | undefined) => !!id && !!process.env.OWNER_DISCORD_ID && id === process.env.OWNER_DISCORD_ID;
+
+export interface StoreEntitlement {
+  id: string;
+  discordId: string;
+  productId: string;
+  productName: string;
+  planId: string;
+  interval: "month" | "year" | null;
+  status: string;
+  periodEnd: string | null;
+}
+
+/** What these Discord accounts bought, straight from the store. Throws if the store can't be reached. */
+export async function fetchStoreAccess(discordIds: string[]): Promise<StoreEntitlement[]> {
+  const ids = [...new Set(discordIds)].filter(Boolean);
+  if (!ids.length || !plansEnforced()) return [];
+  const res = await fetch(`${storeUrl()}/api/bridge/access?discordId=${ids.join(",")}`, {
+    headers: { authorization: `Bearer ${process.env.STORE_BRIDGE_SECRET}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) throw new Error(`The store answered ${res.status}.`);
+  const body = (await res.json()) as { entitlements?: StoreEntitlement[] };
+  return body.entitlements ?? [];
+}
+
+/** Live on the store: paid up (or within the grace days of a late renewal). */
+export function entitlementLive(status: string, periodEnd: Date | string | null): boolean {
+  if (status === "active") return true;
+  if (status === "past_due" && periodEnd) return new Date(periodEnd).getTime() + GRACE > Date.now();
+  return false;
+}
+
+const cache = new Map<string, { at: number; tiers: Tier[]; reason: "owner" | "gift" | "paid" | undefined }>();
+const refreshing = new Set<string>();
+
+export function forgetGuildPlan(guildId?: string) {
+  if (guildId) cache.delete(guildId);
+  else cache.clear();
+}
+
+/** Brings every GuildPlan row of these buyers in line with the store. */
+export async function refreshBuyers(discordIds: string[]): Promise<StoreEntitlement[]> {
+  const list = await fetchStoreAccess(discordIds);
+  const rows = await prisma.guildPlan.findMany({ where: { ownerDiscordId: { in: discordIds }, NOT: { entitlementId: { startsWith: "gift:" } } } });
+  for (const row of rows) {
+    const e = list.find((x) => x.id === row.entitlementId);
+    await prisma.guildPlan.update({
+      where: { id: row.id },
+      data: { status: e ? e.status : "ended", periodEnd: e?.periodEnd ? new Date(e.periodEnd) : row.periodEnd, checkedAt: new Date() },
+    });
+    forgetGuildPlan(row.guildId);
+  }
+  return list;
+}
+
+/** The plans a server has right now, and why. */
+export async function guildPlanState(guildId: string): Promise<{ tiers: Tier[]; reason?: "owner" | "gift" | "paid" }> {
+  if (!plansEnforced()) return { tiers: ALL };
+  const hit = cache.get(guildId);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit;
+
+  let tiers: Tier[] = [];
+  let reason: "owner" | "gift" | "paid" | undefined;
+  if (isBotOwner(ownerOf(guildId))) {
+    tiers = ALL;
+    reason = "owner";
+  } else {
+    const rows = await prisma.guildPlan.findMany({ where: { guildId } }).catch(() => []);
+    const got = new Set<Tier>();
+    for (const r of rows) {
+      const gift = r.entitlementId.startsWith("gift:");
+      if (!gift && !entitlementLive(r.status, r.periodEnd)) continue;
+      for (const t of r.tiers) if (ALL.includes(t as Tier)) got.add(t as Tier);
+      reason = gift && reason !== "paid" ? "gift" : "paid";
+    }
+    tiers = ALL.filter((t) => got.has(t));
+    // Out of date? Ask the store in the background; the next check uses the answer.
+    const stale = [...new Set(rows.filter((r) => !r.entitlementId.startsWith("gift:") && Date.now() - r.checkedAt.getTime() > CHECK_EVERY).map((r) => r.ownerDiscordId))];
+    for (const buyer of stale) {
+      if (refreshing.has(buyer)) continue;
+      refreshing.add(buyer);
+      void refreshBuyers([buyer])
+        .catch((e) => console.warn("[plans] store check failed:", e instanceof Error ? e.message : e))
+        .finally(() => refreshing.delete(buyer));
+    }
+  }
+  const out = { at: Date.now(), tiers, reason };
+  cache.set(guildId, out);
+  return out;
+}
+
+export async function guildHasTier(guildId: string, tier: Tier): Promise<boolean> {
+  return (await guildPlanState(guildId)).tiers.includes(tier);
+}

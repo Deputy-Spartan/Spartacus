@@ -3487,3 +3487,24 @@ model SocialsOverlay {
   postMessageId   String? // the message Spartacus posted, edited in place on Update
   postedChannelId String? // where that message is, to clean it up after a channel change
 }
+
+// A paid plan from the Outpost Gaming store, placed on one server. The store
+// owns the purchase; this row only remembers which server it unlocks and when
+// the store last said it was paid up (periodEnd), so the bot can decide
+// without asking the store on every message. entitlementId "gift:<guild>" is
+// a free plan the bot owner gave a server.
+model GuildPlan {
+  id             String    @id @default(cuid())
+  guildId        String
+  entitlementId  String    @unique
+  productId      String
+  tiers          String[]
+  ownerDiscordId String
+  status         String    @default("active")
+  periodEnd      DateTime?
+  checkedAt      DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([guildId])
+  @@index([ownerDiscordId])
+}

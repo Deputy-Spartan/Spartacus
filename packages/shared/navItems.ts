@@ -29,6 +29,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "", label: "Overview", icon: "📊" },
       { href: "/modules", label: "Modules", icon: "🧩" },
+      { href: "/plans", label: "Plans", icon: "⭐" },
       { href: "/errors", label: "Errors", icon: "⚠️" },
     ],
   },
@@ -83,6 +84,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/pre-stream", label: "Pre-Stream Checklist", icon: "📋", moduleKey: "PRE_STREAM" },
       // Socials, Money Counter and K/D Counter live inside it (/overlays/socials, /money, /kd).
       { href: "/overlays", label: "Overlays", icon: "🎨" },
+      { href: "/stream-deck", label: "Stream Deck", icon: "🎛️" }, // Stream Deck plan (was Owner Only)
     ],
   },
   {
@@ -161,7 +163,6 @@ export const OWNER_NAV_SECTION: NavSection = {
   items: [
     { href: "/bot-customization", label: "Bot Customization", icon: "🤖" },
     { href: "/owner-panel", label: "Command Center", icon: "🔑" },
-    { href: "/stream-deck", label: "Stream Deck", icon: "🎛️" },
     { href: "/quick-links", label: "Quick Links", icon: "🔗" },
     { href: "/front-page", label: "Front Page", icon: "🏠" },
     { href: "/whats-new", label: "What's New", icon: "🔔" },

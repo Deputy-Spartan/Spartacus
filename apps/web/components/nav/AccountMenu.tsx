@@ -8,8 +8,11 @@ import { THEMES, useUserPrefs } from "../../lib/userPrefs";
 import { Icon } from "../ui/AppIcon";
 import { ThemePreview } from "../ui/ThemePreview";
 
+// The OG Armory store (a separate site). Override with NEXT_PUBLIC_STORE_URL on Vercel.
+const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || "https://outpostgaming.netlify.app";
+
 // The avatar in the top bar opens this: who you're signed in as, a Theme row
-// (opens preview cards to pick from), Profile, Account settings and Log out.
+// (opens preview cards to pick from), Profile, Account settings, the store link and Log out.
 export function AccountMenu({ user, guildId }: { user: { username: string; avatar: string | null }; guildId: string }) {
   const router = useRouter();
   const { prefs, save } = useUserPrefs();
@@ -133,6 +136,9 @@ export function AccountMenu({ user, guildId }: { user: { username: string; avata
           <Link role="menuitem" href={`/dashboard/${guildId}/account?tab=account`} onClick={() => setOpen(false)} className={item}>
             <Icon name="settings" /> Account settings
           </Link>
+          <a role="menuitem" href={STORE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={item}>
+            <Icon name="gift" /> OG Armory store
+          </a>
           {statusUrl && (
             <a role="menuitem" href={statusUrl} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={item}>
               <Icon name="heart-pulse" /> Status page

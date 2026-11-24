@@ -407,8 +407,10 @@ export function blueprintApplications(layout: BlueprintLayout = "gaming") {
 
 // ---- The Spartacus HQ layout (/hq-setup, or /server-setup layout: Spartacus HQ) ----
 // One server for testing Spartacus and for OG Armory store support. New people see only
-// 📌 Start Here. Onboarding asks them to agree to the rules (required, gives ✅ Member) and
-// what they want to see; each answer opens one section. 🎭・get-roles changes it later.
+// 📌 Start Here. Onboarding asks what they want to see (each answer opens one section), their
+// pings, and last, a required rules agreement (gives ✅ Member). 🎭・get-roles changes it later.
+// The command starts fresh: it deletes every channel, category, role and onboarding question
+// first (after a backup), then builds all of this.
 
 const HQ_ROLES: BlueprintRole[] = [
   { key: "admin", name: "⚙️ Admin", color: 0xed4245, hoist: true, aliases: ["admins", "admin", "administrator"], perms: "admin-lite" },
@@ -491,10 +493,9 @@ const HQ_PICKERS: BlueprintPicker[] = [
   ]},
 ];
 
+// The rules agreement is the last question and required, so nobody gets in (or gets any
+// section role) without agreeing. Discord hands out every answer's roles at the end.
 const HQ_ONBOARDING: BlueprintOnboardingPrompt[] = [
-  { title: "Do you agree to the server rules?", singleSelect: true, required: true, options: [
-    { role: "member", channels: ["rules", "announcements", "roles", "general", "botcmds", "support"], label: "I've read the rules and I agree", emoji: "✅", description: "Required to see the rest of the server" },
-  ]},
   { title: "What are you here for?", singleSelect: false, required: true, options: [
     { role: "customer", channels: ["store-news", "store-chat", "store-help"], label: "Help with a store order", emoji: "🛒", description: "Orders, license keys, downloads and billing" },
     { role: "spartacus", channels: ["guides", "sp-help", "requests"], label: "Help using Spartacus", emoji: "🤖", description: "Setting it up and using it in your server" },
@@ -502,6 +503,9 @@ const HQ_ONBOARDING: BlueprintOnboardingPrompt[] = [
     { role: "ping:ann", channels: ["announcements"], label: "Just news and updates", emoji: "📢", description: "Announcements only" },
   ]},
   { title: "What should we ping you for?", singleSelect: false, options: HQ_PICKERS[1].options },
+  { title: "Last step: do you agree to the server rules?", singleSelect: true, required: true, options: [
+    { role: "member", channels: ["rules", "announcements", "roles", "general", "botcmds", "support"], label: "I've read the rules and I agree", emoji: "✅", description: "Required to join. Read #📜・rules first" },
+  ]},
 ];
 
 export const HQ_RULES = [

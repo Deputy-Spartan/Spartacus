@@ -7,7 +7,7 @@ import { runServerSetupCommand } from "../../modules/setup/serverSetupCommand";
 const command: CommandModule = {
   data: new SlashCommandBuilder()
     .setName("hq-setup")
-    .setDescription("Build Spartacus HQ: bot testing, Spartacus help and OG Armory store support")
+    .setDescription("Start fresh and build Spartacus HQ: bot testing, Spartacus help and store support (asks first)")
     .addBooleanOption((o) => o.setName("fresh-roles").setDescription("Delete every old role and keep only the ones HQ needs (asks first)"))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(false) as SlashCommandBuilder,

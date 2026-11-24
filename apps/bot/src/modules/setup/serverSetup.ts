@@ -65,17 +65,20 @@ export interface SetupOptions {
   // people have. Layout roles that already exist are reused, so whoever has
   // them keeps them. Admin-power, bot, booster and Twitch roles always stay.
   freshRoles?: boolean;
+  // Start fresh (HQ): after the backup, delete every channel, category, role and onboarding
+  // question Spartacus can, then build everything. Ignores parts, categories and archiving.
+  wipe?: boolean;
   // Leaving these out builds everything.
   parts?: SetupPart[];
   categories?: string[];
 }
 
-export const partOn = (opts: SetupOptions, part: SetupPart) => !opts.parts || opts.parts.includes(part);
-export const categoryOn = (opts: SetupOptions, key: string) => !opts.categories || opts.categories.includes(key);
+export const partOn = (opts: SetupOptions, part: SetupPart) => !!opts.wipe || !opts.parts || opts.parts.includes(part);
+export const categoryOn = (opts: SetupOptions, key: string) => !!opts.wipe || !opts.categories || opts.categories.includes(key);
 // Old channels only move to the archive when every category is being built,
 // so channels from a category that was skipped never get swept up.
 export const archiveOn = (opts: SetupOptions) =>
-  opts.archiveOthers && partOn(opts, "channels") && blueprintCategories(opts.games, opts.layout).every((c) => categoryOn(opts, c.key));
+  !opts.wipe && opts.archiveOthers && partOn(opts, "channels") && blueprintCategories(opts.games, opts.layout).every((c) => categoryOn(opts, c.key));
 export const deleteOn = (opts: SetupOptions) => archiveOn(opts) && !!opts.deleteUnused;
 
 type ChannelMatch = { spec: BlueprintChannel; category: BlueprintCategory; existing: GuildBasedChannel | null };
@@ -305,11 +308,13 @@ async function snapshot(guild: Guild) {
   await prisma.serverBackup.create({ data: { guildId: guild.id, name: `Before Server Setup · ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`, data: { roles, channels } as object } });
 }
 
-// Fills settings that are still empty; anything set on the dashboard stays.
-async function fillSettings(model: string, guildId: string, values: Record<string, unknown>) {
+// Fills settings that are still empty; anything set on the dashboard stays. With `force`
+// (a start-fresh build) every value is replaced, since the old channels and roles are gone.
+async function fillSettingsBase(model: string, guildId: string, values: Record<string, unknown>, force = false) {
   const delegate = (prisma as unknown as Record<string, { findUnique: Function; create: Function; update: Function }>)[model];
   const current = await delegate.findUnique({ where: { guildId } });
   if (!current) return delegate.create({ data: { guildId, ...values } });
+  if (force) return delegate.update({ where: { guildId }, data: values });
   const blank = (v: unknown) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
   const missing = Object.fromEntries(Object.entries(values).filter(([k]) => blank((current as Record<string, unknown>)[k])));
   return Object.keys(missing).length ? delegate.update({ where: { guildId }, data: missing }) : current;
@@ -357,13 +362,20 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   const ids: Ids = { roles: new Map(), channels: new Map(), categories: new Map() };
   const me = guild.members.me;
   const topPosition = me?.roles.highest.position ?? 0;
-  const plan = await planSetup(guild, opts);
+  let plan = await planSetup(guild, opts);
 
   await snapshot(guild).then(() => step("🗄️ Backup saved (Server Backup on the dashboard)"), (err) => {
     logError("bot", err, guild.id);
     notes.push("The backup couldn't be saved, so nothing was changed.");
     throw err;
   });
+
+  // Start fresh: wipe, then plan again against the empty server so everything is built new.
+  let oldCommunity: string[] = [];
+  if (opts.wipe) {
+    oldCommunity = await wipeServer(guild, step, notes);
+    plan = await planSetup(guild, opts);
+  }
 
   if (partOn(opts, "roles")) {
     // Roles, created bottom-up so the first in the list ends up highest.
@@ -533,6 +545,24 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
     await setupServerSettings(guild, opts, ids, notes);
     await step("⚙️ Server settings: AFK channel, join messages and Community");
   }
+  // Discord won't delete its Community rules and updates channels while they're in use, so the
+  // wipe renamed them. Now the new ones take over and the old ones go.
+  if (opts.wipe && oldCommunity.length) {
+    const rules = ids.channels.get("rules");
+    const updates = ids.channels.get("staff-chat");
+    if (rules && updates && guild.features.includes("COMMUNITY")) {
+      await guild
+        .edit({ rulesChannel: rules, publicUpdatesChannel: updates, safetyAlertsChannel: updates, reason: "Server Setup: start fresh" } as never)
+        .catch(() => notes.push("Couldn't switch Discord's rules and updates channels to the new ones. Change them in Server Settings → Community → Overview."));
+    }
+    let removed = 0;
+    for (const id of oldCommunity) {
+      const old = await guild.channels.fetch(id).catch(() => null);
+      if (!old || old.id === rules || old.id === updates) continue;
+      await old.delete("Server Setup: start fresh").then(() => removed++, () => notes.push(`Couldn't delete the old #${old.name}. Delete it by hand once Community points at the new channels.`));
+    }
+    if (removed) await step(`🧹 Moved Community to the new channels and deleted ${removed} old one${removed === 1 ? "" : "s"}`);
+  }
   if (partOn(opts, "modules")) {
     await setupModules(guild, opts, ids, notes);
     await step(`🧩 Modules set up and switched on: ${modulesOn(opts).length}`);
@@ -542,6 +572,62 @@ export async function runSetup(guild: Guild, opts: SetupOptions, progress: (line
   const mods = guild.roles.cache.filter((r) => !r.managed && r.permissions.has(PermissionFlagsBits.Administrator) && r.members.some((m) => !m.user.bot));
   if (mods.size) notes.push(`These roles give people Administrator: ${mods.map((r) => r.name).join(", ")}. Consider giving them only the permissions they need.`);
   return { done, notes };
+}
+
+// ---- Start fresh: everything Spartacus is allowed to remove goes, after the backup ----
+// Stays: @everyone, bot and booster roles, roles above Spartacus's own, and Discord's Community
+// rules/updates/safety channels (renamed now, replaced and deleted after the build).
+async function wipeServer(guild: Guild, step: (line: string) => Promise<void>, notes: string[]): Promise<string[]> {
+  const g = guild.id;
+  // Onboarding points at channels, so it's cleared first.
+  await guild.client.rest
+    .put(`/guilds/${g}/onboarding` as `/${string}`, { body: { prompts: [], default_channel_ids: [], enabled: false, mode: 0 } })
+    .then(() => step("🧹 Onboarding questions cleared"), (err: unknown) => {
+      logError("bot", err, g);
+      notes.push("Couldn't clear the old onboarding questions. The new ones replace them at the end.");
+    });
+
+  // Spartacus settings that point at channels and roles that are about to go.
+  const where = { where: { guildId: g } };
+  await Promise.all(
+    [
+      prisma.rolePanel.deleteMany(where), prisma.reactionRolePanel.deleteMany(where), prisma.ticketPanel.deleteMany(where), prisma.applicationPanel.deleteMany(where),
+      prisma.tempChannelLobby.deleteMany(where), prisma.statChannel.deleteMany(where), prisma.statusChannel.deleteMany(where),
+      prisma.levelRole.deleteMany(where), prisma.joinRole.deleteMany(where),
+      prisma.welcomeConfig.updateMany({ ...where, data: { channelId: null, leaveChannelId: null } }),
+      prisma.rulesGateSettings.updateMany({ ...where, data: { channelId: null, messageId: null, roleId: null, logChannelId: null } }),
+      // Every module goes off; the build switches on just the ones this layout uses.
+      prisma.moduleToggle.updateMany({ ...where, data: { enabled: false } }),
+    ].map((q) => (q as Promise<unknown>).catch((err) => logError("bot", err, g))),
+  );
+
+  await guild.channels.fetch().catch(() => null);
+  const community = new Set([guild.rulesChannelId, guild.publicUpdatesChannelId, guild.safetyAlertsChannelId].filter(Boolean) as string[]);
+  const all = [...guild.channels.cache.values()].filter((c) => !c.isThread());
+  let channels = 0, categories = 0;
+  for (const c of all.filter((x) => x.type !== ChannelType.GuildCategory)) {
+    if (community.has(c.id)) {
+      await (c as GuildBasedChannel & { edit: Function }).edit({ name: `old-${c.name}`.slice(0, 100), parent: null, reason: "Server Setup: start fresh" }).catch(() => null);
+      continue;
+    }
+    await c.delete("Server Setup: start fresh").then(() => channels++, () => notes.push(`Couldn't delete #${c.name}.`));
+  }
+  for (const c of all.filter((x) => x.type === ChannelType.GuildCategory)) {
+    await c.delete("Server Setup: start fresh").then(() => categories++, () => notes.push(`Couldn't delete the ${c.name} category.`));
+  }
+  await step(`🧹 Deleted ${channels} channel${channels === 1 ? "" : "s"} and ${categories} categor${categories === 1 ? "y" : "ies"}`);
+
+  await guild.roles.fetch().catch(() => null);
+  const top = guild.members.me?.roles.highest;
+  const canGo = (r: Role) => r.id !== g && !r.managed && !!top && top.comparePositionTo(r) > 0;
+  let roles = 0;
+  for (const r of [...guild.roles.cache.values()].filter(canGo)) {
+    await r.delete("Server Setup: start fresh").then(() => roles++, () => notes.push(`Couldn't delete the ${r.name} role.`));
+  }
+  const stayed = [...guild.roles.cache.values()].filter((r) => r.id !== g && !r.managed && !canGo(r));
+  await step(`🧹 Deleted ${roles} role${roles === 1 ? "" : "s"}${stayed.length ? ` (${stayed.length} above Spartacus stayed)` : ""}`);
+  if (stayed.length) notes.push(`These roles are above Spartacus's role, so they weren't deleted: ${stayed.map((r) => r.name).slice(0, 10).join(", ")}. Delete them by hand, or move Spartacus to the top and run it again.`);
+  return [...community];
 }
 
 async function setupServerSettings(guild: Guild, opts: SetupOptions, ids: Ids, notes: string[]) {
@@ -577,6 +663,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
   const cat = (key: string) => ids.categories.get(key) ?? null;
   const streaming = opts.layout === "streaming";
   const hq = opts.layout === "hq";
+  const fillSettings = (model: string, guildId: string, values: Record<string, unknown>) => fillSettingsBase(model, guildId, values, !!opts.wipe);
   const staffRoles = (streaming ? ["mod", "admin"] : hq ? ["admin", "mod", "support"] : ["staff", "support"]).map(role).filter(Boolean) as string[];
   // Posts an embed in a channel the first time only, so running setup again never doubles it.
   const postOnce = async (key: string, embed: object) => {
@@ -601,7 +688,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
         goodbyeText: "{user} left {server}.",
       })],
     ["Rules", async () => {
-      if (!streaming) return fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: hq ? HQ_RULES : BLUEPRINT_RULES });
+      if (!streaming) return fillSettings("rulesGateSettings", g, { channelId: ch("rules"), roleId: role("member"), logChannelId: ch("server-log"), defaultEmbedTitle: "📜 Server Rules", defaultEmbedDescription: hq ? HQ_RULES : BLUEPRINT_RULES, ...(opts.wipe ? { messageId: null } : {}) });
       // Open door: just post the rules in the rules channel if it's empty.
       const rulesCh = ch("rules") ? await guild.channels.fetch(ch("rules")!).catch(() => null) : null;
       if (!rulesCh || !rulesCh.isTextBased()) return;
@@ -631,7 +718,9 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       const typeIds: string[] = [];
       for (const t of blueprintTicketTypes(opts.layout)) {
         const found = await prisma.ticketType.findFirst({ where: { guildId: g, name: t.name } });
-        const type = found ?? (await prisma.ticketType.create({ data: { guildId: g, name: t.name, emoji: t.emoji, description: t.description, categoryId: ticketCat, staffRoleIds: staffRoles } }));
+        const type = found
+          ? opts.wipe ? await prisma.ticketType.update({ where: { id: found.id }, data: { categoryId: ticketCat, staffRoleIds: staffRoles } }) : found
+          : await prisma.ticketType.create({ data: { guildId: g, name: t.name, emoji: t.emoji, description: t.description, categoryId: ticketCat, staffRoleIds: staffRoles } });
         typeIds.push(type.id);
       }
       const support = ch("support");
@@ -651,6 +740,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
       const typeIds: string[] = [];
       for (const a of blueprintApplications(opts.layout)) {
         const found = await prisma.applicationType.findFirst({ where: { guildId: g, name: a.name } });
+        if (found && opts.wipe) await prisma.applicationType.update({ where: { id: found.id }, data: { reviewChannelId: ch("staff-desk"), staffRoleIds: staffRoles } });
         const type =
           found ??
           (await prisma.applicationType.create({

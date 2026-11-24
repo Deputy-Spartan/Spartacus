@@ -262,7 +262,7 @@ export type BlueprintLayout = "gaming" | "streaming" | "hq";
 export const BLUEPRINT_LAYOUTS: Array<{ id: BlueprintLayout; label: string; emoji: string; description: string }> = [
   { id: "gaming", label: "Gaming community", emoji: "🎮", description: "Rules gate, game channels, squads and Matchmaking" },
   { id: "streaming", label: "Streaming community", emoji: "🔴", description: "Open door: stream alerts, clips, hangout, supporters, Matchmaking" },
-  { id: "hq", label: "Spartacus HQ & store support", emoji: "🛠️", description: "Bot testing, Spartacus help and OG Armory support, opened by rules and onboarding" },
+  { id: "hq", label: "Spartacus HQ & store support", emoji: "🛠️", description: "Bot testing, Spartacus help and store support, opened by rules and onboarding" },
 ];
 export const DEFAULT_STREAMING_GAMES: BlueprintGameId[] = ["r6", "cod", "other"];
 
@@ -406,7 +406,7 @@ export function blueprintApplications(layout: BlueprintLayout = "gaming") {
 }
 
 // ---- The Spartacus HQ layout (/hq-setup, or /server-setup layout: Spartacus HQ) ----
-// One server for testing Spartacus and for OG Armory store support. New people see only
+// One server for testing Spartacus and for store support. New people see only
 // 📌 Start Here. Onboarding asks what they want to see (each answer opens one section), their
 // pings, and last, a required rules agreement (gives ✅ Member). 🎭・get-roles changes it later.
 // The command starts fresh: it deletes every channel, category, role and onboarding question
@@ -439,7 +439,7 @@ function hqCategories(): BlueprintCategory[] {
       { key: "welcome", name: "👋・welcome", kind: "text", topic: "What's here and how to find your way around.", aliases: ["welcome", "welcomes", "start-here"] },
     ]},
     { key: "info", name: "📢 Information", aliases: ["information", "info", "news"], access: memberRead, channels: [
-      { key: "announcements", name: "📢・announcements", kind: "announcement", topic: "News about Spartacus and the OG Armory.", aliases: ["announcements", "news"] },
+      { key: "announcements", name: "📢・announcements", kind: "announcement", topic: "News about Spartacus and the store.", aliases: ["announcements", "news"] },
       { key: "roles", name: "🎭・get-roles", kind: "text", topic: "Open or hide sections and choose your pings. Change it any time.", aliases: ["get-roles", "roles", "self-roles", "role-select", "pick-roles"] },
       { key: "bot-status", name: "🟢・status", kind: "text", topic: "Live status for Spartacus and the store.", aliases: ["status", "bot-status", "uptime"] },
     ]},
@@ -447,7 +447,7 @@ function hqCategories(): BlueprintCategory[] {
       { key: "general", name: "💬・general", kind: "text", topic: "Chat about anything.", aliases: ["general", "general-chat", "chat", "lounge"] },
       { key: "botcmds", name: "🤖・bot-commands", kind: "text", topic: "Use Spartacus commands here: /store, /license, /rank and more.", aliases: ["bot-commands", "commands", "bots", "bot-spam"] },
     ]},
-    { key: "store", name: "🛒 OG Armory Store", aliases: ["og-armory-store", "og-armory", "store", "shop"], access: store, channels: [
+    { key: "store", name: "🛒 Store", aliases: ["og-armory-store", "og-armory", "store", "shop"], access: store, channels: [
       { key: "store-news", name: "🛍️・store-news", kind: "text", topic: "New products, sales and drops from outpostgaming.netlify.app.", aliases: ["store-news", "deals", "drops", "shop-news"], access: storeRead },
       { key: "store-chat", name: "💬・store-chat", kind: "text", topic: "Talk about the bots, overlays and dashboards.", aliases: ["store-chat", "shop-chat"] },
       { key: "store-help", name: "❓・store-help", kind: "text", topic: "Quick questions about orders, keys and downloads. Anything private goes in a ticket.", aliases: ["store-help", "order-help", "shop-help"] },
@@ -470,7 +470,7 @@ function hqCategories(): BlueprintCategory[] {
     { key: "tickets", name: "🗂️ Open Tickets", aliases: ["open-tickets", "store-tickets", "tickets-open"], access: staffTalk, channels: [] },
     { key: "staff", name: "🛡️ Staff", aliases: ["staff", "mods", "moderators", "staff-only"], access: staffTalk, channels: [
       { key: "staff-chat", name: "🛡️・staff-chat", kind: "text", aliases: ["staff-chat", "mod-chat", "staff"] },
-      { key: "store-alerts", name: "🛒・store-alerts", kind: "text", topic: "Orders, refunds, failed renewals and new ticket alerts from the OG Armory.", aliases: ["store-alerts", "order-log", "orders"] },
+      { key: "store-alerts", name: "🛒・store-alerts", kind: "text", topic: "Orders, refunds, failed renewals and new ticket alerts from the store.", aliases: ["store-alerts", "order-log", "orders"] },
       { key: "mod-log", name: "📋・mod-log", kind: "text", topic: "Moderation actions, edits and deletes.", aliases: ["mod-log", "mod-logs", "logs"] },
       { key: "server-log", name: "📤・server-log", kind: "text", topic: "Joins, leaves, rules accepted and security alerts.", aliases: ["server-log", "join-leave", "member-log"] },
       { key: "staff-desk", name: "🧾・transcripts", kind: "text", topic: "Closed tickets, applications and the weekly report.", aliases: ["transcripts", "ticket-logs", "tickets-and-applications"] },
@@ -511,7 +511,7 @@ const HQ_ONBOARDING: BlueprintOnboardingPrompt[] = [
 export const HQ_RULES = [
   "**1. Be respectful.** No harassment, hate or slurs, toward members or staff.",
   "**2. Keep private things private.** Never post license keys, order numbers, emails or payment details in public channels. Open a ticket instead.",
-  "**3. Use the right place.** Store questions in 🛒 OG Armory Store, bot questions in 🤖 Spartacus Help, testing in 🧪 Test Lab.",
+  "**3. Use the right place.** Store questions in 🛒 Store, bot questions in 🤖 Spartacus Help, testing in 🧪 Test Lab.",
   "**4. No spam or self-promo.** No unsolicited DMs or ads.",
   "**5. Report bugs, don't abuse them.** Found an exploit in Spartacus or the store? Report it in 🐞・bug-reports or a ticket.",
   "**6. Staff decisions are final.** Disagree? Open a ticket, calmly.",
@@ -523,11 +523,11 @@ export const HQ_RULES = [
 // The 👋・welcome guide: one message that maps the whole server.
 export const HQ_GUIDE = {
   title: "👋 Welcome to Spartacus HQ",
-  description: "The home of the **Spartacus** bot and the **OG Armory** store. Here's how it's laid out. You only see the sections you picked; change them any time in 🎭・get-roles.",
+  description: "The home of the **Spartacus** bot and the **Outpost Gaming** store. Here's how it's laid out. You only see the sections you picked; change them any time in 🎭・get-roles.",
   fields: [
     { name: "📢 Information", value: "Announcements, your roles and live status." },
     { name: "💬 Community", value: "General chat and a channel for bot commands." },
-    { name: "🛒 OG Armory Store", value: "Store news, chat and quick order questions. Buyers get 💎・verified-buyers automatically." },
+    { name: "🛒 Store", value: "Store news, chat and quick order questions. Buyers get 💎・verified-buyers automatically." },
     { name: "🤖 Spartacus Help", value: "Guides, help with your setup, and feature requests." },
     { name: "🧪 Test Lab", value: "Try new features early and report bugs." },
     { name: "🎫 Support", value: "Private tickets for orders, keys, billing, Spartacus or anything else. Store tickets opened on the website show up here too." },

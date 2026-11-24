@@ -53,7 +53,7 @@ async function wipeScreen(guild: Guild, confirm = false): Promise<InteractionEdi
   const lines = [
     confirm
       ? `This **permanently deletes everything** in **${guild.name}** and builds Spartacus HQ from scratch. It can't be undone.`
-      : "Starts fresh, then builds **Spartacus HQ**: one clean server for testing Spartacus and supporting OG Armory customers.",
+      : "Starts fresh, then builds **Spartacus HQ**: one clean server for testing Spartacus and supporting store customers.",
     "",
     `**🧹 Deleted first:** ${channels} channel${channels === 1 ? "" : "s"}, ${categories} categor${categories === 1 ? "y" : "ies"}, ${deletable.length} role${deletable.length === 1 ? "" : "s"}${people ? ` (taken off ${people} member${people === 1 ? "" : "s"}, staff included)` : ""}, and the onboarding questions. Messages in deleted channels are gone for good.`,
     `**🏗️ Then built:** 12 roles, ${hq.length} categories, ${built} channels, the rules, role and ticket panels, and 3 onboarding questions. The last question is the rules agreement.`,
@@ -110,7 +110,7 @@ async function planScreen(guild: Guild, opts: SetupOptions): Promise<Interaction
     .setDescription(
       [
         opts.layout === "hq"
-          ? "Builds **Spartacus HQ**: one clean server for testing Spartacus and supporting OG Armory customers. New people see only 📌 Start Here. Onboarding makes them agree to the rules, then asks what they're here for, and each answer opens its own section: 🛒 Store, 🤖 Spartacus Help or 🧪 Test Lab. 🎭・get-roles lets them change it later. Tickets open privately in 🗂️ Open Tickets, next to the store's website tickets."
+          ? "Builds **Spartacus HQ**: one clean server for testing Spartacus and supporting store customers. New people see only 📌 Start Here. Onboarding makes them agree to the rules, then asks what they're here for, and each answer opens its own section: 🛒 Store, 🤖 Spartacus Help or 🧪 Test Lab. 🎭・get-roles lets them change it later. Tickets open privately in 🗂️ Open Tickets, next to the store's website tickets."
           : opts.layout === "streaming"
           ? "Builds an open streaming community: stream alerts, clips, hangout, Matchmaking, supporters and creators, with nearly every module set up. Pick what to build below. Parts you skip stay as they are, and the parts you build reuse what's already there."
           : "Builds a clean layout for an FPS gaming community. Pick what to build below: everything, or only some parts and categories. Parts you skip stay as they are, and the parts you build use what's already there.",

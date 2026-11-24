@@ -9,7 +9,7 @@ import { RoleSelect } from "../../../../components/ui/RoleSelect";
 import { api } from "../../../../lib/api";
 import { OG_ALERTS, OG_SETUP_LABELS, type OgAlertKey, type OgProduct, type OgRouting, type OgSummary, type OgTickets } from "../../../../lib/ogStore";
 
-// Owner Only → OG Armory Store: run the store website from Spartacus. Reads and changes the store
+// Owner Only → Store: run the store website from Spartacus. Reads and changes the store
 // through the API (which talks to the store with STORE_BRIDGE_SECRET) and posts to Discord as Spartacus.
 type Tab = "overview" | "channels" | "post" | "website";
 const TABS: Array<[Tab, string]> = [["overview", "📊 Overview"], ["channels", "📡 Channels"], ["post", "📣 Post to Discord"], ["website", "🌐 Store website"]];
@@ -32,7 +32,7 @@ export default function OgStorePage({ params }: { params: { guildId: string } })
     <div className="space-y-4 max-w-5xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">🛒 OG Armory Store</h1>
+          <h1 className="text-2xl font-bold">🛒 Store</h1>
           <p className="text-sm text-slate-400">Run the store website from here: alerts, ticket channels, Discord posts and the store banner.</p>
         </div>
         {data && (
@@ -203,7 +203,7 @@ function fill(t: Template, p: OgProduct | undefined) {
   if (!p || t === "custom") return { title: "", description: "" };
   if (t === "sale") return { title: `${p.name} is on sale`, description: `${p.short}\n\nGrab it before the sale ends.` };
   if (t === "update") return { title: `${p.name} update`, description: "What's new:\n• \n\nDownload it again from My Library." };
-  return { title: `New: ${p.name}`, description: `${p.short}\n\nAvailable now in the OG Armory.` };
+  return { title: `New: ${p.name}`, description: `${p.short}\n\nAvailable now in the store.` };
 }
 
 function Post({ guildId, data }: { guildId: string; data: OgSummary }) {
@@ -314,7 +314,7 @@ function Post({ guildId, data }: { guildId: string; data: OgSummary }) {
                   <div><p className="text-xs font-semibold text-white">Category</p>{product.category}</div>
                 </div>
               )}
-              <p className="mt-2 text-xs text-[#949ba4]">OG Armory · {data.store.url.replace(/^https:\/\//, "")}</p>
+              <p className="mt-2 text-xs text-[#949ba4]">Outpost Gaming Store · {data.store.url.replace(/^https:\/\//, "")}</p>
             </div>
             {product?.image && <img src={product.image} alt="" className="h-16 w-16 rounded object-cover" />}
           </div>

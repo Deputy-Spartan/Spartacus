@@ -1,4 +1,4 @@
-// Owner Only → OG Armory Store: shapes of what the store website sends back through the API.
+// Owner Only → Store: shapes of what the store website sends back through the API.
 
 export type OgAlertKey = "orders" | "refunds" | "renewals" | "news";
 export interface OgAlertRoute { on: boolean; channelId: string; pingRoleId: string }

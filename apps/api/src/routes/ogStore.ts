@@ -2,7 +2,7 @@ import { Router, type NextFunction, type Response } from "express";
 import { requireAuth, isOwner, type AuthedRequest } from "../middleware/requireAuth";
 import { getGuildChannels, postChannelMessage } from "../lib/discordRest";
 
-// Owner Only → OG Armory Store. Reads and changes the store website through its /api/bridge/*
+// Owner Only → Store. Reads and changes the store website through its /api/bridge/*
 // endpoints (server to server, with STORE_BRIDGE_SECRET, the same value set on Netlify), and posts
 // store announcements to Discord as Spartacus. Only the owner (OWNER_DISCORD_ID) can use it.
 const router = Router();
@@ -91,7 +91,7 @@ router.post("/owner/og-store/post", requireAuth, ownerOnly, async (req: AuthedRe
         color: 0xe7bb5f,
         fields,
         thumbnail: image ? { url: image } : undefined,
-        footer: { text: `OG Armory · ${storeUrl().replace(/^https:\/\//, "")}` },
+        footer: { text: `Outpost Gaming Store · ${storeUrl().replace(/^https:\/\//, "")}` },
       },
     ],
     components: buttons.length ? [{ type: 1, components: buttons.map((x) => ({ type: 2, style: 5, label: x.label, url: x.url })) }] : [],

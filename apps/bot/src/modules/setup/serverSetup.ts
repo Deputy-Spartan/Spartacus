@@ -883,7 +883,7 @@ async function setupModules(guild: Guild, opts: SetupOptions, ids: Ids, notes: s
   }
   for (const key of modulesOn(opts)) invalidateModuleCache(g, key);
   if (hq) {
-    notes.push(`To connect the OG Armory store: in the store's admin › Staff & roles, pick 🗂️ Open Tickets as the ticket category and #🛒・store-alerts as the alert channel, and link 🎟️ Support Team, 🛡️ Moderator and ⚙️ Admin.`);
+    notes.push(`To connect the store: in the store's admin › Staff & roles, pick 🗂️ Open Tickets as the ticket category and #🛒・store-alerts as the alert channel, and link 🎟️ Support Team, 🛡️ Moderator and ⚙️ Admin.`);
     notes.push("Give 💎 Verified Buyer to each product on the store's Products page so buyers unlock 💎・verified-buyers automatically.");
   } else notes.push("LFG needs its command made on the dashboard (LFG page), since it picks a trigger word for your server.");
 }

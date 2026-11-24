@@ -2188,7 +2188,7 @@ export const api = {
     return URL.createObjectURL(await res.blob());
   },
   getFrontPage: () => request<{ cards: import("@spartacus/shared").FrontPageCard[]; custom: boolean; statusUrl: string | null }>("/owner/front-page"),
-  // Owner Only → OG Armory Store (talks to the store website through the API).
+  // Owner Only → Store (talks to the store website through the API).
   getOgStore: () => request<import("./ogStore").OgSummary>("/owner/og-store"),
   saveOgStoreRouting: (routing: import("./ogStore").OgRouting) => request<{ routing: import("./ogStore").OgRouting }>("/owner/og-store/routing", { method: "PUT", body: JSON.stringify({ routing }) }),
   saveOgStoreTickets: (tickets: import("./ogStore").OgTickets) => request<{ tickets: import("./ogStore").OgTickets }>("/owner/og-store/tickets", { method: "PUT", body: JSON.stringify(tickets) }),

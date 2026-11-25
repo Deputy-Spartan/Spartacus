@@ -54,6 +54,36 @@ export async function fetchStoreAccess(discordIds: string[]): Promise<StoreEntit
   return body.entitlements ?? [];
 }
 
+// The store's own Discord server, asked once every 6 hours, so only joins
+// there are reported (the store then gives the buyer their customer roles).
+let storeGuild: { id: string | null; at: number } | null = null;
+async function storeGuildId(): Promise<string | null> {
+  if (storeGuild && Date.now() - storeGuild.at < 6 * 60 * 60_000) return storeGuild.id;
+  try {
+    const res = await fetch(`${storeUrl()}/api/bridge/info`, {
+      headers: { authorization: `Bearer ${process.env.STORE_BRIDGE_SECRET}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = res.ok ? ((await res.json()) as { guildId?: string | null }) : null;
+    storeGuild = { id: body?.guildId ?? null, at: Date.now() };
+  } catch {
+    storeGuild = { id: storeGuild?.id ?? null, at: Date.now() - 5 * 60 * 60_000 }; // try again in an hour
+  }
+  return storeGuild.id;
+}
+
+/** Someone joined a server. If it's the store's, the store gives their Subscriber / Customer / Returning Customer roles now. */
+export async function notifyStoreJoin(guildId: string, discordId: string): Promise<void> {
+  if (!plansEnforced()) return;
+  if ((await storeGuildId()) !== guildId) return;
+  await fetch(`${storeUrl()}/api/bridge/joined`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${process.env.STORE_BRIDGE_SECRET}`, "content-type": "application/json" },
+    body: JSON.stringify({ discordId, guildId }),
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
+}
+
 /** Live on the store: paid up (or within the grace days of a late renewal). */
 export function entitlementLive(status: string, periodEnd: Date | string | null): boolean {
   if (status === "active") return true;

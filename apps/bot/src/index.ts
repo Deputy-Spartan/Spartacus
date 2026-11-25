@@ -3,7 +3,7 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 import { ActivityType, Client, Events, GatewayIntentBits, Options, Partials, type PresenceStatusData } from "discord.js";
-import { logError, prisma, setGuildOwnerLookup } from "@spartacus/db";
+import { logError, notifyStoreJoin, prisma, setGuildOwnerLookup } from "@spartacus/db";
 import { commands } from "./commands";
 import { registerCommands } from "./lib/registerCommands";
 import { isLeader, startLeaderLoop, takeLeadership } from "./lib/leader";
@@ -357,6 +357,8 @@ export function startBot() {
   client.on(Events.GuildMemberAdd, logger.onMemberAdd);
   client.on(Events.GuildMemberAdd, guildMemberAdd.onMemberJoin);
   client.on(Events.GuildMemberAdd, (m) => void onVerificationJoin(m).catch(() => null));
+  // Outpost Gaming store: a buyer joining the store's server gets their customer roles straight away.
+  client.on(Events.GuildMemberAdd, (m) => { if (!m.user.bot) void notifyStoreJoin(m.guild.id, m.id).catch(() => null); });
   client.on(Events.GuildMemberRemove, logger.onMemberRemove);
   client.on(Events.GuildMemberUpdate, logger.onMemberUpdate);
   client.on(Events.VoiceStateUpdate, logger.onVoiceStateUpdate);

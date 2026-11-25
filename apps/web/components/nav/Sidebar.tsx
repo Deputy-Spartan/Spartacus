@@ -23,6 +23,9 @@ import { useEditMode } from "../../lib/editMode";
 // the way two hand-maintained copies eventually would.
 export { NAV_SECTIONS, NAV_MODULE_KEYS, MODULE_KEY_TO_HREF };
 
+// The Outpost Gaming store (same value as the account menu's Store link).
+const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || "https://outpostgaming.netlify.app";
+
 export function Sidebar({
   guildId,
   open,
@@ -357,6 +360,21 @@ export function Sidebar({
                         );
                       })
                     : section.items.map((item) => pageRow(item, section.section))}
+                  {/* The Outpost Gaming store (a separate site): plans, single features and downloads. */}
+                  {key === "top" && !searching && (
+                    <a
+                      href={STORE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={onNavigate}
+                      className="sp-metal relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm"
+                      title="Opens the Outpost Gaming Store in a new tab"
+                    >
+                      <AppIcon emoji="🛒" size={22} />
+                      <span className="flex-1 min-w-0 truncate">Store</span>
+                      <span className="shrink-0 text-[10px] text-slate-500" aria-hidden="true">↗</span>
+                    </a>
+                  )}
                 </div>
               )}
             </div>

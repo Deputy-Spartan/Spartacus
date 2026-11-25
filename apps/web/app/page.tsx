@@ -7,6 +7,8 @@ import { forgetLastUser, readLastUser, type LastUser } from "../lib/lastUser";
 import { AppIcon } from "../components/ui/AppIcon";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+// Spartacus is made by Outpost Gaming; its store sells the paid plans. Same value as the account menu's link.
+const STORE_URL = process.env.NEXT_PUBLIC_STORE_URL || "https://outpostgaming.netlify.app";
 
 // The info boxes, each opening into what it means. The owner edits them in
 // Owner Only → Front Page; the built-in set shows until that loads (or if it fails).
@@ -108,7 +110,12 @@ function LandingContent() {
         <div aria-hidden="true" className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(123,153,188,0.32),transparent_65%)]" />
         <div className="relative flex items-center gap-2.5">
           <BotLogo src={stats?.botAvatar} failed={statsFailed} className="h-9 w-9 ring-1 ring-white/10" />
-          <span className="text-xl font-extrabold tracking-tight">Spartacus</span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-xl font-extrabold tracking-tight">Spartacus</span>
+            <a href={STORE_URL} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#e0b25c] hover:text-[#f3cf85]">
+              by Outpost Gaming
+            </a>
+          </span>
         </div>
         <h1 className="relative mt-10 text-3xl sm:text-4xl font-extrabold leading-tight max-w-xl">Run your gaming community from one dashboard.</h1>
         <p className="relative mt-3 text-slate-400 max-w-md">Everything your server needs, set up in minutes and managed in one place. Tap a box to see what it does.</p>
@@ -216,9 +223,16 @@ function LandingContent() {
               Not you? Use a different account
             </button>
           )}
+          <div className="mt-6 border-t border-white/10 pt-4 text-xs text-slate-400">
+            Spartacus is made by <span className="font-semibold text-[#e0b25c]">Outpost Gaming</span>. Pro features, overlays and the Stream Deck plugin are on the{" "}
+            <a href={STORE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#f3cf85] underline underline-offset-2 hover:text-white">
+              Outpost Gaming Store
+            </a>
+            . Same Discord account on both.
+          </div>
         </div>
         <p className="absolute bottom-5 text-[11px] text-slate-600">
-          Spartacus · Discord sign-in only, no password stored
+          Spartacus by Outpost Gaming · Discord sign-in only, no password stored
           {statusUrl && (
             <>
               {" · "}

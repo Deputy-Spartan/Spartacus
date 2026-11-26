@@ -45,6 +45,8 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
     return null;
   }
 
+  await placeUnderLobby(guild, created, lobby).catch(() => null);
+
   if (member.voice.channelId) await member.voice.setChannel(created.id).catch(() => null);
   // A game picked on the panel already named the channel, so it skips the game menu.
   const games = lobby.gamePicker && !game ? cleanTempGameChoices(lobby.gameChoices) : [];
@@ -69,6 +71,30 @@ export async function createSquad(guild: Guild, member: GuildMember, lobby: Temp
     data: { guildId: guild.id, lobbyId: lobby.id, channelId: created.id, textChannelId, controlsThreadId, ownerId: member.id },
   });
   return created;
+}
+
+// When the squad shares a category with the lobby channel, moves it just under
+// the lobby (after any squads already there), so it sits above channels like
+// AFK instead of at the bottom of the category.
+async function placeUnderLobby(guild: Guild, squad: VoiceChannel, lobby: TempChannelLobby) {
+  if (!lobby.lobbyChannelId) return;
+  const lobbyChannel = guild.channels.cache.get(lobby.lobbyChannelId);
+  if (!lobbyChannel || lobbyChannel.parentId !== squad.parentId) return;
+
+  const voice = [...guild.channels.cache.values()]
+    .filter((c) => c.parentId === squad.parentId && (c.type === ChannelType.GuildVoice || c.type === ChannelType.GuildStageVoice) && c.id !== squad.id)
+    .sort((a, b) => ("rawPosition" in a && "rawPosition" in b ? a.rawPosition - b.rawPosition : 0) || (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
+
+  const squadIds = new Set(
+    (await prisma.tempChannelInstance.findMany({ where: { lobbyId: lobby.id }, select: { channelId: true } })).map((i) => i.channelId)
+  );
+  let at = voice.findIndex((c) => c.id === lobbyChannel.id);
+  if (at < 0) return;
+  at += 1;
+  while (at < voice.length && squadIds.has(voice[at].id)) at += 1;
+
+  voice.splice(at, 0, squad);
+  await guild.channels.setPositions(voice.map((c, position) => ({ channel: c.id, position })));
 }
 
 // Puts the Lock, Rename and Limit buttons in the voice channel's chat, or in

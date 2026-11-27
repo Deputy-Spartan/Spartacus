@@ -294,6 +294,8 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
 
         <ObsCard path={`/overlay/${kind}/${guildId}`} w={W} h={H} note={<p className={`${hint} mt-3`}>This one is your full stream size, so it lines up with your stream. The see-through parts don&apos;t cover anything.</p>} />
 
+        {kind === "wheel" && <WheelLumia guildId={guildId} settings={settings} update={update} />}
+
         {deckCmds.length > 0 && (
           <NeonCard>
             <p className="font-medium">🎛️ Stream Deck</p>
@@ -413,6 +415,57 @@ function ToolSections({ sections, settings, update }: { sections: ToolSection[];
 }
 
 // AFK popups: your commands (edit, add, try) and their links for Lumia.
+// Lumia Stream (or any app): a run link that spins the wheel.
+function WheelLumia({ guildId, settings, update }: { guildId: string; settings: Settings; update: (p: Partial<Settings>) => void }) {
+  const [runKey, setRunKey] = useState("");
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    api.getChatCommands(guildId).then((r) => setRunKey(r.config.runKey ?? "")).catch(() => null);
+  }, [guildId]);
+  const cmd = String(settings.spinCmd || "spin");
+  const link = `${API_URL}/public/chat-command/${guildId}/${encodeURIComponent(cmd)}?key=${runKey}&from=Lumia`;
+  const copy = () =>
+    navigator.clipboard
+      .writeText(link)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => null);
+  return (
+    <NeonCard>
+      <p className="font-medium">⚡ Lumia Stream</p>
+      <p className={hint}>Spin the wheel from a Lumia command or button.</p>
+      {!settings.chatSpin && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-sm text-amber-200">
+          <span className="flex-1">The link only works while Spin from chat is on.</span>
+          <button type="button" className="neon-button-sm" onClick={() => update({ chatSpin: true })}>
+            Turn it on
+          </button>
+        </div>
+      )}
+      {runKey ? (
+        <div className="flex gap-2 mt-3">
+          <input className={`${field} font-mono text-xs`} readOnly value={link} aria-label="Lumia link" onFocus={(e) => e.target.select()} />
+          <button type="button" className={button} onClick={copy}>
+            {copied ? "Copied ✓" : "Copy link"}
+          </button>
+        </div>
+      ) : (
+        <p className={`${hint} mt-3`}>
+          Open the <Link href={`/dashboard/${guildId}/chat-commands`} className="text-neon-blue underline">Chat Commands page</Link> once to make your link.
+        </p>
+      )}
+      <ol className="list-decimal pl-5 mt-3 space-y-1 text-sm text-slate-300">
+        <li>In Lumia: Actions → Action Source: Api.</li>
+        <li>Paste the link into URL. Type of request: get or post.</li>
+        <li>Press Test Action. The wheel spins.</li>
+      </ol>
+      <p className={`${hint} mt-3`}>Don&apos;t also add Lumia&apos;s own wheel (Overlay → Send Game Trigger) to that command, or two wheels spin.</p>
+    </NeonCard>
+  );
+}
+
 function AfkCommands({ guildId, settings, update, busy, act }: { guildId: string; settings: Settings; update: (p: Partial<Settings>) => void; busy: string; act: (label: string, a: Record<string, unknown>) => void }) {
   // Read as typed (a half-typed command isn't dropped); the server tidies it on save.
   const items: AfkItem[] = (() => {

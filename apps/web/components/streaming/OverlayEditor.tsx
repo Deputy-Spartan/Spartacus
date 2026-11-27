@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  COUNTER_COLORS,
   MESSAGE_EVERY,
   MESSAGE_EXTRAS,
   MESSAGE_PRESETS,
@@ -25,7 +24,7 @@ import { NeonCard } from "../ui/NeonCard";
 import { useConfirm } from "../ui/ConfirmDialog";
 import { PageGuideButton } from "../nav/PageGuideButton";
 import { ShowOnStream } from "./ShowOnStream";
-import { AnimChoices, Choices, CommonLook, CounterPreview, ObsCard, Swatch, Toggle, button, demoIn, field, hint } from "./CounterParts";
+import { AnimChoices, Choices, ColorChoices, CommonLook, CounterPreview, ObsCard, Toggle, button, demoIn, field, hint } from "./CounterParts";
 import { useAutoSave } from "../../lib/useAutoSave";
 import { api } from "../../lib/api";
 
@@ -585,19 +584,7 @@ export function OverlayEditor({ guildId, kind }: { guildId: string; kind: Overla
           />
           {kind === "winloss" && (
             <>
-              <Choices
-                title="Losses number color"
-                cols={4}
-                items={COUNTER_COLORS}
-                value={str("dcolor")}
-                onPick={(dcolor) => pick({ dcolor }, "losses")}
-                render={([c, name]) => (
-                  <>
-                    <Swatch c={c} />
-                    {name}
-                  </>
-                )}
-              />
+              <ColorChoices title="Losses number color" value={str("dcolor")} onPick={(dcolor) => pick({ dcolor }, "losses")} />
               <Choices title="+/− colors" cols={2} items={[["kd", "Wins green, losses red"], ["updown", "Up green, down red"]] as const} value={str("colors")} onPick={(colors) => pick({ colors }, "losses")} />
               <Choices title="+/− words" cols={2} items={[["num", "+1"], ["word", "+1 WIN"]] as const} value={str("dtext")} onPick={(dtext) => pick({ dtext })} />
               {!!look.streakOn && <Choices title="Win streak every" items={WIN_STREAKS} value={Number(look.streakEvery)} onPick={(streakEvery) => update({ streakEvery })} />}

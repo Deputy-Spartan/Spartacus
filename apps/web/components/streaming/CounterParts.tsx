@@ -100,6 +100,74 @@ export function AnimChoices({ items, value, onPick }: { items: ReadonlyArray<Ani
   );
 }
 
+// "#abc", "abc", "#AABBCC" or "aabbcc" → "#aabbcc"; anything else → null.
+export function parseHex(raw: string): string | null {
+  const t = raw.trim().replace(/^#/, "").toLowerCase();
+  if (/^[0-9a-f]{6}$/.test(t)) return `#${t}`;
+  if (/^[0-9a-f]{3}$/.test(t)) return `#${t.replace(/./g, (c) => c + c)}`;
+  return null;
+}
+
+// A color picker with a box to type or paste a hex code (like #FFC641).
+export function HexColor({ value, onChange, label, small }: { value: string; onChange: (c: string) => void; label: string; small?: boolean }) {
+  const [text, setText] = useState(value);
+  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    if (!focused) setText(value);
+  }, [value, focused]);
+  const bad = text.trim() !== "" && !parseHex(text);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <input type="color" aria-label={label} value={parseHex(value) ?? "#ffffff"} onChange={(e) => onChange(e.target.value)} className={`${small ? "h-8 w-9" : "h-8 w-11"} rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer shrink-0`} />
+      <input
+        aria-label={`${label} hex code`}
+        value={text}
+        maxLength={7}
+        spellCheck={false}
+        autoCapitalize="off"
+        placeholder="#ffffff"
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          setText(value);
+        }}
+        onChange={(e) => {
+          setText(e.target.value);
+          const c = parseHex(e.target.value);
+          if (c && c !== value) onChange(c);
+        }}
+        className={`${small ? "w-[4.6rem]" : "w-[5.2rem]"} bg-base-950 border rounded-lg px-1.5 py-1.5 text-xs font-mono uppercase ${bad ? "border-rose-400/70" : "border-white/10"}`}
+      />
+    </span>
+  );
+}
+
+// Color swatches plus your own hex code.
+export function ColorChoices({ title, value, onPick }: { title: ReactNode; value: string; onPick: (c: string) => void }) {
+  const custom = !COUNTER_COLORS.some(([c]) => c === value);
+  return (
+    <>
+      <Choices
+        title={title}
+        cols={4}
+        items={COUNTER_COLORS}
+        value={value}
+        onPick={onPick}
+        render={([c, name]) => (
+          <>
+            <Swatch c={c} />
+            {name}
+          </>
+        )}
+      />
+      <div className={`mt-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${custom ? "border-neon-blue bg-neon-blue/10" : "border-white/10"}`}>
+        <span className="text-sm text-slate-300 flex-1">Your own color {custom && <span className="text-neon-blue">✓</span>}</span>
+        <HexColor label="Your own color" value={value} onChange={onPick} />
+      </div>
+    </>
+  );
+}
+
 export const Swatch = ({ c }: { c: string }) => <span className="inline-block w-3 h-3 rounded-full border border-black mr-1 align-[-1px]" style={{ background: c }} />;
 const pm = (
   <>
@@ -123,19 +191,7 @@ export function CommonLook<L extends CounterLook>({ look, pick, sounds, colorTit
       <Choices title="Corners" items={COUNTER_CORNERS} value={look.corners} onPick={(corners) => pick({ corners })} />
       <Choices title="Outline" items={COUNTER_OUTLINES} value={look.outline} onPick={(outline) => pick({ outline })} />
       <Choices title="While nothing's happening" cols={4} items={COUNTER_IDLES} value={look.idle} onPick={(idle) => pick({ idle })} />
-      <Choices
-        title={colorTitle}
-        cols={4}
-        items={COUNTER_COLORS}
-        value={look.color}
-        onPick={(color) => pick({ color })}
-        render={([c, name]) => (
-          <>
-            <Swatch c={c} />
-            {name}
-          </>
-        )}
-      />
+      <ColorChoices title={colorTitle} value={look.color} onPick={(color) => pick({ color })} />
       <Choices title={<>{pm} style</>} cols={2} items={COUNTER_DSTYLES} value={look.dstyle} onPick={(dstyle) => pick({ dstyle })} />
       <Choices title={<>{pm} size</>} items={COUNTER_DSIZES} value={look.dsize} onPick={(dsize) => pick({ dsize })} />
       <Choices title="Speed" items={COUNTER_SPEEDS} value={look.speed} onPick={(speed) => pick({ speed })} />

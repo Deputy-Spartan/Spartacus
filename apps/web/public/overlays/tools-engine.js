@@ -425,168 +425,455 @@
       };
     };
 
-    // Spin wheel: drawn on a canvas. Pegs push the pointer aside as they pass
-    // (with a tick each), it slows like a real wheel and rocks back a little.
+    // Spin wheel: drawn on a canvas that fills the OBS canvas (any size or
+    // shape). Pegs push the pointer aside as they pass (with a tick each), it
+    // slows like a real wheel and rocks back a little. It can come in and leave
+    // with an animation, take winners off, and show the result 3 ways.
     // Every color and part comes from the settings (packages/shared/tools.ts).
-    const wheelKeep = { angle: 0 };
-    M.wheel = (layer, s) => {
-      const slices = Array.from({ length: 16 }, (_, i) => String(s[`s${i + 1}`] ?? "").trim()).filter(Boolean);
-      const colors = String(s.colors || "#e5484d,#f5a524,#30a46c,#3e63dd").split(",").filter((c) => /^#[0-9a-f]{6}$/i.test(c));
+    const wheelKeep = { angle: 0, hist: [] };
+    M.wheel = (layer, s, st) => {
+      const preview = root.dataset.preview === "1";
+      const HEXRE = /^#[0-9a-f]{6}$/i, FULL = Math.PI * 2;
+      const num = (v, d) => (v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? d : Number(v));
+      const extra = (() => { try { const v = JSON.parse(s.extra || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } })();
+      const slots = Array.from({ length: 16 }, (_, i) => ({ t: String(s[`s${i + 1}`] ?? "").trim(), slot: i + 1, c: "", tc: "", w: 1, msg: "", ...(extra[i] && typeof extra[i] === "object" ? extra[i] : {}) })).filter((x) => x.t);
+      const palette = String(s.colors || "#e5484d,#f5a524,#30a46c,#3e63dd").split(",").filter((c) => HEXRE.test(c));
+      if (!palette.length) palette.push("#888888");
+      let out = Array.isArray(st.out) ? st.out.map(Number) : [];
+      let items = [], geo = [];
+
       const w = document.createElement("div");
       w.className = "wh";
-      w.innerHTML = `<div class="wh-label acc xt"></div><div class="wh-wrap"><canvas class="wh-c" width="1000" height="1000"></canvas><div class="wh-res xt ${box(s)}" hidden></div></div>`;
-      const lab = w.querySelector(".wh-label");
-      lab.textContent = s.label || ""; lab.hidden = !s.label;
+      const resHtml = "<small></small><b></b><i></i>";
+      w.innerHTML = `<div class="wh-g"><div class="wh-label acc xt"></div><div class="wh-wrap"><canvas class="wh-c" width="1000" height="1000"></canvas><div class="wh-res card xt ${box(s)}" hidden>${resHtml}</div></div></div>` +
+        `<div class="wh-res banner xt ${box(s)}" hidden>${resHtml}</div><div class="wh-res big xt" hidden>${resHtml}</div><canvas class="wh-fx"></canvas><div class="wh-hist" hidden></div>`;
       layer.appendChild(w);
-      const cv = w.querySelector(".wh-c"), ctx = cv.getContext("2d"), res = w.querySelector(".wh-res");
-      const S = 1000, C = 500, R_OUT = 470, n = Math.max(1, slices.length), seg = (Math.PI * 2) / n;
-      const rim = Math.max(0, Math.min(60, Number(s.rimWidth) || 0)), R = R_OUT - rim;
+      const g = w.querySelector(".wh-g"), lab = w.querySelector(".wh-label"), wrap = w.querySelector(".wh-wrap"), histEl = w.querySelector(".wh-hist");
+      const cv = w.querySelector(".wh-c"), ctx = cv.getContext("2d"), fxc = w.querySelector(".wh-fx"), fctx = fxc.getContext("2d");
+      const RES = { card: w.querySelector(".wh-res.card"), banner: w.querySelector(".wh-res.banner"), big: w.querySelector(".wh-res.big") };
+      w.style.setProperty("--win", HEXRE.test(s.winColor) ? s.winColor : "#ffffff");
+      lab.textContent = s.label || ""; lab.hidden = !s.label;
+
+      const S = 1000, C = 500, R_OUT = 470;
+      const rim = Math.max(0, Math.min(60, num(s.rimWidth, 22))), R = R_OUT - rim;
       const P = { top: -Math.PI / 2, right: 0, bottom: Math.PI / 2, left: Math.PI }[s.pointerSide] ?? -Math.PI / 2;
-      const neon = s.fill === "neon", hub = Math.max(0, Number(s.hubSize) || 0);
+      const neon = s.fill === "neon", hubType = s.hubType || "text", hub = hubType === "none" ? 0 : Math.max(0, num(s.hubSize, 70)), hubB = Math.max(0, num(s.hubBorder, 0));
+      const pegSize = Math.max(4, Math.min(30, num(s.pegSize, 9))), pegR = R - Math.max(16, pegSize + 8);
       const fontOf = (px) => `${FONT_W[s.font] || 400} ${px}px ${FONTS[s.font] || FONTS.lilita}`;
       const lum = (hex) => { const v = parseInt(String(hex).slice(1), 16); return [v >> 16, (v >> 8) & 255, v & 255].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }).reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0); };
+      const shade = (hex, k) => { const n = parseInt(String(hex).slice(1), 16); const f = (v) => Math.max(0, Math.min(255, Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; };
+      const autoOn = (col) => (lum(col) > 0.45 ? "#15171b" : "#ffffff");
       const upper = (t) => (s.upper ? t.toUpperCase() : t);
+      const wrapPi = (a) => { a = ((a % FULL) + FULL) % FULL; return a > Math.PI ? a - FULL : a; };
+      const colOf = (i) => (s.perSlice && HEXRE.test(items[i].c) ? items[i].c : palette[i % palette.length]);
+      const txtCol = (i, col) => (neon ? col : s.textMode === "one" ? s.textColor : s.textMode === "slice" && HEXRE.test(items[i].tc) ? items[i].tc : autoOn(col));
 
-      // The turning part and the still part are drawn once, then just rotated.
+      // The center picture or video.
+      let media = null;
+      if ((hubType === "image" || hubType === "video") && /^https:\/\//i.test(s.hubMedia || "")) {
+        if (hubType === "video") { media = document.createElement("video"); Object.assign(media, { muted: true, loop: true, playsInline: true, autoplay: true, src: s.hubMedia }); media.play().catch(() => null); media.addEventListener("loadeddata", () => wake()); }
+        else { media = new Image(); media.onload = () => wake(); media.src = s.hubMedia; }
+      }
+      const mediaReady = () => media && (media.tagName === "VIDEO" ? media.readyState >= 2 : media.complete && media.naturalWidth > 0);
+
+      // ---- The turning part, drawn once and then just rotated ----
       const wedges = document.createElement("canvas"); wedges.width = wedges.height = S;
       const base = document.createElement("canvas"); base.width = base.height = S;
-      function build() {
-        const g = wedges.getContext("2d");
-        g.clearRect(0, 0, S, S); g.save(); g.translate(C, C);
-        slices.forEach((t, i) => {
-          const col = colors[i % colors.length] || "#888888";
-          g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R, i * seg, (i + 1) * seg); g.closePath();
-          g.fillStyle = neon ? (i % 2 ? "#131a28" : "#0c111c") : col; g.fill();
-          if (neon) { g.save(); g.beginPath(); g.arc(0, 0, R - 12, i * seg + 0.03, (i + 1) * seg - 0.03); g.strokeStyle = col; g.lineWidth = 6; g.shadowColor = col; g.shadowBlur = 20; g.stroke(); g.restore(); }
-        });
-        if (s.dividers) for (let i = 0; i < n; i++) {
-          g.save(); g.rotate(i * seg); g.beginPath(); g.moveTo(0, 0); g.lineTo(R, 0);
-          g.strokeStyle = s.dividerColor; g.lineWidth = Number(s.dividerWidth) || 4; if (neon) { g.shadowColor = s.dividerColor; g.shadowBlur = 10; } g.stroke(); g.restore();
+      function sliceText(gx, i) {
+        const it = items[i], { a0, sp } = geo[i], mid = a0 + sp / 2, col = colOf(i), txt = upper(it.t);
+        const pad = s.pegs ? Math.max(40, pegSize * 2 + 24) : 24, inner = (hub ? Math.max(hub + hubB, 30) : 30) + 18, outer = R - pad, n = items.length;
+        let size = Math.min(64, 40 + 120 / n, 640 / Math.max(6, txt.length)) * num(s.textSize, 100) / 100;
+        const setF = () => (gx.font = fontOf(size));
+        const yOff = () => (s.font === "teko" ? size * 0.07 : size * 0.03);
+        const mv = num(s.textMove, 0), sh = num(s.textShift, 0);
+        const paint = (t, x, y) => {
+          if (s.sOutline) { gx.save(); gx.lineJoin = "round"; gx.lineWidth = num(s.sOutlineWidth, 4) * 2; gx.strokeStyle = s.sOutlineColor; gx.strokeText(t, x, y); gx.restore(); }
+          gx.save();
+          if (neon) { gx.shadowColor = col; gx.shadowBlur = 12; } else if (s.sShadow) { gx.shadowColor = "rgba(0,0,0,.6)"; gx.shadowBlur = 8; gx.shadowOffsetY = 3; }
+          gx.fillText(t, x, y); gx.restore();
+        };
+        gx.save(); gx.rotate(mid); gx.fillStyle = txtCol(i, col); gx.textBaseline = "middle";
+        if (s.textDir === "across" || s.textDir === "curve") {
+          const rAt = () => Math.max(30, (s.textAlign === "middle" ? (inner + outer) / 2 : s.textAlign === "center" ? inner + size * 0.6 : outer - size * 0.6) + mv);
+          setF();
+          if (s.textDir === "across") {
+            const fit = () => 2 * rAt() * Math.sin(Math.min(sp, Math.PI) / 2) * 0.86;
+            while (gx.measureText(txt).width > fit() && size > 12) { size -= 2; setF(); }
+            gx.translate(rAt(), 0); gx.rotate(Math.PI / 2); gx.textAlign = "center";
+            paint(txt, sh, yOff());
+          } else {
+            let tw = gx.measureText(txt).width;
+            while (tw / rAt() > sp * 0.88 && size > 12) { size -= 2; setF(); tw = gx.measureText(txt).width; }
+            const r = rAt(); let a = -tw / (2 * r) + sh / r; gx.textAlign = "center";
+            for (const ch of txt) { const cw = gx.measureText(ch).width; gx.save(); gx.rotate(a + cw / (2 * r)); gx.translate(r, 0); gx.rotate(Math.PI / 2); paint(ch, 0, yOff()); gx.restore(); a += cw / r; }
+          }
+        } else {
+          setF();
+          while (gx.measureText(txt).width > outer - inner && size > 12) { size -= 2; setF(); }
+          const chord = 2 * ((inner + outer) / 2) * Math.sin(Math.min(sp, Math.PI) / 2) * 0.9;
+          while (size > chord && size > 12) { size -= 2; setF(); }
+          let x;
+          if (s.textAlign === "middle") { gx.textAlign = "center"; x = (inner + outer) / 2; } else if (s.textAlign === "center") { gx.textAlign = "left"; x = inner; } else { gx.textAlign = "right"; x = outer; }
+          paint(txt, x + mv, sh + yOff());
         }
-        const pad = s.pegs ? 40 : 26, room = R - pad - Math.max(hub, 30) - 24;
-        slices.forEach((t, i) => {
-          const col = colors[i % colors.length] || "#888888", txt = upper(t);
-          let size = Math.min(64, 40 + 120 / n, 640 / Math.max(6, txt.length)) * (Number(s.textSize) || 100) / 100;
-          g.save(); g.rotate(i * seg + seg / 2); g.font = fontOf(size);
-          while (g.measureText(txt).width > room && size > 16) { size -= 2; g.font = fontOf(size); }
-          g.textAlign = "right"; g.textBaseline = "middle";
-          g.fillStyle = neon ? col : s.autoText ? (lum(col) > 0.45 ? "#15171b" : "#ffffff") : s.textColor;
-          if (neon) { g.shadowColor = col; g.shadowBlur = 12; }
-          g.fillText(txt, R - pad, s.font === "teko" ? 4 : 2); g.restore();
+        gx.restore();
+      }
+      function build() {
+        items = slots.filter((x) => !out.includes(x.slot));
+        if (!items.length) items = slots.slice();
+        const ws = items.map((x) => (s.odds ? Math.max(1, Math.min(5, Number(x.w) || 1)) : 1)), tot = ws.reduce((a, b) => a + b, 0) || 1;
+        let a = 0; geo = ws.map((v) => { const sp = (v / tot) * FULL, r = { a0: a, sp }; a += sp; return r; });
+        const gx = wedges.getContext("2d");
+        gx.clearRect(0, 0, S, S); gx.save(); gx.translate(C, C);
+        items.forEach((it, i) => {
+          const { a0, sp } = geo[i], col = colOf(i);
+          gx.beginPath(); gx.moveTo(0, 0); gx.arc(0, 0, R, a0, a0 + sp); gx.closePath();
+          if (neon) gx.fillStyle = i % 2 ? "#131a28" : "#0c111c";
+          else if (s.fill === "shaded") { const gr = gx.createRadialGradient(0, 0, 0, 0, 0, R); gr.addColorStop(0, shade(col, -0.45)); gr.addColorStop(0.6, col); gr.addColorStop(1, shade(col, 0.14)); gx.fillStyle = gr; }
+          else gx.fillStyle = col;
+          gx.fill();
+          if (neon) { gx.save(); gx.beginPath(); gx.arc(0, 0, R - 12, a0 + 0.03, a0 + sp - 0.03); gx.strokeStyle = col; gx.lineWidth = 6; gx.shadowColor = col; gx.shadowBlur = 20; gx.stroke(); gx.restore(); }
         });
-        if (s.pegs) for (let i = 0; i < n; i++) { const a = i * seg; g.beginPath(); g.arc(Math.cos(a) * (R - 16), Math.sin(a) * (R - 16), 8, 0, Math.PI * 2); g.fillStyle = s.pegColor; g.fill(); }
-        g.restore();
+        if (s.dividers && items.length > 1) geo.forEach(({ a0 }) => {
+          gx.save(); gx.rotate(a0); gx.beginPath(); gx.moveTo(0, 0); gx.lineTo(R, 0);
+          gx.strokeStyle = s.dividerColor; gx.lineWidth = num(s.dividerWidth, 4); if (neon) { gx.shadowColor = s.dividerColor; gx.shadowBlur = 10; } gx.stroke(); gx.restore();
+        });
+        items.forEach((_, i) => sliceText(gx, i));
+        gx.restore();
         const b = base.getContext("2d"); b.clearRect(0, 0, S, S);
-        if (s.shadow) { b.save(); b.beginPath(); b.arc(C, C + 10, R_OUT, 0, Math.PI * 2); b.fillStyle = "rgba(0,0,0,.45)"; b.filter = "blur(14px)"; b.fill(); b.restore(); }
-        if (rim > 0) { b.beginPath(); b.arc(C, C, R_OUT, 0, Math.PI * 2); b.fillStyle = s.rimColor; b.fill(); }
+        if (s.shadow) { b.save(); b.beginPath(); b.arc(C, C + 10, R_OUT, 0, FULL); b.fillStyle = "rgba(0,0,0,.45)"; b.filter = "blur(14px)"; b.fill(); b.restore(); }
+        if (rim > 0) {
+          b.beginPath(); b.arc(C, C, R_OUT, 0, FULL);
+          if (s.rimStyle === "metal") { const gr = b.createLinearGradient(C - R_OUT, C - R_OUT, C + R_OUT, C + R_OUT); gr.addColorStop(0, shade(s.rimColor, 0.5)); gr.addColorStop(0.35, shade(s.rimColor, -0.1)); gr.addColorStop(0.5, shade(s.rimColor, 0.35)); gr.addColorStop(0.75, shade(s.rimColor, -0.4)); gr.addColorStop(1, shade(s.rimColor, 0.25)); b.fillStyle = gr; }
+          else b.fillStyle = s.rimColor;
+          b.fill();
+        }
+        lastPeg = null;
       }
 
+      // ---- Each frame ----
       let angle = wheelKeep.angle, vel = 0, flap = 0, flapV = 0, spinning = false, winIdx = -1, winOn = false, lastPeg = null, anim = null, raf = 0, idleFrames = 0;
+      const hitAt = [];
+      function drawPegs(now) {
+        if (!s.pegs) return;
+        const c = s.pegColor, sz = pegSize;
+        ctx.save(); ctx.translate(C, C); ctx.rotate(angle);
+        geo.forEach(({ a0 }, j) => {
+          ctx.save(); ctx.rotate(a0); ctx.translate(pegR, 0);
+          const hot = s.pegFlash ? Math.max(0, 1 - (now - (hitAt[j] ?? -1e9)) / 380) : 0;
+          if (hot > 0) { ctx.save(); ctx.globalAlpha = hot * 0.7; ctx.shadowColor = s.pegFlashColor; ctx.shadowBlur = sz * 2.2; ctx.beginPath(); ctx.arc(0, 0, sz * 1.35, 0, FULL); ctx.fillStyle = s.pegFlashColor; ctx.fill(); ctx.restore(); }
+          if (s.pegStyle === "bar") {
+            const L = sz * 3.2, T = sz * 0.9;
+            ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = sz * 0.6; ctx.shadowOffsetY = sz * 0.25;
+            ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-L / 2, -T / 2, L, T, T / 2); else ctx.rect(-L / 2, -T / 2, L, T);
+            const gr = ctx.createLinearGradient(0, -T / 2, 0, T / 2); gr.addColorStop(0, shade(c, 0.45)); gr.addColorStop(0.5, c); gr.addColorStop(1, shade(c, -0.4));
+            ctx.fillStyle = gr; ctx.fill(); ctx.restore();
+          } else if (s.pegStyle === "diamond") {
+            ctx.rotate(Math.PI / 4); const d = sz * 1.25;
+            ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = sz * 0.6; ctx.shadowOffsetY = sz * 0.25; ctx.fillStyle = shade(c, -0.35); ctx.fillRect(-d / 2, -d / 2, d, d); ctx.restore();
+            const gr = ctx.createLinearGradient(-d / 2, -d / 2, d / 2, d / 2); gr.addColorStop(0, shade(c, 0.6)); gr.addColorStop(0.5, c); gr.addColorStop(1, shade(c, -0.35));
+            ctx.fillStyle = gr; ctx.fillRect(-d / 2 + 1.5, -d / 2 + 1.5, d - 3, d - 3);
+          } else if (s.pegStyle === "dot") {
+            ctx.beginPath(); ctx.arc(0, 0, sz, 0, FULL); ctx.fillStyle = c; ctx.fill();
+          } else {
+            // Round studs keep their light from the top left as they turn.
+            ctx.rotate(-(angle + a0));
+            ctx.save(); ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = sz * 0.8; ctx.shadowOffsetY = sz * 0.3;
+            ctx.beginPath(); ctx.arc(0, 0, sz, 0, FULL); ctx.fillStyle = shade(c, -0.5); ctx.fill(); ctx.restore();
+            const gr = ctx.createRadialGradient(-sz * 0.35, -sz * 0.4, sz * 0.08, 0, 0, sz);
+            gr.addColorStop(0, shade(c, 0.8)); gr.addColorStop(0.45, c); gr.addColorStop(1, shade(c, -0.45));
+            ctx.beginPath(); ctx.arc(0, 0, sz * 0.88, 0, FULL); ctx.fillStyle = gr; ctx.fill();
+          }
+          ctx.restore();
+        });
+        ctx.restore();
+      }
+      function pointerPath() {
+        ctx.beginPath();
+        const ps = s.pointerStyle;
+        if (ps === "arrow") { ctx.moveTo(-9, -4); ctx.lineTo(9, -4); ctx.lineTo(9, 44); ctx.lineTo(28, 44); ctx.lineTo(0, 100); ctx.lineTo(-28, 44); ctx.lineTo(-9, 44); }
+        else if (ps === "pin") { ctx.arc(0, 22, 24, Math.PI * 0.8, Math.PI * 2.2); ctx.lineTo(0, 98); }
+        else if (ps === "notch") { ctx.moveTo(-13, 6); ctx.lineTo(13, 6); ctx.lineTo(0, 80); }
+        else if (ps === "triangle") { ctx.moveTo(-28, 4); ctx.lineTo(28, 4); ctx.lineTo(0, 96); }
+        else { ctx.moveTo(-24, 0); ctx.quadraticCurveTo(-27, 34, -10, 70); ctx.quadraticCurveTo(-3, 86, 0, 104); ctx.quadraticCurveTo(3, 86, 10, 70); ctx.quadraticCurveTo(27, 34, 24, 0); ctx.quadraticCurveTo(0, -10, -24, 0); }
+        ctx.closePath();
+      }
+      function drawPointer() {
+        const k = num(s.pointerSize, 100) / 100, col = s.pointerColor, ps = s.pointerStyle;
+        ctx.save(); ctx.translate(C, C); ctx.rotate(P + Math.PI / 2); ctx.translate(0, -(C - 12)); ctx.rotate(s.bounce ? flap : 0); ctx.scale(k, k);
+        ctx.lineJoin = "round";
+        if (s.pointerShadow) { ctx.save(); ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8; pointerPath(); ctx.fillStyle = col; ctx.fill(); ctx.restore(); }
+        if (s.pointer3d) {
+          const gr = ctx.createLinearGradient(-28, 0, 28, 0);
+          gr.addColorStop(0, shade(col, 0.4)); gr.addColorStop(0.45, col); gr.addColorStop(1, shade(col, -0.5));
+          pointerPath(); ctx.fillStyle = gr; ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = shade(col, lum(col) < 0.05 ? 0.25 : -0.55); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(-8, 22); ctx.quadraticCurveTo(-9, 50, -3, 74); ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.stroke();
+        } else { pointerPath(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 8; ctx.stroke(); ctx.fill(); }
+        if (ps !== "notch") {
+          const by = ps === "pin" ? 22 : 16, br = 9;
+          const bg = ctx.createRadialGradient(-3, by - 3, 1, 0, by, br);
+          bg.addColorStop(0, "#ffffff"); bg.addColorStop(0.35, "#c9cdd3"); bg.addColorStop(1, "#5b616b");
+          ctx.beginPath(); ctx.arc(0, by, br, 0, FULL); ctx.fillStyle = s.pointer3d ? bg : autoOn(col); ctx.fill();
+          if (s.pointer3d) { ctx.lineWidth = 1.5; ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.stroke(); }
+        }
+        ctx.restore();
+      }
+      function drawHub() {
+        if (!hub) return;
+        ctx.save(); ctx.translate(C, C); if (s.hubTurns) ctx.rotate(angle);
+        if (hubB > 0) { ctx.beginPath(); ctx.arc(0, 0, hub + hubB, 0, FULL); ctx.fillStyle = s.hubBorderColor; ctx.fill(); }
+        ctx.beginPath(); ctx.arc(0, 0, hub, 0, FULL); ctx.fillStyle = s.hubColor; ctx.fill();
+        if (hubType === "text" && s.hubText) {
+          const t = upper(String(s.hubText)), len = t.length;
+          let px = hub * (len <= 1 ? 1.2 : len === 2 ? 0.9 : len === 3 ? 0.65 : 1.9 / len);
+          ctx.font = fontOf(px); while (ctx.measureText(t).width > hub * 1.7 && px > 8) { px -= 2; ctx.font = fontOf(px); }
+          ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = s.hubTextColor; ctx.fillText(t, 0, px * 0.08);
+        } else if (mediaReady()) {
+          const m = media, iw = m.videoWidth || m.naturalWidth, ih = m.videoHeight || m.naturalHeight, d = hub * 2;
+          const kk = s.hubFit === "contain" ? Math.min(d / iw, d / ih) * 0.86 : Math.max(d / iw, d / ih);
+          ctx.save(); ctx.beginPath(); ctx.arc(0, 0, hub, 0, FULL); ctx.clip(); ctx.drawImage(m, (-iw * kk) / 2, (-ih * kk) / 2, iw * kk, ih * kk); ctx.restore();
+        }
+        ctx.restore();
+      }
       function draw(now) {
         ctx.clearRect(0, 0, S, S);
         ctx.drawImage(base, 0, 0);
-        ctx.save(); ctx.beginPath(); ctx.arc(C, C, R, 0, Math.PI * 2); ctx.clip();
+        ctx.save(); ctx.beginPath(); ctx.arc(C, C, R, 0, FULL); ctx.clip();
         ctx.save(); ctx.translate(C, C); ctx.rotate(angle); ctx.drawImage(wedges, -C, -C); ctx.restore();
         if (Math.abs(vel) > 0.06 && !reduce) for (let k = 1; k <= 3; k++) { ctx.save(); ctx.globalAlpha = 0.2; ctx.translate(C, C); ctx.rotate(angle - (vel * k) / 3 * 0.9); ctx.drawImage(wedges, -C, -C); ctx.restore(); }
-        if (winOn) {
-          const pulse = 0.5 + 0.5 * Math.sin(now / 120);
+        if (winOn && geo[winIdx]) {
+          const { a0, sp } = geo[winIdx], pulse = 0.5 + 0.5 * Math.sin(now / 120), hl = s.winHighlight || "glow";
           ctx.save(); ctx.translate(C, C); ctx.rotate(angle);
-          ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, winIdx * seg, (winIdx + 1) * seg); ctx.closePath();
-          ctx.globalAlpha = 0.12 + 0.14 * pulse; ctx.fillStyle = s.winColor; ctx.fill();
-          ctx.globalAlpha = 0.9; ctx.lineWidth = 8; ctx.strokeStyle = s.winColor; ctx.stroke(); ctx.restore();
+          if (hl === "dim" || hl === "both") geo.forEach((o, j) => { if (j === winIdx) return; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, o.a0, o.a0 + o.sp); ctx.closePath(); ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fill(); });
+          if (hl === "glow" || hl === "both") {
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a0, a0 + sp); ctx.closePath();
+            ctx.globalAlpha = 0.12 + 0.14 * pulse; ctx.fillStyle = s.winColor; ctx.fill();
+            ctx.globalAlpha = 0.9; ctx.lineWidth = 8; ctx.strokeStyle = s.winColor; ctx.stroke();
+          }
+          ctx.restore();
         }
         ctx.restore();
+        drawPegs(now);
         if (s.shine) {
-          ctx.save(); ctx.beginPath(); ctx.arc(C, C, R, 0, Math.PI * 2); ctx.clip();
+          ctx.save(); ctx.beginPath(); ctx.arc(C, C, R, 0, FULL); ctx.clip();
           const gl = ctx.createLinearGradient(C - 300, C - 420, C + 120, C + 160);
           gl.addColorStop(0, "rgba(255,255,255,.2)"); gl.addColorStop(0.45, "rgba(255,255,255,.04)"); gl.addColorStop(0.46, "rgba(255,255,255,0)");
           ctx.fillStyle = gl; ctx.fillRect(0, 0, S, S); ctx.restore();
         }
         if (s.lights && rim >= 12) {
-          const count = 24, rB = R_OUT - rim / 2, sz = Math.max(3, Math.min(9, rim / 2 - 3));
+          const count = Math.max(8, Math.min(48, num(s.lightsCount, 24))), rB = R_OUT - rim / 2, sz = Math.max(3, Math.min(9, rim / 2 - 3));
           for (let i = 0; i < count; i++) {
-            const a = (i / count) * Math.PI * 2, x = C + Math.cos(a) * rB, y = C + Math.sin(a) * rB;
-            const on = winOn ? Math.floor(now / 160) % 2 === 0 : spinning ? (i + Math.floor(now / 70)) % 4 === 0 : (i + Math.floor(now / 600)) % 2 === 0;
-            ctx.save(); ctx.beginPath(); ctx.arc(x, y, sz, 0, Math.PI * 2); ctx.fillStyle = s.lightsColor;
+            const a = (i / count) * FULL, x = C + Math.cos(a) * rB, y = C + Math.sin(a) * rB;
+            let on;
+            if (winOn) on = Math.floor(now / 160) % 2 === 0;
+            else if (s.lightsMode === "steady") on = true;
+            else if (s.lightsMode === "blink") on = Math.floor(now / (spinning ? 120 : 500)) % 2 === i % 2;
+            else on = (i + Math.floor(now / (spinning ? 70 : 220))) % 4 === 0;
+            ctx.save(); ctx.beginPath(); ctx.arc(x, y, sz, 0, FULL); ctx.fillStyle = s.lightsColor;
             if (on) { ctx.shadowColor = s.lightsColor; ctx.shadowBlur = 18; } else ctx.globalAlpha = 0.22;
             ctx.fill(); ctx.restore();
           }
         }
-        if (hub > 0) {
-          ctx.beginPath(); ctx.arc(C, C, hub, 0, Math.PI * 2); ctx.fillStyle = s.hubColor; ctx.fill();
-          if (s.hubText) {
-            const len = String(s.hubText).length, px = hub * (len === 1 ? 1.2 : len === 2 ? 0.9 : 0.65);
-            ctx.save(); ctx.font = fontOf(px); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = s.hubTextColor;
-            ctx.fillText(upper(String(s.hubText)), C, C + px * 0.08); ctx.restore();
-          }
-        }
-        // The pointer, pushed aside by the pegs.
-        const k = (Number(s.pointerSize) || 100) / 100;
-        ctx.save(); ctx.translate(C, C); ctx.rotate(P + Math.PI / 2); ctx.translate(0, -(C - 12)); ctx.rotate(flap); ctx.scale(k, k);
-        ctx.beginPath(); ctx.moveTo(-28, 4); ctx.lineTo(28, 4); ctx.lineTo(0, 96); ctx.closePath();
-        ctx.lineJoin = "round"; ctx.lineWidth = 8; ctx.strokeStyle = s.pointerColor; ctx.stroke(); ctx.fillStyle = s.pointerColor; ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 18, 8, 0, Math.PI * 2); ctx.fillStyle = lum(s.pointerColor) > 0.45 ? "#15171b" : "#ffffff"; ctx.fill();
-        ctx.restore();
+        drawHub();
+        drawPointer();
       }
+      // Bigger pegs touch the pointer for longer; "How much it bends" sets how far it swings.
       function pointer() {
-        const Wd = 0.075, MAX = 0.55;
-        let phi = (((angle - P) % seg) + seg) % seg; if (phi > seg / 2) phi -= seg;
+        const Wd = Math.min(0.22, (pegSize + 12) / pegR), MAX = { soft: 0.32, normal: 0.55, strong: 0.85 }[s.bounceHard] || 0.55;
+        let phi = Infinity, near = -1;
+        geo.forEach((o, j) => { const d = wrapPi(angle + o.a0 - P); if (Math.abs(d) < Math.abs(phi)) { phi = d; near = j; } });
         let target = 0;
-        if (s.pegs) {
-          if (vel >= 0 && phi > -Wd && phi <= 0) target = (-MAX * (phi + Wd)) / Wd;
-          if (vel < 0 && phi < Wd && phi >= 0) target = (MAX * (Wd - phi)) / Wd;
+        if (s.pegs && geo.length > 1) {
+          if (vel >= 0 && phi > -Wd && phi <= 0) target = -MAX * Math.sin(((phi + Wd) / Wd) * Math.PI / 2);
+          if (vel < 0 && phi < Wd && phi >= 0) target = MAX * Math.sin(((Wd - phi) / Wd) * Math.PI / 2);
         }
-        const peg = Math.floor((angle - P) / seg);
-        if (lastPeg !== null && peg !== lastPeg && spinning && s.sound === "tick") sfx("tick");
-        lastPeg = peg;
+        const rel = (((P - angle) % FULL) + FULL) % FULL, idx = geo.findIndex((o) => rel >= o.a0 && rel < o.a0 + o.sp);
+        if (lastPeg !== null && idx !== lastPeg && spinning) { if (s.tick) sfx("tick"); hitAt[near] = performance.now(); }
+        lastPeg = idx;
+        // Pushed by the peg, then it snaps back past the middle and settles.
         if ((vel >= 0 && target < flap) || (vel < 0 && target > flap)) { flap = target; flapV = 0; }
-        else { flapV += (0 - flap) * 0.35; flapV *= 0.62; flap += flapV; }
+        else { flapV += (0 - flap) * 0.32; flapV *= 0.7; flap += flapV; }
       }
+
+      // ---- Confetti ----
+      let parts = [];
+      function burst() {
+        if (reduce) return;
+        const sr = root.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), x = wr.left - sr.left + wr.width / 2, y = wr.top - sr.top + wr.height / 2;
+        const cols = [...items.map((_, i) => colOf(i)), s.winColor], k = sr.width / 1100;
+        for (let i = 0; i < 160; i++) {
+          const a = Math.random() * FULL, v = (3 + Math.random() * 7) * k;
+          parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 4 * k, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3, w: (5 + Math.random() * 6) * k, h: (3 + Math.random() * 4) * k, c: cols[i % cols.length], life: 0, g: 0.18 * k });
+        }
+      }
+      function drawFx() {
+        const fw = root.clientWidth, fh = root.clientHeight;
+        if (!parts.length) return;
+        fctx.clearRect(0, 0, fw, fh);
+        parts = parts.filter((p) => p.life < 170 && p.y < fh + 20);
+        for (const p of parts) {
+          p.life++; p.vy += p.g; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+          fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.r); fctx.globalAlpha = Math.max(0, 1 - p.life / 170); fctx.fillStyle = p.c; fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fctx.restore();
+        }
+        if (!parts.length) fctx.clearRect(0, 0, fw, fh);
+      }
+
       function frame(now) {
-        if (anim) anim(now); else vel *= 0.9;
+        if (anim) anim(now);
+        else if (s.idle && !spinning && !winOn) { vel = (s.dir === "ccw" ? -1 : 1) * 0.003; angle += vel; }
+        else vel *= 0.9;
         pointer();
         draw(now);
-        // Keep going while something moves; otherwise rest (lights keep blinking).
-        const moving = anim || winOn || Math.abs(flap) > 0.002 || Math.abs(vel) > 0.0005 || (s.lights && rim >= 12);
+        drawFx();
+        const hot = s.pegFlash && hitAt.some((t) => now - t < 400);
+        const moving = anim || winOn || hot || parts.length || s.idle || Math.abs(flap) > 0.002 || Math.abs(vel) > 0.0005 || (s.lights && rim >= 12) || (media && media.tagName === "VIDEO");
         idleFrames = moving ? 0 : idleFrames + 1;
         raf = idleFrames > 2 ? 0 : requestAnimationFrame(frame);
       }
-      const wake = () => { idleFrames = 0; if (!raf) raf = requestAnimationFrame(frame); };
-      build(); wake();
-      document.fonts.ready.then(() => { build(); wake(); });
-      let hideRes = 0, winOff = 0;
+      function wake() { idleFrames = 0; if (!raf) raf = requestAnimationFrame(frame); }
+
+      // ---- Size: the wheel fills the canvas, leaving room for the top words ----
+      function layout() {
+        const sw = root.clientWidth, shh = root.clientHeight, short = Math.min(sw, shh);
+        w.style.setProperty("--wu", short / 1080 + "px");
+        lab.style.fontSize = (short * 0.075 * num(s.titleSize, 100)) / 100 + "px";
+        lab.style.maxWidth = sw * 0.96 + "px";
+        g.classList.toggle("below", s.titlePos === "below");
+        const th = lab.hidden ? 0 : lab.offsetHeight, gap = th ? short * 0.02 : 0;
+        const room = Math.min(sw * 0.96, shh * 0.96 - th - gap);
+        const d = Math.max(40, (room * Math.max(30, Math.min(100, num(s.wheelSize, 92)))) / 100);
+        wrap.style.width = wrap.style.height = d + "px";
+        g.style.gap = gap + "px";
+        const gw = Math.max(d, Math.min(lab.hidden ? 0 : lab.offsetWidth, sw * 0.96)), gh = d + th + gap;
+        g.style.width = gw + "px";
+        g.style.left = (s.place === "left" ? sw * 0.02 : s.place === "right" ? sw * 0.98 - gw : (sw - gw) / 2) + "px";
+        g.style.top = (shh - gh) / 2 + "px";
+        const dpr = window.devicePixelRatio || 1;
+        fxc.width = sw * dpr; fxc.height = shh * dpr; fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      // ---- Coming in and leaving ----
+      const spinsOnly = s.showMode === "spins";
+      let shown = !spinsOnly || preview, gAnim = null, laterT = 0, resT = 0, backT = 0;
+      function moves(kind, leaving) {
+        const from = s.place === "right" ? "120%" : "-120%";
+        const k = {
+          zoom: [{ opacity: 0, transform: "scale(.3)" }, { opacity: 1, transform: "scale(1.06)", offset: 0.7 }, { opacity: 1, transform: "scale(1)" }],
+          drop: [{ opacity: 0, transform: "translateY(-110%)" }, { opacity: 1, transform: "translateY(5%)", offset: 0.72 }, { opacity: 1, transform: "translateY(0)" }],
+          rise: [{ opacity: 0, transform: "translateY(110%)" }, { opacity: 1, transform: "translateY(-4%)", offset: 0.72 }, { opacity: 1, transform: "translateY(0)" }],
+          spin: [{ opacity: 0, transform: "rotate(-220deg) scale(.3)" }, { opacity: 1, transform: "rotate(8deg) scale(1.03)", offset: 0.75 }, { opacity: 1, transform: "rotate(0) scale(1)" }],
+          slide: [{ opacity: 0, transform: `translateX(${from})` }, { opacity: 1, transform: "translateX(2%)", offset: 0.75 }, { opacity: 1, transform: "translateX(0)" }],
+          fade: [{ opacity: 0 }, { opacity: 1 }],
+        }[kind];
+        if (!k) return null;
+        if (!leaving) return k;
+        if (kind === "drop") return [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(110%)" }];
+        if (kind === "rise") return [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(-110%)" }];
+        return [k[k.length - 1], k[0]];
+      }
+      const enterMs = Math.max(200, num(s.enterTime, 700));
+      function showG() {
+        if (gAnim) gAnim.cancel();
+        g.style.visibility = "visible";
+        if (shown) return Promise.resolve();
+        shown = true;
+        const k = reduce ? moves("fade") : moves(s.enter);
+        if (!k) return Promise.resolve();
+        gAnim = g.animate(k, { duration: enterMs, easing: "cubic-bezier(.2,.9,.3,1)" });
+        return new Promise((r) => setTimeout(r, enterMs));
+      }
+      function hideG() {
+        if (gAnim) gAnim.cancel();
+        shown = false;
+        const k = reduce ? moves("fade", true) : moves(s.leave, true);
+        if (!k) { g.style.visibility = "hidden"; return; }
+        const dur = enterMs * 0.8;
+        gAnim = g.animate(k, { duration: dur, easing: "cubic-bezier(.5,0,.8,.4)", fill: "forwards" });
+        setTimeout(() => { if (!shown) { g.style.visibility = "hidden"; if (gAnim) gAnim.cancel(); } }, dur);
+      }
+      if (!shown) g.style.visibility = "hidden";
+
+      function hideRes() { Object.values(RES).forEach((el) => (el.hidden = true)); }
+      function showHist() {
+        histEl.hidden = !s.history || !wheelKeep.hist.length;
+        histEl.innerHTML = wheelKeep.hist.map((h) => `<span>${esc(h)}</span>`).join("");
+      }
+      function takeOff(slot) {
+        if (!s.remove || out.includes(slot)) return;
+        out = [...out, slot]; winOn = false; build(); wake();
+      }
+
+      build(); layout(); showHist(); wake();
+      document.fonts.ready.then(() => { build(); layout(); wake(); });
+      addEventListener("resize", layout);
       return {
-        fire(t, d) {
-          if (t !== "spin" || spinning || !slices.length) return;
-          clearTimeout(hideRes); clearTimeout(winOff);
-          res.hidden = true; winOn = false; winIdx = -1; spinning = true;
-          // Land with the slice the server picked under the pointer.
-          const index = Math.max(0, Math.min(slices.length - 1, Number(d.index) || 0));
-          const want = P - (index * seg + seg * (0.18 + Math.random() * 0.64)), full = Math.PI * 2, start = angle;
-          const extra = (((want - start) % full) + full) % full, secs = Number(s.spinTime) || 7;
-          const turns = reduce ? 0 : Math.max(3, Math.round(secs * 0.9)), settle = reduce ? 0 : Math.min(seg * 0.12, 0.05);
-          const end = start + turns * full + extra, over = end + settle, dur = reduce ? 300 : secs * 1000, back = reduce ? 0 : 520, t0 = performance.now();
+        sync(next) {
+          // Put back from the dashboard or a new page load: follow the server.
+          const o = Array.isArray(next.out) ? next.out.map(Number) : [];
+          if (!spinning && !winOn && o.length < out.length) { out = o; build(); wake(); }
+          return null;
+        },
+        async fire(t, d) {
+          if (t === "putback") { if (!spinning) { out = []; winOn = false; build(); wake(); } return; }
+          if (t !== "spin" || spinning) return;
+          clearTimeout(resT); clearTimeout(laterT); clearTimeout(backT);
+          hideRes(); spinning = true; winOn = false; winIdx = -1;
+          // Use the wheel the server spun (slices taken off before this spin).
+          const want = Array.isArray(d.out) ? d.out.map(Number) : out;
+          if (JSON.stringify(want) !== JSON.stringify(out)) { out = want; build(); }
+          if (!shown) await showG();
+          let index = Math.max(0, Math.min(items.length - 1, Number(d.index) || 0));
+          if (d.slot) { const j = items.findIndex((x) => x.slot === Number(d.slot)); if (j >= 0) index = j; }
+          const { a0, sp } = geo[index], cw = s.dir !== "ccw", start = angle;
+          const aim = P - (a0 + sp * (0.18 + Math.random() * 0.64));
+          const secs = Math.max(2, num(s.spinTime, 7)), turns = reduce ? 0 : Math.max(1, num(s.turns, 6));
+          const end = cw ? start + turns * FULL + ((((aim - start) % FULL) + FULL) % FULL) : start - turns * FULL - ((((start - aim) % FULL) + FULL) % FULL);
+          const settle = reduce || s.ease === "quick" ? 0 : Math.min(sp * 0.12, 0.05) * (cw ? 1 : -1);
+          const over = end + settle, dur = reduce ? 300 : secs * 1000, back = settle ? 520 : 0, t0 = performance.now();
+          const ease = { smooth: (p) => 1 - Math.pow(1 - p, 3.4), tense: (p) => 1 - Math.pow(1 - p, 5.5), quick: (p) => 1 - Math.pow(1 - p, 2.2) }[s.ease] || ((p) => 1 - Math.pow(1 - p, 3.4));
           anim = (now) => {
             const tt = now - t0, prev = angle;
-            if (tt < dur) angle = start + (over - start) * (1 - Math.pow(1 - tt / dur, 3.4));
+            if (tt < dur) angle = start + (over - start) * ease(tt / dur);
             else if (tt < dur + back) { const p = (tt - dur) / back; angle = over + (end - over) * p * p * (3 - 2 * p); }
             else {
-              angle = end; anim = null; vel = 0; spinning = false;
-              wheelKeep.angle = angle % full;
-              winIdx = index; winOn = true;
-              res.textContent = slices[index]; res.hidden = false;
-              play(res, [{ opacity: 0, transform: "translate(-50%, -50%) scale(.4)" }, { opacity: 1, transform: "translate(-50%, -50%) scale(1.12)", offset: 0.6 }, { opacity: 1, transform: "translate(-50%, -50%) scale(1)" }], { duration: 500 });
-              sfx(s.sound === "tick" ? "fanfare" : s.sound);
-              winOff = setTimeout(() => { winOn = false; wake(); }, 6000);
-              hideRes = setTimeout(() => (res.hidden = true), 8000);
+              angle = end % FULL; anim = null; vel = 0; spinning = false;
+              wheelKeep.angle = angle;
+              land(index);
               return;
             }
             vel = angle - prev;
           };
           wake();
         },
-        stop() { cancelAnimationFrame(raf); raf = 0; clearTimeout(hideRes); clearTimeout(winOff); wheelKeep.angle = angle % (Math.PI * 2); },
+        stop() { cancelAnimationFrame(raf); raf = 0; clearTimeout(resT); clearTimeout(laterT); clearTimeout(backT); removeEventListener("resize", layout); if (media && media.pause) media.pause(); wheelKeep.angle = angle % FULL; },
       };
+      function land(index) {
+        const it = items[index];
+        winIdx = index; winOn = true;
+        const style = s.resStyle || "card";
+        if (style !== "off" && RES[style]) {
+          const el = RES[style];
+          el.querySelector("small").textContent = s.resTop || ""; el.querySelector("small").hidden = !s.resTop;
+          el.querySelector("b").textContent = it.t;
+          el.querySelector("i").textContent = it.msg || ""; el.querySelector("i").hidden = !it.msg;
+          el.hidden = false;
+          const k = style === "banner" ? [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }] : style === "big" ? [{ opacity: 0, transform: "scale(1.1)" }, { opacity: 1, transform: "scale(1)" }] : [{ opacity: 0, transform: "translate(-50%, -50%) scale(.4)" }, { opacity: 1, transform: "translate(-50%, -50%) scale(1.12)", offset: 0.6 }, { opacity: 1, transform: "translate(-50%, -50%) scale(1)" }];
+          play(el, k, { duration: 500, easing: "cubic-bezier(.2,1.2,.4,1)" });
+        }
+        if (s.confetti) burst();
+        sfx(s.winSound || "fanfare");
+        wheelKeep.hist = [it.t, ...wheelKeep.hist].slice(0, 5); showHist();
+        wake();
+        resT = setTimeout(() => {
+          hideRes(); winOn = false; takeOff(it.slot); wake();
+          if (spinsOnly) laterT = setTimeout(() => {
+            hideG();
+            // The dashboard preview brings it back so you can keep changing it.
+            if (preview) backT = setTimeout(() => showG(), enterMs + 900);
+          }, Math.max(1, num(s.hideSecs, 3)) * 1000);
+        }, Math.max(2, num(s.resSecs, 6)) * 1000);
+      }
     };
 
     M.dice = (layer, s) => {

@@ -2845,6 +2845,7 @@ export const api = {
   getTool: (guildId: string, kind: string) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`),
   saveTool: (guildId: string, kind: string, settings: ToolRowData["settings"]) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}`, { method: "PUT", body: JSON.stringify({ settings }) }),
   toolAction: (guildId: string, kind: string, action: Record<string, unknown>) => request<ToolRowData>(`/guilds/${guildId}/tool/${kind}/action`, { method: "POST", body: JSON.stringify(action) }),
+  uploadToolMedia: (guildId: string, kind: string, file: File) => uploadFile(`/guilds/${guildId}/tool/${kind}/media`, file) as Promise<{ url: string; video: boolean }>,
   getOverlay: (guildId: string, kind: string) => request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}`),
   saveOverlay: (guildId: string, kind: string, input: OverlaySettings) => request<OverlaySettings>(`/guilds/${guildId}/overlay/${kind}`, { method: "PUT", body: JSON.stringify(input) }),
   overlayAction: (guildId: string, kind: string, action: Record<string, unknown>) =>

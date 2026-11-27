@@ -158,8 +158,12 @@ async function runToolCommand(input: RunInput): Promise<{ ok: boolean; message: 
       const next = await changeTool(guildId, "wheel", { op: "spin" });
       if ("error" in next) return { ok: false, message: next.error };
       const result = String(next.state.last ?? "");
-      // Said once the wheel has stopped on stream.
-      if (s.chatPost && result) setTimeout(() => void postAs(input, `🎡 The wheel landed on: ${result}`).catch(() => null), (Number(s.spinTime) || 7) * 1000 + 900);
+      const winMsg = String(next.state.lastMsg ?? "").trim();
+      // Said once the wheel has stopped on stream (after it comes in, if it was hidden).
+      const tpl = String(s.chatMsg || "🎡 The wheel landed on: {winner}");
+      const text = (tpl.includes("{winner}") ? tpl.split("{winner}").join(result) : `${tpl} ${result}`) + (winMsg ? ` · ${winMsg}` : "");
+      const wait = (Number(s.spinTime) || 7) * 1000 + 900 + (s.showMode === "spins" ? Number(s.enterTime) || 700 : 0);
+      if (s.chatPost && result) setTimeout(() => void postAs(input, text.slice(0, 400)).catch(() => null), wait);
       return { ok: true, message: `Spinning… it lands on ${result}.` };
     }
   }

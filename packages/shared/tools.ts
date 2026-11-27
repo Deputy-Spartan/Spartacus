@@ -24,7 +24,8 @@ export interface ToolGroup {
 }
 // Fine-tuning options, shown in fold-out groups on the dashboard.
 // `show: [key, value]` only shows it while that setting has that value.
-export type ToolField = { key: string; label: string; show?: readonly [string, string | number | boolean] } & (
+// The value can also be a list: it shows while the setting is any of them.
+export type ToolField = { key: string; label: string; show?: readonly [string, string | number | boolean | ReadonlyArray<string>] } & (
   | { type: "color" }
   | { type: "colors"; max: number } // a comma list of colors
   | { type: "range"; min: number; max: number; step?: number; unit?: string }
@@ -73,27 +74,70 @@ const IDLE: ToolGroup = { title: "While it's up", kind: "four", items: [["none",
 
 // ---- Spin wheel: flat looks to start from, then every part can be changed ----
 export const WHEEL_SLICES = 16;
+// The look: a starting look sets all of these (your words and choices stay).
 const WHEEL_LOOK = {
   colors: "#e5484d,#f5a524,#30a46c,#3e63dd,#8e4ec6,#d6409f", fill: "solid",
-  dividers: true, dividerColor: "#ffffff", dividerWidth: 5, pegs: true, pegColor: "#d4d4d8",
-  textSize: 100, upper: true, autoText: true, textColor: "#ffffff",
-  rimWidth: 22, rimColor: "#ffffff", hubSize: 70, hubColor: "#ffffff", hubText: "S", hubTextColor: "#111318",
-  pointerSide: "top", pointerColor: "#111318", pointerSize: 100,
-  lights: false, lightsColor: "#ffd98a", shine: false, shadow: true, winColor: "#ffffff", spinTime: 7,
+  dividers: true, dividerColor: "#ffffff", dividerWidth: 5,
+  pegs: true, pegStyle: "stud", pegColor: "#d4d4d8", pegSize: 9, pegFlash: true, pegFlashColor: "#ffffff",
+  textSize: 100, upper: true, textMode: "auto", textColor: "#ffffff", sOutline: false, sOutlineColor: "#000000", sOutlineWidth: 4, sShadow: false,
+  rimWidth: 22, rimColor: "#ffffff", rimStyle: "flat",
+  hubSize: 70, hubColor: "#ffffff", hubTextColor: "#111318", hubBorder: 0, hubBorderColor: "#d4a24c",
+  pointerSide: "top", pointerStyle: "flapper", pointerColor: "#111318", pointerSize: 100, pointer3d: true, pointerShadow: true,
+  lights: false, lightsColor: "#ffd98a", lightsCount: 24, lightsMode: "chase", shine: false, shadow: true, winColor: "#ffffff",
   font: "teko",
+};
+// Everything else about the wheel (kept when you pick a starting look).
+const WHEEL_MORE = {
+  perSlice: false, odds: false, extra: "[]",
+  hubType: "text", hubText: "S", hubMedia: "", hubFit: "cover", hubTurns: false,
+  textDir: "out", textAlign: "edge", textMove: 0, textShift: 0,
+  bounce: true, bounceHard: "normal",
+  spinTime: 7, turns: 6, dir: "cw", ease: "smooth", tick: true, winSound: "fanfare", idle: false,
+  winHighlight: "glow", resStyle: "card", resTop: "THE WHEEL SAYS", resSecs: 6, confetti: true, remove: false, history: false,
+  chatMsg: "🎡 The wheel landed on: {winner}",
+  showMode: "always", enter: "zoom", leave: "zoom", enterTime: 700, hideSecs: 3,
+  wheelSize: 92, place: "center", titlePos: "above", titleSize: 100,
 };
 const WHEEL_PRESETS: Record<string, Record<string, string | number | boolean>> = {
   clean: { ...WHEEL_LOOK },
   mono: { ...WHEEL_LOOK, colors: "#16181c,#eeeeee", dividers: false, pegColor: "#e11d48", rimColor: "#16181c", hubColor: "#eeeeee", hubTextColor: "#16181c", pointerColor: "#e11d48", font: "bebas" },
-  pastel: { ...WHEEL_LOOK, colors: "#fbcfe8,#bfdbfe,#bbf7d0,#fde68a,#ddd6fe,#fed7aa", pegColor: "#e5e7eb", pointerColor: "#1f2937", hubTextColor: "#1f2937", font: "fredoka", upper: false },
+  pastel: { ...WHEEL_LOOK, colors: "#fbcfe8,#bfdbfe,#bbf7d0,#fde68a,#ddd6fe,#fed7aa", fill: "shaded", pegColor: "#e5e7eb", pointerColor: "#1f2937", hubTextColor: "#1f2937", font: "fredoka", upper: false },
   twotone: { ...WHEEL_LOOK, colors: "#d4a24c,#1b1f25", dividers: false, pegColor: "#f5f0e6", rimColor: "#2a2f36", hubColor: "#0d0f12", hubTextColor: "#d4a24c", pointerColor: "#d4a24c", font: "bebas", winColor: "#d4a24c" },
-  retro: { ...WHEEL_LOOK, colors: "#e4572e,#f3a712,#29335c,#4c9f70,#b4436c", dividerColor: "#fbf5e6", pegColor: "#29335c", rimColor: "#fbf5e6", hubColor: "#fbf5e6", hubTextColor: "#e4572e", pointerColor: "#29335c", font: "barlow" },
+  retro: { ...WHEEL_LOOK, colors: "#e4572e,#f3a712,#29335c,#4c9f70,#b4436c", dividerColor: "#fbf5e6", pegColor: "#29335c", rimColor: "#fbf5e6", hubColor: "#fbf5e6", hubTextColor: "#e4572e", pointerColor: "#29335c", pointerStyle: "pin", font: "barlow" },
   neon: { ...WHEEL_LOOK, colors: "#22d3ee,#f472b6,#a3e635,#facc15", fill: "neon", dividerColor: "#22d3ee", dividerWidth: 3, pegColor: "#ffffff", rimWidth: 40, rimColor: "#0a0d14", lights: true, lightsColor: "#22d3ee", hubColor: "#0a0d14", hubTextColor: "#22d3ee", pointerColor: "#f472b6", shine: true, winColor: "#22d3ee" },
+  olive: { ...WHEEL_LOOK, colors: "#535838,#ffc641,#6a5f31,#000000", dividerColor: "#000000", dividerWidth: 4, rimWidth: 30, rimColor: "#000000", pegColor: "#ffc641", hubColor: "#000000", hubTextColor: "#ffc641", hubBorder: 6, hubBorderColor: "#ffc641", pointerColor: "#ffc641", pointerStyle: "arrow", winColor: "#ffc641", font: "blackops", lights: true, lightsColor: "#ffc641", lightsMode: "steady", lightsCount: 20 },
 };
 const WHEEL_SAMPLE = ["No scope only", "10 squats", "Pistol only", "Free pass", "Chat picks my loadout", "Crouch the whole round"];
 const wheelSlots = Object.fromEntries(Array.from({ length: WHEEL_SLICES }, (_, i) => [`s${i + 1}`, WHEEL_SAMPLE[i] ?? ""]));
 export const wheelSlicesOf = (s: Record<string, unknown>) =>
   Array.from({ length: WHEEL_SLICES }, (_, i) => String(s[`s${i + 1}`] ?? "").trim()).filter(Boolean);
+// Each slice's extras, by slot (slice 1 is [0]): its own color, text color,
+// odds (1-5) and the words for when it wins.
+export interface WheelExtra { c: string; tc: string; w: number; msg: string }
+export interface WheelItem extends WheelExtra { t: string; slot: number }
+export function cleanWheelExtra(raw: unknown): WheelExtra[] {
+  let v: unknown = raw;
+  if (typeof v === "string") {
+    try { v = JSON.parse(v); } catch { v = []; }
+  }
+  const arr = Array.isArray(v) ? v : [];
+  const hex = (x: unknown) => (typeof x === "string" && HEX.test(x) ? x.toLowerCase() : "");
+  return Array.from({ length: WHEEL_SLICES }, (_, i) => {
+    const x = (arr[i] && typeof arr[i] === "object" ? arr[i] : {}) as Record<string, unknown>;
+    return { c: hex(x.c), tc: hex(x.tc), w: Math.max(1, Math.min(5, Math.round(Number(x.w) || 1))), msg: typeof x.msg === "string" ? x.msg.trim().slice(0, 60) : "" };
+  });
+}
+// The slices on the wheel right now (empty ones and the ones taken off are left out).
+export function wheelItemsOf(s: Record<string, unknown>, out: number[] = []): WheelItem[] {
+  const ex = cleanWheelExtra(s.extra);
+  const items: WheelItem[] = [];
+  for (let i = 0; i < WHEEL_SLICES; i++) {
+    const t = String(s[`s${i + 1}`] ?? "").trim();
+    if (t && !out.includes(i + 1)) items.push({ t, slot: i + 1, ...ex[i] });
+  }
+  return items;
+}
+const wheelOut = (st: Record<string, unknown>) => (Array.isArray(st.out) ? st.out.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= WHEEL_SLICES) : []);
 
 // ---- AFK popups: !brb, !coffee… show a card with a countdown over the game ----
 export interface AfkItem {
@@ -271,55 +315,111 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
   },
   wheel: {
     kind: "wheel", title: "Spin wheel", icon: "🎡", section: "tools", line: "A wheel you spin with a button, a Stream Deck key or !spin in chat.",
-    settings: { ...COMMON, color: "#ffffff", label: "🎡 CHALLENGE WHEEL", preset: "clean", ...WHEEL_LOOK, ...wheelSlots, sound: "tick", chatSpin: true, chatPost: true, spinCmd: "spin" },
+    settings: { ...COMMON, color: "#ffffff", label: "🎡 CHALLENGE WHEEL", preset: "clean", ...WHEEL_LOOK, ...WHEEL_MORE, ...wheelSlots, chatSpin: true, chatPost: true, spinCmd: "spin" },
     state: {},
     groups: {
-      preset: { title: "Starting look (then change anything below)", kind: "small", items: [["clean", "Clean"], ["mono", "Mono"], ["pastel", "Pastel"], ["twotone", "Two-Tone"], ["retro", "Retro"], ["neon", "Neon"]] },
+      preset: { title: "Starting look (then change anything below)", kind: "small", items: [["clean", "Clean"], ["mono", "Mono"], ["pastel", "Pastel"], ["twotone", "Two-Tone"], ["retro", "Retro"], ["neon", "Neon"], ["olive", "Olive & Gold"]] },
       font: { ...G.font, title: "Font (slices and words)" },
       look: { ...G.look, title: "Top words and result box" },
       color: { ...G.color, title: "Top words color" },
       corners: { ...G.corners, title: "Result box corners" },
       outline: { ...G.outline, title: "Text outline (top words and result)" },
-      size: { ...G.size, title: "Wheel size" },
-      sound: sound("Sound", [["off", "Off"], ["tick", "Ticks + fanfare"], ["ding", "Ding at the end"]]),
       volume: G.volume,
     },
     sections: [
+      { title: "📐 Size and place", fields: [
+        { type: "range", key: "wheelSize", label: "Wheel size", min: 30, max: 100, unit: "%" },
+        { type: "pick", key: "place", label: "Where on screen", items: [["left", "Left"], ["center", "Middle"], ["right", "Right"]] },
+        { type: "pick", key: "titlePos", label: "Top words go", items: [["above", "Above the wheel"], ["below", "Below the wheel"]] },
+        { type: "range", key: "titleSize", label: "Top words size", min: 50, max: 180, unit: "%" },
+      ]},
+      { title: "🎬 Coming in and out", fields: [
+        { type: "pick", key: "showMode", label: "Show the wheel", items: [["always", "All the time"], ["spins", "Only for a spin"]] },
+        { type: "pick", key: "enter", label: "How it comes in", items: [["zoom", "Zoom in"], ["drop", "Drop in"], ["rise", "Rise up"], ["spin", "Spin in"], ["slide", "Slide in"], ["fade", "Fade in"], ["none", "Just appear"]] },
+        { type: "pick", key: "leave", label: "How it leaves", items: [["zoom", "Zoom out"], ["drop", "Drop down"], ["rise", "Fly up"], ["spin", "Spin out"], ["slide", "Slide out"], ["fade", "Fade out"], ["none", "Just vanish"]] },
+        { type: "range", key: "enterTime", label: "How long it takes", min: 300, max: 1500, step: 100, unit: " ms" },
+        { type: "range", key: "hideSecs", label: "Leaves this long after the result", min: 1, max: 30, unit: " sec", show: ["showMode", "spins"] },
+      ]},
       { title: "🎨 Slices", fields: [
-        { type: "colors", key: "colors", label: "Slice colors (they repeat around the wheel)", max: 8 },
-        { type: "pick", key: "fill", label: "Fill", items: [["solid", "Solid color"], ["neon", "Dark with neon edge"]] },
+        { type: "switch", key: "perSlice", label: "Pick a color for each slice (in Your slices)" },
+        { type: "colors", key: "colors", label: "Slice colors (they repeat around the wheel)", max: 8, show: ["perSlice", false] },
+        { type: "pick", key: "fill", label: "Fill", items: [["solid", "Solid"], ["shaded", "Shaded"], ["neon", "Dark with neon edge"]] },
         { type: "switch", key: "dividers", label: "Lines between slices" },
         { type: "color", key: "dividerColor", label: "Line color", show: ["dividers", true] },
         { type: "range", key: "dividerWidth", label: "Line thickness", min: 1, max: 12, show: ["dividers", true] },
-        { type: "switch", key: "pegs", label: "Pegs on the edge (the pointer clicks on them)" },
-        { type: "color", key: "pegColor", label: "Peg color", show: ["pegs", true] },
+        { type: "switch", key: "odds", label: "Some slices win more often (set odds in Your slices)" },
       ]},
-      { title: "🔤 Text", fields: [
-        { type: "range", key: "textSize", label: "Size", min: 60, max: 140, unit: "%" },
+      { title: "🔤 Slice text", fields: [
+        { type: "range", key: "textSize", label: "Size", min: 50, max: 150, unit: "%" },
         { type: "switch", key: "upper", label: "ALL CAPS" },
-        { type: "switch", key: "autoText", label: "Pick black or white text for me" },
-        { type: "color", key: "textColor", label: "Text color", show: ["autoText", false] },
+        { type: "pick", key: "textMode", label: "Text color", items: [["auto", "Black or white for me"], ["one", "One color"], ["slice", "Per slice"]] },
+        { type: "color", key: "textColor", label: "Color", show: ["textMode", "one"] },
+        { type: "pick", key: "textDir", label: "Direction", items: [["out", "Out from the center"], ["across", "Across the slice"], ["curve", "Curved"]] },
+        { type: "pick", key: "textAlign", label: "Line up", items: [["edge", "Near the edge"], ["middle", "Middle"], ["center", "Near the center"]] },
+        { type: "range", key: "textMove", label: "Move toward the edge (+) or center (−)", min: -150, max: 150 },
+        { type: "range", key: "textShift", label: "Move sideways", min: -60, max: 60 },
+        { type: "switch", key: "sOutline", label: "Outline" },
+        { type: "color", key: "sOutlineColor", label: "Outline color", show: ["sOutline", true] },
+        { type: "range", key: "sOutlineWidth", label: "Outline thickness", min: 1, max: 10, show: ["sOutline", true] },
+        { type: "switch", key: "sShadow", label: "Shadow" },
       ]},
-      { title: "⭕ Rim and center", fields: [
+      { title: "⭕ Center", fields: [
+        { type: "pick", key: "hubType", label: "What's in the center", items: [["text", "Letters"], ["image", "Picture"], ["video", "Video"], ["none", "Nothing"]] },
+        { type: "text", key: "hubText", label: "Letters (up to 6)", max: 6, show: ["hubType", "text"] },
+        { type: "color", key: "hubTextColor", label: "Letter color", show: ["hubType", "text"] },
+        { type: "pick", key: "hubFit", label: "Fit", items: [["cover", "Fill the circle"], ["contain", "Fit inside"]], show: ["hubType", ["image", "video"]] },
+        { type: "switch", key: "hubTurns", label: "Turns with the wheel", show: ["hubType", ["text", "image", "video"]] },
+        { type: "range", key: "hubSize", label: "Size", min: 0, max: 220 },
+        { type: "color", key: "hubColor", label: "Background" },
+        { type: "range", key: "hubBorder", label: "Ring thickness", min: 0, max: 24 },
+        { type: "color", key: "hubBorderColor", label: "Ring color" },
+      ]},
+      { title: "🛞 Rim, pegs and lights", fields: [
         { type: "range", key: "rimWidth", label: "Rim thickness", min: 0, max: 60 },
         { type: "color", key: "rimColor", label: "Rim color" },
-        { type: "range", key: "hubSize", label: "Center size", min: 0, max: 120 },
-        { type: "color", key: "hubColor", label: "Center color" },
-        { type: "text", key: "hubText", label: "Center text (up to 3 letters)", max: 3 },
-        { type: "color", key: "hubTextColor", label: "Center text color" },
+        { type: "pick", key: "rimStyle", label: "Rim finish", items: [["flat", "Flat"], ["metal", "Metal"]] },
+        { type: "switch", key: "pegs", label: "Pegs on the edge (the pointer hits them)" },
+        { type: "pick", key: "pegStyle", label: "Peg shape", items: [["stud", "Round studs"], ["dot", "Flat dots"], ["bar", "Bars"], ["diamond", "Diamonds"]], show: ["pegs", true] },
+        { type: "color", key: "pegColor", label: "Peg color", show: ["pegs", true] },
+        { type: "range", key: "pegSize", label: "Peg size", min: 4, max: 30, show: ["pegs", true] },
+        { type: "switch", key: "pegFlash", label: "Pegs flash when the pointer hits them", show: ["pegs", true] },
+        { type: "color", key: "pegFlashColor", label: "Flash color", show: ["pegFlash", true] },
+        { type: "switch", key: "lights", label: "Lights on the rim (needs a rim 12 or thicker)" },
+        { type: "color", key: "lightsColor", label: "Light color", show: ["lights", true] },
+        { type: "range", key: "lightsCount", label: "How many lights", min: 8, max: 48, step: 4, show: ["lights", true] },
+        { type: "pick", key: "lightsMode", label: "Light pattern", items: [["chase", "Chase"], ["blink", "Blink"], ["steady", "Always on"]], show: ["lights", true] },
+        { type: "switch", key: "shine", label: "Shine" },
+        { type: "switch", key: "shadow", label: "Shadow under the wheel" },
       ]},
       { title: "📍 Pointer", fields: [
         { type: "pick", key: "pointerSide", label: "Where", items: [["top", "Top"], ["right", "Right"], ["bottom", "Bottom"], ["left", "Left"]] },
+        { type: "pick", key: "pointerStyle", label: "Shape", items: [["flapper", "Flapper"], ["triangle", "Triangle"], ["arrow", "Arrow"], ["pin", "Pin"], ["notch", "Thin"]] },
         { type: "color", key: "pointerColor", label: "Color" },
-        { type: "range", key: "pointerSize", label: "Size", min: 60, max: 150, unit: "%" },
+        { type: "range", key: "pointerSize", label: "Size", min: 50, max: 160, unit: "%" },
+        { type: "switch", key: "pointer3d", label: "3D shading" },
+        { type: "switch", key: "pointerShadow", label: "Shadow" },
+        { type: "switch", key: "bounce", label: "Bends on each peg" },
+        { type: "pick", key: "bounceHard", label: "How much it bends", items: [["soft", "A little"], ["normal", "Normal"], ["strong", "A lot"]], show: ["bounce", true] },
       ]},
-      { title: "✨ Extras", fields: [
-        { type: "switch", key: "lights", label: "Lights on the rim (needs a thick rim)" },
-        { type: "color", key: "lightsColor", label: "Light color", show: ["lights", true] },
-        { type: "switch", key: "shine", label: "Shine" },
-        { type: "switch", key: "shadow", label: "Shadow under the wheel" },
-        { type: "color", key: "winColor", label: "Winning slice glow" },
-        { type: "range", key: "spinTime", label: "Spin time", min: 3, max: 15, unit: " sec" },
+      { title: "🌀 Spin", fields: [
+        { type: "range", key: "spinTime", label: "Spin time", min: 3, max: 20, unit: " sec" },
+        { type: "range", key: "turns", label: "Turns before it stops", min: 2, max: 15 },
+        { type: "pick", key: "dir", label: "Direction", items: [["cw", "Clockwise"], ["ccw", "Counter-clockwise"]] },
+        { type: "pick", key: "ease", label: "How it slows down", items: [["smooth", "Smooth"], ["tense", "Slow, tense finish"], ["quick", "Quick stop"]] },
+        { type: "switch", key: "tick", label: "Tick sound on each peg" },
+        { type: "pick", key: "winSound", label: "Win sound", items: [["fanfare", "Fanfare"], ["ding", "Ding"], ["airhorn", "Air horn"], ["drumroll", "Drum"], ["off", "None"]] },
+        { type: "switch", key: "idle", label: "Turn slowly while waiting" },
+      ]},
+      { title: "🏆 When it lands", fields: [
+        { type: "pick", key: "winHighlight", label: "The winning slice", items: [["glow", "Glows"], ["dim", "Others go dark"], ["both", "Both"], ["none", "Nothing"]] },
+        { type: "color", key: "winColor", label: "Winner color" },
+        { type: "pick", key: "resStyle", label: "Show the result", items: [["card", "Box on the wheel"], ["banner", "Banner at the bottom"], ["big", "Big across the screen"], ["off", "Don't show it"]] },
+        { type: "text", key: "resTop", label: "Top line of the result", max: 30 },
+        { type: "range", key: "resSecs", label: "Show it for", min: 2, max: 20, unit: " sec" },
+        { type: "switch", key: "confetti", label: "Confetti" },
+        { type: "switch", key: "remove", label: "Take the winner off the wheel (Put slices back brings them back)" },
+        { type: "switch", key: "history", label: "Show the last 5 results" },
+        { type: "text", key: "chatMsg", label: "Chat message ({winner} is the slice)", max: 80 },
       ]},
     ],
     presets: WHEEL_PRESETS,
@@ -327,9 +427,9 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
       ["chatSpin", "!spin in chat", "You and your mods can spin it from Kick or Twitch chat."],
       ["chatPost", "Post the result in chat", "Says what it landed on when it stops (needs your account connected)."],
     ],
-    words: [["label", "Top words"], ["spinCmd", "Chat command (without the !)"], ...Array.from({ length: WHEEL_SLICES }, (_, i) => [`s${i + 1}`, `Slice ${i + 1}${i >= 2 ? " (optional)" : ""}`] as [string, string])],
-    buttons: [["🎡 Spin", { op: "spin" }]],
-    auto: "Up to 16 slices. Empty ones are left out.",
+    words: [["label", "Top words"], ["spinCmd", "Chat command (without the !)"]],
+    buttons: [["🎡 Spin", { op: "spin" }], ["↩️ Put slices back", { op: "putback" }]],
+    auto: "Up to 16 slices. Set them in Your slices below.",
   },
   dice: {
     kind: "dice", title: "Dice & coin", icon: "🎲", section: "tools", line: "Roll dice or flip a coin on stream to settle bets with chat.",
@@ -482,11 +582,15 @@ export function cleanToolSettings(kind: ToolKind, raw: unknown): ToolRow["settin
     const v = r[k];
     if (typeof def === "number") out[k] = Number.isFinite(Number(v)) && v !== "" && v !== null && v !== undefined ? Math.max(-1e12, Math.min(1e12, Number(v))) : def;
     else if (typeof def === "boolean") out[k] = typeof v === "boolean" ? v : def;
-    else out[k] = typeof v === "string" ? v.slice(0, k === "link" ? 300 : k === "list" ? 4000 : 120) : def;
+    else out[k] = typeof v === "string" ? v.slice(0, k === "link" ? 300 : k === "list" ? 4000 : k === "extra" ? 3000 : k === "hubMedia" ? 400 : 120) : def;
   }
+  // The wheel used to have a "pick black or white for me" switch.
+  if (kind === "wheel" && r.textMode === undefined && r.autoText === false) out.textMode = "one";
   // Only the choices on offer, for the ones picked from a list.
   for (const [k, g] of Object.entries(TOOLS[kind].groups)) {
-    if (!g.items.some(([id]) => String(id) === String(out[k]))) out[k] = d[k];
+    // Color picks also take your own hex code.
+    if (g.swatch && HEX.test(String(out[k]))) out[k] = String(out[k]).toLowerCase();
+    else if (!g.items.some(([id]) => String(id) === String(out[k]))) out[k] = d[k];
     else if (typeof d[k] === "number") out[k] = Number(out[k]);
   }
   for (const f of (TOOLS[kind].sections ?? []).flatMap((x) => x.fields)) {
@@ -504,6 +608,11 @@ export function cleanToolSettings(kind: ToolKind, raw: unknown): ToolRow["settin
   if (typeof out.spinCmd === "string") out.spinCmd = cmdWord(out.spinCmd) || "spin";
   if (typeof out.backCmd === "string") out.backCmd = cmdWord(out.backCmd) || "back";
   if (kind === "afk") out.list = JSON.stringify(cleanAfkList(out.list));
+  if (kind === "wheel") {
+    out.extra = JSON.stringify(cleanWheelExtra(out.extra));
+    // Only a web link (an uploaded file gets one from the API).
+    if (!/^https:\/\/[^\s"'<>]+$/i.test(String(out.hubMedia))) out.hubMedia = "";
+  }
   // The OBS browser source size (the tools are made for 1920x1080).
   Object.assign(out, cleanCanvas(r.canvasW, r.canvasH, 1920, 1080));
   return out;
@@ -574,15 +683,29 @@ export function applyToolAction(kind: ToolKind, current: ToolRow, a: Record<stri
       return { error: "Start or end the poll." };
     }
     case "wheel": {
-      const slices = wheelSlicesOf(s);
-      if (!slices.length) return { error: "Add at least one slice." };
-      // One spin at a time (a little grace for the rock back at the end).
-      const busyFor = (Number(s.spinTime) || 7) * 1000 + 800;
+      const out = wheelOut(st);
+      if (op === "putback") {
+        if (!out.length) return { error: "Every slice is already on the wheel." };
+        st.out = [];
+        push(row, "putback", {}, now);
+        return row;
+      }
+      const items = wheelItemsOf(s, out);
+      if (!items.length) return { error: out.length ? "Every slice was taken off. Press Put slices back." : "Add at least one slice." };
+      if (out.length && items.length < 2) return { error: "Only one slice is left. Press Put slices back." };
+      // One spin at a time (a little grace for coming in and the rock back at the end).
+      const busyFor = (Number(s.spinTime) || 7) * 1000 + 800 + (s.showMode === "spins" ? Number(s.enterTime) || 700 : 0);
       if (now - (Number(st.spunAt) || 0) < busyFor) return { error: "It's still spinning." };
-      const index = Math.floor(Math.random() * slices.length);
-      push(row, "spin", { index, result: slices[index] }, now);
-      st.last = slices[index];
+      // Odds: a 3× slice is 3 times as likely (and drawn 3 times as big).
+      const ws = items.map((x) => (s.odds ? x.w : 1));
+      let r = Math.random() * ws.reduce((a, b) => a + b, 0), index = items.length - 1;
+      for (let i = 0; i < ws.length; i++) { r -= ws[i]; if (r < 0) { index = i; break; } }
+      const win = items[index];
+      push(row, "spin", { index, slot: win.slot, result: win.t, msg: win.msg, out }, now);
+      st.last = win.t;
+      st.lastMsg = win.msg;
       st.spunAt = now;
+      if (s.remove) st.out = [...out, win.slot];
       return row;
     }
     case "afk": {

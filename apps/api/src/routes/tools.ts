@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { Router } from "express";
+import multer from "multer";
 import { prisma } from "@spartacus/db";
 import {
   DAY_NAMES,
@@ -166,6 +168,52 @@ router.post("/guilds/:guildId/tool/:kind/action", requireAuth, requireGuildPermi
   const next = await changeTool(req.params.guildId, kind, body);
   if ("error" in next) return res.status(400).json(next);
   res.json(next);
+});
+
+// ---- A picture or short video for a tool (the Spin wheel's center) ----
+// Kept in the database (one per tool, the new one replaces the old) and shown
+// from /public/tool-media/<server>/<id>. Discord upload links run out, so not those.
+const MEDIA_BYTES = 5 * 1024 * 1024;
+const IMAGE_BYTES = 2 * 1024 * 1024;
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MEDIA_BYTES },
+  fileFilter: (_req, file, cb) => cb(null, /^(image\/(png|jpeg|gif|webp)|video\/(mp4|webm))$/.test(file.mimetype)),
+});
+router.post("/guilds/:guildId/tool/:kind/media", requireAuth, requireGuildPermission, (req, res, next) => {
+  mediaUpload.single("file")(req, res, (err: unknown) => {
+    if (err) return res.status(400).json({ error: (err as { code?: string }).code === "LIMIT_FILE_SIZE" ? "That file is too big. Pictures up to 2 MB, videos up to 5 MB." : "Couldn't read that file." });
+    next();
+  });
+}, async (req, res) => {
+  const { guildId, kind } = req.params;
+  if (kind !== "wheel") return res.status(404).json({ error: "No tool like that." });
+  if (!req.file) return res.status(400).json({ error: "Pick a PNG, JPG, GIF or WebP picture, or an MP4 or WebM video." });
+  if (req.file.mimetype.startsWith("image/") && req.file.size > IMAGE_BYTES) return res.status(400).json({ error: "That picture is too big. Keep it under 2 MB." });
+  const old = await prisma.streamDeckState.findMany({ where: { guildId, key: { startsWith: `toolmedia:${kind}:` } }, select: { key: true } }).catch(() => [] as Array<{ key: string }>);
+  if (old.length) await prisma.streamDeckState.deleteMany({ where: { guildId, key: { in: old.map((o) => o.key) } } }).catch(() => null);
+  const id = randomBytes(9).toString("base64url");
+  await putRow(guildId, `toolmedia:${kind}:${id}`, { type: req.file.mimetype, data: req.file.buffer.toString("base64") });
+  const base = (await import("@spartacus/bot").catch(() => null))?.apiBase() ?? `${req.protocol}://${req.get("host")}`;
+  res.status(201).json({ url: `${base}/public/tool-media/${guildId}/${kind}/${id}`, video: req.file.mimetype.startsWith("video/") });
+});
+router.get("/public/tool-media/:guildId/:kind/:id", async (req, res) => {
+  const { guildId, kind, id } = req.params;
+  if (!validGuild(guildId) || !isToolKind(kind) || !/^[\w-]{6,20}$/.test(id)) return res.status(404).end();
+  const v = (await getRow(guildId, `toolmedia:${kind}:${id}`)) as { type?: string; data?: string } | undefined;
+  if (!v?.data) return res.status(404).end();
+  const buf = Buffer.from(v.data, "base64");
+  const type = /^(image|video)\/[\w.+-]+$/.test(v.type ?? "") ? v.type! : "application/octet-stream";
+  res.set({ "Content-Type": type, "Cache-Control": "public, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff", "Accept-Ranges": "bytes", "Access-Control-Allow-Origin": "*" });
+  // Videos ask for parts of the file.
+  const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ""));
+  if (range && (range[1] || range[2])) {
+    const start = range[1] ? Number(range[1]) : Math.max(0, buf.length - Number(range[2]));
+    const end = range[1] && range[2] ? Math.min(Number(range[2]), buf.length - 1) : buf.length - 1;
+    if (start >= buf.length || start > end) return res.status(416).set("Content-Range", `bytes */${buf.length}`).end();
+    return res.status(206).set("Content-Range", `bytes ${start}-${end}/${buf.length}`).send(buf.subarray(start, end + 1));
+  }
+  res.send(buf);
 });
 
 // Public: OBS reads this every second.

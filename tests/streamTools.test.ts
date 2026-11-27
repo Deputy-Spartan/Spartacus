@@ -1,7 +1,7 @@
 // Streaming › Overlays: the Spin wheel and AFK popups rules (no database).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AFK_DEFAULTS, applyToolAction, cleanAfkList, cleanToolRow, cleanToolSettings, TOOLS, wheelSlicesOf } from "../packages/shared";
+import { AFK_DEFAULTS, applyToolAction, cleanAfkList, cleanToolRow, cleanToolSettings, cleanWheelExtra, TOOLS, wheelItemsOf, wheelSlicesOf } from "../packages/shared";
 
 test("spin wheel: up to 16 slices, one spin at a time", () => {
   const s = cleanToolSettings("wheel", { s1: "A", s2: "B", s9: "I", s16: "P", s17: "nope", spinTime: 5 });
@@ -21,7 +21,8 @@ test("spin wheel: colors, sizes and picks are kept to what's allowed", () => {
   assert.equal(s.colors, "#ff0000,#00ff00");
   assert.equal(s.rimWidth, 60);
   assert.equal(s.pointerSide, "top");
-  assert.equal(s.hubText, "SPA");
+  assert.equal(s.hubText, "SPARTA");
+  assert.equal(cleanToolSettings("wheel", { hubText: "TOOLONGTEXT" }).hubText, "TOOLON");
   assert.equal(s.pegColor, TOOLS.wheel.settings.pegColor);
   assert.equal(s.spinCmd, "spinnow");
   // Every starting look only sets real settings with allowed values.
@@ -29,6 +30,69 @@ test("spin wheel: colors, sizes and picks are kept to what's allowed", () => {
     const clean = cleanToolSettings("wheel", { ...TOOLS.wheel.settings, ...p });
     for (const [k, v] of Object.entries(p)) assert.equal(clean[k], v, `${name}.${k}`);
   }
+});
+
+test("spin wheel: odds, taking winners off and putting them back", () => {
+  const extra = cleanWheelExtra([{ w: 5, msg: "  Do it  ", c: "#FFC641" }, { w: 99 }, { w: -3, tc: "red" }]);
+  assert.deepEqual(extra[0], { c: "#ffc641", tc: "", w: 5, msg: "Do it" });
+  assert.equal(extra[1].w, 5);
+  assert.equal(extra[2].w, 1);
+  assert.equal(extra[2].tc, "");
+  assert.equal(extra.length, 16);
+
+  const s = cleanToolSettings("wheel", { s1: "A", s2: "B", s3: "C", s4: "", s5: "", s6: "", odds: true, remove: true, extra: JSON.stringify([{ w: 5, msg: "yay" }, { w: 1 }, { w: 1 }]) });
+  assert.deepEqual(wheelItemsOf(s).map((x) => x.t), ["A", "B", "C"]);
+  // A 5× slice wins far more often.
+  let a = 0;
+  for (let i = 0; i < 400; i++) {
+    const r = applyToolAction("wheel", cleanToolRow("wheel", { settings: s }), { op: "spin" }, 1_000_000);
+    if (!("error" in r) && r.state.last === "A") a++;
+  }
+  assert.ok(a > 230 && a < 330, `A won ${a} of 400`);
+
+  // Taking winners off: each spin removes the slice that won.
+  let row = cleanToolRow("wheel", { settings: s });
+  const r1 = applyToolAction("wheel", row, { op: "spin" }, 100_000);
+  assert.ok(!("error" in r1));
+  row = r1 as typeof row;
+  assert.equal((row.state.out as number[]).length, 1);
+  const ev = row.events[row.events.length - 1];
+  assert.deepEqual(ev.data.out, []);
+  assert.equal(wheelItemsOf(s, row.state.out as number[]).length, 2);
+  const r2 = applyToolAction("wheel", row, { op: "spin" }, 200_000);
+  row = r2 as typeof row;
+  assert.deepEqual(applyToolAction("wheel", row, { op: "spin" }, 300_000), { error: "Only one slice is left. Press Put slices back." });
+  const back = applyToolAction("wheel", row, { op: "putback" }, 300_000) as typeof row;
+  assert.deepEqual(back.state.out, []);
+  assert.deepEqual(applyToolAction("wheel", back, { op: "putback" }, 300_000), { error: "Every slice is already on the wheel." });
+});
+
+test("spin wheel: center links, old text color switch, new picks", () => {
+  assert.equal(cleanToolSettings("wheel", { hubMedia: "javascript:alert(1)" }).hubMedia, "");
+  assert.equal(cleanToolSettings("wheel", { hubMedia: "http://x.com/a.png" }).hubMedia, "");
+  assert.equal(cleanToolSettings("wheel", { hubMedia: "https://api.example.com/public/tool-media/1/wheel/abc" }).hubMedia, "https://api.example.com/public/tool-media/1/wheel/abc");
+  assert.equal(cleanToolSettings("wheel", { autoText: false }).textMode, "one");
+  assert.equal(cleanToolSettings("wheel", { autoText: false, textMode: "slice" }).textMode, "slice");
+  const s = cleanToolSettings("wheel", { pegSize: 99, pegStyle: "spiky", enter: "teleport", textMove: -999, place: "left" });
+  assert.equal(s.pegSize, 30);
+  assert.equal(s.pegStyle, "stud");
+  assert.equal(s.enter, "zoom");
+  assert.equal(s.textMove, -150);
+  assert.equal(s.place, "left");
+});
+
+test("color picks take your own hex code too", () => {
+  let checked = 0;
+  for (const [kind, info] of Object.entries(TOOLS)) {
+    for (const [k, g] of Object.entries(info.groups)) {
+      if (!g.swatch) continue;
+      const k2 = kind as keyof typeof TOOLS;
+      assert.equal(cleanToolSettings(k2, { [k]: "#FFC641" })[k], "#ffc641", `${kind}.${k}`);
+      assert.equal(cleanToolSettings(k2, { [k]: "red" })[k], info.settings[k], `${kind}.${k} bad`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 0);
 });
 
 test("afk popups: start, a set number of minutes, and back", () => {

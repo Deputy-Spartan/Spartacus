@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AFK_MAX, TOOLS, TOOL_COMMANDS, cleanAfkList, type AfkItem, type ToolKind, type ToolRow, type ToolSection } from "@spartacus/shared";
+import { AFK_MAX, TOOLS, TOOL_COMMANDS, WHEEL_SLICES, cleanAfkList, cleanWheelExtra, type AfkItem, type ToolKind, type ToolRow, type ToolSection, type WheelExtra } from "@spartacus/shared";
 import { NeonCard } from "../ui/NeonCard";
 import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { PageGuideButton } from "../nav/PageGuideButton";
 import { ShowOnStream } from "./ShowOnStream";
-import { CanvasPicker, EditorSplit, ObsCard, PreviewPane, Swatch, Toggle, button, field, hint } from "./CounterParts";
+import { CanvasPicker, EditorSplit, HexColor, ObsCard, PreviewPane, Swatch, Toggle, button, field, hint } from "./CounterParts";
 import { useAutoSave } from "../../lib/useAutoSave";
 import { api } from "../../lib/api";
 
@@ -23,6 +23,8 @@ const TOOL_CANVASES = [
   [2560, 1440, "1440p"],
   [3840, 2160, "4K"],
 ] as const;
+// The wheel fills whatever canvas it's on, so it also comes tall and square.
+const WHEEL_CANVASES = [...TOOL_CANVASES, [1080, 1920, "Vertical"], [1080, 1080, "Square"]] as const;
 const FONT_NAME: Record<string, string> = { lilita: "Lilita One", bangers: "Bangers", russo: "Russo One", blackops: "Black Ops One", bebas: "Bebas Neue", luckiest: "Luckiest Guy", teko: "Teko", barlow: "Barlow Condensed", fredoka: "Fredoka", marker: "Permanent Marker" };
 type Settings = ToolRow["settings"];
 type Feed = { state: Record<string, unknown>; live: Record<string, unknown>; events: ToolRow["events"]; now: number };
@@ -140,7 +142,7 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
               <CanvasPicker
                 w={W}
                 h={H}
-                sizes={TOOL_CANVASES}
+                sizes={kind === "wheel" ? WHEEL_CANVASES : TOOL_CANVASES}
                 onPick={(canvasW, canvasH) => update({ canvasW, canvasH })}
                 note="Match your OBS canvas (OBS Settings → Video → Base resolution) and use the same Width and Height on the browser source."
               />
@@ -189,6 +191,8 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
         )}
 
         {kind === "afk" && <AfkCommands guildId={guildId} settings={settings} update={update} busy={busy} act={act} />}
+        {kind === "wheel" && <WheelSlices settings={settings} update={update} out={(row.state.out as number[] | undefined) ?? []} />}
+        {kind === "wheel" && ["image", "video"].includes(String(settings.hubType)) && <WheelCenter guildId={guildId} settings={settings} update={update} />}
 
         <NeonCard>
           <p className="font-medium">🎨 Look and words</p>
@@ -244,6 +248,12 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
                   );
                 })}
               </div>
+              {(g.swatch || key === "color") && (
+                <div className={`mt-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${g.items.some(([id]) => String(id) === String(settings[key])) ? "border-white/10" : "border-neon-blue bg-neon-blue/10"}`}>
+                  <span className="text-sm text-slate-300 flex-1">Your own color</span>
+                  <HexColor label={`${g.title}: your own color`} value={String(settings[key])} onChange={(c) => update({ [key]: c })} />
+                </div>
+              )}
               {key === "preset" && info.sections && <ToolSections sections={info.sections} settings={settings} update={update} />}
             </div>
           ))}
@@ -274,7 +284,11 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
                 canvasW: W,
                 canvasH: H,
                 // Your words, slices and AFK commands stay; only the look goes back.
-                ...Object.fromEntries([...info.words.map(([k]) => k), "list", "followUserId"].filter((k) => k in settings).map((k) => [k, settings[k]])),
+                ...Object.fromEntries(
+                  [...info.words.map(([k]) => k), "list", "followUserId", "extra", "hubMedia", "hubText", "chatMsg", "resTop", ...Object.keys(settings).filter((k) => /^s\d+$/.test(k))]
+                    .filter((k) => k in settings)
+                    .map((k) => [k, settings[k]]),
+                ),
               })
             }
           >
@@ -330,7 +344,11 @@ function ToolSections({ sections, settings, update }: { sections: ToolSection[];
           </summary>
           <div className="px-3 pb-3 space-y-3">
             {sec.fields
-              .filter((f) => !f.show || String(settings[f.show[0]]) === String(f.show[1]))
+              .filter((f) => {
+                if (!f.show) return true;
+                const want = f.show[1], have = String(settings[f.show[0]]);
+                return Array.isArray(want) ? want.includes(have) : have === String(want);
+              })
               .map((f) => {
                 const v = settings[f.key];
                 const id = `tf-${f.key}`;
@@ -343,10 +361,10 @@ function ToolSections({ sections, settings, update }: { sections: ToolSection[];
                   );
                 if (f.type === "color")
                   return (
-                    <label key={f.key} htmlFor={id} className="flex items-center justify-between gap-3">
+                    <div key={f.key} className="flex items-center justify-between gap-3">
                       <span className="text-sm min-w-0">{f.label}</span>
-                      <input id={id} type="color" value={String(v)} onChange={(e) => update({ [f.key]: e.target.value })} className="h-8 w-12 rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer" />
-                    </label>
+                      <HexColor label={f.label} value={String(v)} onChange={(c) => update({ [f.key]: c })} />
+                    </div>
                   );
                 if (f.type === "range")
                   return (
@@ -395,7 +413,7 @@ function ToolSections({ sections, settings, update }: { sections: ToolSection[];
                     <p className="text-sm mb-1.5">{f.label}</p>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {list.map((c, i) => (
-                        <input key={i} type="color" aria-label={`Color ${i + 1}`} value={c} onChange={(e) => set(list.map((x, j) => (j === i ? e.target.value : x)))} className="h-8 w-10 rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer" />
+                        <HexColor key={i} small label={`Color ${i + 1}`} value={c} onChange={(nc) => set(list.map((x, j) => (j === i ? nc : x)))} />
                       ))}
                       <button type="button" className={`${button} !px-2.5 !py-1`} disabled={list.length >= f.max} onClick={() => set([...list, list[list.length % 2] ?? "#ffffff"])} aria-label="Add a color">
                         +
@@ -415,6 +433,146 @@ function ToolSections({ sections, settings, update }: { sections: ToolSection[];
 }
 
 // AFK popups: your commands (edit, add, try) and their links for Lumia.
+// Spin wheel: each slice's words, plus its own color, text color, odds and
+// what happens when it wins (the extras show when they're turned on).
+const lumOf = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return [n >> 16, (n >> 8) & 255, n & 255].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }).reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+};
+function WheelSlices({ settings, update, out }: { settings: Settings; update: (p: Partial<Settings>) => void; out: number[] }) {
+  const texts = Array.from({ length: WHEEL_SLICES }, (_, i) => String(settings[`s${i + 1}`] ?? ""));
+  // Read as typed (half-typed words aren't dropped); the server tidies it on save.
+  const extra: WheelExtra[] = (() => {
+    try {
+      const v = JSON.parse(String(settings.extra || "[]"));
+      if (Array.isArray(v)) return Array.from({ length: WHEEL_SLICES }, (_, i) => ({ c: "", tc: "", w: 1, msg: "", ...(v[i] && typeof v[i] === "object" ? v[i] : {}) }));
+    } catch {
+      /* fall through */
+    }
+    return cleanWheelExtra(null);
+  })();
+  const lastUsed = texts.reduce((m, t, i) => (t.trim() ? i : m), -1);
+  const [shown, setShown] = useState(() => Math.max(2, lastUsed + 1));
+  const count = Math.max(shown, lastUsed + 1);
+  const palette = String(settings.colors || "#888888").split(",").filter(Boolean);
+  const filled = texts.map((t, i) => (t.trim() ? i : -1)).filter((i) => i >= 0);
+  const colorAt = (i: number) => (settings.perSlice && extra[i].c) || palette[Math.max(0, filled.indexOf(i) >= 0 ? filled.indexOf(i) : i) % palette.length];
+  const setExtra = (i: number, patch: Partial<WheelExtra>) => update({ extra: JSON.stringify(extra.map((x, j) => (j === i ? { ...x, ...patch } : x))) });
+  const remove = (i: number) => {
+    const nt = [...texts], ne = [...extra];
+    nt.splice(i, 1); nt.push("");
+    ne.splice(i, 1); ne.push({ c: "", tc: "", w: 1, msg: "" });
+    update({ ...Object.fromEntries(nt.map((t, j) => [`s${j + 1}`, t])), extra: JSON.stringify(ne) });
+    setShown(Math.max(2, count - 1));
+  };
+  return (
+    <NeonCard>
+      <p className="font-medium">🍕 Your slices</p>
+      <p className={hint}>Up to {WHEEL_SLICES}. The second box is optional: what happens when that slice wins. It shows under the result and in chat.</p>
+      <div className="space-y-2 mt-3">
+        {Array.from({ length: count }, (_, i) => (
+          <div key={i} className="rounded-lg border border-white/10 p-2.5 space-y-2" style={{ borderLeft: `4px solid ${colorAt(i)}` }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <input className={`${field} !p-1.5 flex-1 !w-auto min-w-[8rem]`} value={texts[i]} maxLength={40} placeholder={`Slice ${i + 1}`} aria-label={`Slice ${i + 1}`} onChange={(e) => update({ [`s${i + 1}`]: e.target.value })} />
+              {!!settings.perSlice && (
+                <span className="flex items-center gap-1 text-xs text-slate-400">
+                  Slice <HexColor small label={`Slice ${i + 1} color`} value={colorAt(i)} onChange={(c) => setExtra(i, { c })} />
+                </span>
+              )}
+              {settings.textMode === "slice" && (
+                <span className="flex items-center gap-1 text-xs text-slate-400">
+                  Text <HexColor small label={`Slice ${i + 1} text color`} value={extra[i].tc || (lumOf(colorAt(i)) > 0.45 ? "#15171b" : "#ffffff")} onChange={(tc) => setExtra(i, { tc })} />
+                </span>
+              )}
+              {!!settings.odds && (
+                <label className="flex items-center gap-1 text-xs text-slate-400">
+                  Odds
+                  <select className={`${field} !w-16 !p-1.5`} value={extra[i].w} onChange={(e) => setExtra(i, { w: Number(e.target.value) })}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {n}×
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {out.includes(i + 1) && <span className="text-xs text-amber-300">Taken off</span>}
+              <button type="button" className={`${button} !px-2 !py-1`} disabled={count <= 2} aria-label={`Remove slice ${i + 1}`} onClick={() => remove(i)}>
+                ✕
+              </button>
+            </div>
+            <input className={`${field} !p-1.5 text-sm`} value={extra[i].msg} maxLength={60} placeholder="When it wins (optional), like: do it for one round" aria-label={`Slice ${i + 1}: when it wins`} onChange={(e) => setExtra(i, { msg: e.target.value })} />
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className={`${button} mt-3`}
+        disabled={count >= WHEEL_SLICES}
+        onClick={() => {
+          update({ [`s${count + 1}`]: `Slice ${count + 1}` });
+          setShown(count + 1);
+        }}
+      >
+        + Add a slice
+      </button>
+      {out.length > 0 && <p className={`${hint} mt-2`}>Slices marked Taken off won a spin. Press ↩️ Put slices back at the top to bring them back.</p>}
+    </NeonCard>
+  );
+}
+
+// The picture or video in the middle of the wheel: a file from your computer
+// (kept by Spartacus) or a link.
+function WheelCenter({ guildId, settings, update }: { guildId: string; settings: Settings; update: (p: Partial<Settings>) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const video = settings.hubType === "video";
+  async function pick(f: File) {
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await api.uploadToolMedia(guildId, "wheel", f);
+      update({ hubMedia: r.url, hubType: r.video ? "video" : "image" });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Couldn't upload that. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <NeonCard>
+      <p className="font-medium">⭕ Center {video ? "video" : "picture"}</p>
+      <p className={hint}>{video ? "MP4 or WebM, up to 5 MB. It plays on a loop with no sound." : "PNG, JPG, GIF or WebP, up to 2 MB. A logo with a see-through background looks great."}</p>
+      <div className="flex flex-wrap items-center gap-2 mt-3">
+        <label className={`${button} cursor-pointer ${busy ? "opacity-50" : ""}`}>
+          {busy ? "Uploading…" : settings.hubMedia ? "Pick a different file" : "Pick a file"}
+          <input
+            type="file"
+            className="sr-only"
+            accept={video ? "video/mp4,video/webm" : "image/png,image/jpeg,image/gif,image/webp"}
+            disabled={busy}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void pick(f);
+            }}
+          />
+        </label>
+        {!!settings.hubMedia && (
+          <button type="button" className={button} onClick={() => update({ hubMedia: "" })}>
+            Remove it
+          </button>
+        )}
+      </div>
+      <label className="block mt-3">
+        <span className="text-sm">Or paste a link</span>
+        <input className={`${field} mt-1`} value={String(settings.hubMedia ?? "")} maxLength={400} placeholder="https://…" onChange={(e) => update({ hubMedia: e.target.value.trim() })} />
+      </label>
+      {err && <p className="text-sm text-rose-300 mt-2">{err}</p>}
+    </NeonCard>
+  );
+}
+
 // Lumia Stream (or any app): a run link that spins the wheel.
 function WheelLumia({ guildId, settings, update }: { guildId: string; settings: Settings; update: (p: Partial<Settings>) => void }) {
   const [runKey, setRunKey] = useState("");
@@ -505,7 +663,7 @@ function AfkCommands({ guildId, settings, update, busy, act }: { guildId: string
               <span className="text-slate-400">!</span>
               <input className={`${field} !w-28 !p-1.5`} value={it.cmd} maxLength={20} aria-label="Command" onChange={(e) => change(i, { cmd: e.target.value.toLowerCase().replace(/[^\p{L}\p{N}_-]/gu, "") })} />
               <input className={`${field} !w-14 !p-1.5 text-center`} value={it.ico} maxLength={8} aria-label="Icon (emoji)" onChange={(e) => change(i, { ico: e.target.value })} />
-              <input type="color" value={it.c} aria-label="Color" onChange={(e) => change(i, { c: e.target.value })} className="h-8 w-10 rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer" />
+              <HexColor small label="Color" value={it.c} onChange={(c) => change(i, { c })} />
               <label className="flex items-center gap-1 text-sm text-slate-300">
                 <input className={`${field} !w-16 !p-1.5 tabular-nums`} type="number" min={1} max={120} value={it.min} aria-label="Minutes" onChange={(e) => change(i, { min: Number(e.target.value) || 1 })} />
                 min

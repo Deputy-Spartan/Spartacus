@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { COUNTER_COLORS, KD_ANIMS, KD_COLOR_MODES, KD_DEFAULTS, KD_DTEXTS, KD_LAYOUTS, KD_SOUNDS, KD_STREAKS, kdRatio, type CounterLook } from "@spartacus/shared";
+import { KD_ANIMS, KD_COLOR_MODES, KD_DEFAULTS, KD_DTEXTS, KD_LAYOUTS, KD_SOUNDS, KD_STREAKS, kdRatio, type CounterLook } from "@spartacus/shared";
 import { NeonCard } from "../../../../../components/ui/NeonCard";
 import { useConfirm } from "../../../../../components/ui/ConfirmDialog";
 import { PageGuideButton } from "../../../../../components/nav/PageGuideButton";
 import { ShowOnStream } from "../../../../../components/streaming/ShowOnStream";
-import { AnimChoices, Choices, CommonLook, CounterPreview, ObsCard, Swatch, Toggle, button, demoIn, field, hint } from "../../../../../components/streaming/CounterParts";
+import { AnimChoices, Choices, ColorChoices, CommonLook, CounterPreview, ObsCard, Toggle, button, demoIn, field, hint } from "../../../../../components/streaming/CounterParts";
 import { useAutoSave } from "../../../../../lib/useAutoSave";
 import { api, type KdCounterSettings } from "../../../../../lib/api";
 
@@ -180,19 +180,7 @@ export default function KdCounterPage({ params }: { params: { guildId: string } 
           <AnimChoices items={KD_ANIMS} value={look.anim} onPick={(anim) => pick({ anim })} />
           <Choices title="Layout" items={KD_LAYOUTS} value={look.layout} onPick={(layout) => pick({ layout })} />
           <CommonLook look={look} pick={pick} sounds={KD_SOUNDS} colorTitle="Kills number color" />
-          <Choices
-            title="Deaths number color"
-            cols={4}
-            items={COUNTER_COLORS}
-            value={look.dcolor}
-            onPick={(dcolor) => pick({ dcolor }, "deaths")}
-            render={([c, name]) => (
-              <>
-                <Swatch c={c} />
-                {name}
-              </>
-            )}
-          />
+          <ColorChoices title="Deaths number color" value={look.dcolor} onPick={(dcolor) => pick({ dcolor }, "deaths")} />
           <Choices title="+/− colors" cols={2} items={KD_COLOR_MODES} value={look.colors} onPick={(colors) => pick({ colors }, "deaths")} />
           <Choices title="+/− words" cols={2} items={KD_DTEXTS} value={look.dtext} onPick={(dtext) => pick({ dtext })} />
 

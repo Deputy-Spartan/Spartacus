@@ -214,11 +214,25 @@
 .pl-foot { display: flex; justify-content: space-between; margin-top: calc(var(--u) * 14); font-size: calc(var(--u) * 30); }
 
 /* Spin the wheel */
-.wh { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); scale: var(--sz); display: grid; justify-items: center; gap: calc(var(--u) * 14); }
-.wh-label { font-size: calc(var(--u) * 50); letter-spacing: .06em; }
-.wh-wrap { position: relative; width: calc(var(--u) * 700); height: calc(var(--u) * 700); }
+/* Spin wheel: fills the OBS canvas. --wu is 1px on a 1080-tall canvas (the short side). */
+.wh { position: absolute; inset: 0; --wu: var(--u); }
+.wh-g { position: absolute; display: flex; flex-direction: column; align-items: center; transform-origin: center; }
+.wh-g.below { flex-direction: column-reverse; }
+.wh-label { line-height: 1.05; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: .1em .3em 0; }
+.wh-wrap { position: relative; flex: none; }
 .wh-c { width: 100%; height: 100%; display: block; }
-.wh-res { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: calc(var(--u) * 64); padding: calc(var(--u) * 18) calc(var(--u) * 44); white-space: nowrap; z-index: 3; max-width: calc(var(--u) * 1400); }
+.wh-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.wh-res { position: absolute; text-align: center; z-index: 3; }
+.wh-res small { display: block; font-size: .32em; letter-spacing: .16em; color: var(--win); -webkit-text-stroke: 0; }
+.wh-res b { display: block; font-weight: inherit; line-height: 1; }
+.wh-res i { display: block; font-style: normal; font-size: .36em; margin-top: .3em; opacity: .9; -webkit-text-stroke: 0; }
+.wh-res.card { top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: calc(var(--wu) * 64); padding: calc(var(--wu) * 16) calc(var(--wu) * 40); white-space: nowrap; max-width: calc(var(--wu) * 1400); }
+.wh-res.banner { left: 0; right: 0; bottom: 0; font-size: calc(var(--wu) * 72); padding: calc(var(--wu) * 22) calc(var(--wu) * 50) calc(var(--wu) * 18); border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0; border-top: calc(var(--wu) * 6) solid var(--win); }
+.wh-res.big { inset: 0; display: grid; place-content: center; font-size: calc(var(--wu) * 150); padding: calc(var(--wu) * 60); background: rgba(0,0,0,.55); color: var(--win); }
+.wh-res.big small, .wh-res.big i { color: #fff; }
+.wh-hist { position: absolute; left: calc(var(--wu) * 24); top: calc(var(--wu) * 24); display: flex; flex-wrap: wrap; gap: calc(var(--wu) * 8); max-width: 40%; }
+.wh-hist span { font-size: calc(var(--wu) * 24); background: rgba(0,0,0,.6); color: #fff; padding: calc(var(--wu) * 4) calc(var(--wu) * 14); border-radius: 999px; }
+.wh-hist span:first-child { background: var(--win); color: #111; }
 
 /* AFK popups (sizes: --w is 1% of the 1920 width, --k the Size slider) */
 .afk { position: absolute; inset: 0; --w: calc(var(--u) * 19.2); --k: 1; --c: #d4a24c; --pbg: rgba(17,20,24,.94); --ptx: #fff; --prad: calc(var(--w) * 1.4); }

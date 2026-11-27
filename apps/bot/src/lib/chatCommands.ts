@@ -2,6 +2,8 @@ import type { StreamerAccount } from "@prisma/client";
 import {
   CHAT_COMMANDS_KEY,
   CHAT_COMMANDS_STATE_KEY,
+  afkListOf,
+  cleanToolRow,
   cleanChatCommands,
   cleanChatCommandsState,
   findChatCommand,
@@ -105,8 +107,69 @@ async function liveInfo(guildId: string, platform: Platform, channel: string) {
   return { liveMs: start ? Date.now() - start.getTime() : null, game: sub?.lastGame ?? "", title: sub?.lastTitle ?? "", tz };
 }
 
+// ---- Overlay tools run from chat: AFK popups (!brb, !coffee… and !back)
+// and the Spin wheel (!spin). Only for you and your mods; anyone else's
+// message goes on to the normal commands (so a viewer's !back still works).
+const clock = (ms: number) => {
+  const t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+};
+async function postAs(input: RunInput, text: string) {
+  if (!input.channel) return;
+  const account = await prisma.streamerAccount.findFirst({ where: { guildId: input.guildId, platform: input.platform, login: input.channel.toLowerCase() } });
+  if (account) await say(account, text);
+}
+async function runToolCommand(input: RunInput): Promise<{ ok: boolean; message: string } | null> {
+  const m = input.text.trim().match(/^!(\S+)\s*(.*)$/s);
+  if (!m) return null;
+  const name = m[1].toLowerCase();
+  const { guildId } = input;
+  const rank = input.from ? 3 : input.rank;
+  if (rank < 2) return null;
+  const rows = await prisma.streamDeckState.findMany({ where: { guildId, key: { in: [toolStateKey("afk"), toolStateKey("wheel")] } } });
+
+  const afkRow = rows.find((r) => r.key === toolStateKey("afk"));
+  if (afkRow) {
+    const row = cleanToolRow("afk", afkRow.value);
+    const s = row.settings;
+    const item = afkListOf(s).find((x) => x.cmd === name);
+    const isBack = name === String(s.backCmd || "back");
+    if ((item || (isBack && row.state.cur)) && rank >= (s.who === "me" ? 3 : 2)) {
+      if (!(await guildHasFeature(guildId, "t:afk", "kit"))) return { ok: false, message: "AFK popups need the Streamer Kit." };
+      const minutes = parseInt(m[2], 10);
+      const next = await changeTool(guildId, "afk", isBack && !item ? { op: "back" } : { op: "start", cmd: name, min: minutes > 0 ? minutes : undefined });
+      if ("error" in next) return { ok: false, message: next.error };
+      if (isBack && !item) {
+        const gone = Number(next.events[next.events.length - 1]?.data.gone) || 0;
+        if (s.chatPost) await postAs(input, `👋 Back! Gone for ${clock(gone)}`).catch(() => null);
+        return { ok: true, message: `Cleared the AFK popup (gone ${clock(gone)}).` };
+      }
+      const cur = next.state.cur as { ico: string; t: string; min: number };
+      if (s.chatPost) await postAs(input, `${cur.t} ${cur.ico} back in ${cur.min} min`.trim()).catch(() => null);
+      return { ok: true, message: `Showing ${cur.t} for ${cur.min} min.` };
+    }
+  }
+
+  const wheelRow = rows.find((r) => r.key === toolStateKey("wheel"));
+  if (wheelRow) {
+    const s = cleanToolRow("wheel", wheelRow.value).settings;
+    if (s.chatSpin && name === String(s.spinCmd || "spin")) {
+      if (!(await guildHasFeature(guildId, "t:wheel", "kit"))) return { ok: false, message: "The Spin wheel needs the Streamer Kit." };
+      const next = await changeTool(guildId, "wheel", { op: "spin" });
+      if ("error" in next) return { ok: false, message: next.error };
+      const result = String(next.state.last ?? "");
+      // Said once the wheel has stopped on stream.
+      if (s.chatPost && result) setTimeout(() => void postAs(input, `🎡 The wheel landed on: ${result}`).catch(() => null), (Number(s.spinTime) || 7) * 1000 + 900);
+      return { ok: true, message: `Spinning… it lands on ${result}.` };
+    }
+  }
+  return null;
+}
+
 export async function runChatCommand(input: RunInput): Promise<{ ok: boolean; message: string }> {
   const { guildId, platform, channel, user, rank } = input;
+  const tool = await runToolCommand(input).catch((e) => (logError("bot", e, guildId), null));
+  if (tool) return tool;
   const cfg = await chatCommandsOf(guildId);
   if (!cfg.on || !cfg[platform]) return { ok: false, message: "Chat commands are off." };
   // The Kick/Twitch chat bot is part of the Streamer Kit.

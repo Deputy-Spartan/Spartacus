@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { TOOLS, TOOL_COMMANDS, type ToolKind, type ToolRow } from "@spartacus/shared";
+import { AFK_MAX, TOOLS, TOOL_COMMANDS, cleanAfkList, type AfkItem, type ToolKind, type ToolRow, type ToolSection } from "@spartacus/shared";
 import { NeonCard } from "../ui/NeonCard";
+import { ToggleSwitch } from "../ui/ToggleSwitch";
 import { PageGuideButton } from "../nav/PageGuideButton";
 import { ShowOnStream } from "./ShowOnStream";
 import { CanvasPicker, EditorSplit, ObsCard, PreviewPane, Swatch, Toggle, button, field, hint } from "./CounterParts";
@@ -22,7 +23,7 @@ const TOOL_CANVASES = [
   [2560, 1440, "1440p"],
   [3840, 2160, "4K"],
 ] as const;
-const FONT_NAME: Record<string, string> = { lilita: "Lilita One", bangers: "Bangers", russo: "Russo One", blackops: "Black Ops One", bebas: "Bebas Neue", luckiest: "Luckiest Guy" };
+const FONT_NAME: Record<string, string> = { lilita: "Lilita One", bangers: "Bangers", russo: "Russo One", blackops: "Black Ops One", bebas: "Bebas Neue", luckiest: "Luckiest Guy", teko: "Teko", barlow: "Barlow Condensed", fredoka: "Fredoka", marker: "Permanent Marker" };
 type Settings = ToolRow["settings"];
 type Feed = { state: Record<string, unknown>; live: Record<string, unknown>; events: ToolRow["events"]; now: number };
 
@@ -187,6 +188,8 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
           </NeonCard>
         )}
 
+        {kind === "afk" && <AfkCommands guildId={guildId} settings={settings} update={update} busy={busy} act={act} />}
+
         <NeonCard>
           <p className="font-medium">🎨 Look and words</p>
           <p className={hint}>Each change shows in the preview.</p>
@@ -222,7 +225,7 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
                     <button
                       key={String(id)}
                       type="button"
-                      onClick={() => update({ [key]: id })}
+                      onClick={() => update({ [key]: id, ...(key === "preset" ? (info.presets?.[String(id)] ?? {}) : {}) })}
                       aria-pressed={on}
                       className={`rounded-lg border transition-colors min-w-0 ${g.kind === "big" ? "text-left p-2.5" : "text-sm px-1.5 py-2"} ${on ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-300 hover:border-white/25"}`}
                     >
@@ -241,8 +244,10 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
                   );
                 })}
               </div>
+              {key === "preset" && info.sections && <ToolSections sections={info.sections} settings={settings} update={update} />}
             </div>
           ))}
+          {info.sections && !info.presets && <ToolSections sections={info.sections} settings={settings} update={update} />}
 
           {info.toggles.length > 0 && kind !== "stats" && (
             <div className="grid sm:grid-cols-2 gap-2 mt-4">
@@ -261,7 +266,18 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
               ))}
             </div>
           )}
-          <button className={`${button} mt-4`} onClick={() => setSettings({ ...info.settings, canvasW: W, canvasH: H, ...(kind === "squad" ? { followUserId: settings.followUserId } : {}) })}>
+          <button
+            className={`${button} mt-4`}
+            onClick={() =>
+              setSettings({
+                ...info.settings,
+                canvasW: W,
+                canvasH: H,
+                // Your words, slices and AFK commands stay; only the look goes back.
+                ...Object.fromEntries([...info.words.map(([k]) => k), "list", "followUserId"].filter((k) => k in settings).map((k) => [k, settings[k]])),
+              })
+            }
+          >
             Back to the default look
           </button>
         </NeonCard>
@@ -296,5 +312,190 @@ export function ToolEditor({ guildId, kind }: { guildId: string; kind: ToolKind 
         )}
       </EditorSplit>
     </div>
+  );
+}
+
+// Fine-tuning: fold-out groups of color pickers, sliders, switches and picks.
+function ToolSections({ sections, settings, update }: { sections: ToolSection[]; settings: Settings; update: (p: Partial<Settings>) => void }) {
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-sm">Customize</p>
+      {sections.map((sec) => (
+        <details key={sec.title} className="rounded-lg border border-white/10 group">
+          <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-semibold flex items-center justify-between">
+            {sec.title}
+            <span className="text-neon-blue group-open:rotate-45 transition-transform text-lg leading-none">+</span>
+          </summary>
+          <div className="px-3 pb-3 space-y-3">
+            {sec.fields
+              .filter((f) => !f.show || String(settings[f.show[0]]) === String(f.show[1]))
+              .map((f) => {
+                const v = settings[f.key];
+                const id = `tf-${f.key}`;
+                if (f.type === "switch")
+                  return (
+                    <div key={f.key} className="flex items-center justify-between gap-3">
+                      <span className="text-sm min-w-0">{f.label}</span>
+                      <ToggleSwitch size="sm" label={f.label} enabled={!!v} onChange={(on) => update({ [f.key]: on })} />
+                    </div>
+                  );
+                if (f.type === "color")
+                  return (
+                    <label key={f.key} htmlFor={id} className="flex items-center justify-between gap-3">
+                      <span className="text-sm min-w-0">{f.label}</span>
+                      <input id={id} type="color" value={String(v)} onChange={(e) => update({ [f.key]: e.target.value })} className="h-8 w-12 rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer" />
+                    </label>
+                  );
+                if (f.type === "range")
+                  return (
+                    <label key={f.key} htmlFor={id} className="block">
+                      <span className="flex justify-between text-sm">
+                        <span>{f.label}</span>
+                        <span className="text-slate-400 tabular-nums">
+                          {String(v)}
+                          {f.unit ?? ""}
+                        </span>
+                      </span>
+                      <input id={id} type="range" min={f.min} max={f.max} step={f.step ?? 1} value={Number(v)} onChange={(e) => update({ [f.key]: Number(e.target.value) })} className="w-full mt-1" />
+                    </label>
+                  );
+                if (f.type === "text")
+                  return (
+                    <label key={f.key} htmlFor={id} className="flex items-center justify-between gap-3">
+                      <span className="text-sm min-w-0">{f.label}</span>
+                      <input id={id} className={`${field} !w-28`} value={String(v ?? "")} maxLength={f.max} onChange={(e) => update({ [f.key]: e.target.value })} />
+                    </label>
+                  );
+                if (f.type === "pick")
+                  return (
+                    <div key={f.key}>
+                      <p className="text-sm mb-1.5">{f.label}</p>
+                      <div className={`grid gap-2 ${f.items.length === 4 ? "grid-cols-4" : f.items.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                        {f.items.map(([iv, name]) => (
+                          <button
+                            key={String(iv)}
+                            type="button"
+                            aria-pressed={String(v) === String(iv)}
+                            onClick={() => update({ [f.key]: iv })}
+                            className={`text-sm rounded-lg border px-1.5 py-2 transition-colors ${String(v) === String(iv) ? "border-neon-blue bg-neon-blue/10 text-white font-semibold" : "border-white/10 text-slate-300 hover:border-white/25"}`}
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                // A list of colors.
+                const list = String(v || "").split(",").filter(Boolean);
+                const set = (next: string[]) => update({ [f.key]: next.join(",") });
+                return (
+                  <div key={f.key}>
+                    <p className="text-sm mb-1.5">{f.label}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {list.map((c, i) => (
+                        <input key={i} type="color" aria-label={`Color ${i + 1}`} value={c} onChange={(e) => set(list.map((x, j) => (j === i ? e.target.value : x)))} className="h-8 w-10 rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer" />
+                      ))}
+                      <button type="button" className={`${button} !px-2.5 !py-1`} disabled={list.length >= f.max} onClick={() => set([...list, list[list.length % 2] ?? "#ffffff"])} aria-label="Add a color">
+                        +
+                      </button>
+                      <button type="button" className={`${button} !px-2.5 !py-1`} disabled={list.length <= 1} onClick={() => set(list.slice(0, -1))} aria-label="Remove the last color">
+                        −
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+// AFK popups: your commands (edit, add, try) and their links for Lumia.
+function AfkCommands({ guildId, settings, update, busy, act }: { guildId: string; settings: Settings; update: (p: Partial<Settings>) => void; busy: string; act: (label: string, a: Record<string, unknown>) => void }) {
+  // Read as typed (a half-typed command isn't dropped); the server tidies it on save.
+  const items: AfkItem[] = (() => {
+    try {
+      const v = JSON.parse(String(settings.list));
+      if (Array.isArray(v)) return v as AfkItem[];
+    } catch {
+      /* fall through */
+    }
+    return cleanAfkList(null);
+  })();
+  const [runKey, setRunKey] = useState("");
+  const [copied, setCopied] = useState("");
+  useEffect(() => {
+    api.getChatCommands(guildId).then((r) => setRunKey(r.config.runKey ?? "")).catch(() => null);
+  }, [guildId]);
+  const save = (next: AfkItem[]) => update({ list: JSON.stringify(next) });
+  const change = (i: number, patch: Partial<AfkItem>) => save(items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const link = (cmd: string) => `${API_URL}/public/chat-command/${guildId}/${encodeURIComponent(cmd)}?key=${runKey}&from=Lumia`;
+  const copy = (text: string, what: string) =>
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(what);
+        setTimeout(() => setCopied(""), 1500);
+      })
+      .catch(() => null);
+  const back = String(settings.backCmd || "back");
+  return (
+    <NeonCard>
+      <p className="font-medium">☕ Your AFK commands</p>
+      <p className={hint}>Press Show to try one. In chat, add a number to set the minutes, like !coffee 8. !{back} clears it.</p>
+      <div className="space-y-3 mt-3">
+        {items.map((it, i) => (
+          <div key={i} className="rounded-lg border border-white/10 p-2.5 space-y-2" style={{ borderLeft: `4px solid ${it.c}` }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-slate-400">!</span>
+              <input className={`${field} !w-28 !p-1.5`} value={it.cmd} maxLength={20} aria-label="Command" onChange={(e) => change(i, { cmd: e.target.value.toLowerCase().replace(/[^\p{L}\p{N}_-]/gu, "") })} />
+              <input className={`${field} !w-14 !p-1.5 text-center`} value={it.ico} maxLength={8} aria-label="Icon (emoji)" onChange={(e) => change(i, { ico: e.target.value })} />
+              <input type="color" value={it.c} aria-label="Color" onChange={(e) => change(i, { c: e.target.value })} className="h-8 w-10 rounded border border-white/10 bg-base-950 p-0.5 cursor-pointer" />
+              <label className="flex items-center gap-1 text-sm text-slate-300">
+                <input className={`${field} !w-16 !p-1.5 tabular-nums`} type="number" min={1} max={120} value={it.min} aria-label="Minutes" onChange={(e) => change(i, { min: Number(e.target.value) || 1 })} />
+                min
+              </label>
+              <span className="flex-1" />
+              <button type="button" className="neon-button-sm" disabled={!!busy} onClick={() => act(`afk-${i}`, { op: "start", cmd: it.cmd })}>
+                {busy === `afk-${i}` ? "…" : "Show"}
+              </button>
+              <button type="button" className={`${button} !px-2 !py-1`} aria-label={`Remove !${it.cmd}`} onClick={() => save(items.filter((_, j) => j !== i))}>
+                ✕
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              <input className={field} value={it.t} maxLength={30} placeholder="Title" aria-label="Title" onChange={(e) => change(i, { t: e.target.value })} />
+              <input className={field} value={it.s} maxLength={60} placeholder="Second line" aria-label="Second line" onChange={(e) => change(i, { s: e.target.value })} />
+            </div>
+            {runKey && (
+              <button type="button" className="text-xs text-neon-blue underline" onClick={() => copy(link(it.cmd), it.cmd)}>
+                {copied === it.cmd ? "Copied ✓" : "Copy link for Lumia"}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button
+          type="button"
+          className={button}
+          disabled={items.length >= AFK_MAX}
+          onClick={() => save([...items, { cmd: `afk${items.length + 1}`, ico: "⏳", t: "Be right back", s: "", min: 5, c: "#d4a24c" }])}
+        >
+          + Add a command
+        </button>
+        {runKey && (
+          <button type="button" className={button} onClick={() => copy(link(back), back)}>
+            {copied === back ? "Copied ✓" : `Copy !${back} link for Lumia`}
+          </button>
+        )}
+      </div>
+      <p className={`${hint} mt-3`}>
+        Lumia: make a command or button, add a web request action (GET) and paste the link. The links use the same key as{" "}
+        <Link href={`/dashboard/${guildId}/chat-commands`} className="text-neon-blue underline">Chat Commands</Link>, so making a new key there changes them too.
+      </p>
+    </NeonCard>
   );
 }

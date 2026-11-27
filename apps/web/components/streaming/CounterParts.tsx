@@ -33,7 +33,7 @@ export const OBS_W = 1400;
 export const OBS_H = 500;
 
 const FONT_LINK =
-  "https://fonts.googleapis.com/css2?family=Lilita+One&family=Bangers&family=Russo+One&family=Black+Ops+One&family=Bebas+Neue&family=Luckiest+Guy&display=swap";
+  "https://fonts.googleapis.com/css2?family=Lilita+One&family=Bangers&family=Russo+One&family=Black+Ops+One&family=Bebas+Neue&family=Luckiest+Guy&family=Teko:wght@600&family=Barlow+Condensed:wght@700&family=Fredoka:wght@600&family=Permanent+Marker&display=swap";
 
 // A row of pick-one buttons.
 export function Choices<T extends string | number>({

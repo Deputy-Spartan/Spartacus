@@ -9,7 +9,7 @@
 // all change it through applyToolAction, so they always agree.
 import { cleanCanvas } from "./counters";
 
-export const TOOL_KINDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx"] as const;
+export const TOOL_KINDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx", "afk"] as const;
 export type ToolKind = (typeof TOOL_KINDS)[number];
 export const isToolKind = (k: unknown): k is ToolKind => TOOL_KINDS.includes(k as ToolKind);
 export const toolStateKey = (k: ToolKind) => `tool:${k}`;
@@ -22,6 +22,20 @@ export interface ToolGroup {
   font?: boolean; // show each choice in its font
   swatch?: boolean; // show each choice as a color dot
 }
+// Fine-tuning options, shown in fold-out groups on the dashboard.
+// `show: [key, value]` only shows it while that setting has that value.
+export type ToolField = { key: string; label: string; show?: readonly [string, string | number | boolean] } & (
+  | { type: "color" }
+  | { type: "colors"; max: number } // a comma list of colors
+  | { type: "range"; min: number; max: number; step?: number; unit?: string }
+  | { type: "switch" }
+  | { type: "text"; max: number }
+  | { type: "pick"; items: ReadonlyArray<Item> }
+);
+export interface ToolSection {
+  title: string;
+  fields: ToolField[];
+}
 export interface ToolInfo {
   kind: ToolKind;
   title: string;
@@ -31,6 +45,9 @@ export interface ToolInfo {
   settings: Record<string, string | number | boolean>;
   state: Record<string, unknown>;
   groups: Record<string, ToolGroup>;
+  sections?: ToolSection[];
+  // Picking a "preset" group choice also sets these.
+  presets?: Record<string, Record<string, string | number | boolean>>;
   toggles: Array<[string, string, string]>;
   words: Array<[string, string]>;
   // Buttons on the dashboard (and Stream Deck commands): [label, action]
@@ -41,7 +58,7 @@ export interface ToolInfo {
 const COLORS: Item[] = [["#f9c933", "Gold"], ["#ffffff", "White"], ["#4ade80", "Green"], ["#f87171", "Red"], ["#22d3ee", "Cyan"], ["#f472b6", "Pink"], ["#fb923c", "Orange"], ["#a78bfa", "Purple"]];
 const G = {
   look: { title: "Box look", kind: "four", items: [["dark", "Dark"], ["gold", "Gold"], ["neon", "Neon"], ["clean", "White"], ["glass", "Glass"], ["military", "Army"], ["red", "Red"], ["discord", "Discord"], ["none", "No box"]] },
-  font: { title: "Font", kind: "small", font: true, items: [["lilita", "Chunky"], ["bangers", "Comic"], ["russo", "Bold"], ["blackops", "Stencil"], ["bebas", "Tall"], ["luckiest", "Cartoon"]] },
+  font: { title: "Font", kind: "small", font: true, items: [["lilita", "Chunky"], ["bangers", "Comic"], ["russo", "Bold"], ["blackops", "Stencil"], ["bebas", "Tall"], ["luckiest", "Cartoon"], ["teko", "Sharp"], ["barlow", "Narrow"], ["fredoka", "Round"], ["marker", "Marker"]] },
   color: { title: "Color", kind: "four", swatch: true, items: COLORS },
   corners: { title: "Corners", kind: "small", items: [["round", "Round"], ["square", "Square"], ["pill", "Pill"]] },
   outline: { title: "Outline", kind: "small", items: [["thick", "Thick"], ["thin", "Thin"], ["none", "None"]] },
@@ -53,6 +70,76 @@ const COMMON = { look: "dark", font: "lilita", color: "#f9c933", corners: "round
 const SPOTS4: Item[] = [["tl", "Top left"], ["tr", "Top right"], ["bl", "Bottom left"], ["br", "Bottom right"]];
 const sound = (title: string, items: Item[]): ToolGroup => ({ title, kind: "four", items });
 const IDLE: ToolGroup = { title: "While it's up", kind: "four", items: [["none", "Still"], ["float", "Float"], ["pulse", "Pulse"], ["glow", "Glow"]] };
+
+// ---- Spin wheel: flat looks to start from, then every part can be changed ----
+export const WHEEL_SLICES = 16;
+const WHEEL_LOOK = {
+  colors: "#e5484d,#f5a524,#30a46c,#3e63dd,#8e4ec6,#d6409f", fill: "solid",
+  dividers: true, dividerColor: "#ffffff", dividerWidth: 5, pegs: true, pegColor: "#d4d4d8",
+  textSize: 100, upper: true, autoText: true, textColor: "#ffffff",
+  rimWidth: 22, rimColor: "#ffffff", hubSize: 70, hubColor: "#ffffff", hubText: "S", hubTextColor: "#111318",
+  pointerSide: "top", pointerColor: "#111318", pointerSize: 100,
+  lights: false, lightsColor: "#ffd98a", shine: false, shadow: true, winColor: "#ffffff", spinTime: 7,
+  font: "teko",
+};
+const WHEEL_PRESETS: Record<string, Record<string, string | number | boolean>> = {
+  clean: { ...WHEEL_LOOK },
+  mono: { ...WHEEL_LOOK, colors: "#16181c,#eeeeee", dividers: false, pegColor: "#e11d48", rimColor: "#16181c", hubColor: "#eeeeee", hubTextColor: "#16181c", pointerColor: "#e11d48", font: "bebas" },
+  pastel: { ...WHEEL_LOOK, colors: "#fbcfe8,#bfdbfe,#bbf7d0,#fde68a,#ddd6fe,#fed7aa", pegColor: "#e5e7eb", pointerColor: "#1f2937", hubTextColor: "#1f2937", font: "fredoka", upper: false },
+  twotone: { ...WHEEL_LOOK, colors: "#d4a24c,#1b1f25", dividers: false, pegColor: "#f5f0e6", rimColor: "#2a2f36", hubColor: "#0d0f12", hubTextColor: "#d4a24c", pointerColor: "#d4a24c", font: "bebas", winColor: "#d4a24c" },
+  retro: { ...WHEEL_LOOK, colors: "#e4572e,#f3a712,#29335c,#4c9f70,#b4436c", dividerColor: "#fbf5e6", pegColor: "#29335c", rimColor: "#fbf5e6", hubColor: "#fbf5e6", hubTextColor: "#e4572e", pointerColor: "#29335c", font: "barlow" },
+  neon: { ...WHEEL_LOOK, colors: "#22d3ee,#f472b6,#a3e635,#facc15", fill: "neon", dividerColor: "#22d3ee", dividerWidth: 3, pegColor: "#ffffff", rimWidth: 40, rimColor: "#0a0d14", lights: true, lightsColor: "#22d3ee", hubColor: "#0a0d14", hubTextColor: "#22d3ee", pointerColor: "#f472b6", shine: true, winColor: "#22d3ee" },
+};
+const WHEEL_SAMPLE = ["No scope only", "10 squats", "Pistol only", "Free pass", "Chat picks my loadout", "Crouch the whole round"];
+const wheelSlots = Object.fromEntries(Array.from({ length: WHEEL_SLICES }, (_, i) => [`s${i + 1}`, WHEEL_SAMPLE[i] ?? ""]));
+export const wheelSlicesOf = (s: Record<string, unknown>) =>
+  Array.from({ length: WHEEL_SLICES }, (_, i) => String(s[`s${i + 1}`] ?? "").trim()).filter(Boolean);
+
+// ---- AFK popups: !brb, !coffee… show a card with a countdown over the game ----
+export interface AfkItem {
+  cmd: string; // without the !
+  ico: string;
+  t: string; // title
+  s: string; // second line
+  min: number;
+  c: string; // color
+}
+export const AFK_MAX = 16;
+export const AFK_DEFAULTS: AfkItem[] = [
+  { cmd: "brb", ico: "⏳", t: "Be right back", s: "Hang tight, chat's still open", min: 5, c: "#d4a24c" },
+  { cmd: "bathroom", ico: "🚽", t: "Bio break", s: "Nature called. Back in a flash", min: 3, c: "#38bdf8" },
+  { cmd: "coffee", ico: "☕", t: "Coffee run", s: "Refueling. Talk amongst yourselves", min: 5, c: "#c08457" },
+  { cmd: "food", ico: "🍔", t: "Grabbing food", s: "Can't game on an empty stomach", min: 10, c: "#f97316" },
+  { cmd: "door", ico: "🚪", t: "At the door", s: "Someone knocked. Be right back", min: 2, c: "#a78bfa" },
+  { cmd: "pet", ico: "🐾", t: "Pet duty", s: "The real boss needs me", min: 3, c: "#4ade80" },
+  { cmd: "phone", ico: "📞", t: "Quick call", s: "Gotta take this one", min: 3, c: "#f472b6" },
+  { cmd: "tech", ico: "🔧", t: "Fixing tech", s: "Something broke. Fixing it now", min: 5, c: "#ef4444" },
+];
+const HEX = /^#[0-9a-f]{6}$/i;
+const cmdWord = (v: unknown) => String(v ?? "").toLowerCase().replace(/^!+/, "").replace(/[^\p{L}\p{N}_-]/gu, "").slice(0, 20);
+export function cleanAfkList(raw: unknown): AfkItem[] {
+  let list: unknown = raw;
+  if (typeof raw === "string") { try { list = JSON.parse(raw); } catch { list = null; } }
+  if (!Array.isArray(list)) return AFK_DEFAULTS.map((x) => ({ ...x }));
+  const seen = new Set<string>();
+  const out: AfkItem[] = [];
+  for (const r of list.slice(0, AFK_MAX)) {
+    const o = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
+    const cmd = cmdWord(o.cmd);
+    if (!cmd || seen.has(cmd)) continue;
+    seen.add(cmd);
+    out.push({
+      cmd,
+      ico: String(o.ico ?? "").trim().slice(0, 8),
+      t: String(o.t ?? "").trim().slice(0, 30),
+      s: String(o.s ?? "").trim().slice(0, 60),
+      min: Math.max(1, Math.min(120, Math.round(Number(o.min)) || 5)),
+      c: HEX.test(String(o.c)) ? String(o.c) : "#d4a24c",
+    });
+  }
+  return out;
+}
+export const afkListOf = (s: Record<string, unknown>) => cleanAfkList(s.list);
 
 export const TOOLS: Record<ToolKind, ToolInfo> = {
   chat: {
@@ -183,19 +270,66 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
     auto: "Votes come from Kick and Twitch chat (one vote each; typing again changes it).",
   },
   wheel: {
-    kind: "wheel", title: "Spin wheel", icon: "🎡", section: "tools", line: "A wheel of challenges that spins on a key press.",
-    settings: { ...COMMON, scheme: "rainbow", label: "🎡 CHALLENGE WHEEL", s1: "No scope only", s2: "10 squats", s3: "Pistol only", s4: "Free pass", s5: "Chat picks my loadout", s6: "Crouch the whole round", s7: "", s8: "", sound: "tick" },
+    kind: "wheel", title: "Spin wheel", icon: "🎡", section: "tools", line: "A wheel you spin with a button, a Stream Deck key or !spin in chat.",
+    settings: { ...COMMON, color: "#ffffff", label: "🎡 CHALLENGE WHEEL", preset: "clean", ...WHEEL_LOOK, ...wheelSlots, sound: "tick", chatSpin: true, chatPost: true, spinCmd: "spin" },
     state: {},
     groups: {
-      scheme: { title: "Wheel colors", kind: "small", items: [["rainbow", "Rainbow"], ["accent", "Accent shades"], ["casino", "Red & black"]] },
-      ...LOOKS,
+      preset: { title: "Starting look (then change anything below)", kind: "small", items: [["clean", "Clean"], ["mono", "Mono"], ["pastel", "Pastel"], ["twotone", "Two-Tone"], ["retro", "Retro"], ["neon", "Neon"]] },
+      font: { ...G.font, title: "Font (slices and words)" },
+      look: { ...G.look, title: "Top words and result box" },
+      color: { ...G.color, title: "Top words color" },
+      corners: { ...G.corners, title: "Result box corners" },
+      outline: { ...G.outline, title: "Text outline (top words and result)" },
+      size: { ...G.size, title: "Wheel size" },
       sound: sound("Sound", [["off", "Off"], ["tick", "Ticks + fanfare"], ["ding", "Ding at the end"]]),
       volume: G.volume,
     },
-    toggles: [],
-    words: [["label", "Top words"], ["s1", "Slice 1"], ["s2", "Slice 2"], ["s3", "Slice 3"], ["s4", "Slice 4"], ["s5", "Slice 5 (optional)"], ["s6", "Slice 6 (optional)"], ["s7", "Slice 7 (optional)"], ["s8", "Slice 8 (optional)"]],
+    sections: [
+      { title: "🎨 Slices", fields: [
+        { type: "colors", key: "colors", label: "Slice colors (they repeat around the wheel)", max: 8 },
+        { type: "pick", key: "fill", label: "Fill", items: [["solid", "Solid color"], ["neon", "Dark with neon edge"]] },
+        { type: "switch", key: "dividers", label: "Lines between slices" },
+        { type: "color", key: "dividerColor", label: "Line color", show: ["dividers", true] },
+        { type: "range", key: "dividerWidth", label: "Line thickness", min: 1, max: 12, show: ["dividers", true] },
+        { type: "switch", key: "pegs", label: "Pegs on the edge (the pointer clicks on them)" },
+        { type: "color", key: "pegColor", label: "Peg color", show: ["pegs", true] },
+      ]},
+      { title: "🔤 Text", fields: [
+        { type: "range", key: "textSize", label: "Size", min: 60, max: 140, unit: "%" },
+        { type: "switch", key: "upper", label: "ALL CAPS" },
+        { type: "switch", key: "autoText", label: "Pick black or white text for me" },
+        { type: "color", key: "textColor", label: "Text color", show: ["autoText", false] },
+      ]},
+      { title: "⭕ Rim and center", fields: [
+        { type: "range", key: "rimWidth", label: "Rim thickness", min: 0, max: 60 },
+        { type: "color", key: "rimColor", label: "Rim color" },
+        { type: "range", key: "hubSize", label: "Center size", min: 0, max: 120 },
+        { type: "color", key: "hubColor", label: "Center color" },
+        { type: "text", key: "hubText", label: "Center text (up to 3 letters)", max: 3 },
+        { type: "color", key: "hubTextColor", label: "Center text color" },
+      ]},
+      { title: "📍 Pointer", fields: [
+        { type: "pick", key: "pointerSide", label: "Where", items: [["top", "Top"], ["right", "Right"], ["bottom", "Bottom"], ["left", "Left"]] },
+        { type: "color", key: "pointerColor", label: "Color" },
+        { type: "range", key: "pointerSize", label: "Size", min: 60, max: 150, unit: "%" },
+      ]},
+      { title: "✨ Extras", fields: [
+        { type: "switch", key: "lights", label: "Lights on the rim (needs a thick rim)" },
+        { type: "color", key: "lightsColor", label: "Light color", show: ["lights", true] },
+        { type: "switch", key: "shine", label: "Shine" },
+        { type: "switch", key: "shadow", label: "Shadow under the wheel" },
+        { type: "color", key: "winColor", label: "Winning slice glow" },
+        { type: "range", key: "spinTime", label: "Spin time", min: 3, max: 15, unit: " sec" },
+      ]},
+    ],
+    presets: WHEEL_PRESETS,
+    toggles: [
+      ["chatSpin", "!spin in chat", "You and your mods can spin it from Kick or Twitch chat."],
+      ["chatPost", "Post the result in chat", "Says what it landed on when it stops (needs your account connected)."],
+    ],
+    words: [["label", "Top words"], ["spinCmd", "Chat command (without the !)"], ...Array.from({ length: WHEEL_SLICES }, (_, i) => [`s${i + 1}`, `Slice ${i + 1}${i >= 2 ? " (optional)" : ""}`] as [string, string])],
     buttons: [["🎡 Spin", { op: "spin" }]],
-    auto: "Empty slices are left out.",
+    auto: "Up to 16 slices. Empty ones are left out.",
   },
   dice: {
     kind: "dice", title: "Dice & coin", icon: "🎲", section: "tools", line: "Roll dice or flip a coin on stream to settle bets with chat.",
@@ -266,6 +400,46 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
     buttons: [["📣 Test pop-up", { op: "test" }]],
     auto: "Set the commands up on the Chat Commands page. This overlay must be open in OBS for sounds, pop-ups and other apps to work.",
   },
+  afk: {
+    kind: "afk", title: "AFK popups", icon: "☕", section: "tools", line: "!brb, !coffee, !bathroom… show a popup with a countdown over your game. The stream stays live.",
+    settings: {
+      style: "card", pos: "bl", font: "teko", textColor: "#ffffff", bg: "#111418", bgOpacity: 94, eachColor: true, color: "#d4a24c",
+      radius: 14, scale: 100, showIcon: true, showSub: true, showTimer: true, showBar: true, dim: true,
+      who: "mods", chatPost: true, backCmd: "back", backWords: "WELCOME BACK", sound: "whoosh", volume: 0.6,
+      list: JSON.stringify(AFK_DEFAULTS),
+    },
+    state: { cur: null, t0: 0, len: 0 },
+    groups: {
+      style: { title: "Style", kind: "small", items: [["card", "Corner card"], ["banner", "Banner"], ["full", "Full screen"]] },
+      pos: { title: "Where (card and banner)", kind: "four", items: SPOTS4 },
+      font: G.font,
+      who: { title: "Who can use them in chat", kind: "small", items: [["mods", "Me and mods"], ["me", "Only me"]] },
+      sound: sound("Sound when it pops up", [["off", "Off"], ["whoosh", "Whoosh"], ["ding", "Ding"], ["pop", "Pop"]]),
+      volume: G.volume,
+    },
+    sections: [
+      { title: "🎨 Look", fields: [
+        { type: "color", key: "textColor", label: "Text color" },
+        { type: "color", key: "bg", label: "Background" },
+        { type: "range", key: "bgOpacity", label: "Background strength", min: 0, max: 100, unit: "%" },
+        { type: "switch", key: "eachColor", label: "Each command uses its own color" },
+        { type: "color", key: "color", label: "Color for all of them", show: ["eachColor", false] },
+        { type: "range", key: "radius", label: "Round corners", min: 0, max: 40 },
+        { type: "range", key: "scale", label: "Size", min: 60, max: 140, unit: "%" },
+      ]},
+      { title: "👀 What shows", fields: [
+        { type: "switch", key: "showIcon", label: "Icon" },
+        { type: "switch", key: "showSub", label: "Second line" },
+        { type: "switch", key: "showTimer", label: "Countdown" },
+        { type: "switch", key: "showBar", label: "Progress bar (ring on Full screen)" },
+        { type: "switch", key: "dim", label: "Darken the screen (Full screen)" },
+      ]},
+    ],
+    toggles: [["chatPost", "Post in chat", "Like \"Coffee run ☕ back in 5 min\", and how long you were gone on !back (needs your account connected)."]],
+    words: [["backCmd", "Clear command (without the !)"], ["backWords", "Words when you're back"]],
+    buttons: [["👋 I'm back (clear it)", { op: "back" }]],
+    auto: "Type a command in Kick or Twitch chat, like !coffee. Add a number to set the minutes: !coffee 8.",
+  },
 };
 
 // Stream Deck: the Overlay Tool key's choices. [value, label, kind, action]
@@ -308,14 +482,28 @@ export function cleanToolSettings(kind: ToolKind, raw: unknown): ToolRow["settin
     const v = r[k];
     if (typeof def === "number") out[k] = Number.isFinite(Number(v)) && v !== "" && v !== null && v !== undefined ? Math.max(-1e12, Math.min(1e12, Number(v))) : def;
     else if (typeof def === "boolean") out[k] = typeof v === "boolean" ? v : def;
-    else out[k] = typeof v === "string" ? v.slice(0, k === "link" ? 300 : 120) : def;
+    else out[k] = typeof v === "string" ? v.slice(0, k === "link" ? 300 : k === "list" ? 4000 : 120) : def;
   }
   // Only the choices on offer, for the ones picked from a list.
   for (const [k, g] of Object.entries(TOOLS[kind].groups)) {
     if (!g.items.some(([id]) => String(id) === String(out[k]))) out[k] = d[k];
     else if (typeof d[k] === "number") out[k] = Number(out[k]);
   }
-  if (out.color && !/^#[0-9a-f]{6}$/i.test(String(out.color))) out.color = d.color;
+  for (const f of (TOOLS[kind].sections ?? []).flatMap((x) => x.fields)) {
+    const v = out[f.key];
+    if (f.type === "color" && !HEX.test(String(v))) out[f.key] = d[f.key];
+    if (f.type === "colors") {
+      const list = String(v).split(",").map((c) => c.trim()).filter((c) => HEX.test(c)).slice(0, f.max);
+      out[f.key] = list.length ? list.join(",") : d[f.key];
+    }
+    if (f.type === "range") out[f.key] = Math.max(f.min, Math.min(f.max, Number(v)));
+    if (f.type === "text") out[f.key] = String(v).slice(0, f.max);
+    if (f.type === "pick" && !f.items.some(([id]) => String(id) === String(v))) out[f.key] = d[f.key];
+  }
+  if (out.color && !HEX.test(String(out.color))) out.color = d.color;
+  if (typeof out.spinCmd === "string") out.spinCmd = cmdWord(out.spinCmd) || "spin";
+  if (typeof out.backCmd === "string") out.backCmd = cmdWord(out.backCmd) || "back";
+  if (kind === "afk") out.list = JSON.stringify(cleanAfkList(out.list));
   // The OBS browser source size (the tools are made for 1920x1080).
   Object.assign(out, cleanCanvas(r.canvasW, r.canvasH, 1920, 1080));
   return out;
@@ -386,11 +574,33 @@ export function applyToolAction(kind: ToolKind, current: ToolRow, a: Record<stri
       return { error: "Start or end the poll." };
     }
     case "wheel": {
-      const slices = [s.s1, s.s2, s.s3, s.s4, s.s5, s.s6, s.s7, s.s8].map((x) => String(x || "").trim()).filter(Boolean);
+      const slices = wheelSlicesOf(s);
       if (!slices.length) return { error: "Add at least one slice." };
+      // One spin at a time (a little grace for the rock back at the end).
+      const busyFor = (Number(s.spinTime) || 7) * 1000 + 800;
+      if (now - (Number(st.spunAt) || 0) < busyFor) return { error: "It's still spinning." };
       const index = Math.floor(Math.random() * slices.length);
       push(row, "spin", { index, result: slices[index] }, now);
       st.last = slices[index];
+      st.spunAt = now;
+      return row;
+    }
+    case "afk": {
+      if (op === "back") {
+        if (!st.cur) return { error: "Nothing is up right now." };
+        push(row, "back", { gone: Math.max(0, now - (Number(st.t0) || now)) }, now);
+        st.cur = null; st.t0 = 0; st.len = 0;
+        return row;
+      }
+      if (op !== "start") return { error: "Pick a command." };
+      const list = afkListOf(s);
+      const want = cmdWord(a.cmd);
+      const item = list.find((x) => x.cmd === want) ?? (Number.isInteger(a.i) ? list[Number(a.i)] : undefined);
+      if (!item) return { error: "No AFK command like that." };
+      const min = Number(a.min) > 0 ? Math.max(1, Math.min(120, Math.round(Number(a.min)))) : item.min;
+      st.cur = { ...item, min, id: now };
+      st.t0 = now; st.len = min * 60000;
+      push(row, "start", { cmd: item.cmd }, now);
       return row;
     }
     case "dice": {

@@ -111,7 +111,7 @@ const ECONOMY_TABS: readonly ModuleKey[] = ["LEVELING", "PRESTIGE", "VOICE_ACTIV
 export const moduleFeature = (key: ModuleKey) => `m:${ECONOMY_TABS.includes(key) ? "ECONOMY" : key}`;
 
 const COUNTER_KINDS = ["money", "kd", "socials", "game", "message", "winloss", "timer", "goal", "challenge", "discord", "ticker"] as const;
-const TOOL_IDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx"] as const;
+const TOOL_IDS = ["chat", "stats", "clip", "cmds", "qr", "squad", "poll", "wheel", "dice", "predict", "welcome", "cmdfx", "afk"] as const;
 
 /** Every single item for sale: [store product id, feature, the plan that also includes it, name]. */
 export const SINGLE_ITEMS: ReadonlyArray<{ product: string; feature: string; tier: PlanTier; name: string }> = [
@@ -139,7 +139,7 @@ export const SINGLE_ITEMS: ReadonlyArray<{ product: string; feature: string; tie
   ...([
     ["chat-box", "chat", "Chat Box"], ["stats-bar", "stats", "Stats Bar"], ["clip-marker", "clip", "Clip Marker"], ["command-tips", "cmds", "Command Tips"],
     ["qr-code", "qr", "QR Code"], ["squad-box", "squad", "Squad Box"], ["stream-poll", "poll", "Stream Poll"], ["spin-wheel", "wheel", "Spin Wheel"],
-    ["dice-and-coin", "dice", "Dice & Coin"], ["predictions", "predict", "Predictions"], ["first-time-welcome", "welcome", "First-Time Welcome"], ["command-alerts", "cmdfx", "Command Alerts"],
+    ["dice-and-coin", "dice", "Dice & Coin"], ["predictions", "predict", "Predictions"], ["first-time-welcome", "welcome", "First-Time Welcome"], ["command-alerts", "cmdfx", "Command Alerts"], ["afk-popups", "afk", "AFK Popups"],
   ] as const).map(([product, kind, name]) => ({ product, feature: `t:${kind}`, tier: "kit" as const, name })),
 ];
 const SINGLE_BY_PRODUCT = new Map(SINGLE_ITEMS.map((s) => [s.product, s]));

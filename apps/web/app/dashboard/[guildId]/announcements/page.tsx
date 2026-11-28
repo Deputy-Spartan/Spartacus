@@ -247,6 +247,12 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                           {channelLabel(r.channelId)} ·{" "}
                           {r.scheduledFor ? `publishes ${formatDateTime(r.scheduledFor)}` : "no schedule — publish manually"}
                         </p>
+                        {r.scheduledFor && (
+                          <p className="mt-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                            ⏰ <b>Scheduled.</b> This posts by itself on {formatDateTime(r.scheduledFor)}. You don&apos;t need to do anything. Only press
+                            Publish Now if you want it out <b>right now</b> instead.
+                          </p>
+                        )}
                       </div>
                       <button onClick={() => openRow(r, "edit")} className="text-slate-500 hover:text-neon-blue text-xs shrink-0 py-1">
                         {editingId === r.id ? "Editing…" : "Edit"}
@@ -256,9 +262,9 @@ export default function AnnouncementsPage({ params }: { params: { guildId: strin
                         <button
                           onClick={() => publish(r)}
                           disabled={publishingId === r.id}
-                          className="text-neon-blue hover:underline text-xs shrink-0 py-1 disabled:opacity-50"
+                          className={`${r.scheduledFor ? "text-slate-500 hover:text-neon-blue" : "text-neon-blue"} hover:underline text-xs shrink-0 py-1 disabled:opacity-50`}
                         >
-                          {publishingId === r.id ? "Publishing…" : "Publish Now"}
+                          {publishingId === r.id ? "Publishing…" : r.scheduledFor ? "Publish Now instead" : "Publish Now"}
                         </button>
                       )}
                       <button onClick={() => remove(r.id)} className="text-slate-500 hover:text-rose-400 text-xs shrink-0 py-1">

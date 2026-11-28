@@ -1849,6 +1849,62 @@ model AiConfig {
   chatMaxSearches    Int     @default(3) // web searches allowed per question
 }
 
+// ---- AI Usage (owner only) ----
+// One row per AI Chat question (answered, skipped or failed). Deleted after
+// AiUsageSettings.keepDays; the daily totals below are kept.
+model AiUsageLog {
+  id           String   @id @default(cuid())
+  guildId      String
+  userId       String?
+  userName     String?
+  channelId    String?
+  channelName  String?
+  question     String?
+  answer       String?
+  sources      Json? // [{url, title}]
+  model        String
+  searches     Int      @default(0)
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costMicros   Int      @default(0) // $1 = 1,000,000
+  fail         String? // why it wasn't answered
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([guildId, createdAt])
+}
+
+// Totals per day (owner's time zone), server and kind ("chat" or "mod").
+model AiUsageDay {
+  id           String @id @default(cuid())
+  day          String // YYYY-MM-DD
+  guildId      String
+  kind         String
+  count        Int    @default(0) // questions asked / messages checked
+  failed       Int    @default(0) // questions not answered
+  flagged      Int    @default(0) // messages AI Moderation flagged
+  searches     Int    @default(0)
+  inputTokens  Int    @default(0)
+  outputTokens Int    @default(0)
+  costMicros   Int    @default(0)
+  searchMicros Int    @default(0) // the web-search part of costMicros
+
+  @@unique([day, guildId, kind])
+  @@index([day])
+}
+
+model AiUsageSettings {
+  id          String  @id @default("global")
+  budgetCents Int     @default(1000) // monthly budget
+  alert75     Boolean @default(true)
+  alert90     Boolean @default(true)
+  onEmpty     String  @default("fast") // keep | fast | pause
+  keepDays    Int     @default(30)
+  alertMonth  String  @default("") // YYYY-MM the two flags below belong to
+  sent75      Boolean @default(false)
+  sent90      Boolean @default(false)
+}
+
 // ---- Server Backup ----
 
 model ServerBackup {

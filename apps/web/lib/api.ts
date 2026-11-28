@@ -532,6 +532,69 @@ export interface AiConfigRow {
   slowmodeError?: string | null;
 }
 
+// AI Usage (owner only). Money is in micro-dollars ($1 = 1,000,000).
+export interface AiUsageSettingsRow {
+  budgetCents: number;
+  alert75: boolean;
+  alert90: boolean;
+  onEmpty: "keep" | "fast" | "pause";
+  keepDays: number;
+}
+export interface AiUsageSummary {
+  period: "today" | "7" | "month";
+  settings: AiUsageSettingsRow;
+  month: string;
+  monthSpentMicros: number;
+  dayOfMonth: number;
+  daysInMonth: number;
+  totals: {
+    spentMicros: number;
+    asked: number;
+    failed: number;
+    searches: number;
+    chatMicros: number;
+    searchMicros: number;
+    modChecks: number;
+    modFlagged: number;
+    modMicros: number;
+  };
+  chart: Array<{ day: string; asked: number; answerMicros: number; searchMicros: number; modMicros: number }>;
+  byModel: Array<{ model: string; costMicros: number; count: number }>;
+  topAskers: Array<{ userId: string | null; userName: string | null; costMicros: number; count: number }>;
+  byServer: Array<{ guildId: string; name: string; costMicros: number }>;
+}
+export type AiUsageLogRow =
+  | {
+      kind: "chat";
+      id: string;
+      guildName: string;
+      userName: string | null;
+      channelName: string | null;
+      question: string | null;
+      model: string;
+      searches: number;
+      costMicros: number;
+      fail: string | null;
+      createdAt: string;
+    }
+  | { kind: "mod"; id: string; day: string; guildName: string; checks: number; flagged: number; inputTokens: number; outputTokens: number; costMicros: number };
+export interface AiUsageEntry {
+  id: string;
+  guildName: string;
+  userName: string | null;
+  channelName: string | null;
+  question: string | null;
+  answer: string | null;
+  sources: Array<{ url: string; title: string }> | null;
+  model: string;
+  searches: number;
+  inputTokens: number;
+  outputTokens: number;
+  costMicros: number;
+  fail: string | null;
+  createdAt: string;
+}
+
 export interface ServerBackupRow {
   id: string;
   name: string;
@@ -2339,6 +2402,15 @@ export const api = {
 
   getBotStatus: () => request<BotStatusRow>("/bot-status"),
 
+  getAiUsage: (period: string, guildId = "") =>
+    request<AiUsageSummary>(`/owner/ai-usage?period=${period}${guildId ? `&guildId=${guildId}` : ""}`),
+  getAiUsageLog: (p: { period: string; filter: string; q: string; guildId?: string; before?: string }) =>
+    request<{ rows: AiUsageLogRow[]; more: boolean }>(
+      `/owner/ai-usage/log?${new URLSearchParams({ period: p.period, filter: p.filter, q: p.q, guildId: p.guildId ?? "", before: p.before ?? "" })}`
+    ),
+  getAiUsageEntry: (id: string) => request<AiUsageEntry>(`/owner/ai-usage/log/${id}`),
+  setAiUsageSettings: (s: Partial<AiUsageSettingsRow>) =>
+    request<AiUsageSettingsRow>(`/owner/ai-usage/settings`, { method: "PUT", body: JSON.stringify(s) }),
   getAiConfig: (guildId: string) => request<AiConfigRow>(`/guilds/${guildId}/ai-config`),
   setAiConfig: (guildId: string, config: Partial<AiConfigRow>) =>
     request<AiConfigRow>(`/guilds/${guildId}/ai-config`, { method: "PUT", body: JSON.stringify(config) }),

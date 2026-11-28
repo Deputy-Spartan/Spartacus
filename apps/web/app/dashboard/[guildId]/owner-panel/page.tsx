@@ -6,9 +6,10 @@ import { useConfirm } from "../../../../components/ui/ConfirmDialog";
 import { FormError } from "../../../../components/ui/FormError";
 import { api, type AccessAuditEntryRow, type AccessRequestRow, type BotConfigRow, type DashboardAccessRow } from "../../../../lib/api";
 import { useOwnerGuard } from "../../../../lib/useOwnerGuard";
+import { AiUsagePanel } from "../../../../components/owner/AiUsagePanel";
 import { useBotStatus, notifyBotStatusChanged } from "../../../../lib/useBotStatus";
 
-type Section = "access" | "status";
+type Section = "access" | "status" | "ai";
 type Tab = "active" | "grant" | "audit";
 
 type OverrideValue = "" | "ONLINE" | "OFFLINE" | "MAINTENANCE";
@@ -233,6 +234,15 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
         >
           Bot Status
         </button>
+        <button
+          onClick={() => setSection("ai")}
+          className={[
+            "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors",
+            section === "ai" ? "border-neon-blue text-neon-blue" : "border-transparent text-slate-500 hover:text-slate-300",
+          ].join(" ")}
+        >
+          AI Usage
+        </button>
       </div>
 
       {section === "access" && (
@@ -434,6 +444,7 @@ export default function OwnerPanelPage({ params }: { params: { guildId: string }
       )}
 
       {section === "status" && <ManualOverrideCard />}
+      {section === "ai" && <AiUsagePanel />}
     </div>
   );
 }

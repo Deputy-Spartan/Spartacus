@@ -14,6 +14,7 @@ export * from "./bumpMessages";
 export * from "./goLive";
 export * from "./quickLinks";
 export * from "./aiChat";
+export * from "./aiUsage";
 export * from "./profileCards";
 export * from "./economyPlus";
 export * from "./tournaments";

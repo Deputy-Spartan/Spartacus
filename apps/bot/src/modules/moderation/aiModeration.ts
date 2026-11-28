@@ -2,6 +2,7 @@ import { Events, Message } from "discord.js";
 import { isModuleEnabled } from "../../lib/moduleGate";
 import { askClaude } from "../../lib/ai";
 import { handleViolation } from "./automod";
+import { recordAiModeration } from "../../lib/aiUsage";
 
 export const name = Events.MessageCreate;
 
@@ -19,8 +20,10 @@ export async function execute(message: Message) {
   const enabled = await isModuleEnabled(message.guildId, "AI_MODERATION");
   if (!enabled) return;
 
-  const verdict = await askClaude(CLASSIFY_PROMPT, message.content.slice(0, 2000), 512);
-  if (verdict?.trim().toUpperCase().startsWith("VIOLATION")) {
+  const { text: verdict, usage } = await askClaude(CLASSIFY_PROMPT, message.content.slice(0, 2000), 512);
+  const flagged = !!verdict?.trim().toUpperCase().startsWith("VIOLATION");
+  void recordAiModeration(message.client, message.guildId, usage, flagged);
+  if (flagged) {
     await handleViolation(message, "AI-flagged content");
   }
 }

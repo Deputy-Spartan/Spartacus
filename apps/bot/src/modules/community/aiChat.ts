@@ -5,6 +5,7 @@ import { isSendableChannel } from "../../lib/channels";
 import { askClaudeTurns, type AiFailure, type AiTurn } from "../../lib/ai";
 import { claimEvent } from "../../lib/eventClaims";
 import { AI_CHAT_DEFAULTS, AI_CHAT_MODELS, type AiChatModel } from "@spartacus/shared";
+import { aiBudgetState, recordAiChat } from "../../lib/aiUsage";
 
 export const name = Events.MessageCreate;
 
@@ -116,7 +117,18 @@ export async function execute(message: Message) {
   const windowSec = config?.chatLimitWindow ?? 60;
   const isStaff = (config?.chatStaffExempt ?? true) && (message.member?.permissions.has(PermissionFlagsBits.ManageGuild) ?? false);
   const wait = isStaff ? 0 : tooFast(`${message.guildId}:${message.author.id}`, limit, windowSec);
+  const speaker = message.member?.displayName ?? message.author.displayName ?? message.author.username;
+  // For the owner's AI Usage log.
+  const logBase = {
+    guildId: message.guildId,
+    userId: message.author.id,
+    userName: speaker,
+    channelId: message.channelId,
+    channelName: "name" in message.channel && typeof message.channel.name === "string" ? `#${message.channel.name}` : "",
+    question: content,
+  };
   if (wait) {
+    void recordAiChat(message.client, { ...logBase, model: "", fail: "Too many questions (limit)" });
     // Every skipped question gets a ⏳ that stays, so it's clear it wasn't
     // just missed. The written note is shown at most every 30s.
     await message.react("⏳").catch(() => null);
@@ -131,16 +143,24 @@ export async function execute(message: Message) {
     return;
   }
 
+  // The owner's monthly AI budget (Command Center › AI Usage): once it's used
+  // up, AI Chat switches to the cheap model or pauses, as the owner picked.
+  const budget = await aiBudgetState().catch(() => "ok" as const);
+  if (budget === "pause") {
+    void recordAiChat(message.client, { ...logBase, model: "", fail: "Paused: monthly budget used up" });
+    await message.reply({ content: "AI chat is taking a break until next month. Try again then!", allowedMentions: { repliedUser: false } }).catch(() => null);
+    return;
+  }
+
   // "…is typing" lasts 10 seconds, and a web search can take longer.
   const channel = message.channel;
   await channel.sendTyping().catch(() => null);
   const typing = setInterval(() => void channel.sendTyping().catch(() => null), 8_000);
 
-  const speaker = message.member?.displayName ?? message.author.displayName ?? message.author.username;
   const question: AiTurn = { role: "user", content: `${speaker}: ${content.slice(0, 1500)}` };
   const search = config?.chatWebSearch ?? AI_CHAT_DEFAULTS.chatWebSearch;
   const system = (config?.chatSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT) + CHAT_RULES + (search ? SEARCH_RULES : "");
-  const pick = (config?.chatModel ?? AI_CHAT_DEFAULTS.chatModel) as AiChatModel;
+  const pick: AiChatModel = budget === "fast" ? "fast" : ((config?.chatModel ?? AI_CHAT_DEFAULTS.chatModel) as AiChatModel);
   const model = (AI_CHAT_MODELS[pick] ?? AI_CHAT_MODELS.smart).id;
 
   const result = await askClaudeTurns(system, [...recall(message.channelId), question], {
@@ -157,7 +177,9 @@ export async function execute(message: Message) {
     const tail = links.length ? `\n-# Sources: ${links.join(" · ")}` : "";
     const body = result.text.slice(0, 2000 - tail.length);
     await message.reply({ content: body + tail, allowedMentions: { repliedUser: true, users: [], roles: [], parse: [] } }).catch(() => null);
+    void recordAiChat(message.client, { ...logBase, model, answer: result.text, sources: result.sources, usage: result.usage });
   } else {
     await message.reply({ content: FAILURE_TEXT[result.reason], allowedMentions: { repliedUser: false } }).catch(() => null);
+    void recordAiChat(message.client, { ...logBase, model, usage: result.usage, fail: FAILURE_TEXT[result.reason] });
   }
 }

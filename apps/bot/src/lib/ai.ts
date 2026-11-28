@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { AiUsage } from "@spartacus/shared";
 
 // The default model: Claude Haiku 5.5, fast and low-cost. AI Moderation always
 // uses it, and AI Chat uses it when a server picks "Fast & cheap".
@@ -9,7 +10,10 @@ export type AiTurn = Anthropic.Beta.BetaMessageParam;
 // Why a call didn't produce text, so callers can say something useful
 // instead of always blaming a missing key.
 export type AiFailure = "no_key" | "bad_key" | "no_credit" | "busy" | "refused" | "error";
-export type AiResult = { ok: true; text: string; sources: Array<{ url: string; title: string }> } | { ok: false; reason: AiFailure };
+// usage: what the call used (for AI Usage), when it got as far as Anthropic answering.
+export type AiResult =
+  | { ok: true; text: string; sources: Array<{ url: string; title: string }>; usage: AiUsage }
+  | { ok: false; reason: AiFailure; usage?: AiUsage };
 
 export interface AiOptions {
   model?: string; // a Claude model id; defaults to Claude Haiku 5.5
@@ -51,6 +55,7 @@ export async function askClaudeTurns(system: string, messages: AiTurn[], opts: A
     // far lets the server carry on from there. A few rounds at most.
     const blocks: Anthropic.Beta.BetaContentBlock[] = [];
     let res: Anthropic.Beta.BetaMessage | null = null;
+    const usage: AiUsage = { model, inputTokens: 0, outputTokens: 0, searches: 0 };
     for (let round = 0; round < 4; round++) {
       const turn: AiTurn[] = blocks.length ? [...messages, { role: "assistant", content: blocks as Anthropic.Beta.BetaContentBlockParam[] }] : messages;
       res = await c.beta.messages.create(
@@ -67,9 +72,14 @@ export async function askClaudeTurns(system: string, messages: AiTurn[], opts: A
         { timeout: searching ? 90_000 : 30_000 }
       );
       blocks.push(...res.content);
+      // Priced at the model that actually answered (a fallback can step in).
+      usage.model = res.model || usage.model;
+      usage.inputTokens += (res.usage.input_tokens ?? 0) + (res.usage.cache_creation_input_tokens ?? 0) + (res.usage.cache_read_input_tokens ?? 0);
+      usage.outputTokens += res.usage.output_tokens ?? 0;
+      usage.searches += res.usage.server_tool_use?.web_search_requests ?? 0;
       if (res.stop_reason !== "pause_turn") break;
     }
-    if (!res || res.stop_reason === "refusal") return { ok: false, reason: "refused" };
+    if (!res || res.stop_reason === "refusal") return { ok: false, reason: "refused", usage };
 
     // Read the answer by block type: thinking and search blocks come back too.
     const texts = blocks.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text");
@@ -81,7 +91,7 @@ export async function askClaudeTurns(system: string, messages: AiTurn[], opts: A
         if (cit.type === "web_search_result_location" && !sources.some((s) => s.url === cit.url)) sources.push({ url: cit.url, title: cit.title ?? cit.url });
       }
     }
-    return text ? { ok: true, text, sources } : { ok: false, reason: "error" };
+    return text ? { ok: true, text, sources, usage } : { ok: false, reason: "error", usage };
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
       console.error("[ai] Anthropic rejected the API key — check ANTHROPIC_API_KEY in Render.");
@@ -99,8 +109,8 @@ export async function askClaudeTurns(system: string, messages: AiTurn[], opts: A
   }
 }
 
-// One question, one answer (used by AI Moderation). Null when it couldn't answer.
-export async function askClaude(system: string, userMessage: string, maxTokens = 1024): Promise<string | null> {
+// One question, one answer (used by AI Moderation). text is null when it couldn't answer.
+export async function askClaude(system: string, userMessage: string, maxTokens = 1024): Promise<{ text: string | null; usage?: AiUsage }> {
   const r = await askClaudeTurns(system, [{ role: "user", content: userMessage }], { maxTokens });
-  return r.ok ? r.text : null;
+  return r.ok ? { text: r.text, usage: r.usage } : { text: null, usage: r.usage };
 }

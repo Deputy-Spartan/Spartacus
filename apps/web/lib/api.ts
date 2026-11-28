@@ -545,6 +545,10 @@ export interface AiUsageSummary {
   settings: AiUsageSettingsRow;
   month: string;
   monthSpentMicros: number;
+  real:
+    | { configured: false }
+    | { configured: true; ok: false; error: string }
+    | { configured: true; ok: true; month: string; monthMicros: number; searchMicros: number; days: Array<{ day: string; micros: number }>; checkedAt: string };
   dayOfMonth: number;
   daysInMonth: number;
   totals: {
@@ -2402,8 +2406,8 @@ export const api = {
 
   getBotStatus: () => request<BotStatusRow>("/bot-status"),
 
-  getAiUsage: (period: string, guildId = "") =>
-    request<AiUsageSummary>(`/owner/ai-usage?period=${period}${guildId ? `&guildId=${guildId}` : ""}`),
+  getAiUsage: (period: string, guildId = "", refresh = false) =>
+    request<AiUsageSummary>(`/owner/ai-usage?period=${period}${guildId ? `&guildId=${guildId}` : ""}${refresh ? "&refresh=1" : ""}`),
   getAiUsageLog: (p: { period: string; filter: string; q: string; guildId?: string; before?: string }) =>
     request<{ rows: AiUsageLogRow[]; more: boolean }>(
       `/owner/ai-usage/log?${new URLSearchParams({ period: p.period, filter: p.filter, q: p.q, guildId: p.guildId ?? "", before: p.before ?? "" })}`

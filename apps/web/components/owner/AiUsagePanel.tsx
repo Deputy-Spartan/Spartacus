@@ -61,8 +61,11 @@ export function AiUsagePanel() {
 
   const t = data.totals;
   const budgetMicros = settings.budgetCents * 10_000;
-  const pct = budgetMicros > 0 ? data.monthSpentMicros / budgetMicros : 0;
-  const pace = (data.monthSpentMicros / Math.max(1, data.dayOfMonth)) * data.daysInMonth;
+  // Anthropic's real bill when the Admin key is set (and higher), otherwise the bot's own count.
+  const real = data.real.configured && data.real.ok ? data.real : null;
+  const spent = real ? Math.max(real.monthMicros, data.monthSpentMicros) : data.monthSpentMicros;
+  const pct = budgetMicros > 0 ? spent / budgetMicros : 0;
+  const pace = (spent / Math.max(1, data.dayOfMonth)) * data.daysInMonth;
   const status = pct >= 0.9 ? { c: STATUS.crit, text: "⛔ Almost out", cls: "text-rose-300 border-rose-500/40 bg-rose-500/10" } : pct >= 0.75 ? { c: STATUS.warn, text: "⚠ Getting close", cls: "text-amber-300 border-amber-500/40 bg-amber-500/10" } : { c: STATUS.good, text: "✓ On track", cls: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10" };
   const word = period === "today" ? "today" : period === "7" ? "last 7 days" : "this month";
   const answered = t.asked - t.failed;
@@ -108,13 +111,14 @@ export function AiUsagePanel() {
           <Gauge pct={pct} color={status.c} marks={[settings.alert75 ? 0.75 : null, settings.alert90 ? 0.9 : null]} />
           <div className="space-y-2">
             <p>
-              <span className="text-3xl font-bold">{usd(data.monthSpentMicros)}</span>{" "}
+              <span className="text-3xl font-bold">{usd(spent)}</span>{" "}
               <span className="text-slate-400">of {usd(budgetMicros)} used in {monthName}</span>
             </p>
             <span className={`inline-block rounded-full border px-2.5 py-0.5 text-xs font-bold ${status.cls}`}>{status.text}</span>
             <p className="text-xs text-slate-400">
-              At this pace: about <b className="text-slate-200">{usd(pace)}</b> by the end of {monthName}. {usd(Math.max(0, budgetMicros - data.monthSpentMicros))} left.
+              At this pace: about <b className="text-slate-200">{usd(pace)}</b> by the end of {monthName}. {usd(Math.max(0, budgetMicros - spent))} left.
             </p>
+            <RealSpend real={data.real} estimate={data.monthSpentMicros} onRefresh={() => api.getAiUsage(period, guildId, true).then(setData).catch(() => null)} />
             <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="ai-budget" className="text-xs text-slate-400">
                 Monthly budget $
@@ -243,6 +247,47 @@ export function AiUsagePanel() {
           differ a little from your real bill at platform.claude.com.
         </p>
       </NeonCard>
+    </div>
+  );
+}
+
+// The real bill from Anthropic (Admin key) next to the bot's own estimate.
+function RealSpend({ real, estimate, onRefresh }: { real: AiUsageSummary["real"]; estimate: number; onRefresh: () => void }) {
+  if (!real.configured) {
+    return (
+      <p className="text-xs text-slate-500 rounded-lg border border-white/10 px-3 py-2">
+        📊 This is the bot&apos;s own estimate. Add <code className="text-slate-300">ANTHROPIC_ADMIN_KEY</code> to the API service in Render to see your real bill from Anthropic here.
+      </p>
+    );
+  }
+  if (!real.ok) {
+    return (
+      <p className="text-xs text-rose-300 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2">
+        {real.error}{" "}
+        <button type="button" onClick={onRefresh} className="underline">
+          Try again
+        </button>
+      </p>
+    );
+  }
+  const mins = Math.max(0, Math.round((Date.now() - new Date(real.checkedAt).getTime()) / 60_000));
+  const diff = real.monthMicros - estimate;
+  return (
+    <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 px-3 py-2 text-xs space-y-1">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>
+          ✓ <b className="text-slate-100">Anthropic says: {usd(real.monthMicros)}</b> this month
+        </span>
+        <span className="text-slate-400">Bot&apos;s estimate: {usd(estimate)}</span>
+        <button type="button" onClick={onRefresh} className="text-neon-blue hover:underline">
+          Refresh
+        </button>
+      </p>
+      <p className="text-slate-500">
+        Checked {mins === 0 ? "just now" : `${mins} min ago`}. Anthropic&apos;s number covers every API key you have (not just the bot), counts days in UTC, and can lag a few
+        minutes. {Math.abs(diff) >= 5_000 ? (diff > 0 ? `It's ${usd(diff)} higher than the bot's count, probably from use outside the bot.` : `The bot's count is ${usd(-diff)} higher; Anthropic may not have caught up yet.`) : "The two match."}{" "}
+        The budget uses whichever is higher.
+      </p>
     </div>
   );
 }

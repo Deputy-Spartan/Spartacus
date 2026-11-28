@@ -18,7 +18,10 @@ async function load(): Promise<{ settings: Settings; spentMicros: number }> {
     prisma.aiUsageDay.aggregate({ where: { day: { startsWith: aiUsageMonth() } }, _sum: { costMicros: true } }).catch(() => null),
   ]);
   const settings: Settings = row ? { ...row, onEmpty: row.onEmpty as AiUsageOnEmpty } : { ...AI_USAGE_DEFAULTS };
-  cache = { at: Date.now(), settings, spentMicros: sum?._sum.costMicros ?? 0 };
+  // Anthropic's real total (kept fresh by the API when an Admin key is set)
+  // wins when it's higher, e.g. when the key is also used outside the bot.
+  const real = row && row.realMonth === aiUsageMonth() ? row.realMicros : 0;
+  cache = { at: Date.now(), settings, spentMicros: Math.max(sum?._sum.costMicros ?? 0, real) };
   return cache;
 }
 

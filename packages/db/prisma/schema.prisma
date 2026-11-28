@@ -1903,6 +1903,10 @@ model AiUsageSettings {
   alertMonth  String  @default("") // YYYY-MM the two flags below belong to
   sent75      Boolean @default(false)
   sent90      Boolean @default(false)
+  // Real spending from Anthropic's cost report (needs ANTHROPIC_ADMIN_KEY on the API).
+  realMonth   String    @default("") // YYYY-MM realMicros belongs to
+  realMicros  Int       @default(0)
+  realAt      DateTime?
 }
 
 // ---- Server Backup ----

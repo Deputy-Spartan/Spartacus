@@ -3,11 +3,13 @@ import { Prisma, prisma } from "@spartacus/db";
 import { AI_USAGE_DEFAULTS, AI_USAGE_KEEP_CHOICES, AI_USAGE_ON_EMPTY, AI_USAGE_TZ, aiUsageDay, aiUsageMonth } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireOwner } from "../middleware/requireOwner";
+import { realCost, startRealCostRefresh } from "../lib/anthropicCost";
 
 // AI Usage (Command Center › AI Usage): what AI Chat and AI Moderation cost
 // across every server, the monthly budget, and the log of every question.
 // Owner only: the API key and the bill are the owner's.
 const router = Router();
+startRealCostRefresh();
 
 type Period = "today" | "7" | "month";
 const periodOf = (v: unknown): Period => (v === "today" || v === "7" ? v : "month");
@@ -42,7 +44,8 @@ router.get("/owner/ai-usage", requireAuth, requireOwner, async (req, res) => {
   const since = zonedMidnight(days[0]);
   const g = guildId ? { guildId } : {};
 
-  const [settings, monthSum, dayRows, chartRows, logModels, askers, servers] = await Promise.all([
+  const [real, settings, monthSum, dayRows, chartRows, logModels, askers, servers] = await Promise.all([
+    realCost(req.query.refresh === "1"),
     settingsRow(),
     prisma.aiUsageDay.aggregate({ where: { day: { startsWith: aiUsageMonth() } }, _sum: { costMicros: true } }),
     prisma.aiUsageDay.findMany({ where: { day: { in: days }, ...g } }),
@@ -70,6 +73,8 @@ router.get("/owner/ai-usage", requireAuth, requireOwner, async (req, res) => {
     settings: { budgetCents: settings.budgetCents, alert75: settings.alert75, alert90: settings.alert90, onEmpty: settings.onEmpty, keepDays: settings.keepDays },
     month: aiUsageMonth(),
     monthSpentMicros: monthSum._sum.costMicros ?? 0,
+    // Anthropic's own numbers for the whole organization, when ANTHROPIC_ADMIN_KEY is set.
+    real,
     // Day of the month and days in it, for "at this pace".
     dayOfMonth: Number(aiUsageDay().slice(8, 10)),
     daysInMonth: new Date(Number(aiUsageMonth().slice(0, 4)), Number(aiUsageMonth().slice(5, 7)), 0).getDate(),

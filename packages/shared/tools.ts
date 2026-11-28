@@ -424,7 +424,7 @@ export const TOOLS: Record<ToolKind, ToolInfo> = {
     ],
     presets: WHEEL_PRESETS,
     toggles: [
-      ["chatSpin", "!spin in chat", "You and your mods can spin it from Kick or Twitch chat."],
+      ["chatSpin", "!spin in chat", "You and your mods can spin it by typing it in Kick or Twitch chat. The Lumia link works either way."],
       ["chatPost", "Post the result in chat", "Says what it landed on when it stops (needs your account connected)."],
     ],
     words: [["label", "Top words"], ["spinCmd", "Chat command (without the !)"]],

@@ -28,7 +28,7 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
       "Leaderboards tab: Weekly Champions, the coin leaderboard and economy analytics.",
     ],
     members: [
-      "Chatting earns 15–25 XP a minute; 100 XP per level (level 10 = 1,000 XP). Level-ups post a colored card with rewards.",
+      "Chatting earns 15–25 XP a minute; level 1 costs 500 XP and each level after costs 150 more (level 10 = 11,750 XP total). Level-ups post a colored card with rewards.",
       "/shop to buy rewards, /crates to open loot crates, /daily every day (streak freezes save a missed day), /profile for their card, /rank for their rank card.",
       "Or the shop panel's buttons: Shop, My Crates, Daily and Balance.",
     ],

@@ -38,6 +38,7 @@ import link from "./community/link";
 import mystream from "./community/mystream";
 import profile from "./leveling/profile";
 import levelroles from "./leveling/levelroles";
+import resetlevels from "./leveling/resetlevels";
 import shop from "./economy/shop";
 import crates from "./economy/crates";
 import so from "./stream/so";
@@ -87,6 +88,7 @@ for (const command of [
   mystream,
   profile,
   levelroles,
+  resetlevels,
   shop,
   crates,
   so,

@@ -30,8 +30,9 @@ export interface XpResult {
 }
 
 // Adds XP with every multiplier that applies: the Stream Deck boost, XP
-// Events, the member's own potion, and Prestige Perks. Levels are a straight
-// line (100 XP per level, see levelForXp), and one award can cross several.
+// Events, the member's own potion, and Prestige Perks. Each level costs more
+// than the last (see xpForLevel), and one award can cross several. A level is
+// never lowered here, so people who leveled on the old curve keep theirs.
 export async function awardXp(guildId: string, userId: string, base: number): Promise<XpResult> {
   const [server, event, personal, plus, before] = await Promise.all([
     xpBoost(guildId),

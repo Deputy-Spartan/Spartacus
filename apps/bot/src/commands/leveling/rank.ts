@@ -4,7 +4,7 @@ import { generateRankCard } from "../../lib/rankCard";
 import { xpForLevel } from "@spartacus/shared";
 import type { CommandModule } from "../types";
 
-// 100 XP per level: the XP total needed for the next level.
+// The XP total needed for the next level.
 function xpForNextLevel(level: number) {
   return xpForLevel(level + 1);
 }

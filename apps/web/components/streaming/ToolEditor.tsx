@@ -594,14 +594,9 @@ function WheelLumia({ guildId, settings, update }: { guildId: string; settings: 
     <NeonCard>
       <p className="font-medium">⚡ Lumia Stream</p>
       <p className={hint}>Spin the wheel from a Lumia command or button.</p>
-      {!settings.chatSpin && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 p-2.5 text-sm text-amber-200">
-          <span className="flex-1">The link only works while Spin from chat is on.</span>
-          <button type="button" className="neon-button-sm" onClick={() => update({ chatSpin: true })}>
-            Turn it on
-          </button>
-        </div>
-      )}
+      <p className={`${hint} mt-2`}>
+        This link always works. If your Lumia command is also called !{String(settings.spinCmd || "spin")}, turn off <b>!spin in chat</b> above so the wheel isn&apos;t spun twice.
+      </p>
       {runKey ? (
         <div className="flex gap-2 mt-3">
           <input className={`${field} font-mono text-xs`} readOnly value={link} aria-label="Lumia link" onFocus={(e) => e.target.select()} />

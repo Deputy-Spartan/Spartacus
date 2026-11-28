@@ -153,7 +153,8 @@ async function runToolCommand(input: RunInput): Promise<{ ok: boolean; message: 
   const wheelRow = rows.find((r) => r.key === toolStateKey("wheel"));
   if (wheelRow) {
     const s = cleanToolRow("wheel", wheelRow.value).settings;
-    if (s.chatSpin && name === String(s.spinCmd || "spin")) {
+    // Run links (Lumia, Stream Deck…) always work; the switch is only for typing it in chat.
+    if ((s.chatSpin || input.from) && name === String(s.spinCmd || "spin")) {
       if (!(await guildHasFeature(guildId, "t:wheel", "kit"))) return { ok: false, message: "The Spin wheel needs the Streamer Kit." };
       const next = await changeTool(guildId, "wheel", { op: "spin" });
       if ("error" in next) return { ok: false, message: next.error };

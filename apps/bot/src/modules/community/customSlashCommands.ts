@@ -888,8 +888,10 @@ const RUN: Record<string, Runner> = {
     const amount = Math.round(num(ctx, p.amount, 0));
     const row = await prisma.memberXp.upsert({ where: { guildId_userId: { guildId: ctx.guild.id, userId: m.id } }, create: { guildId: ctx.guild.id, userId: m.id, xp: Math.max(0, amount) }, update: { xp: { increment: amount } } });
     const xp = Math.max(0, row.xp);
-    await prisma.memberXp.update({ where: { id: row.id }, data: { xp, level: levelForXp(xp) } });
-    return `Gave ${amount} XP to ${m.displayName} (level ${levelForXp(xp)})`;
+    // Giving XP never drops a level (people who leveled on the old, faster curve keep theirs).
+    const level = amount >= 0 ? Math.max(row.level, levelForXp(xp)) : levelForXp(xp);
+    await prisma.memberXp.update({ where: { id: row.id }, data: { xp, level } });
+    return `Gave ${amount} XP to ${m.displayName} (level ${level})`;
   },
   async giveaway(ctx, p) {
     const c = await textChannel(ctx, p.channel);

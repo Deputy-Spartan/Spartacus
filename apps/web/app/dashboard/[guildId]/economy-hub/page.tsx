@@ -369,7 +369,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
             <Step n={2} title="Quick start" desc="The fastest way to a working economy.">
               <ol className="space-y-2 text-sm text-slate-300 list-decimal pl-5">
                 <li>
-                  <b>⚡ Levels:</b> turn on XP &amp; Levels. Members earn 15–25 XP a message (once a minute), 100 XP per level.
+                  <b>⚡ Levels:</b> turn on XP &amp; Levels. Members earn 15–25 XP a message (once a minute). Level 1 costs 500 XP and each level after costs 150 more.
                 </li>
                 <li>
                   <b>🎖️ Level Roles:</b> run <code className="text-neon-blue">/levelroles</code> in Discord to make the colored level roles (change levels, names and colors there first if you like).
@@ -394,7 +394,7 @@ export default function EconomyHubPage({ params }: { params: { guildId: string }
 
         {tab === "levels" && (
           <>
-            <Step n={1} title="Turn on XP & levels" desc="Members earn 15–25 XP per message (once a minute). 100 XP per level: level 10 = 1,000 XP, 20 = 2,000, 30 = 3,000." {...mod("LEVELING")} />
+            <Step n={1} title="Turn on XP & levels" desc="Members earn 15–25 XP per message (once a minute). Each level costs more: level 10 = 11,750 XP, 25 = 57,500, 50 = 208,750." {...mod("LEVELING")} />
             <Step n={2} title="Level-up moments" desc="Every level has its own color, from grey to gold, and level-ups come with rewards.">
           <div className="flex flex-wrap gap-1.5" aria-label="Level colors">
             {Array.from({ length: Math.max(50, s.ladder[s.ladder.length - 1].level) }, (_, i) => i + 1).map((l) => (

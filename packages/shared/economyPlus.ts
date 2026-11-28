@@ -1,14 +1,24 @@
 // Economy Hub: everything that makes levels and coins worth chasing, in the
 // one Economy module. Shared by the bot and the dashboard.
 
-// ---- XP curve: a straight line, 100 XP per level. The XP total to reach
-// level 10 is 1,000, level 20 is 2,000, level 30 is 3,000, and so on.
-export const XP_PER_LEVEL = 100;
+// ---- XP curve ("Hardest", picked 2026-11-27): level 1 costs 500 XP and each
+// level after costs 150 more than the one before (level 2 = 650, level 3 =
+// 800…). XP total to reach level 10 is 11,750, level 25 is 57,500, level 50
+// is 208,750. About 42× slower than the old 100 XP a level.
+export const XP_FIRST_LEVEL = 500;
+export const XP_STEP = 150;
 export function xpForLevel(level: number): number {
-  return Math.max(0, level) * XP_PER_LEVEL;
+  const L = Math.max(0, Math.floor(level));
+  return XP_FIRST_LEVEL * L + (XP_STEP * L * (L - 1)) / 2;
 }
 export function levelForXp(xp: number): number {
-  return Math.max(0, Math.floor(xp / XP_PER_LEVEL));
+  if (!(xp > 0)) return 0;
+  // Solve xpForLevel(L) <= xp, then nudge for rounding.
+  const a = XP_STEP / 2, b = XP_FIRST_LEVEL - XP_STEP / 2;
+  let L = Math.max(0, Math.floor((-b + Math.sqrt(b * b + 4 * a * xp)) / (2 * a)));
+  while (xpForLevel(L + 1) <= xp) L++;
+  while (L > 0 && xpForLevel(L) > xp) L--;
+  return L;
 }
 
 // ---- The level ladder: one role every 5 levels, colors progressing from

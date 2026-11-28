@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "@spartacus/db";
-import { AI_CHAT_DEFAULTS, AI_CHAT_LIMIT_CHOICES, AI_CHAT_WINDOW_CHOICES, SLOWMODE_CHOICES } from "@spartacus/shared";
+import { AI_CHAT_DEFAULTS, AI_CHAT_LIMIT_CHOICES, AI_CHAT_MODELS, AI_CHAT_SEARCH_CHOICES, AI_CHAT_WINDOW_CHOICES, SLOWMODE_CHOICES } from "@spartacus/shared";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireGuildPermission } from "../middleware/requireGuildPermission";
 import { setChannelSlowmode } from "../lib/discordRest";
@@ -37,6 +37,9 @@ router.put("/guilds/:guildId/ai-config", requireAuth, requireGuildPermission, as
     chatStaffExempt: typeof body.chatStaffExempt === "boolean" ? body.chatStaffExempt : (before?.chatStaffExempt ?? true),
     chatRequireMention: typeof body.chatRequireMention === "boolean" ? body.chatRequireMention : (before?.chatRequireMention ?? false),
     chatSlowmode: pick(body.chatSlowmode, SLOWMODE_CHOICES, before?.chatSlowmode ?? 0),
+    chatModel: typeof body.chatModel === "string" && body.chatModel in AI_CHAT_MODELS ? body.chatModel : (before?.chatModel ?? AI_CHAT_DEFAULTS.chatModel),
+    chatWebSearch: typeof body.chatWebSearch === "boolean" ? body.chatWebSearch : (before?.chatWebSearch ?? AI_CHAT_DEFAULTS.chatWebSearch),
+    chatMaxSearches: pick(body.chatMaxSearches, AI_CHAT_SEARCH_CHOICES, before?.chatMaxSearches ?? AI_CHAT_DEFAULTS.chatMaxSearches),
   };
   // Slowmode only means something on a picked channel.
   if (!data.chatChannelId) data.chatSlowmode = 0;

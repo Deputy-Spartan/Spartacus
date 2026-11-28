@@ -4,15 +4,18 @@ import { isModuleEnabled } from "../../lib/moduleGate";
 import { isSendableChannel } from "../../lib/channels";
 import { askClaudeTurns, type AiFailure, type AiTurn } from "../../lib/ai";
 import { claimEvent } from "../../lib/eventClaims";
+import { AI_CHAT_DEFAULTS, AI_CHAT_MODELS, type AiChatModel } from "@spartacus/shared";
 
 export const name = Events.MessageCreate;
 
 const DEFAULT_SYSTEM_PROMPT =
-  "You are Spartacus, a helpful Discord bot. Keep replies short and conversational — a sentence or two, not an essay.";
+  "You are Spartacus, a helpful Discord bot. Answer any question people ask, clearly and conversationally. Keep it short when a short answer does the job, and give more detail when the question needs it.";
 
 // Added to every personality so the model knows how the conversation reaches it.
 const CHAT_RULES =
   "\n\nYou're chatting in a Discord channel. Each user message starts with the speaker's name, and several people may talk to you. Reply as plain Discord text (no name prefix), under 1,500 characters.";
+const SEARCH_RULES =
+  "\n\nYou can search the web. Search whenever the answer depends on recent or specific facts (news, game updates and patch notes, release dates, prices, stats, schedules, people, anything after your training) or when you aren't sure. Don't search for simple chat or things you clearly know. Never say you can't look things up. Don't paste links in your reply; the sources are added for you.";
 
 // ---- Short memory: the last few messages with the bot, per channel ----
 const MEMORY_TURNS = 10; // 5 questions and 5 answers
@@ -29,6 +32,7 @@ function recall(channelId: string): AiTurn[] {
 }
 
 function remember(channelId: string, question: AiTurn, answer: string) {
+  // Only the answer's words are kept, not the search results behind them.
   let turns = [...recall(channelId), question, { role: "assistant", content: answer } as AiTurn].slice(-MEMORY_TURNS);
   while (turns.length && turns[0].role !== "user") turns = turns.slice(1); // must start with a question
   memory.set(channelId, { at: Date.now(), turns });
@@ -127,17 +131,32 @@ export async function execute(message: Message) {
     return;
   }
 
-  await message.channel.sendTyping().catch(() => null);
+  // "…is typing" lasts 10 seconds, and a web search can take longer.
+  const channel = message.channel;
+  await channel.sendTyping().catch(() => null);
+  const typing = setInterval(() => void channel.sendTyping().catch(() => null), 8_000);
 
   const speaker = message.member?.displayName ?? message.author.displayName ?? message.author.username;
   const question: AiTurn = { role: "user", content: `${speaker}: ${content.slice(0, 1500)}` };
-  const system = (config?.chatSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT) + CHAT_RULES;
+  const search = config?.chatWebSearch ?? AI_CHAT_DEFAULTS.chatWebSearch;
+  const system = (config?.chatSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT) + CHAT_RULES + (search ? SEARCH_RULES : "");
+  const pick = (config?.chatModel ?? AI_CHAT_DEFAULTS.chatModel) as AiChatModel;
+  const model = (AI_CHAT_MODELS[pick] ?? AI_CHAT_MODELS.smart).id;
 
-  const result = await askClaudeTurns(system, [...recall(message.channelId), question]);
+  const result = await askClaudeTurns(system, [...recall(message.channelId), question], {
+    model,
+    maxSearches: search ? (config?.chatMaxSearches ?? AI_CHAT_DEFAULTS.chatMaxSearches) : 0,
+    effort: pick === "smart" ? "medium" : "low",
+    maxTokens: 2048,
+  }).finally(() => clearInterval(typing));
 
   if (result.ok) {
     remember(message.channelId, question, result.text);
-    await message.reply({ content: result.text.slice(0, 2000), allowedMentions: { repliedUser: true, users: [], roles: [], parse: [] } }).catch(() => null);
+    // Up to 3 sources, as links without previews.
+    const links = result.sources.slice(0, 3).map((s) => `[${s.title.replace(/[[\]]/g, "").slice(0, 60)}](<${s.url}>)`);
+    const tail = links.length ? `\n-# Sources: ${links.join(" · ")}` : "";
+    const body = result.text.slice(0, 2000 - tail.length);
+    await message.reply({ content: body + tail, allowedMentions: { repliedUser: true, users: [], roles: [], parse: [] } }).catch(() => null);
   } else {
     await message.reply({ content: FAILURE_TEXT[result.reason], allowedMentions: { repliedUser: false } }).catch(() => null);
   }

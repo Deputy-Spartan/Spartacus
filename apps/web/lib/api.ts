@@ -526,6 +526,9 @@ export interface AiConfigRow {
   chatLimitWindow: number; // seconds
   chatStaffExempt: boolean;
   chatSlowmode: number; // seconds of Discord slowmode on chatChannelId
+  chatModel: "smart" | "fast";
+  chatWebSearch: boolean;
+  chatMaxSearches: number;
   slowmodeError?: string | null;
 }
 

@@ -1844,6 +1844,9 @@ model AiConfig {
   chatLimitWindow    Int     @default(60) // seconds
   chatStaffExempt    Boolean @default(true) // Manage Server skips the limit
   chatSlowmode       Int     @default(0) // Discord slowmode (seconds) put on chatChannelId
+  chatModel          String  @default("smart") // "smart" = Claude Sonnet 5.5, "fast" = Claude Haiku 5.5
+  chatWebSearch      Boolean @default(true) // let it search the web when it doesn't know
+  chatMaxSearches    Int     @default(3) // web searches allowed per question
 }
 
 // ---- Server Backup ----

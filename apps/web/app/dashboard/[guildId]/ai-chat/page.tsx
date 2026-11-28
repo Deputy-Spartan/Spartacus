@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AI_CHAT_LIMIT_CHOICES, AI_CHAT_WINDOW_CHOICES, SLOWMODE_CHOICES, formatSeconds } from "@spartacus/shared";
+import { AI_CHAT_LIMIT_CHOICES, AI_CHAT_MODELS, AI_CHAT_SEARCH_CHOICES, AI_CHAT_WINDOW_CHOICES, SLOWMODE_CHOICES, formatSeconds, type AiChatModel } from "@spartacus/shared";
 import { NeonCard } from "../../../../components/ui/NeonCard";
 import { ChannelSelect } from "../../../../components/ui/ChannelSelect";
 import { ModuleHeader } from "../../../../components/ui/ModuleHeader";
@@ -50,8 +50,63 @@ export default function AiChatPage({ params }: { params: { guildId: string } }) 
         guildId={params.guildId}
         moduleKey="AI_CHAT"
         title="AI Chat"
-        description="Pick a channel and the bot answers every message there with Claude Haiku 5.5, or mention it anywhere if no channel is picked. It remembers the last few messages in the channel for 15 minutes, so follow-up questions work. Set how often members can ask, and a slowmode for the AI channel, below. Needs ANTHROPIC_API_KEY set in Render."
+        description="Pick a channel and the bot answers every message there, or mention it anywhere if no channel is picked. It can search the web for answers it doesn't know, and remembers the last few messages in the channel for 15 minutes, so follow-up questions work. Needs ANTHROPIC_API_KEY set in Render."
       />
+
+      <NeonCard className="mb-4">
+        <p className="font-medium mb-1">Brain &amp; web search</p>
+        <p className="text-xs text-slate-500 mb-4">Which AI answers, and whether it can look things up online.</p>
+
+        <label className={label}>Model</label>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(AI_CHAT_MODELS) as AiChatModel[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => persist({ ...config, chatModel: k })}
+              aria-pressed={config.chatModel === k}
+              className={`rounded-lg border px-3 py-2 text-sm text-left ${config.chatModel === k ? "border-neon-blue bg-neon-blue/10 text-slate-100" : "border-white/10 text-slate-400 hover:text-slate-200"}`}
+            >
+              {AI_CHAT_MODELS[k].name}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500 mt-2">
+          {config.chatModel === "smart"
+            ? "Best answers, and much better at searching. Costs about ½¢ per answer, or about 4–5¢ when it searches the web."
+            : "Quick and very cheap, but gives up sooner on harder questions. About 1¢ when it searches the web."}
+        </p>
+
+        <div className="border-t border-white/5 my-4" />
+
+        <label className="flex items-center gap-2 text-sm text-slate-300">
+          <ToggleSwitch size="sm" enabled={config.chatWebSearch} onChange={(v) => persist({ ...config, chatWebSearch: v })} />
+          Search the web when it doesn&apos;t know
+        </label>
+        <p className="text-xs text-slate-500 mt-2">
+          {config.chatWebSearch
+            ? "For news, game updates, patch notes, prices and anything recent, it searches first and adds up to 3 source links under its answer. Each search costs about 1¢."
+            : "Off: it only answers from what it already knows, so anything recent or very specific may be wrong or missing."}
+        </p>
+        {config.chatWebSearch && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300 mt-3">
+            <span>Up to</span>
+            <select
+              className={select}
+              value={config.chatMaxSearches}
+              onChange={(e) => persist({ ...config, chatMaxSearches: Number(e.target.value) })}
+              aria-label="Searches per question"
+            >
+              {AI_CHAT_SEARCH_CHOICES.map((n) => (
+                <option key={n} value={n}>
+                  {n} search{n === 1 ? "" : "es"}
+                </option>
+              ))}
+            </select>
+            <span>per question</span>
+          </div>
+        )}
+      </NeonCard>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <NeonCard>
